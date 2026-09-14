@@ -215,6 +215,28 @@ function abrePorDefecto(cfg, l, persona, franja) {
   return !!(persona.abre && persona.abre[l.id] && persona.abre[l.id].includes(franja));
 }
 
+
+// ---------- interruptores: reglas del grupo y características por persona ----------
+// El encargado puede apagar una regla para todo el grupo (cfg.reglas[k] = false) o
+// una característica concreta de una ficha (p.inactivas = ['nuncaCon', …]). Lo
+// apagado no lo comprueba nadie: ni puedeEstar, ni el generador, ni la revisión.
+const CARACTERISTICAS = [
+  { k: 'locales', lbl: 'Locales donde trabaja' }, { k: 'franjas', lbl: 'Mañanas y tardes' }, { k: 'libra', lbl: 'Días que libra' },
+  { k: 'partido', lbl: 'Días de partido' }, { k: 'vetos', lbl: 'No hace (local y franja)' }, { k: 'nuncaCon', lbl: 'Nunca con' },
+  { k: 'cubreA', lbl: 'Cubre a' }, { k: 'cocina', lbl: 'Cocina' }, { k: 'abre', lbl: 'Sale el primero' }, { k: 'noAbre', lbl: 'No abre' },
+  { k: 'noPrimero', lbl: 'Nunca de primero' }, { k: 'prefs', lbl: 'Preferencias' }, { k: 'contrato', lbl: 'Contrato' },
+];
+const REGLAS = [
+  { k: 'minimos', lbl: 'Mínimos por local, franja y día' }, { k: 'cocina', lbl: 'Cocina: quién la lleva y en qué posición' },
+  { k: 'nuncaCon', lbl: '«Nunca con»: no coinciden en la misma casilla' }, { k: 'libra', lbl: 'Días que libra cada persona' },
+  { k: 'vetos', lbl: 'Vetos por local y franja' }, { k: 'partido', lbl: 'Partidos solo los días declarados' },
+  { k: 'noPrimero', lbl: 'Quien no sale nunca el primero (Leo; Cristian por la tarde)', nueva: true },
+  { k: 'primeroCompleto', lbl: 'El primero de cada franja hace turno completo: quien viene de la mañana no abre la tarde (salvo turno continuo)', nueva: true },
+  { k: 'cubreA', lbl: '«Cubre a»: quién ocupa el sitio de quien falta' }, { k: 'abre', lbl: 'Quién sale el primero (fijo por local)' },
+];
+function regla(cfg, k) { return !(cfg && cfg.reglas && cfg.reglas[k] === false); }
+function caracteristicaActiva(p, k) { return !(p && Array.isArray(p.inactivas) && p.inactivas.includes(k)); }
+
 // ---------- reglas duras por persona ----------
 function motivoAusencia(a) { return a ? (AUS_LBL[a.tipo] ? AUS_LBL[a.tipo].motivo : 'ausente') : ''; }
 function lblLocales(cfg, ids) { return ids.map(id => (localDe(cfg, id) || { nombre: id }).nombre).join(' o '); }
@@ -238,11 +260,12 @@ function puedeEstar(cfg, staff, est, iso, tid, pid, opts) {
   if (aus) return { ok: false, motivo: motivoAusencia(aus) + (aus.detalle ? ' · ' + aus.detalle : ''), avisos };
   for (const t of turnosDe(cfg)) if (t.franja === franja && t.id !== tid && pidsEn(est, iso, t.id).includes(pid)) return { ok: false, motivo: `ya en ${t.local.nombre} esta ${FRANJA_LBL[franja].toLowerCase()}`, avisos };
   let m = null;
-  if (Array.isArray(p.locales) && p.locales.length && !p.locales.includes(localId)) m = forzable(`solo ${lblLocales(cfg, p.locales)}`);
-  if (!m && Array.isArray(p.franjas) && p.franjas.length && !p.franjas.includes(franja)) m = forzable(p.franjas.length === 1 ? (p.franjas[0] === 'M' ? 'siempre de mañana' : 'solo tardes') : 'franja no permitida');
-  if (!m && (p.libra || []).includes(dow)) m = forzable(`libra ${DOW_PL[dow]}`);
-  if (!m && (p.vetos || []).some(v => v.localId === localId && v.franja === franja)) m = forzable(`no hace ${franja === 'M' ? 'mañanas' : 'tardes'} en ${l.nombre}`);
-  if (!m) {
+  const act = k => regla(cfg, k) && caracteristicaActiva(p, k);
+  if (act('locales') && Array.isArray(p.locales) && p.locales.length && !p.locales.includes(localId)) m = forzable(`solo ${lblLocales(cfg, p.locales)}`);
+  if (!m && act('franjas') && Array.isArray(p.franjas) && p.franjas.length && !p.franjas.includes(franja)) m = forzable(p.franjas.length === 1 ? (p.franjas[0] === 'M' ? 'siempre de mañana' : 'solo tardes') : 'franja no permitida');
+  if (!m && act('libra') && (p.libra || []).includes(dow)) m = forzable(`libra ${DOW_PL[dow]}`);
+  if (!m && act('vetos') && (p.vetos || []).some(v => v.localId === localId && v.franja === franja)) m = forzable(`no hace ${franja === 'M' ? 'mañanas' : 'tardes'} en ${l.nombre}`);
+  if (!m && act('partido')) {
     const otra = franja === 'M' ? 'T' : 'M';
     const enOtra = turnosDe(cfg).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(pid));
     if (enOtra) {
@@ -254,11 +277,13 @@ function puedeEstar(cfg, staff, est, iso, tid, pid, opts) {
       }
     }
   }
-  if (!m) {
+  if (!m && regla(cfg, 'nuncaCon')) {
     for (const q of asignados(est, iso, tid)) {
       const qp = personaDe(staff, q.pid);
       if (!qp) continue;
-      if ((p.nuncaCon || []).includes(q.pid) || (qp.nuncaCon || []).includes(pid)) { m = forzable(`nunca con ${qp.nombre}`); break; }
+      const mio = caracteristicaActiva(p, 'nuncaCon') && (p.nuncaCon || []).includes(q.pid);
+      const suyo = caracteristicaActiva(qp, 'nuncaCon') && (qp.nuncaCon || []).includes(pid);
+      if (mio || suyo) { m = forzable(`nunca con ${qp.nombre}`); break; }
     }
   }
   if (m) return { ok: false, motivo: m, avisos };
@@ -289,6 +314,100 @@ function ordenarCasilla(cfg, iso, tid, entries) {
   while (lista.length) out.push(lista.shift());
   return out;
 }
+
+// ---------- el primero de la casilla ----------
+// La posición 1 abre y hace turno completo (regla 31 del prototipo del 11/09). Quien
+// no puede salir el primero (Leo siempre, Cristian por la tarde, quien viene de hacer
+// la mañana salvo turno continuo, quien «no abre» ese local) puede estar en la casilla
+// pero no en la 1.ª. Si nadie de la casilla puede, la 1.ª es un HUECO DISPONIBLE.
+function puedePrimero(cfg, staff, est, iso, tid, pid) {
+  const p = personaDe(staff, pid);
+  if (!p) return { ok: false, motivo: 'no existe' };
+  const { localId, franja } = partirTurno(tid);
+  const l = localDe(cfg, localId);
+  if (regla(cfg, 'noPrimero') && caracteristicaActiva(p, 'noPrimero') && (p.noPrimero || []).includes(franja)) return { ok: false, motivo: `${p.nombre} no sale ${franja === 'M' ? 'el primero de la mañana' : 'el primero de la tarde'}` };
+  if (caracteristicaActiva(p, 'noAbre') && (p.noAbre || []).includes(localId)) return { ok: false, motivo: `${p.nombre} no abre ${l ? l.nombre : localId}` };
+  if (franja === 'T' && regla(cfg, 'primeroCompleto')) {
+    for (const t of turnosDe(cfg)) {
+      if (t.franja !== 'M' || !pidsEn(est, iso, t.id).includes(pid)) continue;
+      if (t.local.id === localId && primeroDe(cfg, staff, est, iso, t.id) === pid) return { ok: true, continuo: true };
+      return { ok: false, motivo: `${p.nombre} viene de hacer la mañana: el primero de la tarde hace turno completo` };
+    }
+  }
+  return { ok: true };
+}
+// quién sale el primero en una casilla: lo marcado a mano; si no, el fijo del local, quien
+// tiene «sale el primero» en su ficha, o el primero de la lista que pueda. null = nadie puede.
+function primeroDe(cfg, staff, est, iso, tid) {
+  const lista = asignados(est, iso, tid);
+  if (!lista.length) return null;
+  const { localId, franja } = partirTurno(tid);
+  const l = localDe(cfg, localId);
+  const okP = e => puedePrimero(cfg, staff, est, iso, tid, e.pid).ok;
+  const man = manualDe(est, iso, tid);
+  const marcado = lista.find(e => e.abre);
+  if (marcado && man.abre) return marcado.pid;   // fijado a mano: manda aunque rompa una regla (queda constancia)
+  if (regla(cfg, 'abre') && l && l.primero && l.primero[franja]) { const e = lista.find(x => x.pid === l.primero[franja]); if (e && okP(e)) return e.pid; }
+  if (regla(cfg, 'abre')) { const e = lista.find(x => { const p = personaDe(staff, x.pid); return p && caracteristicaActiva(p, 'abre') && p.abre && p.abre[localId] && p.abre[localId].includes(franja) && okP(x); }); if (e) return e.pid; }
+  // la cocina tiene su propia posición: solo abre si nadie más puede (o si es la fija del local, como Susana Capón el martes)
+  const e = lista.find(x => !x.cocina && okP(x)) || lista.find(okP);
+  return e ? e.pid : null;
+}
+function motivoSinPrimero(cfg, staff, est, iso, tid) {
+  const lista = asignados(est, iso, tid);
+  const motivos = lista.map(e => puedePrimero(cfg, staff, est, iso, tid, e.pid).motivo).filter(Boolean);
+  return `nadie de la casilla puede abrir${motivos.length ? ': ' + motivos.join('; ') : ''}`;
+}
+function porQueNadiePrimero(cfg, staff, est, iso, tid) {
+  const out = {};
+  for (const p of staff) {
+    let r = puedeEstar(cfg, staff, est, iso, tid, p.id);
+    if (r.ok || pidsEn(est, iso, tid).includes(p.id)) r = puedePrimero(cfg, staff, est, iso, tid, p.id);
+    if (r.ok) continue;
+    (out[r.motivo] = out[r.motivo] || []).push(p.nombre);
+  }
+  return out;
+}
+// orden completo de una casilla: el primero (o un hueco si nadie puede), la cocina en su
+// posición, y el resto en su orden; con hueco, quien viene de partido va al final
+function ordenCompleto(cfg, staff, est, iso, tid) {
+  const lista = asignados(est, iso, tid);
+  if (!lista.length) return { orden: [], primero: null, motivoHueco: null };
+  const { franja } = partirTurno(tid);
+  const primero = primeroDe(cfg, staff, est, iso, tid);
+  const otra = franja === 'M' ? 'T' : 'M';
+  const enOtra = pid => turnosDe(cfg).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(pid));
+  const entradas = lista.map(e => Object.assign({}, e, { abre: !!primero && e.pid === primero }));
+  let base = entradas, motivoHueco = null;
+  if (!primero) {
+    motivoHueco = motivoSinPrimero(cfg, staff, est, iso, tid);
+    const coc = entradas.filter(e => e.cocina), resto = entradas.filter(e => !e.cocina);
+    resto.sort((a, b) => (enOtra(a.pid) ? 1 : 0) - (enOtra(b.pid) ? 1 : 0));
+    base = [{ hueco: true, abre: true, pid: null }, ...coc, ...resto];
+  }
+  return { orden: ordenarCasilla(cfg, iso, tid, base), primero, motivoHueco };
+}
+function esContinuo(cfg, staff, est, iso, localId, pid) {
+  const tm = turnoId(localId, 'M'), tt = turnoId(localId, 'T');
+  return turnoAbierto(cfg, est, iso, tm) && turnoAbierto(cfg, est, iso, tt) && primeroDe(cfg, staff, est, iso, tm) === pid && primeroDe(cfg, staff, est, iso, tt) === pid;
+}
+// posiciones tal como se enseñan y se imprimen: [{pos, pid, nombre, abre, abreFijo, cocina,
+// partido, continuo, comodin, por, nota, supuesto, forzado, hueco, motivo}]
+function posicionesDe(cfg, staff, est, iso, tid) {
+  const { localId, franja } = partirTurno(tid);
+  const l = localDe(cfg, localId);
+  const { orden, primero, motivoHueco } = ordenCompleto(cfg, staff, est, iso, tid);
+  const otra = franja === 'M' ? 'T' : 'M';
+  const enOtra = pid => turnosDe(cfg).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(pid));
+  return orden.map((e, i) => {
+    if (e.hueco) return { pos: i + 1, hueco: true, motivo: motivoHueco, abre: true };
+    const p = personaDe(staff, e.pid) || { nombre: e.pid };
+    const continuo = e.pid === primero && esContinuo(cfg, staff, est, iso, localId, e.pid);
+    const abreFijo = !!(l && l.primero && l.primero[franja] === e.pid) || !!(p.abre && p.abre[localId] && p.abre[localId].includes(franja));
+    const por = e.por || ((e.razon || '').match(/^cubre a (.+)$/) ? (staff.find(q => q.nombre === e.razon.slice(8)) || {}).id || null : null);
+    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && abreFijo, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: !(p.locales || []).length, por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, forzado: !!e.forzado, origen: e.origen || 'manual' };
+  });
+}
 // recalcula cocina, abre y orden salvo lo que el encargado haya fijado a mano
 function normalizarCasilla(est, cfg, staff, iso, tid) {
   const lista = asignados(est, iso, tid);
@@ -301,12 +420,12 @@ function normalizarCasilla(est, cfg, staff, iso, tid) {
     for (const e of lista) { const r = rangoCocina(cfg, l, personaDe(staff, e.pid), franja, iso); if (r >= 0 && r < mejorR) { mejorR = r; mejor = e; } }
     for (const e of lista) e.cocina = e === mejor;
   } else if (!man.cocina) for (const e of lista) e.cocina = false;
-  if (!man.abre) {
-    const yaHay = lista.find(e => e.abre && abrePorDefecto(cfg, l, personaDe(staff, e.pid), franja));
-    for (const e of lista) e.abre = yaHay ? e === yaHay : false;
-    if (!yaHay) { const c = lista.find(e => abrePorDefecto(cfg, l, personaDe(staff, e.pid), franja)); if (c) c.abre = true; }
+  if (!man.abre) { const pr = primeroDe(cfg, staff, est, iso, tid); for (const e of lista) e.abre = !!pr && e.pid === pr; }
+  if (!man.orden) {
+    const { orden } = ordenCompleto(cfg, staff, est, iso, tid);
+    const porPid = {}; for (const e of lista) porPid[e.pid] = e;
+    est.asig[iso][tid] = orden.filter(e => !e.hueco).map(e => porPid[e.pid]);
   }
-  if (!man.orden) est.asig[iso][tid] = ordenarCasilla(cfg, iso, tid, lista);
 }
 function asignar(est, cfg, staff, iso, tid, pid, opts) {
   const o = opts || {};
@@ -317,6 +436,7 @@ function asignar(est, cfg, staff, iso, tid, pid, opts) {
   if (o.supuesto) entry.supuesto = true;
   if (r.avisos.length) { entry.avisos = r.avisos.slice(); if (o.forzar) entry.forzado = true; }
   if (o.nota) entry.nota = o.nota;
+  if (o.por) entry.por = o.por;
   const lista = ((est.asig[iso] = est.asig[iso] || {})[tid] = est.asig[iso][tid] || []);
   if (o.cocina) { for (const e of lista) e.cocina = false; marcarManual(est, iso, tid, 'cocina'); }
   if (o.abre) { for (const e of lista) e.abre = false; marcarManual(est, iso, tid, 'abre'); }
@@ -373,7 +493,8 @@ function revisarTurno(cfg, staff, est, iso, tid) {
     sinCocina: !!(abierto && tieneCocina && !coc),
     cocinaObligatoria: !!(l && l.cocina && l.cocina.obligatoria && l.cocina.obligatoria[franja]),
     cocinaNoApta: !!(coc && !puedeCocina(cfg, personaDe(staff, coc.pid), localId, iso)),
-    sinAbre: !!(abierto && n > 0 && !lista.some(e => e.abre)),
+    sinAbre: !!(abierto && n > 0 && !primeroDe(cfg, staff, est, iso, tid)),
+    motivoAbre: abierto && n > 0 && !primeroDe(cfg, staff, est, iso, tid) ? motivoSinPrimero(cfg, staff, est, iso, tid) : null,
     forzados: lista.filter(e => e.forzado).length,
     avisos: lista.filter(e => e.avisos && e.avisos.length).map(e => `${nombreDe(staff, e.pid)}: ${e.avisos.join(', ')}`),
     incompatibles: [],
@@ -396,7 +517,7 @@ function revisionMes(cfg, staff, est, opts) {
       if (r.faltan) out.push({ iso: d.iso, turnoId: t.id, tipo: 'falta', nivel: r.supuesto ? 'media' : 'alta', n: r.faltan, msg: `${donde}: falta${r.faltan > 1 ? 'n' : ''} ${r.faltan} (hay ${r.n} de ${r.minimo}${r.supuesto ? ', mínimo supuesto' : ''}${r.refuerzo ? ', con refuerzo' : ''})` });
       if (r.sinCocina) out.push({ iso: d.iso, turnoId: t.id, tipo: 'sin-cocina', nivel: r.cocinaObligatoria ? 'alta' : 'media', msg: `${donde}: sin cocina${r.cocinaObligatoria ? ' (obligatoria)' : ''}` });
       if (r.cocinaNoApta) out.push({ iso: d.iso, turnoId: t.id, tipo: 'cocina-no-apta', nivel: 'media', msg: `${donde}: la cocina la lleva alguien que no es cocina de ese local` });
-      if (r.sinAbre) out.push({ iso: d.iso, turnoId: t.id, tipo: 'sin-abre', nivel: 'info', msg: `${donde}: nadie definido para abrir` });
+      if (r.sinAbre) out.push({ iso: d.iso, turnoId: t.id, tipo: 'sin-abre', nivel: 'alta', msg: `${donde}: hueco disponible en la 1.ª posición — ${r.motivoAbre}` });
       for (const [a, b] of r.incompatibles) out.push({ iso: d.iso, turnoId: t.id, tipo: 'incompatibles', nivel: 'alta', msg: `${donde}: ${a} y ${b} no pueden coincidir` });
       if (r.forzados) out.push({ iso: d.iso, turnoId: t.id, tipo: 'forzado', nivel: 'media', msg: `${donde}: ${r.forzados} asignación(es) forzada(s) a mano — ${r.avisos.join(' · ')}` });
       else if (r.avisos.length) out.push({ iso: d.iso, turnoId: t.id, tipo: 'aviso', nivel: 'media', msg: `${donde}: ${r.avisos.join(' · ')}` });
@@ -421,7 +542,7 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
       const aus = ausenciaEn(p, iso);
       if (aus) { ausentes.push({ pl, p, aus }); r.ausentes.push({ iso, turnoId: pl.t, pid: pl.p, tipo: aus.tipo }); continue; }
       if (pidsEn(est, iso, pl.t).includes(pl.p)) continue;
-      const a = asignar(est, cfg, staff, iso, pl.t, pl.p, { origen: 'patron', razon: 'plaza fija de la semana tipo', supuesto: !!pl.s, cocina: pl.c ? true : undefined, abre: pl.a ? true : undefined });
+      const a = asignar(est, cfg, staff, iso, pl.t, pl.p, { origen: 'patron', razon: pl.por ? `cubre a ${nombreDe(staff, pl.por)}` : 'plaza fija de la semana tipo', supuesto: !!pl.s, cocina: pl.c ? true : undefined, abre: pl.a ? true : undefined, por: pl.por, nota: pl.n });
       if (a.ok) r.aplicados.push({ iso, turnoId: pl.t, pid: pl.p, origen: 'patron', razon: a.entry.razon, supuesto: !!pl.s });
       else r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: a.motivo });
     }
@@ -430,7 +551,7 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
       const candidatos = staff.filter(q => q.id !== p.id && (q.cubreA || []).some(c => c.pid === p.id && (!c.dow || c.dow === dow) && (!c.turnoId || c.turnoId === pl.t)));
       for (const q of candidatos) {
         if (pidsEn(est, iso, pl.t).includes(q.id)) break;
-        const a = asignar(est, cfg, staff, iso, pl.t, q.id, { origen: 'patron', razon: `cubre a ${p.nombre}`, permitirPartido: true, cocina: pl.c && puedeCocina(cfg, q, partirTurno(pl.t).localId, iso) ? true : undefined });
+        const a = asignar(est, cfg, staff, iso, pl.t, q.id, { origen: 'patron', razon: `cubre a ${p.nombre}`, por: p.id, permitirPartido: true, cocina: pl.c && puedeCocina(cfg, q, partirTurno(pl.t).localId, iso) ? true : undefined });
         if (a.ok) { r.aplicados.push({ iso, turnoId: pl.t, pid: q.id, origen: 'patron', razon: a.entry.razon, por: p.id }); r.coberturas.push({ iso, turnoId: pl.t, pid: q.id, por: p.id }); break; }
       }
     }
@@ -445,7 +566,7 @@ function patronDesdeSemana(est, lunesIso) {
     const dow = isoDow(iso);
     patron[dow] = [];
     for (const [tid, lista] of Object.entries(est.asig[iso] || {})) for (const e of lista) {
-      const pl = { t: tid, p: e.pid }; if (e.cocina) pl.c = 1; if (e.abre) pl.a = 1; if (e.supuesto) pl.s = 1;
+      const pl = { t: tid, p: e.pid }; if (e.cocina) pl.c = 1; if (e.abre) pl.a = 1; if (e.supuesto) pl.s = 1; if (e.por) pl.por = e.por; if (e.nota) pl.n = e.nota;
       patron[dow].push(pl);
     }
   }
@@ -466,6 +587,7 @@ function candidatosPara(cfg, staff, est, iso, tid, opts) {
     const r = puedeEstar(cfg, staff, est, iso, tid, p.id, { permitirPartido: !!o.permitirPartido });
     if (!r.ok) continue;
     let score = 50; const razones = [];
+    if (o.primero) { const pr = puedePrimero(cfg, staff, est, iso, tid, p.id); if (!pr.ok) continue; if ((l.primero && l.primero[franja] === p.id) || (p.abre && p.abre[localId] && p.abre[localId].includes(franja))) { score += 25; razones.push('sale el primero'); } else razones.push('puede abrir (turno completo)'); }
     const cubre = (p.cubreA || []).find(c => ausentesHoy.includes(c.pid) && (!c.dow || c.dow === dow) && (!c.turnoId || c.turnoId === tid));
     if (cubre) { score += 60; razones.push(`cubre a ${nombreDe(staff, cubre.pid)}`); }
     if (esComodin(p)) { score += 30; razones.push('comodín'); }
@@ -526,6 +648,17 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
         rev = revisarTurno(cfg, staff, target, iso, t.id);
       }
     }
+    // el primero de cada casilla hace turno completo: si nadie de los puestos puede abrir se
+    // busca a alguien que pueda; si no lo hay, la 1.ª posición queda como hueco disponible
+    for (const t of abiertos) {
+      if (!asignados(target, iso, t.id).length || primeroDe(cfg, staff, target, iso, t.id)) continue;
+      const c = candidatosPara(cfg, staff, target, iso, t.id, { primero: true, permitirPartido: !!o.permitirPartido })[0];
+      if (c) {
+        const a = asignar(target, cfg, staff, iso, t.id, c.pid, { origen: 'generador', razon: c.razones.join(' · '), permitirPartido: !!o.permitirPartido });
+        if (a.ok) { r.aplicados.push({ iso, turnoId: t.id, pid: c.pid, origen: 'generador', razon: a.entry.razon, avisos: a.avisos }); continue; }
+      }
+      r.huecos.push({ iso, turnoId: t.id, pos: 1, tipo: 'primero', faltan: 0, minimo: minimoDe(cfg, iso, t.id).min, motivo: motivoSinPrimero(cfg, staff, target, iso, t.id), porQueNadie: porQueNadiePrimero(cfg, staff, target, iso, t.id) });
+    }
   }
   return r;
 }
@@ -533,6 +666,155 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
 function candidatosConAviso(cfg, staff, est, iso, tid) {
   const sin = new Set(candidatosPara(cfg, staff, est, iso, tid).map(c => c.pid));
   return candidatosPara(cfg, staff, est, iso, tid, { permitirPartido: true }).filter(c => !sin.has(c.pid));
+}
+
+
+// ---------- condiciones del grupo, verificación y generador semanal ----------
+// El catálogo sale de los datos (locales y fichas): cada mínimo, cada cocina y cada
+// característica activa es una condición con su texto, y la verificación recorre la
+// semana generada y dice cuál se cumple y cuál no. Es la lista que imprime el
+// prototipo del 11/09 («las 32 condiciones que comprueba el simulador»).
+const DOW_L1 = ['', 'L', 'M', 'X', 'J', 'V', 'S', 'D'];   // inicial de cada día (el DOW_C de la app vive fuera del modelo)
+function resumenMinimos(l, f) {
+  const partes = [];
+  let grupo = null;
+  for (const d of TODOS) {
+    if (!(l.abre && l.abre[f] && l.abre[f].includes(d))) { if (grupo) { partes.push(grupo); grupo = null; } continue; }
+    const v = ((l.minimos && l.minimos[f]) || {})[d] || 0, sup = !!((l.supuestos && l.supuestos[f]) || {})[d];
+    if (grupo && grupo.v === v && grupo.sup === sup && grupo.hasta === d - 1) grupo.hasta = d;
+    else { if (grupo) partes.push(grupo); grupo = { desde: d, hasta: d, v, sup }; }
+  }
+  if (grupo) partes.push(grupo);
+  return partes.map(g => `${DOW_L1[g.desde]}${g.hasta !== g.desde ? '–' + DOW_L1[g.hasta] : ''} ${g.v}${g.sup ? '*' : ''}`).join(', ');
+}
+function descripcionCocina(cfg, l) {
+  const nombres = ids => ids.map(id => (personaDe(cfg.staff || [], id) || { nombre: id }).nombre);
+  const posTxt = f => { const p = (l.cocina && l.cocina.posicion && l.cocina.posicion[f]) || 2; const desde = l.cocina && l.cocina.posicionSiDesde && l.cocina.posicionSiDesde[f]; return `${p}.ª${desde ? ` con ${desde} o más` : ''}`; };
+  if (!l.cocina || !(localTieneCocina(l, 'M') || localTieneCocina(l, 'T'))) return 'sin cocina propia';
+  const ob = l.cocina.obligatoria || {};
+  const pos = posTxt('M') === posTxt('T') ? `cocina en ${posTxt('M')} posición` : `cocina ${posTxt('M')} por la mañana · ${posTxt('T')} por la tarde`;
+  return (ob.M && ob.T ? 'cocina obligatoria mañana y tarde · ' : '') + pos;
+}
+function condicionesDe(cfg, staff) {
+  const st = staff || cfg.staff || [];
+  const out = [];
+  const add = (id, texto, x) => out.push(Object.assign({ id, num: out.length + 1, texto, ok: true, detalle: '' }, x || {}));
+  const nom = pid => (personaDe(st, pid) || { nombre: pid }).nombre;
+  const dowsTxt = ds => ds.map(d => DOW_PL[d].replace('los ', '')).join(', ');
+  if (regla(cfg, 'minimos')) for (const l of cfg.locales) for (const f of FRANJAS) { const r = resumenMinimos(l, f); if (r) add(`min:${l.id}:${f}`, `${l.nombre} por la ${FRANJA_LBL[f].toLowerCase()}: ${r}`, { tipo: 'minimos', localId: l.id, franja: f }); }
+  if (regla(cfg, 'cocina')) for (const l of cfg.locales) {
+    if (!(localTieneCocina(l, 'M') || localTieneCocina(l, 'T'))) continue;
+    const tit = [...new Set([...(l.cocina.titulares.M || []), ...(l.cocina.titulares.T || [])])].map(nom);
+    const res = (l.cocina.reservas || []).filter(id => !tit.includes(nom(id))).map(nom);
+    const ob = l.cocina.obligatoria || {};
+    const quien = tit.length ? `la cocina la lleva${tit.length > 1 ? 'n' : ''} ${tit.join(', ').replace(/, ([^,]*)$/, ' o $1')}${res.length ? `; si falta, ${res.join(' u ')}` : ''}` : 'hay cocina';
+    add(`coc:${l.id}`, `En ${l.nombre} ${ob.M && ob.T ? 'hay cocina mañana y tarde, todos los días: ' : ''}${quien} (${descripcionCocina(cfg, l).replace(/^cocina obligatoria mañana y tarde · /, '')})`, { tipo: 'cocina', localId: l.id });
+  }
+  const vistos = new Set();
+  for (const p of st) {
+    if (deBaja(p)) continue;
+    const act = k => regla(cfg, k === 'locales' || k === 'franjas' || k === 'cocina' || k === 'noAbre' ? 'cocina' : k) && caracteristicaActiva(p, k);
+    if (caracteristicaActiva(p, 'locales') && (p.locales || []).length) add(`p:${p.id}:locales`, `${p.nombre}: ${p.locales.length === 1 ? 'solo en ' : ''}${lblLocales(cfg, p.locales)}`, { tipo: 'persona', pid: p.id, k: 'locales' });
+    if (caracteristicaActiva(p, 'franjas') && (p.franjas || []).length === 1) add(`p:${p.id}:franjas`, `${p.nombre} solo hace ${p.franjas[0] === 'M' ? 'mañanas' : 'tardes'}`, { tipo: 'persona', pid: p.id, k: 'franjas' });
+    if (regla(cfg, 'libra') && caracteristicaActiva(p, 'libra') && (p.libra || []).length) add(`p:${p.id}:libra`, `${p.nombre} libra ${p.libra.map(d => DOW_PL[d]).join(' y ')}${p.libreVariable ? ' (día libre variable)' : ''}`, { tipo: 'persona', pid: p.id, k: 'libra' });
+    if (regla(cfg, 'partido') && caracteristicaActiva(p, 'partido') && ((p.partido || {}).siempre || ((p.partido || {}).dias || []).length)) add(`p:${p.id}:partido`, `${p.nombre} hace partido ${p.partido.siempre ? 'siempre' : 'los ' + dowsTxt(p.partido.dias)}`, { tipo: 'persona', pid: p.id, k: 'partido' });
+    if (regla(cfg, 'vetos') && caracteristicaActiva(p, 'vetos')) for (const v of p.vetos || []) add(`p:${p.id}:veto:${v.localId}:${v.franja}`, `${p.nombre} no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'} en ${(localDe(cfg, v.localId) || {}).nombre || v.localId}`, { tipo: 'persona', pid: p.id, k: 'vetos' });
+    if (regla(cfg, 'nuncaCon') && caracteristicaActiva(p, 'nuncaCon')) for (const q of p.nuncaCon || []) { const key = [p.id, q].sort().join('|'); if (vistos.has(key)) continue; vistos.add(key); add(`p:${p.id}:nuncaCon:${q}`, `${p.nombre} y ${nom(q)} no coinciden`, { tipo: 'persona', pid: p.id, k: 'nuncaCon', otro: q }); }
+    if (regla(cfg, 'cubreA') && caracteristicaActiva(p, 'cubreA')) for (const c of p.cubreA || []) add(`p:${p.id}:cubre:${c.pid}:${c.dow || ''}`, `${p.nombre} cubre a ${nom(c.pid)}${c.dow ? ' ' + DOW_PL[c.dow] : ''}${c.turnoId ? ' en ' + (localDe(cfg, partirTurno(c.turnoId).localId) || {}).nombre + ' por la ' + FRANJA_LBL[partirTurno(c.turnoId).franja].toLowerCase() : ''}`, { tipo: 'persona', pid: p.id, k: 'cubreA', informativa: true });
+    if (regla(cfg, 'cocina') && caracteristicaActiva(p, 'cocina') && p.cocina) {
+      if (p.cocina.nunca) add(`p:${p.id}:cocina`, `${p.nombre} nunca está en cocina`, { tipo: 'persona', pid: p.id, k: 'cocina' });
+      else if ((p.cocina.soloDias || []).length) add(`p:${p.id}:cocina`, `${p.nombre} lleva la cocina solo ${p.cocina.soloDias.map(d => DOW_PL[d]).join(' y ')}`, { tipo: 'persona', pid: p.id, k: 'cocina' });
+    }
+    if (regla(cfg, 'abre') && caracteristicaActiva(p, 'abre')) for (const [lid, fs] of Object.entries(p.abre || {})) for (const f of fs) add(`p:${p.id}:abre:${lid}:${f}`, `${p.nombre} sale ${/a$/.test(p.nombre.split(' ')[0]) ? 'la primera' : 'el primero'} en ${(localDe(cfg, lid) || {}).nombre || lid} por la ${FRANJA_LBL[f].toLowerCase()}`, { tipo: 'persona', pid: p.id, k: 'abre', localId: lid, franja: f });
+    if (caracteristicaActiva(p, 'noAbre')) for (const lid of p.noAbre || []) add(`p:${p.id}:noAbre:${lid}`, `${p.nombre} no abre ${(localDe(cfg, lid) || {}).nombre || lid}`, { tipo: 'persona', pid: p.id, k: 'noAbre', localId: lid });
+    if (regla(cfg, 'noPrimero') && caracteristicaActiva(p, 'noPrimero') && (p.noPrimero || []).length) add(`p:${p.id}:noPrimero`, `${p.nombre} no sale nunca ${p.noPrimero.length === 2 ? 'el primero, ni de mañana ni de tarde' : p.noPrimero[0] === 'T' ? 'el primero de la tarde (no hace la tarde completa)' : 'el primero de la mañana'}`, { tipo: 'persona', pid: p.id, k: 'noPrimero', nueva: true });
+  }
+  if (regla(cfg, 'primeroCompleto')) add('reg:primeroCompleto', 'El primero de cada franja hace turno completo: quien ha trabajado la mañana no abre la tarde y los partidos entran a partir del segundo puesto (si sale primero en mañana y tarde del mismo local es turno continuo)', { tipo: 'regla', k: 'primeroCompleto', nueva: true });
+  return out;
+}
+function verificarSemana(cfg, staff, est, lunes) {
+  const dias = []; for (let k = 0; k < 7; k++) dias.push(addDias(lunes, k));
+  const conds = condicionesDe(cfg, staff);
+  const dl = iso => `${DOW_LBL[isoDow(iso)]} ${+iso.slice(8, 10)}`;
+  const slotsCache = {};
+  const slots = (iso, tid) => slotsCache[iso + tid] || (slotsCache[iso + tid] = posicionesDe(cfg, staff, est, iso, tid));
+  for (const c of conds) {
+    const v = [];
+    if (c.tipo === 'minimos') for (const iso of dias) { const tid = turnoId(c.localId, c.franja); if (!turnoAbierto(cfg, est, iso, tid)) continue; const r = revisarTurno(cfg, staff, est, iso, tid); if (r.faltan) v.push(`${dl(iso)}: ${r.n} de ${r.minimo}`); }
+    else if (c.tipo === 'cocina') for (const iso of dias) for (const f of FRANJAS) {
+      const tid = turnoId(c.localId, f), l = localDe(cfg, c.localId);
+      if (!turnoAbierto(cfg, est, iso, tid) || !localTieneCocina(l, f)) continue;
+      const r = revisarTurno(cfg, staff, est, iso, tid);
+      if (r.sinCocina) { if (r.cocinaObligatoria || r.n) v.push(`${dl(iso)} ${FRANJA_LBL[f].toLowerCase()}: sin cocina`); continue; }
+      if (r.cocinaNoApta) v.push(`${dl(iso)} ${FRANJA_LBL[f].toLowerCase()}: la cocina no es de este local`);
+      const sl = slots(iso, tid); const coc = sl.find(x => x.cocina);
+      if (coc && !coc.abre) { let pos = (l.cocina.posicion && l.cocina.posicion[f]) || 2; const desde = l.cocina.posicionSiDesde && l.cocina.posicionSiDesde[f]; if (desde && sl.filter(x => !x.hueco).length < desde) pos = Math.min(pos, 2); if (coc.pos !== Math.min(pos, sl.length)) v.push(`${dl(iso)} ${FRANJA_LBL[f].toLowerCase()}: cocina en ${coc.pos}.ª`); }
+    }
+    else if (c.tipo === 'persona') {
+      const p = personaDe(staff, c.pid);
+      for (const iso of dias) {
+        const dow = isoDow(iso);
+        const mis = turnosDe(cfg).filter(t => pidsEn(est, iso, t.id).includes(c.pid));
+        if (c.k === 'locales') for (const t of mis) if (!p.locales.includes(t.local.id)) v.push(`${dl(iso)}: en ${t.local.nombre}`);
+        if (c.k === 'franjas') for (const t of mis) if (!p.franjas.includes(t.franja)) v.push(`${dl(iso)}: ${FRANJA_LBL[t.franja].toLowerCase()}`);
+        if (c.k === 'libra' && mis.length && p.libra.includes(dow)) v.push(`${dl(iso)}: trabaja`);
+        if (c.k === 'partido' && mis.some(t => t.franja === 'M') && mis.some(t => t.franja === 'T') && !(p.partido.siempre || p.partido.dias.includes(dow))) v.push(`${dl(iso)}: partido no declarado`);
+        if (c.k === 'vetos') for (const t of mis) if ((p.vetos || []).some(x => x.localId === t.local.id && x.franja === t.franja)) v.push(`${dl(iso)}: ${t.local.nombre} ${FRANJA_LBL[t.franja].toLowerCase()}`);
+        if (c.k === 'nuncaCon') for (const t of mis) if (pidsEn(est, iso, t.id).includes(c.otro)) v.push(`${dl(iso)}: juntos en ${t.local.nombre}`);
+        if (c.k === 'cocina') for (const t of mis) { const e = asignados(est, iso, t.id).find(x => x.pid === c.pid); if (e && e.cocina && !puedeCocina(cfg, p, t.local.id, iso)) v.push(`${dl(iso)}: lleva la cocina en ${t.local.nombre}`); }
+        if (c.k === 'abre') { const tid = turnoId(c.localId, c.franja); if (pidsEn(est, iso, tid).includes(c.pid)) { const s = slots(iso, tid).find(x => x.pid === c.pid); if (s && s.pos !== 1) v.push(`${dl(iso)}: sale ${s.pos}.º`); } }
+        if (c.k === 'noAbre') { const t = mis.find(x => x.local.id === c.localId); if (t) { const s = slots(iso, t.id).find(x => x.pid === c.pid); if (s && s.pos === 1) v.push(`${dl(iso)}: abre ${t.local.nombre}`); } }
+        if (c.k === 'noPrimero') for (const t of mis) { if (!p.noPrimero.includes(t.franja)) continue; const s = slots(iso, t.id).find(x => x.pid === c.pid); if (s && s.pos === 1) v.push(`${dl(iso)}: primero en ${t.local.nombre} ${FRANJA_LBL[t.franja].toLowerCase()}`); }
+      }
+    }
+    else if (c.tipo === 'regla' && c.k === 'primeroCompleto') for (const iso of dias) for (const t of turnosDe(cfg)) {
+      if (t.franja !== 'T' || !turnoAbierto(cfg, est, iso, t.id)) continue;
+      const s = slots(iso, t.id)[0]; if (!s || s.hueco) continue;
+      const enM = turnosDe(cfg).some(x => x.franja === 'M' && pidsEn(est, iso, x.id).includes(s.pid));
+      if (enM && !s.continuo) v.push(`${dl(iso)}: ${s.nombre} abre ${t.local.nombre} viniendo de la mañana`);
+    }
+    c.ok = !v.length; c.detalle = v.join(' · ');
+  }
+  return conds;
+}
+// Genera (o completa) la semana del lunes dado con la semana tipo y las fichas, y devuelve
+// la planilla lista para enseñar e imprimir como el prototipo: posiciones por casilla,
+// huecos disponibles con motivo, qué ha cambiado, quién libra y las condiciones comprobadas.
+function generarSemana(cfg, staff, est, lunes, opts) {
+  const o = opts || {};
+  const target = o.simular ? clonarEstado(est) : est;
+  const dias = []; for (let k = 0; k < 7; k++) dias.push(addDias(lunes, k));
+  const foto = e => { const m = {}; for (const iso of dias) for (const t of turnosDe(cfg)) m[iso + '|' + t.id] = pidsEn(e, iso, t.id).slice(); return m; };
+  const antes = foto(target);
+  const g = generarPlanilla(cfg, staff, target, lunes, dias[6], { desdeIso: o.desdeIso, permitirPartido: !!o.permitirPartido, sinPatron: !!o.sinPatron });
+  const despues = foto(target);
+  const cambios = [];
+  for (const k of Object.keys(despues)) { const [iso, tid] = k.split('|'); if (JSON.stringify(antes[k]) !== JSON.stringify(despues[k])) cambios.push({ iso, turnoId: tid, antes: antes[k], despues: despues[k] }); }
+  const cambiado = new Set(cambios.map(c => c.iso + '|' + c.turnoId));
+  const locales = cfg.locales.map(l => ({
+    id: l.id, nombre: l.nombre, corto: l.corto, color: l.color, cocina: descripcionCocina(cfg, l),
+    franjas: FRANJAS.map(f => ({ franja: f, dias: dias.map(iso => {
+      const tid = turnoId(l.id, f);
+      if (!turnoAbierto(cfg, target, iso, tid)) return { iso, tid, abierto: false };
+      const r = revisarTurno(cfg, staff, target, iso, tid);
+      return { iso, tid, abierto: true, n: r.n, min: r.minimo, supuesto: r.supuesto, refuerzo: r.refuerzo, faltan: r.faltan, cambiado: cambiado.has(iso + '|' + tid), slots: posicionesDe(cfg, staff, target, iso, tid) };
+    }) })),
+  }));
+  const activosSem = staff.filter(p => !deBaja(p, lunes));
+  const libran = {}, diasPorPersona = {};
+  for (const iso of dias) {
+    const trabajan = new Set();
+    for (const t of turnosDe(cfg)) for (const pid of pidsEn(target, iso, t.id)) trabajan.add(pid);
+    libran[iso] = activosSem.filter(p => !trabajan.has(p.id) && !ausenciaEn(p, iso)).map(p => p.id);
+    for (const pid of trabajan) diasPorPersona[pid] = (diasPorPersona[pid] || 0) + 1;
+  }
+  const huecos = g.huecos.filter(h => dias.includes(h.iso)).map(h => Object.assign({ pos: null, tipo: 'faltan' }, h));
+  const condiciones = verificarSemana(cfg, staff, target, lunes);
+  const turnos = dias.reduce((a, iso) => a + turnosDe(cfg).filter(t => turnoAbierto(cfg, target, iso, t.id)).length, 0);
+  const plazas = dias.reduce((a, iso) => a + turnosDe(cfg).reduce((b, t) => b + pidsEn(target, iso, t.id).length, 0), 0);
+  return { lunes, dias, locales, libran, huecos, cambios, condiciones, aplicados: g.aplicados.length, rechazados: g.rechazados,
+    resumen: { turnos, plazas, condiciones: condiciones.length, condicionesRotas: condiciones.filter(c => !c.ok).length, huecos: huecos.length, descansos: Object.values(libran).reduce((a, x) => a + x.length, 0), maxDias: Math.max(0, ...Object.values(diasPorPersona)), cambios: cambios.length, deBaja: staff.filter(p => deBaja(p, lunes)).map(p => p.id) },
+    estado: target };
 }
 
 // ---------- horas ----------
@@ -804,50 +1086,66 @@ function semillaPasarela() {
     P('cris', 'Cris Parreño', 'sala', ['MONACO'], ['M'], [7], { nota: 'Yilian le hace el día libre' }),
     P('esmeralda', 'Esmeralda', 'cocina', ['MONACO'], ['M'], [1], { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] }, nota: 'la sustituye Jenny los lunes' }),
     P('mariluz', 'Mari Luz', 'sala', ['PASARELA'], ['M', 'T'], [3], { partido: { dias: [1, 2, 4, 5, 6] }, nuncaCon: ['lavinia'], nota: 'siempre partido; el domingo hace la mañana' }),
-    P('noe', 'Noe', 'sala', ['EL33'], ['M', 'T'], [1], { partido: { dias: [2, 3] }, cocina: { titular: ['EL33'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'jenny', dow: 2 }, { pid: 'victoria', dow: 3 }], nota: 'siempre de tarde; cocina cuando cubre; el domingo tercero de la mañana y estira el turno' }),
+    P('noe', 'Noe', 'sala', ['EL33'], ['M', 'T'], [1], { partido: { dias: [2, 3] }, cocina: { titular: ['EL33'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'jenny', dow: 2 }, { pid: 'victoria', dow: 3 }], nota: 'siempre de tarde; cocina cuando cubre; el domingo estira el turno en El 33' }),
     P('scapon', 'Susana Capón', 'sala', ['MONACO'], ['T'], [1], { cocina: { titular: ['MONACO'], reserva: [], soloDias: [2] }, abre: { MONACO: ['T'] }, nota: 'sale la primera; camarera, no cocinera salvo el martes (día flojo) para que libre Hojan' }),
     P('ivan', 'Iván', 'sala', ['PASARELA'], ['T'], [1], { abre: { PASARELA: ['T'] }, nota: 'sale el primero' }),
     P('juani', 'Juani', 'sala', ['ZAPA'], ['M'], [6]),
     P('sluna', 'Susana Luna', 'sala', ['ZAPA'], ['T'], [4], { nota: 'la cubre Roberto los jueves' }),
-    P('roberto', 'Roberto', 'apoyo', ['ZAPA', 'PASARELA'], ['M', 'T'], [1], { partido: { dias: [4, 5, 6] }, cocina: { titular: [], reserva: ['ZAPA'], soloDias: [] }, cubreA: [{ pid: 'sluna' }, { pid: 'adrian' }], supuestos: ['partido viernes y sábado (decisión Highkey)'], nota: 'tercero de apoyo por las mañanas en Zapatillera; el domingo a Pasarela por la mañana con Mari Luz; cocina si descansa Adrián' }),
-    P('lavinia', 'Lavinia', 'comodin', ['PASARELA', 'ZAPA'], ['M', 'T'], [1, 2, 4], { partido: { dias: [3, 7] }, nuncaCon: ['mariluz'], cubreA: [{ pid: 'mariluz', dow: 3 }], comodin: true, nota: 'el miércoles (libre de Mari Luz) hace partido en Pasarela; el domingo puede hacer partido pero no es obligatorio' }),
+    P('roberto', 'Roberto', 'apoyo', ['ZAPA', 'PASARELA'], ['M', 'T'], [1], { partido: { dias: [3, 5, 6] }, cocina: { titular: [], reserva: ['ZAPA'], soloDias: [] }, cubreA: [{ pid: 'sluna' }, { pid: 'adrian' }], nota: 'tercero de apoyo por las mañanas en Zapatillera; los jueves abre la tarde por Susana Luna; el domingo, Pasarela con Mari Luz' }),
+    P('lavinia', 'Lavinia', 'comodin', ['PASARELA', 'ZAPA'], ['M', 'T'], [1, 2, 4], { partido: { dias: [3, 7] }, nuncaCon: ['mariluz'], cubreA: [{ pid: 'mariluz', dow: 3 }], comodin: true, nota: 'el miércoles (libre de Mari Luz) hace partido en Pasarela; viernes y sábado, tarde en Zapatillera; el domingo dobla' }),
     P('tere', 'Tere', 'apoyo', ['PASARELA', 'MONACO'], ['M'], [6, 7], { comodin: true, nota: 'apoyo de mañanas; no trabaja fines de semana' }),
-    P('leo', 'Leo', 'comodin', [], ['T'], [3, 4, 7], { nuncaCon: ['scapon'], comodin: true, nota: 'comodín de tardes en cualquier local' }),
-    P('jenny', 'Jenny', 'cocina', ['EL33', 'MONACO'], ['M', 'T'], [2], { partido: { dias: [3, 4, 5, 6, 7] }, cocina: { titular: ['EL33', 'MONACO'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'esmeralda', dow: 1 }], nota: 'cocina de El 33 en partido; los lunes en el Mónaco en el sitio de Esmeralda; el domingo dobla' }),
-    P('cristian', 'Cristian', 'comodin', [], ['M', 'T'], [1, 3], { cocina: { titular: [], reserva: [], soloDias: [], nunca: true }, vetos: [{ localId: 'PASARELA', franja: 'M' }], noAbre: ['EL33'], comodin: true, nota: 'camarero comodín; el martes tarde fijo en el Mónaco con Susana Capón; no hace cocina' }),
-    P('yilian', 'Yilian', 'apoyo', ['MONACO'], ['M', 'T'], [4], { libreVariable: true, partido: { dias: [1] }, cubreA: [{ pid: 'cris', dow: 7 }, { pid: 'scapon', dow: 1, turnoId: 'MONACO_T' }], supuestos: ['partido el lunes por Susana Capón (decisión Highkey)', 'día libre variable'], nota: 'apoyo de Cris Parreño de mañana; le hace el domingo; el lunes hace la tarde de Susana Capón' }),
+    P('leo', 'Leo', 'comodin', [], ['T'], [3, 4, 7], { nuncaCon: ['scapon'], noPrimero: ['M', 'T'], comodin: true, nota: 'comodín de tardes en cualquier local; entra siempre a partir del segundo puesto' }),
+    P('jenny', 'Jenny', 'cocina', ['EL33', 'MONACO'], ['M', 'T'], [2], { partido: { dias: [3, 4, 5, 6, 7] }, cocina: { titular: ['EL33', 'MONACO'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'esmeralda', dow: 1 }], nota: 'cocina de El 33 en partido; los lunes cocina del Mónaco por Esmeralda; el domingo dobla (mañana El 33, tarde Mónaco)' }),
+    P('cristian', 'Cristian', 'comodin', [], ['M', 'T'], [3], { partido: { dias: [6] }, cocina: { titular: [], reserva: [], soloDias: [], nunca: true }, vetos: [{ localId: 'PASARELA', franja: 'M' }], noAbre: ['EL33'], noPrimero: ['T'], comodin: true, supuestos: ['seis días (la plantilla dice cinco): pendiente del cliente'], nota: 'camarero comodín; no hace la tarde completa (nunca el primero de la tarde); el martes tarde fijo en el Mónaco' }),
+    P('yilian', 'Yilian', 'apoyo', ['MONACO'], ['M', 'T'], [4], { libreVariable: true, cubreA: [{ pid: 'cris', dow: 7 }, { pid: 'scapon', dow: 1, turnoId: 'MONACO_T' }], nota: 'apoyo de Cris Parreño de mañana; le hace el domingo; el lunes abre la tarde por Susana Capón' }),
     P('lola', 'Lola', 'sala', ['PASARELA'], ['M'], [7], { abre: { PASARELA: ['M'] }, cubreA: [{ pid: 'laura' }], nota: 'abre el local; cubre la baja de Laura' }),
     P('adrian', 'Adrián', 'cocina', ['ZAPA'], ['M', 'T'], [3], { partido: { siempre: true, dias: [1, 2, 4, 5, 6, 7] }, cocina: { titular: ['ZAPA'], reserva: [], soloDias: [] }, nota: 'cocina de Zapatillera, siempre partido' }),
     P('victoria', 'Victoria', 'sala', ['EL33'], ['M', 'T'], [3], { partido: { dias: [5, 6] }, nota: 'de mañana; viernes y sábado partido; Noe la cubre el miércoles' }),
-    P('hojan', 'Hojan', 'cocina', ['EL33', 'MONACO'], ['M', 'T'], [2, 7], { partido: { dias: [1, 6] }, cocina: { titular: ['EL33', 'MONACO'], reserva: ['ZAPA'], soloDias: [] }, cubreA: [{ pid: 'maydeth' }], supuestos: ['tercero de El 33 el sábado por la mañana (partido)'], nota: 'cubre la baja de Maydeth; el lunes partido (El 33 mañana y Mónaco tarde); de miércoles a sábado cocina de tarde del Mónaco' }),
+    P('hojan', 'Hojan', 'cocina', ['EL33', 'MONACO'], ['M', 'T'], [2, 7], { partido: { dias: [1] }, cocina: { titular: ['EL33', 'MONACO'], reserva: ['ZAPA'], soloDias: [] }, cubreA: [{ pid: 'maydeth' }], nota: 'cubre la baja de Maydeth; el lunes partido: cocina de El 33 y del Mónaco' }),
     P('laura', 'Laura', 'sala', ['PASARELA'], ['M', 'T'], [], { ausencias: [{ tipo: 'BAJ', desde: '2026-09-01', detalle: 'la cubre Lola' }] }),
     P('maydeth', 'Maydeth', 'cocina', ['MONACO'], ['M', 'T'], [], { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] }, ausencias: [{ tipo: 'BAJ', desde: '2026-09-01', detalle: 'la cubre Hojan' }] }),
   ];
   asignarColores(staff);
-  // semana tipo (recuento del PDF); s = plaza supuesta por Highkey, no fijada por el grupo
-  const pl = (t, p, f) => { const o = { t, p }; if (f && f.includes('c')) o.c = 1; if (f && f.includes('a')) o.a = 1; if (f && f.includes('s')) o.s = 1; return o; };
+  // semana tipo = la planilla corregida del 11/09 (prototipo del cliente). Orden dentro de
+  // cada casilla: el primero abre; c = cocina; a = sale el primero (fijo); s = plaza supuesta
+  // por Highkey; por = a quién cubre; n = nota que se enseña bajo el nombre.
+  const pl = (t, p, f, x) => { const o = { t, p }; if (f && f.includes('c')) o.c = 1; if (f && f.includes('a')) o.a = 1; if (f && f.includes('s')) o.s = 1; if (x && x.por) o.por = x.por; if (x && x.n) o.n = x.n; return o; };
   const patron = {
-    1: [pl('EL33_M', 'victoria'), pl('EL33_M', 'hojan', 'c'), pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('MONACO_M', 'jenny', 'c'), pl('MONACO_M', 'cris'), pl('MONACO_M', 'yilian'), pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'tere', 's'),
-        pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'), pl('MONACO_T', 'hojan', 'c'), pl('MONACO_T', 'yilian', 's'), pl('PASARELA_T', 'mariluz'), pl('PASARELA_T', 'leo', 's')],
-    2: [pl('EL33_M', 'victoria'), pl('EL33_M', 'noe', 'c'), pl('EL33_T', 'noe', 'c'), pl('EL33_T', 'leo', 's'), pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_M', 'roberto'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'),
-        pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'cris'), pl('MONACO_M', 'yilian'), pl('MONACO_T', 'scapon', 'ac'), pl('MONACO_T', 'cristian'), pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'mariluz')],
-    3: [pl('EL33_M', 'jenny', 'c'), pl('EL33_M', 'noe'), pl('EL33_T', 'jenny', 'c'), pl('EL33_T', 'noe'), pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'roberto', 'c'),
-        pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'cris'), pl('MONACO_M', 'yilian'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'hojan', 'c'), pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'lavinia'), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'lavinia')],
-    4: [pl('EL33_M', 'victoria'), pl('EL33_M', 'jenny', 'c'), pl('EL33_T', 'noe'), pl('EL33_T', 'jenny', 'c'), pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_M', 'roberto'), pl('ZAPA_T', 'adrian', 'c'), pl('ZAPA_T', 'roberto'),
-        pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'cris'), pl('MONACO_M', 'cristian', 's'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'hojan', 'c'), pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'mariluz')],
-    5: [pl('EL33_M', 'victoria'), pl('EL33_M', 'jenny', 'c'), pl('EL33_T', 'noe'), pl('EL33_T', 'jenny', 'c'), pl('EL33_T', 'victoria'), pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_M', 'roberto'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'), pl('ZAPA_T', 'roberto', 's'), pl('ZAPA_T', 'lavinia', 's'),
-        pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'cris'), pl('MONACO_M', 'yilian'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'hojan', 'c'), pl('MONACO_T', 'cristian', 's'), pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'mariluz'), pl('PASARELA_T', 'leo', 's')],
-    6: [pl('EL33_M', 'victoria'), pl('EL33_M', 'jenny', 'c'), pl('EL33_M', 'hojan', 's'), pl('EL33_T', 'noe'), pl('EL33_T', 'jenny', 'c'), pl('EL33_T', 'victoria'), pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_M', 'roberto'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'), pl('ZAPA_T', 'roberto', 's'), pl('ZAPA_T', 'lavinia', 's'),
-        pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'cris'), pl('MONACO_M', 'yilian'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'hojan', 'c'), pl('MONACO_T', 'cristian', 's'), pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'mariluz'), pl('PASARELA_T', 'leo', 's')],
-    7: [pl('EL33_M', 'victoria'), pl('EL33_M', 'jenny', 'c'), pl('EL33_M', 'noe'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'),
-        pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'yilian'), pl('MONACO_M', 'cristian', 's'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'jenny', 'c'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'roberto'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'lavinia', 's')],
+    1: [pl('EL33_M', 'victoria'), pl('EL33_M', 'hojan', 'c', { n: 'cocina de El 33' }),
+        pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'),
+        pl('MONACO_M', 'cris'), pl('MONACO_M', 'jenny', 'c', { por: 'esmeralda' }), pl('MONACO_M', 'cristian', 's'), pl('MONACO_T', 'yilian', 'a', { por: 'scapon' }), pl('MONACO_T', 'hojan', 'c'),
+        pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'mariluz'), pl('PASARELA_T', 'leo', 's')],
+    2: [pl('EL33_M', 'victoria'), pl('EL33_M', 'noe', 'c', { por: 'jenny' }), pl('EL33_T', 'noe', 'c', { por: 'jenny' }), pl('EL33_T', 'leo', 's'),
+        pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_M', 'roberto'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'),
+        pl('MONACO_M', 'cris'), pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'yilian'), pl('MONACO_T', 'scapon', 'ac', { n: 'excepción del martes' }), pl('MONACO_T', 'cristian'),
+        pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'mariluz')],
+    3: [pl('EL33_M', 'noe', '', { por: 'victoria' }), pl('EL33_M', 'jenny', 'c'), pl('EL33_T', 'noe', '', { por: 'victoria' }), pl('EL33_T', 'jenny', 'c'),
+        pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'roberto', 'c'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'roberto', 'c', { n: 'reserva' }),
+        pl('MONACO_M', 'cris'), pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'yilian'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'hojan', 'c'),
+        pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'lavinia', '', { por: 'mariluz' }), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'lavinia', '', { por: 'mariluz' })],
+    4: [pl('EL33_M', 'victoria'), pl('EL33_M', 'jenny', 'c'), pl('EL33_T', 'noe'), pl('EL33_T', 'jenny', 'c'),
+        pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_T', 'roberto', '', { por: 'sluna' }), pl('ZAPA_T', 'adrian', 'c'),
+        pl('MONACO_M', 'cris'), pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'cristian', 's'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'hojan', 'c'),
+        pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'mariluz')],
+    5: [pl('EL33_M', 'victoria'), pl('EL33_M', 'jenny', 'c'), pl('EL33_T', 'noe'), pl('EL33_T', 'jenny', 'c'), pl('EL33_T', 'victoria'),
+        pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_M', 'roberto'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'), pl('ZAPA_T', 'roberto'), pl('ZAPA_T', 'lavinia'),
+        pl('MONACO_M', 'cris'), pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'yilian'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'hojan', 'c'), pl('MONACO_T', 'cristian', 's'),
+        pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'mariluz'), pl('PASARELA_T', 'leo', 's')],
+    6: [pl('EL33_M', 'victoria'), pl('EL33_M', 'jenny', 'c'), pl('EL33_M', 'cristian', 's'), pl('EL33_T', 'noe'), pl('EL33_T', 'jenny', 'c'), pl('EL33_T', 'victoria'),
+        pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'roberto'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'), pl('ZAPA_T', 'roberto'), pl('ZAPA_T', 'lavinia'),
+        pl('MONACO_M', 'cris'), pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'yilian'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'hojan', 'c'), pl('MONACO_T', 'cristian', 's'),
+        pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'mariluz'), pl('PASARELA_T', 'leo', 's')],
+    7: [pl('EL33_M', 'victoria'), pl('EL33_M', 'jenny', 'c'), pl('EL33_M', 'noe', '', { n: 'turno estirado' }),
+        pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'lavinia'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'),
+        pl('MONACO_M', 'yilian', '', { por: 'cris' }), pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'cristian', 's'), pl('MONACO_T', 'scapon', 'a'), pl('MONACO_T', 'jenny', 'c', { por: 'hojan' }),
+        pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'roberto', '', { n: 'con Mari Luz' }), pl('PASARELA_T', 'ivan', 'a'), pl('PASARELA_T', 'lavinia')],
   };
   const equipos = [
     { id: 'barcelona', nombre: 'Barcelona', corto: 'Barça', color: '#a50044', refuerzo: { EL33: 1, ZAPA: 1, MONACO: 1, PASARELA: 1 }, franja: 'T' },
     { id: 'madrid', nombre: 'Madrid', corto: 'Madrid', color: '#3b3b3b', refuerzo: { EL33: 1, ZAPA: 1, MONACO: 1, PASARELA: 1 }, franja: 'T' },
     { id: 'elche', nombre: 'Elche', corto: 'Elche', color: '#0a7a3c', refuerzo: { EL33: 1, ZAPA: 1, MONACO: 1, PASARELA: 1 }, franja: 'T' },
   ];
-  return { locales, staff, patron, equipos, eventos: [], extras: [], festivos: [], cierres: {} };
+  return { locales, staff, patron, equipos, eventos: [], extras: [], festivos: [], cierres: {}, reglas: {} };
 }
 
 // ---------- mes de demostración ----------
@@ -896,7 +1194,9 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, horarioDe, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
-    fusionarEstado, sembrarDemo, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
+    fusionarEstado, sembrarDemo,
+    CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
+    resumenMinimos, descripcionCocina, condicionesDe, verificarSemana, generarSemana, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,
   };
 }

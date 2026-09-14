@@ -1,0 +1,227 @@
+// LA APP EN MODO LOCAL (14/09). Sin servidor: el repo servido por un servidor
+// estático propio, sesión local ya abierta y `?demo=1` (el mes en pantalla se
+// genera con la semana tipo). Se recorren las siete vistas en escritorio (1280×900)
+// y la barra inferior en el móvil (400×820): selector de Hoy, cuadrante de la
+// Semana, botones de fútbol del Mes con deshacer, generador con historial,
+// revisión, ficha, horas, entrevistas, tema oscuro, impresión y persistencia.
+// Cuenta como fallo un `pageerror` o un assert; los errores de red de la consola, no.
+import { createServer } from 'node:http';
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { join, dirname, extname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cargarChromium, contador, llega, prepararPagina, asignarDesdeSelector } from './e2e-util.mjs';
+
+const { chromium, CHROMIUM } = await cargarChromium();
+const RAIZ = resolve(join(dirname(fileURLToPath(import.meta.url)), '..'));
+const { ok, resumen } = contador();
+const t0 = Date.now();
+
+// ── servidor estático (nunca server.js): la app detecta que no hay backend ──
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.ico': 'image/x-icon' };
+const srv = createServer((req, res) => {
+  const u = new URL(req.url, 'http://x');
+  if (u.pathname.startsWith('/api/')) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end('{"error":"sin servidor"}'); return; }
+  const abs = resolve(join(RAIZ, u.pathname === '/' ? 'index.html' : u.pathname));
+  if (!abs.startsWith(RAIZ) || !existsSync(abs) || statSync(abs).isDirectory()) { res.writeHead(404); res.end(); return; }
+  res.writeHead(200, { 'Content-Type': MIME[extname(abs)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+  res.end(readFileSync(abs));
+});
+await new Promise(r => srv.listen(0, '127.0.0.1', r));
+const BASE = `http://127.0.0.1:${srv.address().port}`;
+
+const HOY = new Date(); const pad = n => String(n).padStart(2, '0');
+const ISO_HOY = `${HOY.getFullYear()}-${pad(HOY.getMonth() + 1)}-${pad(HOY.getDate())}`, CLAVE = ISO_HOY.slice(0, 7);
+const errores = [];
+const abrirContexto = async (br, viewport, movil) => {
+  const ctx = await br.newContext(Object.assign({ viewport }, movil ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}));
+  // la app pide contraseña en modo local salvo que la sesión ya esté abierta en la pestaña
+  await ctx.addInitScript(() => { try { sessionStorage.setItem('shiftia_pas_sesion', '1'); sessionStorage.setItem('shiftia_pas_rol', 'admin'); } catch (e) {} });
+  return ctx;
+};
+const visible = async (pg, sel) => pg.evaluate(s => { const el = document.querySelector(s); if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; }, sel);
+const vista = async (pg, v) => { await pg.click(`.tab[data-v="${v}"]`); return llega(pg, v => { const s = document.getElementById('view-' + v); return !!s && !s.classList.contains('hidden'); }, v, 4000); };
+const br = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
+let asig = null;
+try {
+  // ══════════════ ESCRITORIO 1280×900 ══════════════
+  console.log('── escritorio 1280×900 · modo local · ?demo=1');
+  const ctx = await abrirContexto(br, { width: 1280, height: 900 });
+  const pg = await ctx.newPage();
+  await prepararPagina(pg, errores, 'escritorio');
+  await pg.goto(BASE + '/index.html?demo=1');
+  await pg.waitForSelector('#view-hoy .loccard', { timeout: 15000 });
+  ok('la app arranca en modo local sin pedir contraseña (sesión ya abierta)', !(await pg.$('.lockscr')) && await pg.evaluate(() => SRV.on === false));
+  const demo = await pg.evaluate(() => ({ asig: Object.keys(est.asig).length, mes: mesKey(S.y, S.m), plazas: Object.values(est.asig).reduce((a, d) => a + Object.values(d).reduce((b, l) => b + l.length, 0), 0) }));
+  ok(`?demo=1 genera el mes en pantalla (${demo.mes}: ${demo.asig} días con ${demo.plazas} plazas)`, demo.asig > 0 && demo.mes === CLAVE, JSON.stringify(demo));
+
+  // 1) las siete vistas cargan sin errores de página
+  for (const v of ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'entrevistas']) {
+    const antes = errores.length;
+    const t = await vista(pg, v);
+    ok(`vista «${v}» carga y se muestra sin errores de página`, t >= 0 && errores.length === antes, errores.slice(antes).join(' | '));
+  }
+
+  // 2) Hoy: cuatro locales y el selector asigna a alguien de «pueden»
+  await vista(pg, 'hoy');
+  ok('Hoy enseña las tarjetas de los 4 locales', await pg.$$eval('#view-hoy .loccard', x => x.length) === 4, await pg.$$eval('#view-hoy .loccard', x => x.length));
+  ok('cada local tiene sus dos casillas (mañana y tarde)', await pg.$$eval('#view-hoy .casilla', x => x.length) === 8, await pg.$$eval('#view-hoy .casilla', x => x.length));
+  asig = await asignarDesdeSelector(pg);
+  ok(`el selector se abre en una casilla y lista candidatos en «pueden» (${asig ? asig.via : '-'})`, !!asig, 'ningún [data-pick] visible con candidatos en «pueden», ni liberando una plaza');
+  ok(`al elegir a ${asig ? asig.pid : '?'} la casilla gana una persona (${asig ? asig.antes + '→' + asig.despues : '-'})`, !!asig && asig.despues === asig.antes + 1, asig && JSON.stringify(asig));
+  ok('el selector se cierra tras elegir', !(await pg.$('#pickerPop')));
+  ok('la asignación queda en el estado con origen manual', !!asig && await pg.evaluate(a => (est.asig[a.iso] && est.asig[a.iso][a.tid] || []).some(x => x.pid === a.pid && x.origen === 'manual'), asig));
+
+  // 3) Semana: 8 filas local×franja, sin desbordar, con pie de descansos
+  await vista(pg, 'semana');
+  await pg.waitForSelector('table.semt', { timeout: 5000 });
+  const filas = await pg.$$eval('table.semt tbody tr:not(.locsec):not(.piedesc)', x => x.length);
+  ok('Semana: 8 filas local × franja (4 locales × 2)', filas === 8, filas);
+  ok('Semana: 4 cabeceras de local', await pg.$$eval('table.semt tr.locsec', x => x.length) === 4);
+  const anchos = await pg.evaluate(() => ({ tabla: document.querySelector('table.semt').getBoundingClientRect().width, root: document.getElementById('semRoot').clientWidth }));
+  ok(`Semana: el cuadrante no desborda a 1280 (tabla ${Math.round(anchos.tabla)} ≤ contenedor ${anchos.root} + 2)`, anchos.tabla <= anchos.root + 2, JSON.stringify(anchos));
+  ok('Semana: existe el pie de descansos y ausencias', await pg.$$eval('table.semt tr.piedesc', x => x.length) >= 1);
+  ok('Semana: la página no hace scroll horizontal', await pg.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+
+  // 4) Mes: botones de fútbol, evento del Barcelona, KPI y deshacer
+  await vista(pg, 'mes');
+  await pg.waitForSelector('#mesRoot table.plan', { timeout: 5000 });
+  const futbol = await pg.$$eval('#futbolBtns [data-futbol]', bs => bs.map(b => b.dataset.futbol).filter(Boolean));
+  ok('Mes: tres botones de fútbol (Barcelona, Madrid, Elche)', futbol.length === 3 && futbol.includes('barcelona'), JSON.stringify(futbol));
+  const kpiEventos = () => pg.evaluate(() => { const k = [...document.querySelectorAll('#kpis .kpi')].find(x => /eventos/i.test(x.textContent)); return k ? k.querySelector('.knum').textContent.trim() : null; });
+  const evAntes = await pg.evaluate(() => ({ n: eventosMes(est).length, chips: document.querySelectorAll('#mesRoot .mesev .evchip').length }));
+  ok(`Mes: el KPI «eventos» está pintado (${evAntes.n} antes)`, await llega(pg, n => { const k = [...document.querySelectorAll('#kpis .kpi')].find(x => /eventos/i.test(x.textContent)); return !!k && k.querySelector('.knum').textContent.trim() === String(n); }, evAntes.n, 3000) >= 0, await kpiEventos());
+  await pg.click('#futbolBtns [data-futbol="barcelona"]');
+  await pg.waitForSelector('#evOvl #evForm', { timeout: 4000 });
+  ok('el botón del Barcelona abre el formulario del evento con su nombre', /Barcelona/.test(await pg.inputValue('#evOvl #evNombre')), await pg.inputValue('#evOvl #evNombre'));
+  ok('el evento propone la fecha del día en pantalla', await pg.inputValue('#evOvl #evIso') === await pg.evaluate(() => isoDia()));
+  ok('el refuerzo por local viene relleno del equipo (4 locales)', await pg.$$eval('#evOvl [data-ref]', x => x.length) === 4);
+  await pg.uncheck('#evOvl #evProponer');   // sin saltar al generador: se comprueba el mes
+  await pg.click('#evOvl #evForm button[type="submit"]');
+  ok('al guardar se cierra el formulario', await llega(pg, () => !document.querySelector('#evOvl'), null, 3000) >= 0);
+  ok('aparece el chip del evento en el mes', await llega(pg, n => document.querySelectorAll('#mesRoot .mesev .evchip').length === n, evAntes.chips + 1, 3000) >= 0, await pg.$$eval('#mesRoot .mesev .evchip', x => x.length));
+  ok('el chip lleva el nombre del partido', await pg.$$eval('#mesRoot .mesev .evchip', x => x.some(c => /Barcelona/.test(c.textContent))));
+  ok(`el KPI «eventos» sube a ${evAntes.n + 1}`, await llega(pg, n => { const k = [...document.querySelectorAll('#kpis .kpi')].find(x => /eventos/i.test(x.textContent)); return !!k && k.querySelector('.knum').textContent.trim() === String(n); }, evAntes.n + 1, 3000) >= 0, await kpiEventos());
+  ok('el día queda marcado con ⚽ en la cabecera del mes', await pg.$$eval('#mesRoot th.day.evday', x => x.length) >= 1);
+  await pg.keyboard.press('Control+z');
+  ok('Ctrl+Z quita el evento (chip fuera)', await llega(pg, n => document.querySelectorAll('#mesRoot .mesev .evchip').length === n, evAntes.chips, 3000) >= 0, await pg.$$eval('#mesRoot .mesev .evchip', x => x.length));
+  ok(`y el KPI vuelve a ${evAntes.n}`, await llega(pg, n => { const k = [...document.querySelectorAll('#kpis .kpi')].find(x => /eventos/i.test(x.textContent)); return !!k && k.querySelector('.knum').textContent.trim() === String(n); }, evAntes.n, 3000) >= 0, await kpiEventos());
+  ok('el historial registra el evento y el deshecho', await pg.evaluate(() => (S.historial || []).some(h => /Evento: Juega el Barcelona/.test(h.txt)) && (S.historial || []).some(h => h.tipo === 'undo' && /evento/.test(h.txt))));
+
+  // 5) Generador: vaciar el periodo, vista previa, aplicar e historial
+  await vista(pg, 'generador');
+  await pg.waitForSelector('#genPrevia', { timeout: 5000 });
+  const rango = await pg.evaluate(() => ({ desde: GEN.desde, hasta: GEN.hasta }));
+  ok(`Generador: el periodo por defecto es la semana en pantalla (${rango.desde} → ${rango.hasta})`, !!rango.desde && !!rango.hasta && rango.desde <= rango.hasta);
+  if (await pg.isChecked('#genDesdeHoy')) await pg.uncheck('#genDesdeHoy');   // toda la semana, no solo desde hoy
+  const plazasEn = () => pg.evaluate(r => { let n = 0; for (const iso of rangoIso(r.desde, r.hasta)) { const e = estadoDeIso(iso); for (const l of Object.values(e.asig[iso] || {})) n += l.length; } return n; }, rango);
+  const antesVaciar = await plazasEn();
+  await pg.click('#genLimpiar');   // el confirm se acepta en el diálogo
+  ok('«Vaciar lo generado en el periodo…» deja huecos (acepta el confirm)', await llega(pg, () => /retiradas/.test((document.querySelector('#toasts') || {}).textContent || ''), null, 3000) >= 0 && await plazasEn() < antesVaciar, `${antesVaciar} → ${await plazasEn()}`);
+  ok('lo puesto a mano en Hoy sobrevive al vaciado', !!asig && await pg.evaluate(a => (estadoDeIso(a.iso).asig[a.iso] && estadoDeIso(a.iso).asig[a.iso][a.tid] || []).some(x => x.pid === a.pid), asig));
+  await pg.click('#genPrevia');
+  ok('«Generar vista previa» produce una propuesta con el botón Aplicar', await llega(pg, () => { const b = document.querySelector('#genAplicar'); return !!b && !b.disabled; }, null, 15000) >= 0, (await pg.$('#genRes') ? await pg.$eval('#genRes', x => x.textContent.slice(0, 200)) : ''));
+  const previa = await pg.evaluate(() => GEN.previa ? { aplicados: GEN.previa.aplicados.length, huecos: GEN.previa.huecos.length, patron: GEN.previa.aplicados.filter(a => a.origen === 'patron').length } : null);
+  ok(`la vista previa propone plazas (${previa ? previa.aplicados : '?'}, ${previa ? previa.patron : '?'} de la semana tipo, ${previa ? previa.huecos : '?'} casillas cortas)`, !!previa && previa.aplicados > 0, JSON.stringify(previa));
+  ok('la vista previa lista los días con sus plazas y razones', await pg.$$eval('#genRes .gendia', x => x.length) >= 1 && await pg.$$eval('#genRes .genrow', x => x.length) >= 1);
+  const histAntes = await pg.evaluate(() => (S.historial || []).length);
+  await pg.click('#genAplicar');
+  ok('«Aplicar» vuelca la propuesta en la planilla', await llega(pg, n => !document.querySelector('#genAplicar') && (S.historial || []).length > n, histAntes, 5000) >= 0);
+  ok('las plazas aplicadas están en el periodo', await plazasEn() >= antesVaciar - 2, `${await plazasEn()} frente a ${antesVaciar} antes de vaciar`);
+  await pg.click('#topHist');
+  await pg.waitForSelector('#histOvl', { timeout: 4000 });
+  const hist = await pg.$$eval('#histOvl .histrow', x => x.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
+  ok('el historial (#topHist) registra la generación', hist.some(h => /GENERADOR/.test(h) && /plaza\(s\) aplicadas/.test(h)), hist.slice(0, 3).join(' | '));
+  ok('y también el vaciado previo', hist.some(h => /Vaciado lo generado/.test(h)));
+  await pg.click('#histOvl [data-ovx]');
+  ok('el historial se cierra', await llega(pg, () => !document.querySelector('#histOvl'), null, 2000) >= 0);
+
+  // 6) Revisión, ficha de Equipo, tabla de Horas y Entrevistas
+  await vista(pg, 'mes');
+  await pg.click('#topRevisar');
+  await pg.waitForSelector('#revOvl', { timeout: 4000 });
+  const rev = await pg.evaluate(() => ({ items: document.querySelectorAll('#revOvl .revitem').length, ordenado: /Todo en orden/.test(document.querySelector('#revOvl').textContent), titulo: (document.querySelector('#revOvl .revh2') || {}).textContent }));
+  ok(`Revisión (#topRevisar) abre y lista entradas (${rev.items}: «${rev.titulo}»)`, rev.items >= 1 || rev.ordenado, JSON.stringify(rev));
+  ok('cada entrada de la revisión lleva a su día', rev.items === 0 || await pg.$$eval('#revOvl .revitem [data-irdia]', x => x.length) === rev.items);
+  await pg.click('#revOvl [data-ovx]');
+  await vista(pg, 'equipo');
+  await pg.waitForSelector('#equipoRoot .cards', { timeout: 5000 });
+  ok('Equipo: hay tarjetas de persona', await pg.$$eval('#equipoRoot .cards > *', x => x.length) >= 20, await pg.$$eval('#equipoRoot .cards > *', x => x.length));
+  const fichaBtn = (await pg.$$('#equipoRoot [data-ficha]')).filter(Boolean);
+  let abierta = false;
+  for (const b of fichaBtn) { if (await b.isVisible()) { await b.click(); abierta = true; break; } }
+  ok('la ficha se abre desde la tarjeta ([data-ficha] / «Editar ficha»)', abierta && await llega(pg, () => !!document.querySelector('#fichaOvl #fichNombre'), null, 4000) >= 0);
+  ok('la ficha lleva nombre, puesto y cuerpo de condiciones', await pg.evaluate(() => !!document.querySelector('#fichaOvl #fichPuesto') && !!document.querySelector('#fichaOvl #fichBody') && !!(document.querySelector('#fichaOvl #fichNombre') || {}).value));
+  await pg.click('#fichaOvl [data-ovx]');
+  ok('la ficha se cierra con «Listo»', await llega(pg, () => !document.querySelector('#fichaOvl'), null, 2000) >= 0);
+  await vista(pg, 'horas');
+  await pg.waitForSelector('#horasRoot table.htab', { timeout: 5000 });
+  const nHoras = await pg.$$eval('#horasRoot table.htab tbody tr.hrow', x => x.length);
+  ok(`Horas: la tabla tiene ≥ 20 filas de persona (${nHoras})`, nHoras >= 20, nHoras);
+  ok('Horas: hay un total de horas del mes', await pg.$$eval('#horasRoot table.htab tfoot .hh', x => x.length >= 1));
+  await vista(pg, 'entrevistas');
+  ok('Entrevistas: aparece «EN CONSTRUCCIÓN»', await pg.$eval('#view-entrevistas', x => /EN CONSTRUCCIÓN/.test(x.textContent)));
+
+  // 7) Tema oscuro
+  const errTema = errores.length;
+  const temas = [];
+  for (let i = 0; i < 3; i++) { await pg.click('#themeBtn'); temas.push(await pg.evaluate(() => document.documentElement.getAttribute('data-theme'))); }
+  ok(`#themeBtn alterna data-theme (${temas.map(t => t || 'auto').join(' → ')}) sin errores`, temas[0] === 'dark' && temas[1] === 'light' && temas[2] === null && errores.length === errTema, JSON.stringify(temas));
+  ok('el tema elegido se recuerda en localStorage', await pg.evaluate(() => localStorage.getItem('shiftia_pas_theme') === 'auto'));
+
+  // 8) Impresión de la semana
+  await vista(pg, 'semana');
+  await pg.click('#printBtn');
+  ok('#printBtn en Semana genera #printRoot .pxpage', await llega(pg, () => { const r = document.getElementById('printRoot'); return !!r && !r.classList.contains('hidden') && !!r.querySelector('.pxpage'); }, null, 4000) >= 0);
+  ok('la hoja lleva cabecera, tabla de la semana y pie', await pg.evaluate(() => !!document.querySelector('#printRoot .pxhead') && !!document.querySelector('#printRoot table.pxsem') && !!document.querySelector('#printRoot .pxfoot')));
+  ok('la hoja lleva los 4 locales, 7 días y el pie de descansos', await pg.evaluate(() => document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc').length === 4 && document.querySelectorAll('#printRoot table.pxsem thead th.pxd').length === 7 && !!document.querySelector('#printRoot table.pxsem tr.pxdesc')));
+  await pg.click('#pClose');
+  ok('«Cerrar» oculta la vista previa', await pg.$eval('#printRoot', r => r.classList.contains('hidden')));
+
+  // 10) Persistencia local: tras recargar, la asignación de Hoy sigue
+  const guardado = asig && await pg.evaluate(a => { try { const j = JSON.parse(localStorage.getItem('shiftia_pasarela_v01')); const m = j.meses[a.iso.slice(0, 7)]; return !!m && (m.asig[a.iso] && m.asig[a.iso][a.tid] || []).some(x => x.pid === a.pid); } catch (e) { return false; } }, asig);
+  ok('localStorage shiftia_pasarela_v01 guarda la asignación de Hoy', !!guardado);
+  await pg.reload();
+  await pg.waitForSelector('#view-hoy .loccard', { timeout: 15000 });
+  await vista(pg, 'hoy');
+  ok('tras recargar, la persona sigue en su casilla de Hoy', !!asig && await llega(pg, a => !!document.querySelector(`[data-cas="${a.iso}|${a.tid}"] .pchip[data-pid="${a.pid}"]`), asig, 4000) >= 0);
+  ok('tras recargar no se vuelve a generar el mes de muestra (el historial no duplica la generación)', await pg.evaluate(() => (S.historial || []).filter(h => /Mes de muestra/.test(h.txt)).length === 1));
+  ok('la navegación (día en pantalla) también se recuerda', asig && await pg.evaluate(() => isoDia()) === asig.iso);
+  await ctx.close();
+
+  // ══════════════ MÓVIL 400×820 ══════════════
+  console.log('── móvil 400×820');
+  const ctxM = await abrirContexto(br, { width: 400, height: 820 }, true);
+  const pm = await ctxM.newPage();
+  await prepararPagina(pm, errores, 'móvil');
+  await pm.goto(BASE + '/index.html?demo=1');
+  await pm.waitForSelector('#view-hoy .loccard', { timeout: 15000 });
+  ok('móvil: la barra inferior #bnav está', await visible(pm, '#bnav'));
+  ok('móvil: las pestañas de escritorio no se ven', !(await visible(pm, '.tabs')));
+  ok('móvil: la página no desborda a 400 px', await pm.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1), await pm.evaluate(() => document.documentElement.scrollWidth + ' > ' + document.documentElement.clientWidth));
+  for (const v of ['semana', 'mes', 'hoy']) {
+    const antes = errores.length;
+    await pm.click(`#bnav [data-bnav="${v}"]`);
+    ok(`móvil: «${v}» desde la barra inferior, sin errores`, await llega(pm, v => !document.getElementById('view-' + v).classList.contains('hidden'), v, 4000) >= 0 && errores.length === antes, errores.slice(antes).join(' | '));
+  }
+  await pm.click('#bnavMas');
+  ok('móvil: «Más» abre #masOvl', await llega(pm, () => !!document.querySelector('#masOvl'), null, 3000) >= 0);
+  ok('móvil: «Más» ofrece Equipo, Horas, Generador y Entrevistas', await pm.evaluate(() => ['equipo', 'horas', 'generador', 'entrevistas'].every(a => !!document.querySelector(`#masOvl [data-mas="${a}"]`))));
+  await pm.click('#masOvl [data-mas="horas"]');
+  ok('móvil: desde «Más» se llega a Horas', await llega(pm, () => !document.querySelector('#masOvl') && !document.getElementById('view-horas').classList.contains('hidden') && !!document.querySelector('#horasRoot table.htab'), null, 5000) >= 0);
+  ok('móvil: la barra marca «Más» como activo en Horas', await pm.$eval('#bnavMas', b => b.classList.contains('on')));
+  for (const v of ['equipo', 'generador', 'entrevistas']) {
+    const antes = errores.length;
+    await pm.click('#bnavMas'); await pm.waitForSelector('#masOvl', { timeout: 3000 }); await pm.click(`#masOvl [data-mas="${v}"]`);
+    ok(`móvil: «${v}» desde «Más», sin errores`, await llega(pm, v => !document.querySelector('#masOvl') && !document.getElementById('view-' + v).classList.contains('hidden'), v, 4000) >= 0 && errores.length === antes, errores.slice(antes).join(' | '));
+  }
+  await ctxM.close();
+
+  ok('sin errores de página en toda la batería', errores.length === 0, errores.slice(0, 4).join(' | '));
+} catch (err) {
+  ok('la batería reventó', false, err.message + '\n' + (err.stack || '').split('\n').slice(1, 3).join('\n'));
+} finally {
+  await br.close().catch(() => {});
+  srv.close();
+}
+console.log(`\ntiempo: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+resumen();

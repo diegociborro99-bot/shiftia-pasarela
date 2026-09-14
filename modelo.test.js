@@ -254,7 +254,8 @@ ok('revisarTurno: cuántos faltan frente al mínimo, si falta cocina y si nadie 
   M.asignar(e, cfg, st, '2026-10-06', 'MONACO_M', 'esmeralda');
   r = M.revisarTurno(cfg, st, e, '2026-10-06', 'MONACO_M');
   assert.strictEqual(r.faltan, 0); assert.strictEqual(r.sinCocina, false);
-  assert.strictEqual(r.sinAbre, true, 'nadie definido para abrir el Mónaco por la mañana: aviso, no error');
+  assert.strictEqual(r.sinAbre, false, 'sin nadie fijo para abrir, abre el primero que puede (regla 31): no es hueco');
+  assert.strictEqual(M.primeroDe(cfg, st, e, '2026-10-06', 'MONACO_M'), 'cris', 'la cocina tiene su posición: abre Cris, no Esmeralda');
   // Pasarela no lleva cocina en la planilla: nunca «sin cocina»
   assert.strictEqual(M.revisarTurno(cfg, st, e, '2026-10-06', 'PASARELA_M').sinCocina, false);
 });
@@ -279,11 +280,11 @@ ok('la semana patrón de la semilla cumple los mínimos de los 54 huecos y la co
   assert.deepStrictEqual(rev.filter(x => x.tipo === 'sin-cocina' && x.turnoId.startsWith('MONACO')), [], 'Mónaco con cocina mañana y tarde');
 });
 
-ok('semana patrón: los días de cada persona cuadran con la columna DÍAS del PDF', () => {
+ok('semana patrón: los días de cada persona cuadran con la columna DÍAS del PDF (Cristian sale a 6 en la planilla corregida del 11/09: pregunta al cliente)', () => {
   const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
   M.instanciarPatron(cfg, st, e, '2026-10-05', '2026-10-11');
   const dias = pid => new Set(Object.keys(e.asig).filter(iso => Object.values(e.asig[iso]).some(c => c.some(x => x.pid === pid)))).size;
-  const esperado = { jacquelin: 6, cris: 6, esmeralda: 6, mariluz: 6, noe: 6, scapon: 6, ivan: 6, juani: 6, sluna: 6, roberto: 6, lavinia: 4, tere: 5, leo: 4, jenny: 6, cristian: 5, yilian: 6, lola: 6, adrian: 6, victoria: 6, hojan: 5, laura: 0, maydeth: 0 };
+  const esperado = { jacquelin: 6, cris: 6, esmeralda: 6, mariluz: 6, noe: 6, scapon: 6, ivan: 6, juani: 6, sluna: 6, roberto: 6, lavinia: 4, tere: 5, leo: 4, jenny: 6, cristian: 6, yilian: 6, lola: 6, adrian: 6, victoria: 6, hojan: 5, laura: 0, maydeth: 0 };
   for (const [pid, d] of Object.entries(esperado)) assert.strictEqual(dias(pid), d, `${pid}: ${dias(pid)} días, esperaba ${d}`);
 });
 
@@ -321,7 +322,8 @@ ok('generarPlanilla en vista previa no toca el estado; aplicado rellena hasta el
   assert.ok(prev.aplicados.every(a => a.razon && a.origen));
   const real = M.generarPlanilla(cfg, st, e, '2026-10-05', '2026-10-11');
   assert.strictEqual(real.aplicados.length, prev.aplicados.length, 'determinista: la previa y la real coinciden');
-  assert.deepStrictEqual(real.huecos, [], 'la semana tipo sale sin turnos cortos');
+  assert.deepStrictEqual(real.huecos.filter(h => h.tipo !== 'primero'), [], 'la semana tipo sale sin turnos cortos');
+  assert.deepStrictEqual(real.huecos.filter(h => h.tipo === 'primero').map(h => h.turnoId + '@' + h.iso).sort(), ['EL33_T@2026-10-06', 'PASARELA_T@2026-10-05'], 'los dos huecos de apertura del prototipo (nadie puede abrir)');
 });
 
 ok('generarPlanilla es aditivo: nunca quita lo puesto a mano y respeta la casilla', () => {
@@ -474,6 +476,89 @@ ok('sembrarDemo: genera el mes en curso y el siguiente con la semana tipo, marca
   const S2 = Object.assign(M.semillaPasarela(), { meses: { '2026-09': { asig: { '2026-09-01': { EL33_M: [{ pid: 'noe', origen: 'manual' }] } }, apertura: {}, manual: {} } }, eventos: [] });
   assert.deepEqual(M.sembrarDemo(S2, '2026-09-14').meses, ['2026-10']);
   assert.equal(S2.meses['2026-09'].asig['2026-09-01'].EL33_M.length, 1, 'septiembre intacto');
+});
+
+// ---------- generador semanal: reglas 30–32, interruptores y el prototipo del 11/09 ----------
+ok('reglas 30 y 32: Cristian y Leo no salen los primeros; 31: el primero de la tarde no viene de la mañana salvo turno continuo', () => {
+  const cfg = cfgBase(), st = staffDe(cfg); const e = M.nuevoEstado(2026, 9, { festivos: [] });
+  assert.equal(M.puedePrimero(cfg, st, e, '2026-09-15', 'EL33_T', 'leo').ok, false, 'Leo nunca de primero');
+  assert.equal(M.puedePrimero(cfg, st, e, '2026-09-19', 'ZAPA_M', 'leo').ok, false, 'ni de mañana');
+  assert.equal(M.puedePrimero(cfg, st, e, '2026-09-15', 'MONACO_T', 'cristian').ok, false, 'Cristian no hace la tarde completa');
+  assert.equal(M.puedePrimero(cfg, st, e, '2026-09-19', 'MONACO_M', 'cristian').ok, true, 'pero sí puede abrir una mañana en el Mónaco');
+  assert.equal(M.puedePrimero(cfg, st, e, '2026-09-19', 'EL33_M', 'cristian').ok, false, 'y no abre El 33');
+  assert.ok(M.asignar(e, cfg, st, '2026-09-14', 'PASARELA_M', 'lola', {}).ok);
+  assert.ok(M.asignar(e, cfg, st, '2026-09-14', 'PASARELA_M', 'mariluz', {}).ok);
+  assert.equal(M.puedePrimero(cfg, st, e, '2026-09-14', 'PASARELA_T', 'mariluz').ok, false, 'viene de hacer la mañana (Lola abre la mañana, así que no es turno continuo)');
+  assert.ok(M.asignar(e, cfg, st, '2026-09-16', 'EL33_M', 'noe', {}).ok);
+  const c = M.puedePrimero(cfg, st, e, '2026-09-16', 'EL33_T', 'noe');
+  assert.equal(c.ok, true); assert.equal(c.continuo, true, 'primera de mañana y de tarde en el mismo local: turno continuo');
+  cfg.reglas = { primeroCompleto: false };
+  assert.equal(M.puedePrimero(cfg, st, e, '2026-09-14', 'PASARELA_T', 'mariluz').ok, true, 'la regla 31 se puede apagar desde Equipo');
+});
+ok('características desactivables por persona: con «nunca con» apagado, Lavinia puede coincidir con Mari Luz', () => {
+  const cfg = cfgBase(), st = staffDe(cfg); const e = M.nuevoEstado(2026, 9, { festivos: [] });
+  assert.ok(M.asignar(e, cfg, st, '2026-09-18', 'PASARELA_T', 'mariluz', {}).ok);
+  assert.equal(M.puedeEstar(cfg, st, e, '2026-09-18', 'PASARELA_T', 'lavinia').ok, false);
+  M.personaDe(st, 'lavinia').inactivas = ['nuncaCon']; M.personaDe(st, 'mariluz').inactivas = ['nuncaCon'];
+  assert.equal(M.puedeEstar(cfg, st, e, '2026-09-18', 'PASARELA_T', 'lavinia').ok, true);
+  M.personaDe(st, 'tere').inactivas = ['libra'];
+  assert.equal(M.puedeEstar(cfg, st, e, '2026-09-19', 'PASARELA_M', 'tere').ok, true, 'con «libra» apagado Tere puede el sábado');
+  assert.equal(M.caracteristicaActiva(M.personaDe(st, 'tere'), 'libra'), false);
+  assert.equal(M.caracteristicaActiva(M.personaDe(st, 'tere'), 'franjas'), true);
+});
+ok('posicionesDe: el primero abre; sin nadie que pueda abrir, la 1.ª posición es un hueco y la cocina sigue en la suya', () => {
+  const cfg = cfgBase(), st = staffDe(cfg); const e = M.nuevoEstado(2026, 9, { festivos: [] });
+  assert.ok(M.asignar(e, cfg, st, '2026-09-15', 'EL33_M', 'victoria', {}).ok);
+  assert.ok(M.asignar(e, cfg, st, '2026-09-15', 'EL33_M', 'noe', { cocina: true }).ok);   // Noe hace la mañana: no puede abrir la tarde
+  assert.ok(M.asignar(e, cfg, st, '2026-09-15', 'EL33_T', 'noe', { cocina: true }).ok);
+  assert.ok(M.asignar(e, cfg, st, '2026-09-15', 'EL33_T', 'leo', { permitirPartido: true }).ok);
+  const s = M.posicionesDe(cfg, st, e, '2026-09-15', 'EL33_T');
+  assert.equal(s.length, 3); assert.equal(s[0].hueco, true); assert.equal(s[0].pos, 1); assert.match(s[0].motivo, /abr/i);
+  assert.equal(s[1].pid, 'noe'); assert.equal(s[1].cocina, true); assert.equal(s[2].pid, 'leo'); assert.equal(s[2].comodin, true);
+  const r = M.revisarTurno(cfg, st, e, '2026-09-15', 'EL33_T');
+  assert.equal(r.faltan, 0); assert.equal(r.sinAbre, true, 'mínimo cubierto pero nadie puede abrir');
+});
+ok('generarSemana del 14 al 20 de septiembre reproduce la planilla corregida del prototipo', () => {
+  const cfg = cfgBase(), st = staffDe(cfg); const e = M.nuevoEstado(2026, 9, { festivos: [] });
+  const r = M.generarSemana(cfg, st, e, '2026-09-14', {});
+  const slots = (iso, tid) => M.posicionesDe(cfg, st, r.estado, iso, tid);
+  const quien = (iso, tid) => slots(iso, tid).map(x => x.hueco ? '·' : x.pid);
+  assert.deepEqual(quien('2026-09-14', 'EL33_M'), ['victoria', 'hojan']);
+  assert.deepEqual(quien('2026-09-15', 'EL33_T'), ['·', 'noe', 'leo'], 'martes tarde El 33: hueco, Noe cocina 2.ª, Leo 3.º');
+  assert.deepEqual(quien('2026-09-14', 'PASARELA_T'), ['·', 'leo', 'mariluz'], 'lunes tarde Pasarela: nadie puede abrir; Mari Luz de partido va después');
+  assert.deepEqual(quien('2026-09-16', 'EL33_M'), ['noe', 'jenny']); assert.deepEqual(quien('2026-09-16', 'EL33_T'), ['noe', 'jenny']);
+  assert.equal(slots('2026-09-16', 'EL33_T')[0].continuo, true, 'Noe el miércoles: turno continuo (C)');
+  assert.equal(slots('2026-09-16', 'EL33_T')[1].partido, true, 'Jenny el miércoles: partido (P)');
+  assert.deepEqual(quien('2026-09-14', 'MONACO_M'), ['cris', 'jenny', 'cristian']); assert.deepEqual(quien('2026-09-14', 'MONACO_T'), ['yilian', 'hojan']);
+  assert.deepEqual(quien('2026-09-17', 'ZAPA_M'), ['jacquelin', 'juani', 'adrian']); assert.deepEqual(quien('2026-09-17', 'ZAPA_T'), ['roberto', 'adrian']);
+  assert.deepEqual(quien('2026-09-19', 'ZAPA_M'), ['jacquelin', 'roberto', 'adrian'], 'cocina 3.ª en Zapatillera por la mañana con tres');
+  assert.deepEqual(quien('2026-09-15', 'MONACO_T'), ['scapon', 'cristian']); assert.equal(slots('2026-09-15', 'MONACO_T')[0].cocina, true, 'el martes Susana Capón lleva la cocina y sale la primera');
+  assert.deepEqual(quien('2026-09-20', 'PASARELA_M'), ['mariluz', 'roberto']); assert.deepEqual(quien('2026-09-20', 'EL33_M'), ['victoria', 'jenny', 'noe']);
+  assert.deepEqual(quien('2026-09-19', 'EL33_M'), ['victoria', 'jenny', 'cristian']);
+  assert.equal(slots('2026-09-14', 'MONACO_T')[0].por, 'scapon', 'Yilian abre por Susana Capón');
+  assert.equal(slots('2026-09-16', 'PASARELA_M')[1].por, 'mariluz', 'Lavinia por Mari Luz');
+  assert.equal(r.huecos.length, 2, JSON.stringify(r.huecos.map(h => [h.iso, h.turnoId, h.pos, h.motivo])));
+  assert.deepEqual(r.huecos.map(h => h.turnoId + '@' + h.iso).sort(), ['EL33_T@2026-09-15', 'PASARELA_T@2026-09-14']);
+  assert.ok(r.huecos.every(h => h.pos === 1 && /abr/i.test(h.motivo)));
+  assert.equal(r.resumen.turnos, 54); assert.equal(r.resumen.descansos, 26); assert.ok(r.resumen.maxDias <= 6);
+  assert.deepEqual(r.libran['2026-09-18'], []); assert.equal(r.libran['2026-09-14'].length, 6); assert.equal(r.libran['2026-09-20'].length, 6);
+  const rotas = r.condiciones.filter(c => !c.ok);
+  assert.ok(r.condiciones.length >= 30, 'catálogo de condiciones: ' + r.condiciones.length);
+  assert.equal(rotas.length, 0, 'condiciones rotas: ' + rotas.map(c => c.texto + ' → ' + c.detalle).join(' | '));
+  assert.ok(r.condiciones.some(c => c.nueva), 'las tres nuevas (30, 31, 32) van marcadas');
+  // segunda generación sobre lo mismo: nada cambia y no hay «corregido»
+  const r2 = M.generarSemana(cfg, st, r.estado, '2026-09-14', {});
+  assert.equal(r2.cambios.length, 0); assert.equal(r2.aplicados, 0);
+});
+ok('generarSemana señala qué ha cambiado respecto a lo que había y respeta lo puesto a mano', () => {
+  const cfg = cfgBase(), st = staffDe(cfg); const e = M.nuevoEstado(2026, 9, { festivos: [] });
+  assert.ok(M.asignar(e, cfg, st, '2026-09-14', 'MONACO_M', 'tere', { origen: 'manual' }).ok);
+  const r = M.generarSemana(cfg, st, e, '2026-09-14', { simular: true });
+  assert.ok(M.pidsEn(r.estado, '2026-09-14', 'MONACO_M').includes('tere'), 'lo manual se queda');
+  assert.equal(M.pidsEn(e, '2026-09-14', 'MONACO_M').length, 1, 'simular no toca el estado real');
+  const cambio = r.cambios.find(c => c.iso === '2026-09-14' && c.turnoId === 'MONACO_M');
+  assert.ok(cambio && cambio.antes.length === 1 && cambio.despues.length >= 3, 'la casilla cambiada se marca');
+  assert.ok(r.cambios.length > 40, 'casi todas las casillas cambian partiendo de una semana vacía');
 });
 
 console.log(`\n${n} tests OK`);
