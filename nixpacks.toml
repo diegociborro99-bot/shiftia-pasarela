@@ -1,0 +1,3 @@
+# Railway/Nixpacks: la app necesita Node 22 (node:sqlite integrado)
+[phases.setup]
+nixPkgs = ['nodejs_22']

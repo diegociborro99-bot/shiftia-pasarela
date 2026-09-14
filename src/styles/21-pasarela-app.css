@@ -1,0 +1,181 @@
+/* ============ PASARELA · marca, casillas, eventos, generador ============ */
+/* pareja de logos en la barra: Shiftia · logo del grupo (o su nombre en texto) */
+.glogo{display:inline-flex;align-items:center;gap:6px;flex:none}
+.glogo .hlogo{width:28px;height:28px;border-radius:7px;object-fit:cover;display:block}
+.glogo .gword{font-family:'Pinyon Script','DM Sans',cursive;font-size:15px;line-height:1;color:var(--ink2);white-space:nowrap;letter-spacing:.01em}
+.glogo .gword b{font-weight:600;color:var(--ink)}
+.glogo.big .hlogo{width:46px;height:46px;border-radius:12px}
+.glogo.big .gword{font-size:20px}
+.coop{width:1.5px;height:22px;background:var(--border);flex:none}
+.dotwarn{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:var(--warn);border:2px solid var(--surface)}
+.iconbtn{position:relative}
+.fbrand{display:inline-flex;align-items:center;gap:7px}
+
+/* ============ HOY: cuatro locales, dos casillas ============ */
+.locgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;align-items:start}
+.loccard{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--sh-sm);overflow:hidden;border-top:4px solid var(--lc,var(--accent))}
+.lochd{display:flex;align-items:center;gap:10px;padding:12px 16px 10px;border-bottom:1px solid var(--border2)}
+.lochd .ldot{width:12px;height:12px;border-radius:4px;background:var(--lc)}
+.lochd b{font-family:var(--font-d);font-size:17px;letter-spacing:-.2px}
+.lochd .lmini{margin-left:auto;display:flex;gap:6px}
+.lochd .btn-mini{min-height:30px;padding:5px 10px}
+.casilla{padding:10px 14px 12px;border-bottom:1px solid var(--border2)}
+.casilla:last-child{border-bottom:0}
+.casilla.corta{background:color-mix(in srgb, var(--warn-bg) 70%, transparent)}
+.casilla.cerrada{opacity:.6}
+.cashd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cashd .fr{font-family:var(--mono);font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}
+.cashd .cnt{font-family:var(--mono);font-size:12px;font-weight:800;color:var(--ink);background:var(--surface2);border-radius:6px;padding:2px 7px}
+.cashd .cnt.falta{background:var(--warn-bg);color:var(--warn)}
+.cashd .cnt.ok{background:var(--ok-bg);color:var(--ok)}
+.cashd .sup{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--warn);cursor:help}
+.cashd .ref{font-family:var(--mono);font-size:9.5px;font-weight:800;color:#fff;background:var(--accent);border-radius:6px;padding:2px 6px;cursor:help}
+.cashd .hor{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink3)}
+.caslista{display:flex;flex-direction:column;gap:6px}
+.pchip{position:relative;padding-left:9px}
+.pchip .pos{flex:none;font-family:var(--mono);font-size:10px;font-weight:800;color:var(--ink3);width:14px;text-align:center}
+.pchip .pnom{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pchip .bdg{flex:none;font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.08em;border-radius:5px;padding:2px 5px}
+.bdg.abre{background:var(--grad);color:#fff}
+.bdg.cocina{background:var(--ink);color:var(--bg)}
+.bdg.forz{background:var(--bad-bg);color:var(--bad)}
+.bdg.sup{background:var(--warn-bg);color:var(--warn)}
+.bdg.ref{background:var(--accent-l);color:var(--accent)}
+.bdg.gen{background:var(--surface2);color:var(--ink3)}
+.pchip.forzado{border-color:color-mix(in srgb, var(--bad) 45%, var(--border));box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--bad) 35%, transparent)}
+.pchip .rmx{margin-left:2px}
+.addchip.corta{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
+.caslista .addchip{min-height:40px;padding:8px 14px;justify-content:center}
+.cascerr{font-size:12.5px;color:var(--ink3);display:flex;align-items:center;gap:8px}
+.cascerr button{border:1px dashed var(--border);background:none;border-radius:8px;font-size:11.5px;font-weight:700;color:var(--ink3);padding:4px 10px}
+.cascerr button:hover{color:var(--accent);border-color:var(--accent)}
+.evchip{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:4px 11px 4px 6px;font-size:12.5px;font-weight:700;background:color-mix(in srgb, var(--ec,var(--accent)) 14%, var(--surface));border:1px solid color-mix(in srgb, var(--ec,var(--accent)) 40%, var(--border));color:var(--ink)}
+.evchip i{width:18px;height:18px;border-radius:50%;background:var(--ec,var(--accent));display:inline-flex;align-items:center;justify-content:center;font-style:normal;color:#fff;font-size:10px;font-weight:900}
+.evchip small{font-family:var(--mono);font-size:10px;color:var(--ink2)}
+.evchip .rmx{opacity:.6}
+.evrow{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.hoyside .scard b.t{font-family:var(--font-d);font-size:14px;display:block;margin-bottom:6px}
+.srow .lp{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
+
+/* ============ selector de personas ============ */
+.picker{width:340px}
+.prowp .prsub{display:block;font-size:10px;color:var(--ink3);font-weight:600;white-space:normal;line-height:1.3}
+.prowp.dis{opacity:.55}
+.prowp .forzar{margin-left:auto;flex:none;border:1px solid var(--border);background:var(--surface);border-radius:7px;font-size:9.5px;font-weight:800;padding:3px 7px;color:var(--warn);font-family:var(--mono)}
+.prowp .forzar:hover{background:var(--warn-bg)}
+.popb.peligro{color:var(--bad)}
+.popb.peligro:hover{border-color:var(--bad)}
+
+/* ============ SEMANA: cuadrante local × franja × día ============ */
+.semt th.lbl{min-width:190px;max-width:190px}
+tr.locsec td{background:color-mix(in srgb, var(--lc) 10%, var(--surface2)) !important;font-family:var(--mono);font-size:10.5px;font-weight:800;letter-spacing:.12em;color:var(--ink);padding:6px 12px;text-align:left}
+tr.locsec .secl{display:inline-flex;align-items:center;gap:8px;position:sticky;left:14px}
+tr.locsec .secl i{width:10px;height:10px;border-radius:3px;background:var(--lc)}
+.semt td.lbl .fr{font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
+.semt td.lbl small{display:block;font-size:10.5px;color:var(--ink3);font-weight:500}
+.wcell{flex-direction:column;align-items:stretch;gap:4px;min-height:44px}
+.wrowp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
+.wav{position:relative;min-width:44px;height:30px;font-size:11px}
+.wav.abre{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--accent)}
+.wav.cocina::after{content:"";position:absolute;right:-4px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--ink);border:2px solid var(--surface)}
+.wav.forzado{outline:2px solid var(--bad);outline-offset:1px}
+.wfalta{font-family:var(--mono);font-size:9.5px;font-weight:800;color:var(--warn);background:var(--warn-bg);border-radius:5px;padding:1px 6px}
+.wcerr{color:var(--ink3);opacity:.5;font-size:12px}
+td.wcorta{background:color-mix(in srgb, var(--warn-bg) 80%, transparent) !important}
+.semt th .evb{display:block;font-size:8px;color:var(--accent);font-weight:800;cursor:help;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+tr.piedesc td{background:var(--surface3);font-size:11px;color:var(--ink2);vertical-align:top;text-align:left;padding:8px 6px;line-height:1.35}
+tr.piedesc td.lbl{font-family:var(--mono);font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+tr.piedesc .dn{display:block;white-space:nowrap}
+tr.piedesc .dn em{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--warn);margin-left:3px}
+
+/* ============ MES: personas × días ============ */
+.pill.pM,.pill.pT,.pill.pP{color:#fff;background:var(--lc,var(--accent));font-size:11px}
+.pill.pT{background:color-mix(in srgb, var(--lc,var(--accent)) 78%, #000)}
+.pill.pP{background:linear-gradient(135deg,var(--lc,var(--accent)) 50%,color-mix(in srgb, var(--lc2,var(--lc,var(--accent))) 78%, #000) 50%)}
+.pill.pP.dobla{background:linear-gradient(135deg,var(--lc) 50%,var(--lc2) 50%)}
+.pill .fz{position:absolute;top:-4px;left:-4px;width:11px;height:11px;border-radius:50%;background:var(--bad);border:1.5px solid var(--surface)}
+.pill.ev{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.plan th.day .evd{display:block;font-size:7px;color:var(--accent);font-weight:800;line-height:1}
+.plan th.day.evday{background:var(--accent-l)}
+tr.frow td.pname .lp{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
+.futbol{display:inline-flex;gap:6px;flex-wrap:wrap}
+.futbol .btn{padding:9px 13px;font-size:13px;border-left:4px solid var(--ec)}
+.futbol .btn:hover{border-left-color:var(--ec)}
+.mesev{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.legendbar .lp{display:inline-block;width:12px;height:12px;border-radius:3px}
+
+/* ============ diálogo de evento ============ */
+.evform .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.reflist{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0}
+.refrow{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:var(--surface3)}
+.refrow i{width:10px;height:10px;border-radius:3px;background:var(--lc);flex:none}
+.refrow b{flex:1;font-size:13px}
+.refrow input{width:58px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-size:14px;padding:6px 8px;text-align:center;font-family:var(--mono)}
+.eqrow{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}
+.eqk{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;color:var(--ink2);border-left:4px solid var(--ec)}
+.eqk.on{background:var(--accent-l);border-color:var(--accent);color:var(--accent);border-left-color:var(--ec)}
+
+/* ============ GENERADOR ============ */
+.gengrid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:980px){.gengrid{grid-template-columns:minmax(0,1fr)}}
+.genpanel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:var(--sh-sm);display:flex;flex-direction:column;gap:12px}
+.genpanel .pinlbl{margin:0}
+.genopt{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink2);cursor:pointer;line-height:1.4}
+.genopt input{accent-color:var(--accent);margin-top:2px;flex:none}
+.genopt b{color:var(--ink)}
+.motor{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.motor button{border:1.5px solid var(--border);background:var(--surface3);border-radius:11px;padding:10px;text-align:left;font:inherit;color:var(--ink2);cursor:pointer}
+.motor button b{display:block;font-size:13px;color:var(--ink)}
+.motor button small{font-size:10.5px;line-height:1.3;display:block;margin-top:2px}
+.motor button.on{border-color:var(--accent);background:var(--accent-l)}
+.motor button:disabled{opacity:.5;cursor:not-allowed}
+.genres{display:flex;flex-direction:column;gap:12px}
+.genkpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.genk{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+.genk b{display:block;font-family:var(--mono);font-size:20px;font-variant-numeric:tabular-nums}
+.genk span{font-size:11px;color:var(--ink3)}
+.genk.warn b{color:var(--warn)} .genk.ok b{color:var(--ok)} .genk.bad b{color:var(--bad)}
+.gendia{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.gendia .gdh{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--surface2);font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+.gendia .gdh small{margin-left:auto;font-weight:600;letter-spacing:0;text-transform:none;font-family:var(--font);font-size:12px;color:var(--ink3)}
+.genrow{display:flex;align-items:center;gap:10px;padding:7px 14px;border-top:1px solid var(--border2);font-size:13px}
+.genrow .av{width:26px;height:26px;font-size:9.5px;border-radius:8px}
+.genrow .gtxt{flex:1;min-width:0}
+.genrow .gtxt b{display:block;font-size:13px;line-height:1.25}
+.genrow .gtxt small{color:var(--ink3);font-size:11px;display:block;white-space:normal}
+.genrow .lpill{flex:none;font-family:var(--mono);font-size:9.5px;font-weight:800;color:#fff;background:var(--lc);border-radius:6px;padding:3px 7px}
+.genrow.hueco{background:var(--bad-bg)}
+.genrow.hueco .gtxt b{color:var(--bad)}
+.genvacio{padding:26px;text-align:center;color:var(--ink3);font-size:13px;background:var(--surface);border:1px dashed var(--border);border-radius:14px}
+.genbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;bottom:0;background:color-mix(in srgb, var(--bg) 88%, transparent);backdrop-filter:blur(10px);padding:10px 0}
+.pqn{font-size:11px;color:var(--ink2);margin-top:3px}
+.pqn b{color:var(--ink)}
+
+/* ============ revisión ============ */
+.revitem .lpill{flex:none;font-family:var(--mono);font-size:9px;font-weight:800;color:#fff;background:var(--lc);border-radius:5px;padding:2px 6px}
+
+/* ============ selector de días (dowk) reutilizado del piloto ============ */
+.dowset{display:flex;gap:5px;flex-wrap:wrap;margin:4px 0 8px}
+.dowk{width:34px;height:34px;border-radius:9px;border:1.5px solid var(--border);background:var(--surface);color:var(--ink2);font-family:var(--mono);font-size:12px;font-weight:800;cursor:pointer}
+.dowk.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.pinlbl{display:block;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin:10px 0 4px;font-family:var(--mono)}
+.pinlbl input,.pinlbl select,.pinlbl textarea{display:block;width:100%;margin-top:4px;font-family:var(--font);font-size:14px;text-transform:none;letter-spacing:0;font-weight:500}
+.logininp{border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--ink);padding:9px 11px}
+@media (max-width:640px){
+  .locgrid{grid-template-columns:minmax(0,1fr)}
+  .picker{width:auto}
+  .reflist{grid-template-columns:1fr}
+  .motor{grid-template-columns:1fr}
+  .futbol .btn{padding:8px 10px;font-size:12.5px}
+}
+
+/* ---------- modo empleado (cada persona ve solo lo suyo) ---------- */
+.modo-empleado #view-hoy,.modo-empleado #view-horas,.modo-empleado #view-generador,.modo-empleado #view-semana,.modo-empleado #view-mes,.modo-empleado #view-equipo{display:none!important}
+.modo-empleado #view-perfil{display:block}
+#view-perfil .festrow small{display:block;margin-top:2px}
+#view-perfil .fichead{flex-wrap:wrap}
+
+/* cuadrante semanal: siete días caben a 1280 px sin desplazamiento */
+.semt th{min-width:140px}
+.semt th.lbl{min-width:150px;max-width:150px}
+.wav{min-width:40px}

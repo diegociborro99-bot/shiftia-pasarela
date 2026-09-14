@@ -1,0 +1,11 @@
+.perfilmes{display:flex;align-items:center;gap:8px;margin:2px 0 10px}
+.perfilmes b{font-family:var(--font-d);font-size:15px;letter-spacing:-.2px;min-width:140px;text-align:center}
+.perfilmes .btn{padding:6px 9px;min-height:32px}
+.perfilmes .btn[disabled]{opacity:.35;pointer-events:none}
+/* día en que se libra la mañana y se trabaja por la tarde: guardia con marca de libranza */
+.ficd.libram{position:relative}
+.ficd.libram::after{content:"";position:absolute;left:0;top:0;width:0;height:0;border-top:9px solid var(--teal,#4ecdc4);border-right:9px solid transparent;border-top-left-radius:4px}
+/* marca «libra la mañana» junto a la actividad, en la rejilla del Mes */
+.pill .smk{opacity:.75;font-weight:700;letter-spacing:-.02em}
+
+.perfilnota{font-size:12px;line-height:1.45;color:var(--ink2);border-left:3px solid var(--warn);background:color-mix(in srgb, var(--warn) 10%, transparent);padding:8px 10px;border-radius:0 8px 8px 0;margin:0 0 10px}

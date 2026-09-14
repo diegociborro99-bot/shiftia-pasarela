@@ -1,0 +1,68 @@
+/* ============ FICHA DE PERSONA · REVISIÓN · RECOMENDADOS · BARRA DEL DÍA ============ */
+.pchip[data-pid]{cursor:pointer}
+.pchip[data-pid]:hover{box-shadow:0 3px 12px rgba(0,0,0,.14)}
+.pn[data-ficha]:hover b,.pchead[data-ficha]:hover b{color:var(--accent)}
+.ovcard.big{max-width:660px;text-align:left;max-height:88vh;overflow:auto;padding:24px 26px}
+.ovx{position:absolute;top:12px;right:14px;border:0;background:var(--surface2);color:var(--ink2);width:30px;height:30px;border-radius:9px;font-size:14px;cursor:pointer;z-index:2}
+.ovx:hover{background:var(--surface3);color:var(--ink)}
+.fichead{display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.fichav{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:19px;font-family:var(--font-d);box-shadow:var(--sh-md);flex:none}
+.fichead h2{font-family:var(--font-d);font-size:21px;font-weight:700;letter-spacing:-.4px;line-height:1.1}
+.fichead .sub{font-size:11.5px;color:var(--ink3);font-weight:600;margin-top:3px;display:block}
+.ficbadges{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.ficb{font-size:10px;font-weight:700;font-family:var(--mono);letter-spacing:.04em;border-radius:7px;padding:3px 8px;background:var(--accent-l);color:var(--accent)}
+.ficb.warn{background:var(--warn-bg);color:var(--warn)}
+.ficstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin:12px 0}
+.fics{background:var(--surface3);border:1px solid var(--border2);border-radius:11px;padding:9px 11px}
+.fics b{font-size:19px;font-family:var(--font-d);display:block;line-height:1.15}
+.fics>span{font-size:9px;font-family:var(--mono);letter-spacing:.06em;color:var(--ink3);text-transform:uppercase;font-weight:700}
+.fics small{display:block;font-size:11px;color:var(--ink3);margin-top:2px;font-weight:600}
+.fics small.up{color:var(--warn)} .fics small.dn{color:var(--ok)}
+.ficcal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
+.ficdh{font-size:11px;font-family:var(--mono);color:var(--ink3);text-align:center;font-weight:700;padding:2px 0}
+.ficd{min-height:42px;border-radius:8px;background:var(--surface3);border:1px solid var(--border2);padding:3px 5px;font-family:var(--mono);cursor:pointer;transition:transform .12s var(--ease),box-shadow .12s}
+.ficd:hover{transform:scale(1.08);box-shadow:var(--sh-md);z-index:2;position:relative}
+.ficd .n{font-size:9.5px;color:var(--ink3);font-weight:700}
+.ficd .c{display:block;font-weight:800;font-size:9px;margin-top:1px;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ficd.wk{background:var(--surface2);opacity:.7}
+.ficd.f-man{background:var(--accent-l);border-color:transparent} .ficd.f-man .c{color:var(--accent)}
+.ficd.f-g{background:var(--ink);border-color:transparent} .ficd.f-g .n,.ficd.f-g .c{color:var(--bg)}   /* sigue al tema: en oscuro #fff sobre --ink era blanco sobre blanco */
+.ficd.f-s{background:rgba(78,205,196,.18);border-color:transparent} .ficd.f-s .c{color:var(--teal-tx)}
+.ficd.f-aus{background:var(--warn-bg);border-color:transparent} .ficd.f-aus .c{color:var(--warn)}
+.ficd.f-lib{background:repeating-linear-gradient(45deg,var(--surface2) 0 5px,var(--surface3) 5px 10px)}
+.ficd.hoy{outline:2px solid var(--accent);outline-offset:1px}
+.revh2{font-family:var(--font-d);font-size:20px;font-weight:700;letter-spacing:-.4px;margin:4px 0 2px}
+.revsub{font-size:11.5px;color:var(--ink3);margin-bottom:10px}
+.revgrp{font-size:10px;font-family:var(--mono);letter-spacing:.1em;font-weight:700;margin:14px 0 6px;display:flex;align-items:center;gap:7px}
+.revgrp .dot{width:9px;height:9px;border-radius:50%}
+.revitem{display:flex;gap:10px;align-items:center;padding:8px 11px;border:1px solid var(--border2);border-radius:10px;background:var(--surface3);font-size:12px;margin-bottom:5px;line-height:1.4;animation:popIn .25s var(--ease) both}
+.revitem.alta{border-left:4px solid var(--bad)}
+.revitem.media{border-left:4px solid var(--warn)}
+.revitem.info{border-left:4px solid var(--accent)}
+.revitem .msg{flex:1;min-width:0}
+.revgo{flex:none;border:1px solid var(--border);background:var(--surface);border-radius:8px;font-size:10px;font-weight:700;padding:4px 9px;cursor:pointer;color:var(--accent);font-family:var(--mono)}
+.revgo:hover{background:var(--accent-l)}
+/* propuesta de arreglo: dice lo que haría antes de hacerlo */
+.revfix{flex:none;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:var(--grad);color:#fff;border-radius:8px;font-size:10px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:var(--mono);transition:transform .15s var(--ease2),filter .15s}
+.revfix:hover{filter:brightness(1.08)}
+.revfix:active{transform:scale(.965)}
+.revfix[disabled]{background:var(--ok);opacity:.85;cursor:default}
+.revtodo{width:100%;margin:2px 0 12px;border:0;background:var(--grad);color:#fff;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px;cursor:pointer;transition:filter .15s}
+.revtodo:hover{filter:brightness(1.08)}
+.revtodo small{font-weight:600;opacity:.9;font-size:10.5px;display:block;margin-top:2px}
+.revok{text-align:center;padding:26px 10px}
+.revok .big{font-size:38px;margin-bottom:8px;display:block}
+.prowp.rec{background:linear-gradient(90deg,var(--accent-l),transparent 75%)}
+.prowp .prsub{display:block;font-size:9.5px;color:var(--ink3);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.star{flex:none;font-size:8.5px;font-family:var(--mono);font-weight:800;letter-spacing:.05em;background:var(--grad);color:#fff;border-radius:6px;padding:2.5px 6px}
+.dsticky{position:fixed;top:0;left:0;right:0;z-index:80;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--sh-md);display:flex;align-items:center;gap:10px;padding:8px 18px;transform:translateY(-100%);transition:transform .25s var(--ease)}
+.dsticky.on{transform:none}
+.dsticky b{font-family:var(--font-d);font-size:15px;letter-spacing:-.2px}
+.dsticky .mini2{font-size:10.5px;color:var(--ink3);font-family:var(--mono);font-weight:700}
+.dsticky .sp{flex:1}
+/* botón de ausencia junto al nombre, en el cuadrante del mes */
+.pnaus{float:right;margin-left:6px;flex:none;width:19px;height:19px;line-height:1;border:1px solid var(--border);background:var(--surface);color:var(--ink3);border-radius:6px;font-size:12px;font-weight:800;cursor:pointer;padding:0;transition:all .14s var(--ease2)}
+.pnaus:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-l)}
+/* bloque de acceso a la app en la ficha de Equipo */
+.acceso{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:9px 0 4px;padding:9px 10px;border:1px dashed var(--border);border-radius:10px;background:var(--surface3)}
+.accl{font-size:9px;font-family:var(--mono);font-weight:800;letter-spacing:.08em;color:var(--ink3);text-transform:uppercase;width:100%}

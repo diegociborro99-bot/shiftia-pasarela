@@ -1,0 +1,110 @@
+/* ============ IMPRESIÓN · GRUPO PASARELA ============ */
+/* Complementa 13-impresion-formato-del-excel.css (mecánica común: .pxpage, .pxhead,
+   .pxw, .pxm, compactación, @media print). Aquí va lo propio del grupo: la pareja de
+   logos, las filas por local con su color (--lc llega en el style de la fila desde
+   l.color), las marcas abre / cocina, el turno corto en ámbar, el pie de descansos,
+   la hoja de un local en grande, las píldoras del mes y la tabla de horas.
+   La hoja es siempre blanca: dentro de #printRoot los tokens semánticos se fijan a los
+   del tema claro, para que el ámbar o el verde no salgan pálidos con la app en oscuro. */
+#printRoot{--warn:#96580a;--warn-bg:rgba(212,136,58,.14);--ok:#1c7c43;--ok-bg:rgba(39,174,96,.12);--bad:#b03333;--bad-bg:rgba(204,68,68,.10);
+  --vac-bg:#dc2626;--vac-tx:#fff;--ld-bg:rgba(90,138,191,.18);--ld-tx:#2a5a8f;--for-bg:rgba(212,136,58,.2);--for-tx:#96580a;--otr-bg:rgba(154,154,154,.16);--otr-tx:#5a5a5a}
+/* pareja de logos: Shiftia · barra · logo del grupo (o su nombre en texto mientras no haya logo) */
+.pxglogo{height:34px;max-width:120px;object-fit:contain;display:block}
+.pxgword{font-family:'DM Sans','Inter',Arial,sans-serif;font-size:14px;font-weight:500;color:#1a2a33;letter-spacing:-.2px;white-space:nowrap;line-height:1}
+.pxgword b{font-weight:800}
+
+/* ---- semana general: una sección por local con su color ---- */
+.pxw tr.pxloc td.sec{background:var(--lc)}
+.pxw tr.pxloc td.lblp{border-left-color:var(--lc)}
+.pxw th.pxd span small{font-size:7.5px;font-weight:600;color:#c8d3da;margin-left:2px;letter-spacing:0}
+.pxw th.pxd i.ev{display:block;font-style:normal;font-size:6.5px;font-weight:700;letter-spacing:.02em;text-transform:none;color:#ffd48a;white-space:normal;line-height:1.1;margin-top:1px}
+.pxw td .nm+.nm{margin-top:1px}
+/* turno corto: fondo ámbar y «falta n» */
+.pxw td.corta{background:var(--warn-bg)}
+.pxw td .falta{display:block;font-size:6.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);margin-top:1px;white-space:nowrap}
+.pxw td .falta i{font-style:normal;font-weight:600;letter-spacing:0;text-transform:none}
+.pxvacio{color:#b9c2c9;font-size:7.5px;font-style:italic}
+/* marcas junto al nombre: llave = abre / sale primero; cocina */
+.nm em.mk{display:inline-flex;align-items:center;gap:2px;font-style:normal;font-variant:small-caps;font-size:7px;font-weight:800;letter-spacing:.05em;border-radius:3px;padding:0 3px;margin-left:2px;line-height:1.5}
+.nm em.mk-abre{background:#fff1cf;color:#7a5200}
+.nm em.mk-coc{background:#e3f1e6;color:#25603a}
+.nm em.mk svg{width:7px;height:7px}
+/* tipos de ausencia que no estaban en el piloto */
+.pxw .nm.a-PERM em{background:var(--for-bg);color:var(--for-tx)}
+.pxw .nm.a-OTRO em{background:var(--otr-bg);color:var(--otr-tx)}
+/* pie de descansos */
+.pxw tr.pxdesc td.sec{background:#5c6b75}
+.pxw tr.pxdesc td.lblp{border-left-color:#5c6b75}
+/* leyenda */
+.pxchip .nm{display:inline-flex}
+.pxchip.corta{background:var(--warn-bg);color:var(--warn)}
+.pxchip.corta b{font-size:6.5px;letter-spacing:.06em;text-transform:uppercase}
+
+/* ---- hoja de un local: vertical, letra grande, para leer de pie desde la barra ---- */
+.pxlocal{font-size:12.5px}
+.pxlocal th.act{width:120px;font-size:9px}
+.pxlocal th.pxd{font-size:11px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
+.pxlocal th.pxd span{display:block;font-size:9px;font-weight:600;color:#c8d3da;letter-spacing:0;text-transform:none}
+.pxlocal th,.pxlocal td{padding:7px 10px}
+.pxlocal td{vertical-align:middle}
+.pxlocal td.lbld{font-weight:700;background:#fafbfc;border-left:6px solid var(--lc);white-space:nowrap}
+.pxlocal td.lbld b{display:block;font-size:13.5px;line-height:1.1}
+.pxlocal td.lbld span{display:block;font-size:10px;color:#5c6b75;font-weight:600;margin-top:1px}
+.pxlocal td.lbld i{display:block;font-style:normal;font-size:8.5px;font-weight:800;color:var(--warn);letter-spacing:.06em;text-transform:uppercase;margin-top:1px}
+.pxlocal td.lbld i.ev{color:#2980b9;text-transform:none;letter-spacing:0;font-weight:700}
+.pxlocal tr.wk td{background:#f6f8fa}
+.pxlocal tr.wk td.lbld{background:#f0f3f5}
+.pxlocal td.cerr{font-size:15px}
+.pxlocal td.corta{background:var(--warn-bg)}
+.pxlocal td .falta{font-size:8.5px;margin-top:3px}
+.pxlocal .nm{font-size:13.5px;line-height:1.4;gap:6px}
+.pxlocal .nm i{width:8px;height:8px}
+.pxlocal .nm em.mk{font-size:9px;padding:0 5px;line-height:1.55}
+.pxlocal .nm em.mk svg{width:9px;height:9px}
+.pxlocal td .nm+.nm{margin-top:2px}
+.pxh3{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#5c6b75;margin:12px 0 5px}
+/* pie de descansos del local: tabla pequeña debajo */
+.pxdesct{font-size:10px}
+.pxdesct th{font-size:8px;letter-spacing:.06em;text-transform:uppercase}
+.pxdesct th,.pxdesct td{padding:4px 8px;vertical-align:middle}
+.pxdesct td.lbld{width:120px;font-weight:700;background:#fafbfc;border-left:4px solid var(--lc);white-space:nowrap}
+.pxdesct td .nm{display:inline-flex;margin:1px 8px 1px 0;font-size:10px}
+.pxdesct td .nm+.nm{margin-top:1px}
+
+/* ---- tablón del mes: píldora con el color del local; dos colores si dobla ---- */
+.pxm td .pm,.pxchip .pm{display:inline-block;min-width:15px;padding:0 3px;border-radius:4px;background:var(--lc);color:#fff;font-weight:800;font-size:7.5px;line-height:1.7;letter-spacing:.02em;text-align:center}
+.pxm td .pm.dobla,.pxchip .pm.dobla{background:linear-gradient(90deg,var(--lc) 50%,var(--lc2) 50%)}
+.pxm td.a-PERM,.pxchip.a-PERM{background:var(--for-bg);color:var(--for-tx)}
+.pxm tr.baja td.nom{color:#8a97a0}
+.pxm td .falta small{font-size:5.5px;margin-left:1px;font-weight:600;letter-spacing:.04em}
+
+/* ---- horas del mes ---- */
+table.pxh{border-collapse:separate;border-spacing:0;width:100%;font-size:9px;border:1px solid #d9e0e6;border-radius:8px;overflow:hidden;font-variant-numeric:tabular-nums}
+.pxh th,.pxh td{border-right:1px solid #e6ebef;border-bottom:1px solid #e6ebef;padding:3px 6px;text-align:left;vertical-align:middle}
+.pxh th:last-child,.pxh td:last-child{border-right:0}
+.pxh th{background:#22333d;color:#fff;font-size:7.5px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.pxh th.num,.pxh td.num{text-align:right}
+.pxh td.num{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:8.5px;color:#3d4f5a}
+.pxh td.hh{font-weight:800;color:#1a2a33}
+.pxh td.pos{color:var(--ok);font-weight:800}
+.pxh td.neg{color:var(--bad);font-weight:800}
+.pxh .mut{color:#b9c2c9;font-weight:400}
+.pxh tr.baja td{color:#8a97a0}
+.pxh td.nom .nm{font-weight:700}
+.pxh td.loc{border-left:4px solid var(--lc);font-weight:700}
+.pxh tfoot td{font-weight:800;background:#eef2f5;border-top:2px solid #22333d;color:#1a2a33}
+.pxh tfoot td.num{color:#1a2a33}
+.pxhloc{margin-top:2px}
+.pxaviso{font-size:8.5px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:4px 8px;margin:0 0 7px;font-weight:600}
+.pxnota{font-size:7.5px;color:#5c6b75;margin-top:5px;line-height:1.45}
+
+/* ---- auto-ajuste a una hoja (montarImpresion pone .compacto / .compacto2 si no cabe) ---- */
+.pxpage.compacto table.pxh{font-size:8px} .pxpage.compacto .pxh th,.pxpage.compacto .pxh td{padding:2px 5px}
+.pxpage.compacto2 table.pxh{font-size:7.4px} .pxpage.compacto2 .pxh th,.pxpage.compacto2 .pxh td{padding:1px 4px}
+.pxpage.compacto .pxlocal{font-size:11px} .pxpage.compacto .pxlocal .nm{font-size:11.5px} .pxpage.compacto .pxlocal th,.pxpage.compacto .pxlocal td{padding:4px 8px}
+.pxpage.compacto2 .pxlocal{font-size:10px} .pxpage.compacto2 .pxlocal .nm{font-size:10.5px} .pxpage.compacto2 .pxlocal th,.pxpage.compacto2 .pxlocal td{padding:3px 7px}
+.pxpage.compacto .pxsem .falta{font-size:6px} .pxpage.compacto2 .pxsem .nm em.mk{font-size:6px;padding:0 2px}
+@media print{
+  .pxh tr,.pxlocal tr,.pxdesct tr{break-inside:avoid;page-break-inside:avoid}
+  .pxh thead{display:table-header-group}
+}

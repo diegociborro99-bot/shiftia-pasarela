@@ -1,0 +1,402 @@
+/* ============ MÓVIL ============
+   La app se diseñó en un portátil y en el móvil era el mismo diseño con las cajas
+   más juntas: 1.176 objetivos táctiles por debajo de los 44 px que recomienda
+   Apple, 1.097 textos por debajo de 11 px, y las fichas de Equipo cortadas.
+   Medido en un iPhone 14 (390×844) el 06/09; los números están en el changelog.
+
+   Lo que hay aquí, por orden: primero un fallo de maquetación que se cuela también
+   en escritorio, luego los fundamentos (que algo se pueda tocar y leer), y al final
+   la vista del profesional, que es la que usan los 22 del servicio todos los días. */
+
+/* ---------- 1. LO QUE NO SABE ENCOGER (también en escritorio) ----------
+   `.tchip i` lleva white-space:nowrap con puntos suspensivos. Visualmente recorta,
+   pero el ancho MÍNIMO del elemento sigue siendo el del texto entero, y la chip de
+   formación de un R5 son 105 caracteres: «QNO 3Q17 · QNO 3Q16 · QNO 3Q13 · CA.
+   PRÓSTATA / ONCO/UROTELIO / UROONCOLOGÍA · QNO CIST/BIOP · QNO LITO/END». Como la
+   rejilla de Equipo usa columnas 1fr (mínimo automático), esa chip estiraba la
+   columna a 954 px y arrastraba a TODAS las fichas: en el móvil se veían cortadas
+   por la mitad, sin los botones de acceso. Con min-width:0 los puntos suspensivos
+   empiezan a hacer su trabajo de verdad. */
+.tchip{min-width:0}
+.tchip i{min-width:0}
+.cards>*{min-width:0}
+.pchead>span[data-ficha]{min-width:0}
+
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  /* ---------- 2. QUE SE PUEDA TOCAR ----------
+     44 px es la medida de un dedo. Se aplica a la altura, no al ancho: un botón
+     puede ser estrecho, pero si es bajo se falla el toque. */
+  .btn,.btn-mini,.btn-sec,.btn-ghost,.btn-cta,.mbtn,.segk,.cvchip,.austipo,.ptab,
+  .achip,.aptall,.addabs,.rmbtn,.cvapply,.loginbtn{min-height:44px}
+  .pmini,.festrm,.avx,.ovx,.vacx,.updx{min-width:40px;min-height:40px}
+  .btn,.btn-sec,.btn-ghost,.btn-cta{padding:12px 16px;font-size:14px}
+  .btn-mini{padding:11px 14px;font-size:13px}
+  .mbtn{min-width:44px;padding:0 12px}
+  input,select,textarea,.logininp{min-height:46px;font-size:16px}   /* 16px: por debajo, iOS hace zoom al enfocar */
+  .aptchk,.singchk{min-height:38px}
+  .bnav button{min-height:52px}
+
+  /* ---------- 3. QUE SE PUEDA LEER ----------
+     Nada por debajo de 11 px en la mano. Las etiquetas en versalitas (mono) eran
+     de 8,5–9 px: legibles en un monitor a 60 cm, no en un móvil a pulso. */
+  body{font-size:14px}
+  .micro,.revgrp,.sechdr .micro,.accl,.persgrp,.cvn,.petbadge,.tchip b,.ps,.abschip,
+  .avisoban .avmeta b,.avisoban .avnew,.avisoban .avpara{font-size:11px}
+  .filltxt,.revsub,.cvpsub,.festvacio,.loginsub,.pchead small,.persnm small,
+  .fics span,.statm{font-size:12px}
+  .tchip,.tchip i,.aptchk,.singchk,.cvwho small,.festinfo small{font-size:12px}
+  small{font-size:12px}
+
+  /* ---------- 4. MENOS ADORNO, MÁS CONTENIDO ----------
+     En una pantalla de 844 px de alto, cada 100 px de cabecera son un turno menos
+     a la vista. */
+  main{padding:12px calc(12px + env(safe-area-inset-right)) calc(84px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))}
+  .card,.pcard,.ovcard{padding:14px}
+  h1{font-size:22px;line-height:1.2}
+  h2{font-size:17px}
+  .dtit,.mestit{font-size:20px}
+  .kpis,.mkpis{gap:8px}
+  .sechdr{margin:14px 0 10px;gap:8px;flex-wrap:wrap}
+
+  /* la guía de tres pasos ocupaba un tercio de la pantalla: se pliega */
+  .guia{padding:12px 14px}
+  .guia .gpaso{gap:10px}
+
+  /* ---------- 5. LA VISTA DEL PROFESIONAL ----------
+     Lo primero que ve al abrir tiene que ser SU TURNO, no su nombre en grande.
+     Antes: logo, avatar de 130 px, nombre a 40 px, tres botones, cuatro KPI y el
+     principio de un calendario vacío — la primera pantalla entera sin un solo dato
+     de trabajo. */
+  .perfilhero{gap:10px;margin:2px 0 12px;align-items:center}
+  .perfilhero .fichav{width:44px !important;height:44px !important;font-size:15px !important;border-radius:12px}
+  .perfilhero h1{font-size:19px !important;letter-spacing:-.3px}
+  .perfilhero .loginsub{font-size:11.5px}
+  /* los botones de la cabecera son de uso ocasional: al final, en una fila que cabe */
+  .perfilhero .btn{order:5;flex:1 1 auto;min-width:0}
+  .perfilhero #perfilVolverAdmin{order:-1;flex:1 1 100%}
+
+  /* pestañas: se deslizan en una sola línea en vez de partirse en dos */
+  /* eran un carrusel con la barra escondida y sin pista de que había más:
+     «Bandeja» (los avisos) quedaba a 0 px visibles en un iPhone SE. Son cuatro
+     fijas: dos filas de dos caben siempre. */
+  .perfiltabs{flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:0}
+  .ptab{flex:1 1 calc(50% - 3px);padding:11px 8px;font-size:13px;text-align:center;justify-content:center}
+
+  /* KPIs: cuatro cifras en dos filas de dos, sin huecos sueltos */
+  .ficstats{display:grid !important;grid-template-columns:1fr 1fr;gap:8px}
+  .fics{padding:10px 12px}
+  .fics b{font-size:22px}
+
+  /* EL ORDEN. Lo que abre un facultativo a las 7 de la mañana es «qué tengo hoy»,
+     y eso estaba en tercer lugar, debajo del nombre, tres botones y cuatro ceros.
+     En el móvil se le da la vuelta: primero los próximos días, luego el calendario
+     del mes, y los totales al final — que son de consulta, no de urgencia.
+     Se hace con `order`, sin tocar el HTML: la misma pantalla en el portátil. */
+  [data-pcont="planilla"]{display:flex;flex-direction:column;gap:12px}
+  [data-pcont="planilla"]>.ficstats{order:3}
+  [data-pcont="planilla"]>.perfilcols{order:1;display:flex;flex-direction:column;gap:12px}
+  [data-pcont="planilla"] .perfilcols>.card:nth-child(1){order:2}   /* tu mes de un vistazo */
+  [data-pcont="planilla"] .perfilcols>.card:nth-child(2){order:1}   /* próximos días con actividad */
+
+  /* los botones de la cabecera son de uso ocasional (imprimir, cuenta, salir): se
+     bajan al final de la pantalla para no comerse la primera vista */
+  .perfilhero{flex-wrap:wrap}
+  .perfilhero .btn{order:9;font-size:13px;padding:10px 12px;min-height:44px}
+
+  /* el calendario del mes: celdas que caben y que dicen algo */
+  .ficcal{gap:3px}
+  .ficd{min-height:46px;padding:3px 2px;border-radius:9px}
+  .ficd .n{font-size:11px}
+  .ficd{min-height:56px}
+  /* dos líneas, pero partiendo solo por espacios: «ONCO/URO» entero cabe en 42 px
+     a 8,5 px de mono; partirlo en «ONCO/UR|O» era peor que recortarlo */
+  .ficd .c{font-size:11px;line-height:1.12;letter-spacing:-.25px;white-space:normal;overflow-wrap:normal;word-break:keep-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* ---------- 6. REJILLAS ANCHAS ----------
+     Mes, Semana y Actividad son matrices: en el móvil se desplazan de lado con la
+     primera columna fija, en vez de encogerse hasta ser ilegibles. */
+  .tscroll,.mscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  .mgrid td:first-child,.mgrid th:first-child,.cvtab td:first-child,.cvtab th:first-child{position:sticky;left:0;z-index:2;background:var(--surface)}
+
+  /* ---------- 7. DIÁLOGOS A PANTALLA COMPLETA ----------
+     Un modal centrado con márgenes desperdicia la mitad del móvil. */
+  .ovl{align-items:flex-end;padding:0}
+  .ovcard{width:100%;max-width:none !important;max-height:92vh;border-radius:20px 20px 0 0;padding:18px calc(14px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left))}
+  .ovx{top:12px;right:12px}
+}
+
+/* pantallas muy estrechas (iPhone SE y similares) */
+@media (max-width:380px){
+  .ficstats{grid-template-columns:1fr 1fr}
+  .perfilhero h1{font-size:17px !important}
+}
+
+/* ---------- 8. LO QUE QUITA GENTE DE UN TURNO ----------
+   Sin ratón no hay :hover que revele nada, así que la × de la ficha estaba
+   siempre al 50 % de opacidad, medía 13×16 px y quedaba pegada al propio nombre
+   (que abre la ficha). Dos acciones muy distintas a tres píxeles. Ahora la × es
+   un objetivo de 44 px, se ve, y además se pregunta antes de quitar. */
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .rmx{opacity:1;min-width:44px;min-height:44px;padding:0 10px;font-size:20px;color:var(--ink3);
+    display:inline-flex;align-items:center;justify-content:center;margin:-8px -6px -8px 2px}
+  .pchip{padding-right:2px}
+  .festrm,.pmini,.avx,.ovx,.vacx,.updx{min-width:44px;min-height:44px}
+  /* el ＋ de poner una ausencia en la rejilla del mes era de 19×19 */
+  .pnaus{min-width:34px;min-height:34px;font-size:17px}
+}
+
+/* ---------- 9. FORMULARIOS QUE NO CABEN EN 320 px ----------
+   Dos rejillas se salían de la pantalla y no era por el texto: era el ancho
+   MÍNIMO de sus columnas.
+   · Peticiones: `.perfilcols` usa columnas 1fr, cuyo suelo es el min-content del
+     contenido. Dentro hay un <select> cuya opción más larga («Cambio de turno con
+     un compañero») impone 390 px de mínimo, así que la tarjeta entera se salía
+     82 px en un iPhone SE. Con minmax(0,1fr) la columna puede encoger y el select
+     recorta como debe.
+   · Vacaciones: la fila de alta baja a dos columnas de 150 px, que con el hueco
+     suman 320 px justos y no caben en 296 px de ancho útil. Por debajo de 380 px
+     pasa a una sola columna. */
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .perfilcols{grid-template-columns:minmax(0,1fr)}
+  .perfilcols>*,.pinlbl,.vacform>*{min-width:0}
+  .pinlbl select,.pinlbl input,.vacform .logininp,select.logininp{width:100%;max-width:100%;box-sizing:border-box}
+}
+@media (max-width:380px){
+  .vacform{grid-template-columns:1fr}
+  .vacform .vacnota,.vacform .btn{grid-column:1/-1}
+}
+
+/* ---------- 10. SEMANA: LA COLUMNA FIJA SE COMÍA LA PANTALLA ----------
+   `.act td.lbl` mide 250 px y es sticky; las columnas de día, 154 px de mínimo.
+   En un móvil de 390 px eso deja 140 px para los siete días: se veía uno y medio,
+   y al desplazar de lado las fichas de gente pasaban POR DEBAJO de la columna
+   fija. Con 118 px de etiqueta y 92 px de día caben tres días enteros. */
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .act td.lbl,.act th.lbl{min-width:118px;max-width:118px;padding:8px 8px;font-size:12.5px}
+  .act td.lbl small{font-size:10.5px}
+  .semt th{min-width:92px}
+  .wacts{gap:4px;margin-top:5px}
+  .wacts button{padding:7px 6px;font-size:11px;flex:1;min-height:34px}
+  .wcell{gap:4px;min-height:44px}
+  .wav{min-width:44px;height:44px;font-size:13px}
+  .wadd,.wtg{min-width:44px;height:44px}
+
+  /* ---------- 11. EL CALENDARIO DEL MES DEL PROFESIONAL ----------
+     Siete columnas 1fr cuyo suelo es el min-content: la etiqueta de la actividad
+     («MIR GUARDIA») no encoge y en 320 px la rejilla se salía 46 px. */
+  .ficcal{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .ficd,.ficdh,.ficd .c,.ficd .n{min-width:0}
+}
+
+/* ---------- 12. LO QUE LA CASCADA SE COMÍA ----------
+   Tres reglas de este fichero perdían contra selectores más específicos de
+   14-importador-aptitudes.css (.ovcard.big, 0,0,2,0) y no llegaban a aplicarse
+   nunca (auditoría del 06/09):
+   · el relleno del área segura en los diálogos grandes: 16 de los 22 diálogos
+     acababan con su último botón sobre el indicador de inicio del iPhone;
+   · el panel de Cobertura, que se pinta DENTRO de la página, heredaba
+     max-height:94dvh + overflow:auto y se convertía en un scroll dentro de otro. */
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .ovcard.big{padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+  .ovcard.big.incard{max-height:none;overflow:visible;padding-bottom:16px}
+
+  /* ---------- 13. MES: LA MISMA CURA QUE SEMANA ----------
+     La columna fija de nombres medía 175 px y cada día 62: en un iPhone 14 se
+     veían dos días, en un SE uno. Con 96 + 38 caben siete y cinco. */
+  :root{--w-nombre:96px;--w-dia:38px}   /* 7 días a la vista en un iPhone 14 (antes 4,5) */
+  .plan td.pname,.plan th.pname{padding:4px 6px}
+  .pn b{font-size:12px}
+  .plan th.day{min-width:var(--w-dia)}
+  .plan th.day .dd{font-size:13.5px}
+  .pill{min-width:32px;height:30px;font-size:11px;padding:0 2px}
+  .plan th.day .dn{font-size:10px}
+  .gb{font-size:8.5px}
+  .plan td{padding:5px 2px}
+}
+
+/* ---------- 14. CABECERAS DE ADMIN: PRIMERO EL DATO ----------
+   Fotografiado a 390 px el 06/09: en Mes, la primera pantalla entera eran cinco
+   botones en tres filas y cuatro KPI de 250 px de alto — ni una celda de la
+   rejilla a la vista. En Semana, 600 px de cabecera antes de la tabla.
+   Ahora: una fila con las flechas y el título, una fila de acciones que se
+   desliza de lado (como las pestañas del profesional), los cuatro KPI en cuatro
+   líneas dentro de una tarjeta y la leyenda en una sola línea deslizable. En el
+   portátil `.dacts` es display:contents: la misma pantalla de siempre. */
+.dacts{display:contents}
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .dnav{gap:8px 10px;margin-bottom:10px;align-items:center}
+  .dnav .spacer{display:none}
+  .dkick{display:none}
+  .dbig,#sLabel,#dTitle{font-size:22px !important;line-height:1.15}
+  .dnav>div[style*="min-width:0"]{flex:1 1 auto}
+  .mlabel{min-width:0;flex:1;font-size:16px}
+  .arrows{padding:2px}
+  .mbtn{width:44px;height:44px}
+  .dstats{flex:1 1 100%;order:3;gap:6px}
+  .dstat{font-size:11px;padding:6px 9px}
+  .dacts{display:flex;order:4;flex:1 1 100%;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -12px;padding:2px 12px 4px}
+  .dacts::-webkit-scrollbar{display:none}
+  .dacts .btn{flex:none;white-space:nowrap;padding:10px 13px;font-size:13px;min-height:44px}
+  /* KPI: cuatro líneas, no cuatro tarjetas */
+  .kpis{display:flex;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:11px;margin-bottom:10px;overflow:hidden}
+  .kpi{display:flex;align-items:baseline;gap:10px;padding:8px 12px;border:0;border-radius:0;border-bottom:1px solid var(--border2)}
+  .kpi:last-child{border-bottom:0}
+  .kpi .micro{flex:1;font-size:11px}
+  .knum{font-size:17px;margin:0}
+  .kcap{display:none}
+  /* leyenda: una línea que se desliza */
+  .legendbar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;gap:12px;padding:8px 12px;margin-bottom:10px}
+  .legendbar::-webkit-scrollbar{display:none}
+  /* OJO: el contenedor de la rejilla NECESITA altura. Sin ella (max-height:none)
+     la cabecera de días no tiene a qué pegarse y en cuanto bajas una fila estás
+     mirando columnas de códigos sin saber de qué día son (auditoría 06/09). */
+  #planTable.tscroll{max-height:max(280px, calc(100dvh - 232px));overscroll-behavior:contain}
+  #semRoot.actwrap,#actRoot.actwrap{max-height:max(280px, calc(100dvh - 196px));overscroll-behavior:contain}
+  .tablewrap.card,.card.actwrap{padding:0;border-radius:12px}
+  /* Semana: columnas fijas para que las fichas se plieguen dentro de la celda
+     en vez de estirar la columna a lo que mida su contenido */
+  table.semt{table-layout:fixed;width:calc(118px + 7 * 96px)}
+  .semt th{width:96px;min-width:96px}
+  .semt th.lbl{width:118px}
+  .wav,.wadd,.wtg{min-width:40px;height:44px}   /* la medida del dedo es la altura */
+  .wcell{gap:4px;min-height:48px}
+}
+
+/* ---------- 15. LO QUE SOBRA EN LA MANO ----------
+   La guía de tres pasos de Día (420 px) y el párrafo de Actividad son de
+   escritorio: en el móvil se consulta y se retoca, no se aprende a planificar.
+   Los botones «＋ SEM / ✕ SEM» de Semana abrían o cerraban una actividad la
+   semana entera: en 118 px se partían en dos líneas y hacían las filas de 170 px;
+   el ＋ de cada día sigue ahí. Y en Mes el nombre corto y sin la palabra
+   «Facultativo», que en 118 px solo estorbaba. */
+.ncorto{display:none}
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .guia{display:none}
+  #view-actividad .dnav>span{display:none}
+  #view-semana .wacts{display:none}
+  #view-actividad .wacts{display:flex;gap:4px;margin-top:4px}
+  #view-actividad .wacts button{flex:1;min-width:0;min-height:44px;font-size:11px;padding:0 2px}
+  .nlargo,.nrol{display:none}
+  .ncorto{display:inline}
+  .pn small{font-size:10px}
+  .pn b{font-size:12.5px}
+}
+
+/* ---------- 16. LAS REGLAS QUE PERDÍAN POR ESPECIFICIDAD ----------
+   OJO: una regla de un solo nombre de clase de este fichero (`.btn{min-height}`)
+   NO gana a `.contenedor .btn{min-height:32px}` de un fichero anterior, por muy
+   tarde que se concatene. Cualquier `X .btn{…}` de escritorio hay que repetirlo
+   aquí con las dos clases. Auditoría del 06/09: las flechas de mes del
+   profesional (la ÚNICA pantalla que ven los 22) seguían en 38×32. */
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .perfilmes .btn{min-height:44px;min-width:44px;padding:10px 12px}
+  .hoyh .btn-mini,.hoyln .btn-mini{min-height:44px}
+  .popb,.updb,.semk{min-height:44px}
+  .cvnav{min-width:44px;min-height:44px}
+  .pmore summary,.cvhist summary,.festotros summary,.aptbox summary{min-height:44px;display:flex;align-items:center}
+  .gclose{min-width:44px;min-height:44px;top:2px;right:2px;display:grid;place-items:center}
+  /* «✕ cerrar» de Día: cierra la actividad y saca a todo el mundo. Medía 66×24
+     al 60 % de opacidad. La confirmación ya la tiene. */
+  .closebtn{opacity:1;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--ink3)}
+  /* el ＋ de ausencia del Mes: 44 px y SIN montarse encima del nombre (float) */
+  .pnaus{display:none}          /* en el móvil el nombre abre un menú: ficha o ausencia */
+  td.pname .pn{display:block}
+  .pn b .dot2{display:none}     /* el color ya lo llevan las pastillas; 96 px no dan para más */
+  /* el trabajador no tiene barra inferior: los 84 px reservados para ella eran
+     un hueco vacío al pie de cada pantalla (el 15 % de un iPhone SE) */
+  .modo-empleado main{padding-bottom:calc(84px + env(safe-area-inset-bottom))}   /* ahora sí tiene barra inferior */
+  /* la lista de próximos días: filas de 52 px en vez de 72, para que el
+     calendario del mes quede una pantalla más cerca */
+  #view-perfil .festrow{padding:5px 8px;gap:8px;margin-bottom:4px}
+  #view-perfil .festfecha{width:40px;padding:2px 0}
+  #view-perfil .festfecha b{font-size:14px}
+  #view-perfil .festinfo b{font-size:12px}
+}
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  /* Día: la ficha de una persona no encoge (nowrap) y se salía de su caja por
+     debajo del «✕ cerrar», que tapaba la × de quitar. Las fichas ocupan su fila
+     entera y el «cerrar» va debajo, a la derecha: nada encima de nada. */
+  .chips{flex:1 1 100%}
+  .pchip{max-width:100%}
+  .closebtn{margin-left:auto}
+}
+
+/* ---------- 17. ACTIVIDAD EN LA MANO ----------
+   La cuadrícula del mes tenía 591 casillas de 31 px a 4 px unas de otras (y
+   cerrar un día retira a la gente); por semanas, el nombre de cada actividad a
+   10,5 px y la sala a 8,5. */
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  #view-actividad .act td{padding:2px;min-width:48px}
+  #view-actividad .act .tg{width:44px;height:44px}
+  #view-actividad .act td.lbl,#view-actividad .act th.lbl{min-width:104px;max-width:104px}
+  #view-actividad .actcount{font-size:11px}
+  .achip{font-size:12px}
+  .achip em,.apn{font-size:11px}
+  .asecl{font-size:10px}
+  .dayc header small,.dayc summary small{font-size:11px}
+  .dayc>summary{min-height:44px}
+  .dayc:not([open])>summary{border-bottom:0}
+}
+
+/* ---------- 18. EL MODELO DE DIÁLOGO EN LA MANO ----------
+   Auditoría del 06/09, veinte diálogos abiertos uno a uno:
+   · el fondo se desplazaba por detrás de todos (al cerrar, el mes estaba en
+     otro sitio): overscroll contenido y el fondo no responde al gesto;
+   · la ✕ iba en absoluto dentro de la tarjeta, que es justo lo que se desplaza:
+     al bajar desaparecía. Ahora es sticky: siempre en la esquina;
+   · el botón de confirmar (Asignación manual, los cuatro pasos de Cobertura)
+     quedaba entre 500 y 1.100 px por debajo del borde: la barra de acción se
+     queda pegada al pie de la hoja, donde cae el pulgar;
+   · las listas de personas con scroll propio dentro de una hoja con scroll
+     dentro de una página con scroll: solo se desplaza la hoja;
+   · con el teclado abierto las hojas suben lo que el teclado tapa (--kb). */
+.popfondo{display:none}
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .ovl{overscroll-behavior:contain;touch-action:none;bottom:var(--kb,0px)}
+  .ovcard,.ovcard.big{overscroll-behavior:contain;touch-action:pan-y}
+  .ovcard .ovx{position:sticky;top:0;float:right;margin:-6px -4px 0 0;z-index:5;background:var(--surface2);box-shadow:0 0 0 3px var(--surface)}
+  .ovcard:not(.incard) .bar,.ovcard:not(.incard) .cvgen,.ovcard:not(.incard) .cvbtns,.asigbar{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom));background:var(--surface);margin:0 -14px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 14px rgba(0,0,0,.08);z-index:4}
+  .perslist{max-height:none;overflow:visible}
+  .popfondo{display:block;position:fixed;inset:0;z-index:119;background:rgba(20,24,30,.28);touch-action:none}
+  .pop.sheet{bottom:calc(64px + env(safe-area-inset-bottom) + var(--kb,0px))}
+  .ovcard:focus-within{padding-bottom:calc(18px + env(safe-area-inset-bottom) + 30vh)}
+}
+
+/* ---------- 19. LA BARRA INFERIOR DEL PROFESIONAL ----------
+   Sus cuatro pestañas iban pegadas al contenido: al bajar por la planilla
+   quedaban 840 px por encima del borde y no había forma de ir a la Bandeja sin
+   volver arriba. En el móvil la barra inferior es suya también. Y en horizontal
+   la cabecera se encoge: un teléfono tumbado tiene 390 px de alto. */
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .modo-empleado .bnav.bnav-emp{display:flex !important}
+  .modo-empleado .perfiltabs{display:none}
+  .bnav button{position:relative}
+  .bnavn{position:absolute;top:4px;right:calc(50% - 22px);min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--bad);color:#fff;font-size:10px;font-weight:800;font-style:normal;display:inline-flex;align-items:center;justify-content:center}
+}
+@media (max-height:520px) and (pointer:coarse){
+  .topbar{padding-top:calc(4px + env(safe-area-inset-top));padding-bottom:4px}
+  .brand svg:first-child{width:24px;height:24px}
+  .brand .bname{font-size:17px}
+  .hlogo{width:22px;height:22px}
+  .bnav button{min-height:44px;padding:2px 0}
+  .bnav button span{display:none}
+}
+
+/* ---------- 20. LOS DOS PRIMEROS TOQUES DEL JEFE ----------
+   El nombre en la rejilla del Mes (abre el menú de la persona) medía 83×36; los
+   24 destinatarios del aviso eran chips de 30 px dentro de un scroll de 220 px
+   dentro de la hoja. */
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .plan td.pname .pn{min-height:44px;display:flex;flex-direction:column;justify-content:center}
+  .rcp{min-height:44px;font-size:13px;padding:4px 12px 4px 4px}
+  .rcpgrid{max-height:none}
+}
+
+/* v2.35.0 · Admin · Día en pantallas estrechas: la fila «nombre · libra la mañana · guardia»
+   de «Salientes de hoy» no cabe en una línea a 320 px; se parte en dos en vez de ensanchar la
+   tarjeta y, con ella, toda la columna del día */
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .srow{flex-wrap:wrap;row-gap:2px}
+  .srow .nm{flex:1 1 auto}
+  .srow small{flex-basis:100%;margin-left:32px;white-space:normal;font-size:11px}
+}

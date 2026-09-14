@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shiftia · Grupo Pasarela · Acceso</title>
+<meta name="robots" content="noindex,nofollow">
+<!--INJECT:BUILD-->
+<meta name="theme-color" content="#f8f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
+<!--INJECT:ICON-->
+<!--INJECT:PWA-->
+<link rel="manifest" href="./manifest.webmanifest">
+</head>
+<body style="margin:0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!--INJECT:STYLES-->
+<style>body{padding-bottom:var(--kb,0px)}</style>
+<div class="lockscr" id="lock">
+  <div class="logincard">
+    <div class="logincoop">
+      <svg viewBox="0 0 32 32" width="46" height="46" aria-hidden="true"><defs><linearGradient id="lgL" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#4ecdc4"/><stop offset="1" stop-color="#2980b9"/></linearGradient></defs><rect width="32" height="32" rx="7" fill="url(#lgL)"/><path d="M16 26c-6-1.5-10-6-9-12s7-9 13-7.5c-4.5-0.7-9 2.2-9.7 6.7s3 9 7.5 10.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M14.5 8c6 1.5 10 6 9 12s-7 9-13 7.5c4.5 0.7 9-2.2 9.7-6.7s-3-9-7.5-10.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      <span class="coop" aria-hidden="true"></span>
+      <span class="glogo big"><img width="46" height="46" alt="Grupo Pasarela" src="<!--INJECT:GLOGO-->" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="gword" hidden>Grupo <b>Pasarela</b></span></span>
+    </div>
+    <div class="loginh">Sh<em>iftia</em></div>
+    <div class="loginsub">Grupo Pasarela · El 33 · Zapatillera · Bar Mónaco · Pasarela</div>
+    <form id="loginForm" autocomplete="on">
+      <label class="loginlbl" for="loginUser">Usuario</label>
+      <input class="logininp" id="loginUser" name="username" autocomplete="username" spellcheck="false" autocapitalize="none" autofocus>
+      <label class="loginlbl" for="loginPass">Contraseña</label>
+      <input class="logininp" type="password" id="loginPass" name="password" autocomplete="current-password">
+      <label class="loginrec"><input type="checkbox" id="loginRec" checked> Mantener la sesión en este dispositivo</label>
+      <button class="btn btn-cta loginbtn" type="submit" id="loginBtn">Entrar</button>
+      <div class="loginerr" id="loginErr" role="alert"></div>
+    </form>
+    <div id="cambioPassOvl" hidden>
+      <p class="loginsub">Estás entrando con una contraseña inicial de un solo uso. Crea la tuya (mínimo 8 caracteres): solo la sabrás tú.</p>
+      <form id="cambioForm">
+        <label class="loginlbl" for="cnv0" id="cnv0lbl">Contraseña inicial que te dieron</label>
+        <input class="logininp" type="password" id="cnv0" autocomplete="current-password">
+        <label class="loginlbl" for="cnv1">Nueva contraseña</label>
+        <input class="logininp" type="password" id="cnv1" autocomplete="new-password">
+        <label class="loginlbl" for="cnv2">Repítela</label>
+        <input class="logininp" type="password" id="cnv2" autocomplete="new-password">
+        <button class="btn btn-cta loginbtn" type="submit" id="cambioBtn">Guardar mi contraseña</button>
+        <div class="loginerr" id="cambioErr" role="alert"></div>
+        <button class="btn btn-ghost" type="button" id="cambioSalir" style="width:100%">Salir</button>
+      </form>
+    </div>
+    <div class="loginfoot">© 2026 Shiftia · Grupo Pasarela<br><span class="hklab">coded by Highkey Labs</span></div>
+  </div>
+</div>
+<script>
+// Pantalla de acceso independiente: la app completa solo se sirve con sesión.
+(function () {
+  if (window.visualViewport) {
+    var kb = function () { var h = Math.max(0, Math.round(innerHeight - visualViewport.height - visualViewport.offsetTop)); document.documentElement.style.setProperty('--kb', h + 'px'); };
+    visualViewport.addEventListener('resize', kb); visualViewport.addEventListener('scroll', kb); kb();
+  }
+  var img = document.querySelector('.glogo img'); if (img && !img.getAttribute('src')) { img.hidden = true; img.nextElementSibling.hidden = false; }
+  var form = document.getElementById('loginForm'), err = document.getElementById('loginErr'), btn = document.getElementById('loginBtn');
+  try { if (localStorage.getItem('shiftia_pas_usuario')) document.getElementById('loginUser').value = localStorage.getItem('shiftia_pas_usuario'); } catch (e) {}
+  if (document.getElementById('loginUser').value) document.getElementById('loginPass').focus();
+  var cambio = document.getElementById('cambioPassOvl'), cambioForm = document.getElementById('cambioForm'), cambioErr = document.getElementById('cambioErr'), cambioBtn = document.getElementById('cambioBtn');
+  var actualConocida = null;
+  function mostrarCambio(actual) {
+    actualConocida = actual || null;
+    form.hidden = true; cambio.hidden = false;
+    document.getElementById('cnv0').hidden = !!actual; document.getElementById('cnv0lbl').hidden = !!actual;
+    document.getElementById(actual ? 'cnv1' : 'cnv0').focus();
+  }
+  document.getElementById('cambioSalir').addEventListener('click', function () {
+    fetch('/api/logout', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(function () { location.reload(); });
+  });
+  cambioForm.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var n1 = document.getElementById('cnv1').value, n2 = document.getElementById('cnv2').value;
+    var act = actualConocida || document.getElementById('cnv0').value;
+    if (n1.length < 8) { cambioErr.textContent = 'Mínimo 8 caracteres'; return; }
+    if (n1 !== n2) { cambioErr.textContent = 'Las dos contraseñas no coinciden'; return; }
+    cambioErr.textContent = ''; cambioBtn.disabled = true; cambioBtn.textContent = 'Guardando…';
+    fetch('/api/password', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actual: act, nueva: n1 }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (r) {
+        if (!r.ok) { cambioErr.textContent = (r.d && r.d.error) || 'No se pudo guardar'; cambioBtn.disabled = false; cambioBtn.textContent = 'Guardar mi contraseña'; return; }
+        location.replace('/');
+      })
+      .catch(function () { cambioErr.textContent = 'Sin conexión con el servidor: inténtalo de nuevo'; cambioBtn.disabled = false; cambioBtn.textContent = 'Guardar mi contraseña'; });
+  });
+  fetch('/api/yo', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) { if (d && d.cambiar) mostrarCambio(null); }).catch(function () {});
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var u = document.getElementById('loginUser').value.trim().toLowerCase();
+    var p = document.getElementById('loginPass').value;
+    var rec = document.getElementById('loginRec').checked;
+    if (!u || !p) { err.textContent = 'Escribe tu usuario y tu contraseña'; return; }
+    err.textContent = ''; btn.disabled = true; btn.textContent = 'Entrando…';
+    fetch('/api/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario: u, password: p, recordar: rec }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (r) {
+        if (!r.ok) { err.textContent = (r.d && r.d.error) || 'No se pudo entrar'; document.getElementById('loginPass').value = ''; btn.disabled = false; btn.textContent = 'Entrar'; return; }
+        try { localStorage.setItem('shiftia_pas_usuario', u); localStorage.setItem('shiftia_pas_srv', '1'); } catch (e) {}
+        if (r.d && r.d.cambiar) { btn.disabled = false; btn.textContent = 'Entrar'; mostrarCambio(p); return; }
+        location.replace('/');
+      })
+      .catch(function () { err.textContent = 'Sin conexión con el servidor: inténtalo de nuevo'; btn.disabled = false; btn.textContent = 'Entrar'; });
+  });
+})();
+</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:wght@500;600;700&display=swap">
+</body>
+</html>

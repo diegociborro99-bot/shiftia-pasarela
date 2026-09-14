@@ -1,0 +1,16 @@
+/* ============ NOTIFICACIONES PUSH · CAMBIOS DE TURNO ============ */
+.pushbloque{margin:0 0 12px}
+.pushrow{display:flex;align-items:center;gap:12px;border:1px solid var(--border2);background:var(--surface3);border-radius:12px;padding:10px 12px;flex-wrap:wrap}
+.pushic{flex:none;width:36px;height:36px;border-radius:10px;background:var(--surface);border:1px solid var(--border);display:grid;place-items:center;color:var(--ink3)}
+.pushic.on{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.pusht{flex:1;min-width:180px} .pusht b{display:block;font-size:13px} .pusht small{font-size:11px;color:var(--ink2);font-weight:600}
+.pushrow .btn{font-size:12px}
+.swaprow{display:flex;align-items:center;gap:10px;border-left:3px solid var(--accent);background:var(--surface3);border-radius:10px;padding:9px 12px;margin-bottom:6px;flex-wrap:wrap}
+.swaprow .swapt{flex:1;min-width:200px;font-size:12.5px} .swaprow .swapt b{display:block;font-size:13px}
+.swaprow .swapt small{color:var(--ink2);font-weight:600}
+.swapbtns{display:flex;gap:6px}
+.petestado{font-size:10.5px;font-weight:700;color:var(--ink2)}
+.swapbtns .btn,.pushrow .btn{min-height:44px}
+.swapbtns{gap:10px}
+.petbadge{font-size:10.5px!important}
+.pushpasos{margin:6px 0 0;padding-left:18px;font-size:11.5px;color:var(--ink2)} .pushpasos li{margin:2px 0}

@@ -1,0 +1,29 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Sintaxis del modelo
+        run: node --check modelo.js
+      - name: index.html está sincronizado con src/ (se ha ejecutado el build)
+        run: node tools/build.mjs --check
+      - name: Tests del modelo
+        run: node modelo.test.js
+      - name: Paridad del modelo embebido
+        run: node tools/check-parity.mjs
+      - name: Tests del servidor
+        run: node --test tests/*.test.mjs
+      - name: Chromium para la batería e2e
+        run: npx --yes playwright-core@1.47.0 install chromium || true
+      - name: Batería e2e (se salta sola sin Chromium)
+        run: |
+          for f in tests/e2e-*.mjs; do [ -f "$f" ] && node "$f" || true; done

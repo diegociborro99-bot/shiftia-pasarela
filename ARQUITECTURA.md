@@ -1,0 +1,91 @@
+# Arquitectura
+
+Misma pila que el piloto de Shiftia: la app se **escribe compartimentada en
+`src/`** y se **ensambla** en un único `index.html` con un build sin
+dependencias. Ese fichero es lo que sirve el servidor y lo que funciona sin
+conexión como PWA.
+
+```
+src/
+  index.template.html      shell HTML (barra superior con los dos logos, pestañas,
+                           seis vistas, barra inferior móvil) con marcadores
+                           <!--INJECT:STYLES--> / <!--INJECT:SCRIPT--> / <!--INJECT:GLOGO-->
+  login.template.html      pantalla de acceso → login.html (se sirve sin sesión)
+  styles/*.css             estilos por área; 01–20 vienen del piloto (tokens, topbar,
+                           nav, día, mes, equipo, overlays, semana, impresión, móvil…),
+                           21–24 son de Pasarela (app, equipo, impresión, horas).
+                           Se concatenan por orden de nombre.
+  app/*.js                 la app, un fichero por sección; el orden lo fija
+                           app/_orden.json. Comparten scope (un solo <script>): sin
+                           import/export.
+modelo.js                  modelo de dominio (fuente única). Se embebe sin su
+                           module.exports; los tests y el servidor lo usan tal cual.
+modelo.test.js             tests del modelo (node modelo.test.js)
+server.js                  backend Node + SQLite, sin dependencias
+estado-servidor.js         proyección del estado por rol (el empleado recibe lo suyo)
+push*.js                   notificaciones push sin dependencias (del piloto; fase 3)
+tools/build.mjs            ensambla src/ → index.html + login.html (embebe el logo)
+tools/check-parity.mjs     el modelo embebido === modelo.js
+tests/                     tests del servidor y de seguridad (node:test)
+assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
+```
+
+## Módulos de la app (`src/app`, en orden)
+
+| Fichero | Qué hace |
+|---|---|
+| `00-pre.js` | `'use strict'`; delante va el modelo embebido. |
+| `01-core-utils.js` | `$`, formatos de fecha, `esc`, toasts, tooltip, overlays y popovers, color por persona y por local. |
+| `02-estado-y-modelo-datos.js` | Estado `S` (locales, staff, patrón, meses, eventos, extras, cierres, equipos), carga y guardado (localStorage o servidor), sincronía entre pestañas, historial, deshacer, `asignarUI` / `desasignarUI`, `renderVistaActiva`. |
+| `10-vista-hoy.js` | Vista Hoy: tarjetas por local con las casillas ordenadas. |
+| `11-selector.js` | Selector de persona (puede / con aviso / no puede + forzar) y menú de una persona en una casilla. |
+| `13-vista-semana.js` | Cuadrante semanal (8 filas × 7 días) con pie de descansos; «guardar como semana tipo». |
+| `14-impresiones.js` | Hojas imprimibles: semana general, por local, mes por persona, informe de horas. |
+| `15-export-xlsx.js` · `15-export-pdf.js` | Excel de la semana y de las horas; PDF. |
+| `17-vista-mes.js` | Mes personas × días, KPIs, leyenda, fila de control, ausencias, botones de fútbol. |
+| `18-eventos.js` | Evento con refuerzo (partidos y otros): refuerzo por local, equipos editables. |
+| `19-vista-equipo.js` · `20-ficha-persona.js` | Equipo: personas, altas y bajas, ficha con todas las condiciones editables, ajustes de los locales. |
+| `21-vista-horas.js` | Contador de horas: tabla del mes, horas extra, cierre y reapertura del mes. |
+| `22-generador.js` | Generador: periodo, opciones, motor local o núcleo, vista previa, aplicar, vaciar lo generado. |
+| `23-revision.js` | Revisión del mes y punto rojo de avisos. |
+| `25-cuenta.js` | Contraseña, usuarios (servidor), copia de seguridad y versiones. |
+| `29-avisos-e-historial.js` | Historial de cambios. |
+| `30-modo-servidor.js` | Detección del servidor, sesión, envío del estado con versionado, SSE, conflictos. |
+| `31-navegacion.js` | Pestañas, día a día, «Más» del móvil, teclado, foco de diálogos, «atrás», tema, PWA, modo empleado. |
+| `32-arranque.js` | Inicio: carga, migración, navegación recordada, `?demo=1`. |
+| `33-actualizacion.js` | Aviso de versión nueva y reinicio limpio. |
+
+## Modelo de datos (resumen)
+
+- **Local**: `{id, nombre, corto, color, abre:{M:[dows],T:[dows]}, minimos:{M:{dow:n},T:{…}}, supuestos, cocina:{obligatoria, titulares, reservas, posicion}, primero:{M,T}, horario:{M,T,porDow}, horarioSupuesto, descansoMin}`.
+- **Persona**: `{id, nombre, puesto, locales, franjas, libra, partido:{dias}, cocina:{titular, reserva, soloDias}, abre:{localId:[franjas]}, noAbre, nuncaCon, cubreA, vetos, contrato:{horasSemana}, ausencias:[{tipo,desde,hasta?}], prefs, nota, supuestos, color}`.
+- **Casilla**: `est.asig[iso][turnoId] = [{pid, cocina, abre, origen, razon, supuesto, forzado?, avisos?, ini?, fin?}]`, con `turnoId = localId_franja`. Es una lista ordenada: la posición 1 abre. `est.manual[iso][turnoId]` recuerda lo que se tocó a mano.
+- **Semana tipo**: `S.patron[dow] = [{t: turnoId, p: pid, c?: cocina, a?: abre, s?: supuesto}]`.
+- **Eventos**: `S.eventos = [{iso, nombre, equipo?, franja, refuerzo:{localId:n}, hora?}]`: suben el mínimo de esas casillas.
+- **Horas**: se derivan de la planilla + `S.extras` (persona, fecha, minutos, motivo) + horario distinto por casilla; `S.cierres['YYYY-MM']` guarda la instantánea del cierre.
+
+## Reglas (en `modelo.js`)
+
+`puedeEstar` devuelve `{ok, motivo, avisos}`: **duras** (cierre del local ese día, ausencia, ya está en esa casilla, no trabaja esa franja, veto local+franja, libra ese día, «nunca con» alguien ya en la casilla, mínimo de cocina obligatoria…) y **blandas** (no es su local, partido no declarado, día que evita…) que se pueden **forzar** desde la interfaz con motivo, y quedan marcadas. `revisarTurno` / `revisionMes` resumen faltas, sin cocina, sin nadie que abra, incompatibles y forzados.
+
+`generarPlanilla` es aditivo y determinista: instancia la semana tipo (saltando ausentes, con «cubre a» como primera alternativa), y rellena los mínimos con `candidatosPara` (puntuación con razones). Devuelve aplicados, huecos con `porQueNadie`, coberturas y rechazados. `toProblem` / `desdeSolucion` traducen al formato del núcleo Shiftia (CP-SAT) y de vuelta.
+
+## Flujo de trabajo
+
+1. Edita el fichero de `src/` (o `modelo.js`) que corresponda.
+2. `npm run build` → regenera `index.html` y `login.html`.
+3. `npm test` → tests del modelo, del servidor y paridad.
+
+> **No edites `index.html` a mano**: lo genera el build y CI lo verifica
+> (`npm run build:check` falla si está desincronizado con `src/`).
+
+## Servidor
+
+`server.js` sirve una lista blanca de ficheros, guarda la planilla en SQLite con
+versionado optimista (`PUT /api/estado` con `baseVersion` → 409 si otro escribió
+antes; la app fusiona con `fusionarEstado`), usuarios con scrypt y cookie firmada,
+SSE (`/api/eventos`) para repintar todos los dispositivos, copia diaria de la BD,
+y el proxy al núcleo (`/api/nucleo/salud`, `/api/nucleo/solve`) con la clave del
+servicio guardada solo en el servidor. Roles: **programador** (todo + auditoría),
+**admin** (el encargado: planilla, condiciones, usuarios), **empleado** (solo lo
+suyo, proyectado por `estado-servidor.js`).

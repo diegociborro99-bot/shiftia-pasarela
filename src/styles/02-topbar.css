@@ -1,0 +1,31 @@
+/* ============ TOPBAR ============ */
+.topbar{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:18px;padding:calc(15px + env(safe-area-inset-top)) calc(26px + env(safe-area-inset-right)) 15px calc(26px + env(safe-area-inset-left));
+  background:color-mix(in srgb, var(--surface) 86%, transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;flex:0 1 auto}
+.brand>svg,.brand .coop{flex:none}
+.bname{font-family:var(--font-d);font-size:24px;font-weight:700;letter-spacing:-.3px;color:var(--ink);white-space:nowrap}
+.bname em{font-style:normal;color:var(--accent)}
+/* El nombre del servicio acompaña a la marca: no compite con el menú ni se recorta.
+   Iba a 15px con max-width:250px, que con el padding dejaba 236px de texto para
+   los 237px que ocupa «Management Urología · HUCSC»: salía con puntos suspensivos
+   en TODAS las pantallas, por un píxel. Ahora es un punto más pequeño (subtítulo,
+   no segundo título), cabe entero y solo aparece cuando el menú tiene sitio. */
+.svc{font-family:var(--font-d);font-size:14px;font-weight:600;color:var(--ink2);border-left:1px solid var(--border);padding-left:13px;margin-left:1px;white-space:nowrap;flex:none;letter-spacing:-.1px}
+@media (max-width:1560px){.svc{display:none}}
+@media (max-width:1400px){.tab{padding:10px 11px;font-size:13.5px}.tab svg{display:none}}
+@media (max-width:1200px){.tab{padding:10px 8px;font-size:13px}.tright{gap:6px}}
+.tabs{display:flex;gap:2px;margin-left:auto;margin-right:auto;overflow-x:auto}
+.tab{position:relative;background:none;border:0;padding:10px 18px;font-size:14.5px;font-weight:600;color:var(--ink3);border-radius:8px;white-space:nowrap;transition:color .15s}
+.tab:hover{color:var(--ink2)}
+.tab[aria-selected="true"]{color:var(--accent)}
+.tab[aria-selected="true"]::after{content:"";position:absolute;left:13px;right:13px;bottom:2px;height:2.5px;background:var(--accent);border-radius:2px}
+.tright{display:flex;align-items:center;gap:10px}
+.iconbtn{width:34px;height:34px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.iconbtn:hover{background:var(--accent-solid);border-color:var(--accent);color:#fff}
+#topAvisos{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 2px 10px rgba(41,128,185,.35)}
+#topAvisos:hover{filter:brightness(1.08);box-shadow:0 4px 14px rgba(41,128,185,.5);transform:translateY(-1px)}
+
+main{max-width:1520px;margin:0 auto;padding:24px 26px 70px}
+.view{animation:viewIn .3s var(--ease)}
+@keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}

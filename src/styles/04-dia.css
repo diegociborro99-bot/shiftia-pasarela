@@ -1,0 +1,51 @@
+/* ============ DÍA ============ */
+/* minmax(0,1fr): «1fr» no baja del contenido mínimo y a 320 px la tarjeta «Salientes de hoy» ensanchaba toda la columna 54 px fuera de pantalla (v2.35.0) */
+.daygrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media(max-width:980px){.daygrid{grid-template-columns:minmax(0,1fr)}}
+.secblock{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh-sm);margin-bottom:14px;overflow:hidden}
+.sechd{display:flex;align-items:center;gap:11px;padding:14px 20px;border-bottom:1px solid var(--border2);font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
+.sechd .dot{width:12px;height:12px;border-radius:4px}
+.sechd .hint{margin-left:auto;letter-spacing:0;text-transform:none;font-family:var(--font);font-weight:500;font-size:12.5px;color:var(--ink3)}
+.slotrow{display:flex;align-items:center;gap:14px;padding:13px 20px;border-bottom:1px solid var(--border2)}
+.slotrow:last-child{border-bottom:0}
+.slotrow:hover{background:var(--surface3)}
+.slbl{flex:0 0 265px;min-width:0;font-size:15.5px;font-weight:700;display:flex;align-items:center;gap:7px}
+.slbl .sala{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--ink3);background:var(--surface2);border-radius:4px;padding:1px 5px}
+.slbl .varinfo{font-size:10px;color:var(--warn)}
+.selwrap{display:flex;gap:6px;flex:1;flex-wrap:wrap;align-items:center}
+.psel{min-width:170px;flex:1;max-width:230px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-size:12px;padding:6px 8px}
+.psel.filled{border-color:color-mix(in srgb, var(--accent) 40%, var(--border));background:var(--accent-l)}
+.salnote{font-size:12.5px;color:var(--sal-tx);font-weight:600;white-space:nowrap}
+.closebtn{border:0;background:none;color:var(--ink3);font-size:14px;padding:4px 7px;border-radius:7px;opacity:0;transition:opacity .15s}
+.slotrow:hover .closebtn{opacity:1}
+.closebtn:hover{background:var(--bad-bg);color:var(--bad)}
+.cerrados{padding:12px 20px;font-size:13px;color:var(--ink3);display:flex;flex-wrap:wrap;gap:6px;align-items:center;border-top:1px dashed var(--border)}
+.reopen{border:1px dashed var(--border);background:none;border-radius:9px;font-size:12.5px;font-weight:700;color:var(--ink3);padding:6px 13px}
+.reopen:hover{color:var(--accent);border-color:var(--accent)}
+.nolab{background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:24px;text-align:center;color:var(--ink2);font-size:13px;margin-bottom:14px}
+.nolab b{display:block;font-family:var(--font-d);font-size:18px;color:var(--ink);margin-bottom:3px}
+/* lateral */
+.side{display:flex;flex-direction:column;gap:12px}
+.scard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:17px 20px;box-shadow:var(--sh-sm)}
+.scard .lst{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.srow{display:flex;align-items:center;gap:10px;font-size:14px}
+.srow .nm{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srow small{color:var(--ink3);font-size:10.5px;margin-left:auto;white-space:nowrap}
+.szero{font-size:13px;color:var(--ink3);margin-top:6px}
+.abschip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;border-radius:6px;padding:2.5px 8px}
+.a-VAC{background:var(--vac-bg);color:var(--vac-tx)} .a-LD{background:var(--ld-bg);color:var(--ld-tx)}
+.a-FOR{background:var(--for-bg);color:var(--for-tx)} .a-ANT{background:var(--ant-bg);color:var(--ant-tx)}
+.a-OTRO{background:var(--otr-bg);color:var(--otr-tx)} .a-ROT{background:var(--rot-bg);color:var(--rot-tx)}
+.a-BAJ{background:var(--bad-bg);color:var(--bad)}
+.a-SAL{background:var(--sal-bg);color:var(--sal-tx)}
+.warnbanner{background:var(--warn-bg);border:1px solid color-mix(in srgb, var(--warn) 25%, transparent);border-radius:13px;padding:13px 18px;font-size:13.5px;color:var(--warn);margin-bottom:14px}
+.warnbanner b{display:block;margin-bottom:3px}
+/* guía de primeros pasos */
+.guia{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--teal);border-radius:15px;padding:14px 40px 14px 20px;margin-bottom:18px;font-size:14px;color:var(--ink2);position:relative;box-shadow:var(--sh-sm)}
+.gstep{display:inline-flex;align-items:center;gap:10px;font-weight:600}
+.gstep b{width:28px;height:28px;border-radius:50%;background:var(--grad);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+.gstep i{font-style:normal;color:var(--accent);font-weight:800}
+.garrow{color:var(--ink3);font-weight:700;font-size:16px}
+.glink{border:0;background:none;color:var(--accent);font-weight:800;font-size:inherit;text-decoration:underline;padding:0;cursor:pointer}
+.gclose{position:absolute;top:10px;right:12px;border:0;background:none;color:var(--ink3);font-size:17px;cursor:pointer}
+.gclose:hover{color:var(--bad)}

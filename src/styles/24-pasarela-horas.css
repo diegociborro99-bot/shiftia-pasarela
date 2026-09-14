@@ -1,0 +1,74 @@
+/* ============ HORAS · contador mensual ============ */
+/* Tabla persona × columnas con cifras tabulares (los números alinean por la coma),
+   saldo en verde / rojo, filas desplegables con el desglose por local y las extras,
+   la tabla por local y el diálogo de hora extra. Solo variables de tema; el color de
+   cada local llega en --lc desde l.color. */
+.haviso{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-radius:12px;padding:11px 15px;font-size:12.5px;line-height:1.45;margin-bottom:12px;border:1px solid transparent;color:var(--ink2)}
+.haviso>span{flex:1;min-width:220px}
+.haviso svg{flex:none}
+.haviso b{font-weight:800}
+.haviso.warn{background:var(--warn-bg);border-color:color-mix(in srgb, var(--warn) 30%, transparent);color:var(--warn)}
+.haviso.ok{background:var(--ok-bg);border-color:color-mix(in srgb, var(--ok) 30%, transparent);color:var(--ok)}
+.haviso .btn-mini{margin-left:auto}
+
+table.htab{border-collapse:separate;border-spacing:0;width:100%;min-width:820px;font-size:13px;font-variant-numeric:tabular-nums}
+.htab th{position:sticky;top:0;z-index:3;background:var(--surface2);font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:9px 10px;text-align:left;white-space:nowrap;box-shadow:0 1px 0 var(--border)}
+.htab th.num,.htab td.num{text-align:right}
+.htab td{padding:8px 10px;border-bottom:1px solid var(--border2);vertical-align:middle}
+.htab td.num{font-family:var(--mono);font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.htab td.hh b{color:var(--ink);font-size:13.5px}
+.htab tr.hrow{cursor:pointer}
+.htab tr.hrow:hover td{background:var(--accent-l)}
+.htab tr.hrow.open td{background:var(--surface3);border-bottom-color:transparent}
+.htab tr.hrow.baja td{opacity:.55}
+.htab tr.hrow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.htab td.per{display:flex;align-items:center;gap:9px;min-width:200px}
+.htab td.per>b{font-size:13.5px;font-weight:600}
+.htab .av{width:28px;height:28px;font-size:9.5px;flex:none}
+.htab .pn2{flex:1;min-width:0}
+.htab .pn2 b{display:block;font-size:13.5px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.htab .pn2 small{display:block;font-size:10px;color:var(--ink3);line-height:1.2}
+.htab .caret{color:var(--ink3);font-size:17px;font-weight:700;line-height:1;opacity:.55;transition:transform .18s var(--ease),opacity .18s}
+.htab tr.hrow.open .caret{transform:rotate(90deg);opacity:1}
+.htab td.saldo.pos{color:var(--ok);font-weight:700}
+.htab td.saldo.neg{color:var(--bad);font-weight:700}
+.htab tfoot td{font-weight:700;color:var(--ink);background:var(--surface3);border-top:2px solid var(--border);border-bottom:0}
+.htab tfoot td.num{color:var(--ink)}
+.htab td.hor{font-size:11.5px;color:var(--ink2);white-space:nowrap}
+.hlocdot{display:inline-block;flex:none;width:11px;height:11px;border-radius:3px;background:var(--lc)}
+.hsup{font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:1px 6px;background:var(--warn-bg);color:var(--warn);margin-left:8px}
+/* desglose de la persona */
+.htab tr.hdet td{background:var(--surface3);padding:4px 14px 14px 52px;border-bottom:1px solid var(--border)}
+.hdgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px}
+.hlocs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.hloc{display:inline-flex;flex-direction:column;border-left:4px solid var(--lc);background:color-mix(in srgb, var(--lc) 9%, var(--surface));border-radius:8px;padding:5px 10px;font-size:12px;line-height:1.3}
+.hloc b{font-size:12.5px;color:var(--ink)}
+.hloc span{font-family:var(--mono);font-size:10.5px;color:var(--ink2)}
+.hxtras{display:flex;flex-direction:column;gap:4px;margin:6px 0 8px}
+.hx{display:flex;align-items:center;gap:9px;font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:8px;background:var(--surface)}
+.hx b{font-family:var(--mono);font-size:11px;color:var(--ink)}
+.hx span{font-family:var(--mono);font-size:11px;color:var(--warn);font-weight:700;white-space:nowrap}
+.hx em{font-style:normal;color:var(--ink2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hxdel{border:0;background:none;color:var(--ink3);font-size:13px;padding:2px 5px;border-radius:5px;cursor:pointer;line-height:1}
+.hxdel:hover{color:var(--bad);background:var(--bad-bg)}
+.hnota{font-size:11px;color:var(--ink3);line-height:1.45;margin-top:4px}
+.hsub{margin:18px 0 8px}
+.hfoot{font-size:11px;color:var(--ink3);margin:8px 2px 4px;line-height:1.5;max-width:900px}
+/* diálogo de hora extra */
+.xform{display:grid;gap:10px;margin-top:12px}
+.xform label{display:grid;gap:4px;font-family:var(--mono);font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.xform input,.xform select{font:500 14px var(--font);letter-spacing:0;text-transform:none;padding:9px 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface3);color:var(--ink);width:100%;min-height:42px}
+.xform input:focus,.xform select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-l)}
+.xform .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.xform .bar{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+@media (max-width:640px){
+  .htab .opt{display:none}
+  table.htab{min-width:0;font-size:12px}
+  .htab th{padding:8px 7px}
+  .htab td{padding:7px 7px}
+  .htab td.per{min-width:150px}
+  .htab tr.hdet td{padding-left:12px}
+  .hdgrid{grid-template-columns:1fr}
+  .haviso{font-size:12px;padding:10px 12px}
+  .haviso .btn-mini{margin-left:0}
+}

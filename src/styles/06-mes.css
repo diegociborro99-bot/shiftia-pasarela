@@ -1,0 +1,55 @@
+/* ============ MES ============ */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 16px}
+.knum{font-family:var(--mono);font-size:21px;font-weight:700;margin:2px 0 0;font-variant-numeric:tabular-nums}
+.kcap{font-size:11px;color:var(--ink3)}
+.kpi.k-warn .knum{color:var(--warn)} .kpi.k-ok .knum{color:var(--ok)}
+html,body{overflow-x:clip}
+.tablewrap{overflow:hidden;margin-bottom:14px}
+.tscroll{overflow:auto;scrollbar-width:thin;max-height:calc(100dvh - 150px)}
+:root{--w-nombre:175px;--w-dia:62px}   /* anchos de la rejilla del mes: el JS los lee para el ancho total de la tabla */
+table.plan{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fixed}
+.plan th.day{width:var(--w-dia)}
+.plan th.pname{width:var(--w-nombre)}
+.plan th{background:var(--surface2);font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:7px 2px;position:sticky;top:0;z-index:5}
+.plan th.day{min-width:56px;text-align:center}
+.plan th.day .dn{display:block;font-size:8.5px}
+.plan th.day .dd{display:block;font-family:var(--mono);font-size:15.5px;font-weight:700;color:var(--ink2)}
+.plan th.day.wk{background:color-mix(in srgb, var(--surface2) 60%, var(--wk))}
+.plan th.day.wk .dd{color:var(--accent)}
+.plan td{padding:6px 3px;border-bottom:1px solid var(--border2);text-align:center;position:relative}
+.plan td.wk{background:var(--wk)}
+.plan td[data-asig]{cursor:pointer}
+.plan td[data-asig]:hover{box-shadow:inset 0 0 0 1.5px var(--accent);border-radius:8px}
+.plan tr.prowp:hover td{background:color-mix(in srgb, var(--accent-l) 60%, transparent)}
+td.pname,th.pname{position:sticky;left:0;z-index:6;background:var(--surface);text-align:left;min-width:var(--w-nombre);max-width:var(--w-nombre);padding:4px 10px;border-right:1px solid var(--border)}
+th.pname{top:0;z-index:8}
+.plan th{box-shadow:0 1px 0 var(--border)}
+.pn b{font-size:13.5px;font-weight:600;display:block;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn small{font-size:9.5px;color:var(--ink3)}
+tr.ghdr td{background:var(--surface2) !important;font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.14em;color:var(--ink2);text-align:left;padding:6px 12px;position:sticky;left:0}
+tr.frow td{background:var(--surface3);border-top:1px solid var(--border);padding:4px 2px}
+tr.frow td.pname{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);background:var(--surface3)}
+.cwarn{display:inline-block;min-width:20px;border-radius:5px;background:var(--warn-bg);color:var(--warn);font-family:var(--mono);font-size:9.5px;font-weight:700;padding:1px 4px}
+.cok{color:var(--ok);font-weight:800;font-size:11px}
+.cmut{color:var(--ink3);opacity:.4}
+.pill.vacio{background:transparent;border:1.5px dashed var(--border);opacity:.6}
+.pill.vacio:hover{transform:none;box-shadow:none}
+.pill{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:50px;height:32px;border-radius:9px;font-size:10.5px;font-weight:800;letter-spacing:.02em;padding:0 4px;border:0;font-family:var(--mono)}
+.k-hosp{background:var(--hosp-bg);color:var(--hosp-tx)} .k-cons{background:var(--cons-bg);color:var(--cons-tx)}
+.k-qno{background:var(--qno-bg);color:var(--qno-tx)} .k-pru{background:var(--pru-bg);color:var(--pru-tx)}
+.k-ges{background:var(--ges-bg);color:var(--ges-tx)}
+.p-S{background:var(--sal-bg);color:var(--sal-tx);font-size:10.5px}
+.p-G{background:var(--g-bg);color:var(--g-tx)}
+.p-GL{background:transparent;color:var(--gl-tx);border:1.5px dashed var(--gl-tx)}
+.striped{background-image:repeating-linear-gradient(45deg,transparent 0 3px,var(--stripe) 3px 6px)}
+.pill.tarde::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 7px 7px 0;border-color:transparent var(--tarde) transparent transparent;border-top-right-radius:6px}
+.gb{position:absolute;top:-7px;right:-8px;min-width:18px;height:14px;border-radius:7px;background:var(--g-bg);color:#fff;font-size:7px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--surface);z-index:2;padding:0 2px;font-family:var(--mono)}
+.gb.gl{background:var(--surface);color:var(--gl-tx);border:1.3px dashed var(--gl-tx)}
+.pill.conf{box-shadow:0 0 0 1.5px var(--bad)}
+.legendbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:9px 14px;margin-bottom:14px;font-size:11px;color:var(--ink2)}
+.lg{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.lgd{min-width:26px;height:17px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:7.5px;font-weight:800;font-family:var(--mono);padding:0 3px}
+
+/* conflicto: además del aro rojo, un signo (daltonismo, lector de pantalla) */
+.cmk{position:absolute;top:-5px;left:-4px;width:13px;height:13px;border-radius:50%;background:var(--bad);color:#fff;font-size:9px;font-weight:900;line-height:13px;text-align:center;font-style:normal}

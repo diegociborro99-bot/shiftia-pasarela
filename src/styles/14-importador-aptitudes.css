@@ -1,0 +1,135 @@
+/* ============ IMPORTADOR + APTITUDES ============ */
+.provbanner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.provbanner .txt{flex:1;min-width:240px}
+textarea.imp{width:100%;min-height:190px;border:1px solid var(--border);border-radius:10px;background:var(--surface3);color:var(--ink);font-family:var(--mono);font-size:12px;padding:12px;resize:vertical}
+.aptbox{margin:2px 0 8px}
+.aptbox summary{font-size:10.5px;color:var(--ink3);cursor:pointer;font-weight:600;list-style:none}
+.aptbox summary::before{content:"▸ ";font-size:9px}
+.aptbox[open] summary::before{content:"▾ "}
+.aptbox summary b{color:var(--accent);font-weight:700}
+.aptgrid{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;padding:9px 10px;background:var(--surface3);border:1px solid var(--border2);border-radius:9px;margin-top:6px}
+.aptchk{font-size:10.5px;display:flex;gap:6px;align-items:center;color:var(--ink2);font-weight:600}
+.aptchk input{accent-color:var(--accent)}
+.aptall{grid-column:1/-1;text-align:left}
+/* tooltip / toast */
+#tip{position:fixed;z-index:200;background:var(--tipbg);color:var(--tiptx);font-size:11.5px;line-height:1.45;border-radius:9px;padding:8px 11px;max-width:260px;pointer-events:none;box-shadow:var(--sh-md);opacity:0;transition:opacity .12s}
+#tip.on{opacity:1}
+#toasts{position:fixed;right:18px;bottom:18px;z-index:300;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:11px;box-shadow:var(--sh-lg);padding:11px 16px;font-size:12.5px;font-weight:600;max-width:340px;animation:popIn .3s var(--ease)}
+@keyframes popIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:none}}
+.toast.ok{border-left-color:#27ae60} .toast.warn{border-left-color:#d4883a} .toast.bad{border-left-color:#cc4444}
+footer{border-top:1px solid var(--border);padding:16px 22px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:var(--ink3);font-size:11px;max-width:1360px;margin:0 auto}
+footer .sep{flex:1}
+@media(max-width:900px){
+  .svc{display:none}
+  .coop{margin:0 4px 0 8px}
+  .tabs{order:3;width:100%;justify-content:flex-start;overflow-x:auto}
+  .topbar{flex-wrap:wrap;gap:8px}
+  main{padding:14px 12px 50px}
+  .slotrow{flex-wrap:wrap;gap:8px}
+  .slbl{flex:1 1 100%;font-size:14.5px}
+  .sechd .hint{flex-basis:100%;margin-left:23px;order:3}
+  .dbig{font-size:32px}
+  .closebtn{opacity:.6}
+}
+.pop.sheet{position:fixed;left:0;right:0;bottom:0;top:auto !important;width:100%;max-width:none;border-radius:18px 18px 0 0;max-height:72dvh;display:flex;flex-direction:column;box-shadow:0 -8px 30px rgba(0,0,0,.25);animation:sheetUp .25s var(--ease)}
+.pop.sheet .plist{max-height:none;flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+/* hojas sin lista propia (ausencias, reparto): el scroll lo lleva la hoja */
+.pop.sheet.sheetscroll{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:block}
+@keyframes sheetUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .topbar{padding:8px 10px;gap:6px}
+  .brand .bname{font-size:19px}
+  .brand svg{width:26px;height:26px}
+  .iconbtn{width:36px;height:36px}
+  .tabs .tab{padding:7px 10px;font-size:12.5px}
+  main{padding:10px 8px 46px}
+  .dbig{font-size:25px}
+  .dstat{font-size:10.5px}
+  .dnav{gap:6px}
+  .btn{padding:8px 12px;font-size:12px}
+  .card{border-radius:13px}
+  .scard{padding:13px 14px}
+  .secblock{padding:12px 10px}
+  .slotrow{padding:10px 8px}
+  .pchip{font-size:12px}
+  .addchip{min-height:38px}
+  /* overlays como hoja inferior */
+  .ovl{padding:0;align-items:flex-end}
+  .ovcard,.ovcard.big{max-width:100%;width:100%;border-radius:20px 20px 0 0;max-height:94dvh;padding:18px 14px;overflow:auto;-webkit-overflow-scrolling:touch;animation:sheetUp .28s var(--ease)}
+  .ovx{top:10px;right:10px}
+  .pgrid{grid-template-columns:1fr 1fr;max-height:none}
+  .qgrid{grid-template-columns:1fr 1fr}
+  .qchip.custom{grid-column:1/-1}
+  .cobplans{flex-direction:column}
+  .cobplan{min-width:0}
+  .cobkpis{gap:7px}
+  .cobkpi{padding:6px 10px;font-size:8.5px}
+  .cobkpi b{font-size:15px}
+  .cobkpis .btn{width:100%;margin-left:0 !important;order:9}
+  .cobper{flex-wrap:wrap}
+  .wsteps{gap:5px}
+  .wstep{font-size:10.5px;gap:5px}
+  .fichead{flex-wrap:wrap;gap:10px}
+  .fichead [data-fcob]{margin-left:0 !important}
+  .fichead [data-fprint]{margin-right:0 !important}
+  .ficstats{grid-template-columns:repeat(3,1fr)}
+  .fics b{font-size:16px}
+  .ficd{min-height:36px;padding:2px 3px}
+  .revh2{font-size:17px}
+  .revitem{font-size:11.5px;padding:7px 9px}
+  .kpis{grid-template-columns:1fr 1fr;gap:8px}
+  .cards{grid-template-columns:1fr}
+  .provbanner{font-size:12px}
+  .dsticky{padding:6px 10px}
+  .dsticky b{font-size:13px}
+  .festchips{max-height:120px;overflow:auto}
+  .pbar2{position:sticky;top:0;background:#fff;padding:8px 0;z-index:5}
+}
+.bnav{display:none}
+.modo-empleado .tabs,.modo-empleado .tright,.modo-empleado .bnav,.modo-empleado .dsticky,.modo-empleado #view-dia,.modo-empleado #view-semana,.modo-empleado #view-actividad,.modo-empleado #view-mes,.modo-empleado #view-cobertura,.modo-empleado #view-equipo,.modo-empleado footer .sep+span{display:none !important}
+#view-perfil{animation:viewIn .3s var(--ease)}
+.perfilhero{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:6px 0 16px}
+.perfiltabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.ptab{border:1.5px solid var(--border);background:var(--surface);border-radius:999px;padding:8px 18px;font-size:12.5px;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .15s var(--ease2)}
+.ptab.on{background:var(--grad);color:#fff;border-color:transparent;box-shadow:var(--sh-md)}
+.ptab i{font-style:normal;background:#fff;color:var(--accent);border-radius:8px;padding:0 6px;font-size:10px;margin-left:4px}
+.ptab:not(.on) i{background:var(--warn-bg);color:var(--warn)}
+.statrow{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.statm{flex:none;width:52px;font-family:var(--mono);font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase}
+.statbar{flex:1;height:14px;background:var(--surface3);border-radius:7px;overflow:hidden}
+.statbar i{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0;min-width:3px;transition:width .4s var(--ease2)}
+.statbar.teal i{background:#0d8a80}
+.statrow b{flex:none;min-width:74px;font-size:11.5px;text-align:right;color:var(--ink)}
+.petbadge{flex:none;font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.06em}
+.petdot{position:absolute;top:4px;right:4px;min-width:15px;height:15px;border-radius:8px;background:var(--bad);color:#fff;font-size:8.5px;font-weight:800;font-style:normal;display:grid;place-items:center;padding:0 3px;border:2px solid var(--surface)}
+.perfilcols{display:grid;grid-template-columns:minmax(300px,440px) 1fr;gap:14px;align-items:start}
+@media(max-width:900px){.perfilcols{grid-template-columns:1fr}.perfilhero h1{font-size:21px}}
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  /* marca centrada, grande, con presencia */
+  /* instalada en el iPhone, sin esto la marca quedaba debajo de la isla dinámica */
+  .topbar{justify-content:center;padding:calc(12px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left))}
+  .brand{justify-content:center}
+  .brand svg:first-child{width:34px;height:34px}
+  .brand .bname{font-size:24px}
+  .hlogo{width:30px;height:30px}
+  .coop{height:26px}
+  .svc{display:none}
+  .tabs{display:none !important}
+  .tright{display:none !important}
+  /* navegación inferior tipo app */
+  .bnav{position:fixed;left:0;right:0;bottom:0;z-index:120;display:flex;background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -6px 24px rgba(0,0,0,.09);padding:6px calc(8px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px)}
+  .bnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:0;background:none;color:var(--ink3);font-size:10px;font-weight:700;font-family:var(--font);padding:6px 0 4px;border-radius:12px;transition:color .15s var(--ease2),background .15s;cursor:pointer}
+  .bnav button.on{color:var(--accent)}
+  .bnav button.on svg{filter:drop-shadow(0 2px 6px rgba(41,128,185,.35))}
+  .bnav button:active{transform:scale(.94)}
+  main{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+  footer{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+  #toasts{bottom:calc(78px + env(safe-area-inset-bottom))}
+  .pop.sheet{bottom:calc(64px + env(safe-area-inset-bottom));border-radius:18px 18px 0 0}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+
+.modo-empleado #view-vacaciones{display:none!important}

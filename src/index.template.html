@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shiftia · Grupo Pasarela</title>
+<meta name="description" content="Shiftia · Grupo Pasarela — planificación de turnos de los cuatro locales: planilla, equipo, horas y generador.">
+<meta name="robots" content="noindex,nofollow">
+<!--INJECT:BUILD-->
+<meta name="theme-color" content="#f8f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shiftia">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%2232%22%20y2%3D%2232%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234ecdc4%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%232980b9%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22url%28%23g%29%22/%3E%3Cpath%20d%3D%22M16%2026c-6-1.5-10-6-9-12s7-9%2013-7.5c-4.5-0.7-9%202.2-9.7%206.7s3%209%207.5%2010.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M14.5%208c6%201.5%2010%206%209%2012s-7%209-13%207.5c4.5%200.7%209-2.2%209.7-6.7s-3-9-7.5-10.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<!--INJECT:STYLES-->
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#4ecdc4"/><stop offset="1" stop-color="#2980b9"/></linearGradient></defs><rect width="32" height="32" rx="7" fill="url(#lg)"/><path d="M16 26c-6-1.5-10-6-9-12s7-9 13-7.5c-4.5-0.7-9 2.2-9.7 6.7s3 9 7.5 10.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M14.5 8c6 1.5 10 6 9 12s-7 9-13 7.5c4.5 0.7 9-2.2 9.7-6.7s-3-9-7.5-10.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M21 6.5l3-3 1.5 3.7" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="coop" aria-hidden="true"></span>
+    <span class="glogo" id="gLogo" title="Grupo Pasarela"><img class="hlogo" alt="Grupo Pasarela" src="<!--INJECT:GLOGO-->" hidden><span class="gword">Grupo <b>Pasarela</b></span></span>
+    <span class="bname">Sh<em>iftia</em></span>
+    <span class="svc">Grupo Pasarela · 4 locales</span>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Vistas">
+    <button class="tab" role="tab" data-v="hoy" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><circle fill="currentColor" stroke="none" cx="12" cy="15.5" r="1.6"/></svg>Hoy</button>
+    <button class="tab" role="tab" data-v="semana"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8.5 10v10.5M15.5 10v10.5"/></svg>Semana</button>
+    <button class="tab" role="tab" data-v="mes"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h2M11 14h2M14.5 14h2M7.5 17.5h2M11 17.5h2"/></svg>Mes</button>
+    <button class="tab" role="tab" data-v="equipo"><svg viewBox="0 0 24 24"><circle cx="9" cy="8.2" r="3.4"/><path d="M3.5 19.5c.9-3.4 3-5.2 5.5-5.2s4.6 1.8 5.5 5.2"/><circle cx="17" cy="9.5" r="2.6"/><path d="M15.6 14.6c2.3.2 4 1.8 4.8 4.9"/></svg>Equipo</button>
+    <button class="tab" role="tab" data-v="horas"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/></svg>Horas</button>
+    <button class="tab" role="tab" data-v="generador"><svg viewBox="0 0 24 24"><path d="M12 3.5l1.8 4.2 4.5.4-3.4 3 1 4.4L12 13.2l-3.9 2.3 1-4.4-3.4-3 4.5-.4z"/><path d="M5 20.5h14"/></svg>Generador</button>
+  </nav>
+  <div class="tright">
+    <button class="iconbtn" id="topRevisar" title="Revisar el mes: turnos cortos, sin cocina, sin nadie que abra" aria-label="Revisar el mes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.7"/><path d="m15.7 15.7 4.8 4.8"/></svg><span class="dotwarn hidden" id="revDot"></span></button>
+    <button class="iconbtn" id="topHist" title="Historial de cambios" aria-label="Historial de cambios"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/></svg></button>
+    <button class="iconbtn" id="undoBtn" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5 3.5 9.5 8 14"/><path d="M3.5 9.5H15a5.5 5.5 0 1 1 0 11h-3"/></svg></button>
+    <button class="iconbtn" id="topCuenta" title="Cuenta, copia de seguridad y usuarios" aria-label="Cuenta"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.2" r="4"/><path d="M4.5 20.5c1.2-4 4-6 7.5-6s6.3 2 7.5 6"/></svg></button>
+    <button class="iconbtn" id="themeBtn" title="Tema claro / oscuro / automático" aria-label="Cambiar tema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5A6.6 6.6 0 0 1 12 3.5Z"/></svg></button>
+  </div>
+</header>
+<div class="dsticky" id="dSticky"><span class="mini2" id="stKick"></span><b id="stTitle"></b><span class="sp"></span><div class="arrows"><button class="mbtn" id="sPrev" aria-label="Día anterior">‹</button><button class="mbtn" id="sNext" aria-label="Día siguiente">›</button></div></div>
+
+<main>
+  <!-- HOY: las cuatro casillas de la mañana y las cuatro de la tarde -->
+  <section class="view" id="view-hoy">
+    <div class="dnav">
+      <div class="arrows"><button class="mbtn" id="dPrev" aria-label="Día anterior">‹</button><button class="mbtn" id="dHoy" title="Ir a hoy">Hoy</button><button class="mbtn" id="dNext" aria-label="Día siguiente">›</button></div>
+      <div><span class="dkick" id="dKick"></span><div class="dbig" id="dTitle"></div></div>
+      <div class="dstats" id="dStats"></div>
+      <span class="spacer"></span>
+      <div class="dacts"><button class="btn btn-sec" id="dEvento" title="Marcar un partido u otro evento con refuerzo">＋ Evento del día</button><button class="btn btn-cta" id="dGenerar" title="Completar los huecos de este día con el generador">✦ Completar el día</button></div>
+    </div>
+    <div id="diaWarn"></div>
+    <div class="daygrid">
+      <div id="diaLocales" class="locgrid"></div>
+      <aside class="side" id="diaSide"></aside>
+    </div>
+  </section>
+
+  <!-- SEMANA: el cuadrante local × franja × día -->
+  <section class="view hidden" id="view-semana">
+    <div class="dnav">
+      <div class="arrows"><button class="mbtn" id="wPrev" aria-label="Semana anterior">‹</button><button class="mbtn" id="wHoy" title="Semana de hoy">Hoy</button><button class="mbtn" id="wNext" aria-label="Semana siguiente">›</button></div>
+      <div><span class="dkick">Semana</span><div class="dbig" id="wTitle"></div></div>
+      <div class="dstats" id="wStats"></div>
+      <span class="spacer"></span>
+      <div class="dacts">
+        <button class="btn btn-sec" id="wPatron" title="Guardar esta semana como la nueva semana tipo del generador">Fijar como semana tipo</button>
+        <button class="btn btn-sec" id="printBtn">Imprimir</button>
+        <button class="btn btn-sec" id="xlsxBtn">Excel</button>
+        <button class="btn btn-cta" id="wGenerar">✦ Generar esta semana</button>
+      </div>
+    </div>
+    <div class="tablewrap card"><div class="tscroll" id="semRoot"></div></div>
+  </section>
+
+  <!-- MES: personas × días, ausencias y eventos -->
+  <section class="view hidden" id="view-mes">
+    <div class="dnav">
+      <div class="arrows"><button class="mbtn" id="mPrev" aria-label="Mes anterior">‹</button><button class="mbtn" id="mNext" aria-label="Mes siguiente">›</button></div>
+      <div><span class="dkick">Mes</span><div class="dbig" id="mTitle"></div></div>
+      <span class="spacer"></span>
+      <div class="dacts">
+        <div class="futbol" id="futbolBtns"></div>
+        <button class="btn btn-sec" id="printMesBtn">Imprimir mes</button>
+        <button class="btn btn-cta" id="mGenerar">✦ Generar el mes</button>
+      </div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="legendbar" id="legend"></div>
+    <div class="tablewrap card"><div class="tscroll" id="mesRoot"></div></div>
+  </section>
+
+  <!-- EQUIPO: fichas editables y ajustes de los locales -->
+  <section class="view hidden" id="view-equipo">
+    <div class="dnav">
+      <div><span class="dkick">Equipo</span><div class="dbig"><b>Personas</b> y locales</div></div>
+      <div class="dstats" id="eqStats"></div>
+      <span class="spacer"></span>
+      <div class="dacts"><button class="btn btn-sec" id="btnLocales">Ajustes de los locales</button><button class="btn btn-cta" id="btnPersonas">＋ Añadir persona</button></div>
+    </div>
+    <div id="equipoRoot"></div>
+  </section>
+
+  <!-- HORAS: contador mensual para pagar -->
+  <section class="view hidden" id="view-horas">
+    <div class="dnav">
+      <div class="arrows"><button class="mbtn" id="hPrev" aria-label="Mes anterior">‹</button><button class="mbtn" id="hNext" aria-label="Mes siguiente">›</button></div>
+      <div><span class="dkick">Contador de horas</span><div class="dbig" id="hTitle"></div></div>
+      <div class="dstats" id="hStats"></div>
+      <span class="spacer"></span>
+      <div class="dacts"><button class="btn btn-sec" id="hExtra">＋ Hora extra</button><button class="btn btn-sec" id="hExcel">Excel</button><button class="btn btn-sec" id="hPrint">Imprimir</button><button class="btn btn-cta" id="hCerrar">Cerrar mes</button></div>
+    </div>
+    <div id="horasRoot"></div>
+  </section>
+
+  <!-- GENERADOR: vista previa y aplicar -->
+  <section class="view hidden" id="view-generador">
+    <div class="dnav">
+      <div><span class="dkick">Generador de planillas</span><div class="dbig"><b>Genera</b> y revisa antes de aplicar</div></div>
+      <span class="spacer"></span>
+    </div>
+    <div id="genRoot"></div>
+  </section>
+</main>
+
+<footer>
+  <span class="fbrand"><svg viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><rect width="32" height="32" rx="7" fill="url(#lg)"/><path d="M16 26c-6-1.5-10-6-9-12s7-9 13-7.5c-4.5-0.7-9 2.2-9.7 6.7s3 9 7.5 10.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M14.5 8c6 1.5 10 6 9 12s-7 9-13 7.5c4.5 0.7 9-2.2 9.7-6.7s-3-9-7.5-10.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg> Shiftia Management Software · Grupo Pasarela · 2026</span>
+  <span class="fnote">Datos de personal: acceso con usuario, cifrado en tránsito y uso exclusivo para la planificación del grupo.</span>
+  <span class="hklab" style="margin-left:auto;white-space:nowrap">coded by Highkey Labs</span>
+</footer>
+
+<nav class="bnav" id="bnav" aria-label="Navegación">
+  <button data-bnav="hoy"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><circle fill="currentColor" stroke="none" cx="12" cy="15.5" r="1.6"/></svg><span>Hoy</span></button>
+  <button data-bnav="semana"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8.5 10v10.5M15.5 10v10.5"/></svg><span>Semana</span></button>
+  <button data-bnav="mes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Mes</span></button>
+  <button data-bnav="mas" id="bnavMas"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg><span>Más</span></button>
+</nav>
+
+<div id="toasts" aria-live="polite"></div>
+<div id="tip" role="tooltip"></div>
+<div id="printRoot" class="hidden"></div>
+<!--INJECT:SCRIPT-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:wght@300;500;600;700&display=swap">
+</body>
+</html>
