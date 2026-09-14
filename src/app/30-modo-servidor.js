@@ -446,7 +446,7 @@ function mostrarLogin() {
       <button class="btn btn-cta loginbtn" type="submit">Entrar</button>
       <div class="loginerr" id="loginErr"></div>
     </form>
-    <div class="loginfoot">© 2026 Shiftia · Grupo Pasarela<br><span class="hklab">coded by Highkey Labs</span></div>
+    <div class="loginfoot">© 2026 Shiftia<br><span class="hklab">coded by Highkey Labs</span></div>
   </div>`;
   document.body.appendChild(sc);
   sc.querySelector('#loginForm').addEventListener('submit', async e => {

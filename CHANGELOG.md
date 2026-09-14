@@ -2,6 +2,9 @@
 
 ## v0.1.2 · 14/09/2026 — Logo del grupo, sección Entrevistas visual y acceso del programador
 
+- Pie de la pantalla de acceso: «© 2026 Shiftia» y «coded by Highkey Labs»; el nombre
+  del grupo va solo en el subtítulo con sus locales. Test en `tests/login.test.mjs`.
+
 - **Logo del Grupo Pasarela** en SVG (`assets/pasarela-logo.svg`), hecho a imitación
   del original: cuadrado gris, rombo y «Grupo Pasarela» en caligrafía convertida a
   trazados (no depende de fuentes). El build lo embebe en la barra superior, la
