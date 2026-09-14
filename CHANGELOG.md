@@ -1,5 +1,12 @@
 # Changelog — Shiftia · Grupo Pasarela
 
+## v0.1.1 · 14/09/2026 — Sección «Entrevistas» (en construcción)
+
+- Nueva pestaña **Entrevistas** en el panel del administrador (y en «Más» del
+  móvil), visible y marcada «en construcción»: ahí se importará más adelante la
+  base de datos de entrevistas y sus funciones. El empleado no la ve. Test en
+  `tests/entrevistas.test.mjs`.
+
 ## v0.1.0 · 14/09/2026 — Primera entrega
 
 Nace la app del Grupo Pasarela sobre la arquitectura y el estilo del piloto de

@@ -39,6 +39,8 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   (por qué nadie puede y candidatos con aviso a un clic), deshacer. Motor local
   determinista o **núcleo Shiftia (CP-SAT)** vía el servidor cuando está
   configurado.
+- **Entrevistas**: sección del administrador reservada para la base de datos de
+  entrevistas y sus funciones (por importar); de momento visible y «en construcción».
 - **Revisar el mes**, historial de cambios, deshacer (Ctrl+Z), tema claro y
   oscuro, PWA instalable, móvil con barra inferior.
 

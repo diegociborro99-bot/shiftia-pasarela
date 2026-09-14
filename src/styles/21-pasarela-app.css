@@ -179,3 +179,12 @@ tr.frow td.pname .lp{display:inline-block;width:8px;height:8px;border-radius:2px
 .semt th{min-width:140px}
 .semt th.lbl{min-width:150px;max-width:150px}
 .wav{min-width:40px}
+
+/* ---------- entrevistas (en construcción) ---------- */
+.tab .tabwip{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--warn);margin-left:5px;vertical-align:middle}
+.dchip.wip{background:var(--warn-bg);color:var(--warn);border:1px solid color-mix(in srgb, var(--warn) 40%, transparent)}
+.wipcard{background:var(--surface);border:1.5px dashed var(--border);border-radius:16px;padding:34px 28px;max-width:640px;text-align:center;margin:18px auto 0}
+.wipcard .wipico{font-size:34px;display:block;margin-bottom:10px}
+.wipcard h2{font-family:var(--font-d);font-size:22px;margin:0 0 10px;color:var(--ink)}
+.wipcard p{font-size:14px;color:var(--ink2);margin:0 0 10px;line-height:1.5}
+.modo-empleado #view-entrevistas{display:none!important}

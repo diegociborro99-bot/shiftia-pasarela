@@ -1,5 +1,5 @@
 // ================= NAVEGACIÓN =================
-const VISTAS = ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador'];
+const VISTAS = ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'entrevistas'];
 function switchTab(v) {
   if (!VISTAS.includes(v)) v = 'hoy';
   cerrarPops();
@@ -19,6 +19,7 @@ function switchTab(v) {
   if (v === 'equipo') renderEquipo();
   if (v === 'horas') renderHoras();
   if (v === 'generador') renderGenerador();
+  if (v === 'entrevistas') renderEntrevistas();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.v)));
 // ir a un día concreto (desde el mes, la revisión, el generador…)
@@ -174,7 +175,7 @@ window.addEventListener('popstate', e => {
 });
 
 // ---------- navegación inferior móvil ----------
-const BNAV_EN_MAS = ['equipo', 'horas', 'generador'];
+const BNAV_EN_MAS = ['equipo', 'horas', 'generador', 'entrevistas'];
 function pintaBnav(v) {
   const activo = BNAV_EN_MAS.includes(v) ? 'mas' : v;
   document.querySelectorAll('.bnav [data-bnav]').forEach(b => {
@@ -204,6 +205,7 @@ function openMas() {
       ${fila('equipo', I('<circle cx="9" cy="8.2" r="3.4"/><path d="M3.5 19.5c.9-3.4 3-5.2 5.5-5.2s4.6 1.8 5.5 5.2"/><circle cx="17" cy="9.5" r="2.6"/><path d="M15.6 14.6c2.3.2 4 1.8 4.8 4.9"/>'), 'Equipo', 'personas, condiciones y locales')}
       ${fila('horas', I('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/>'), 'Contador de horas', 'horas del mes para la nómina')}
       ${fila('generador', I('<path d="M12 3.5l1.8 4.6 4.7.4-3.6 3.1 1.1 4.6-4-2.5-4 2.5 1.1-4.6-3.6-3.1 4.7-.4Z"/>'), 'Generador de planillas', 'semana tipo + relleno inteligente')}
+      ${fila('entrevistas', I('<path d="M4 5.5h16v10H9l-4 3.5v-3.5H4Z"/><path d="M8 9h8M8 12h5"/>'), 'Entrevistas', 'en construcción')}
       ${fila('evento', I('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17M3.5 12h17"/>'), 'Partido u evento', 'refuerzo por local')}
       ${fila('revisar', I('<circle cx="10.7" cy="10.7" r="6.7"/><path d="m15.7 15.7 4.8 4.8"/>'), 'Revisar el mes', 'casillas cortas, sin cocina, forzados')}
       ${fila('deshacer', I('<path d="M8 5 3.5 9.5 8 14"/><path d="M3.5 9.5H15a5.5 5.5 0 1 1 0 11h-3"/>'), 'Deshacer', 'última acción de planilla')}
@@ -220,7 +222,7 @@ function openMas() {
     if (!m) return;
     ov.remove();
     const a = m.dataset.mas;
-    if (a === 'equipo' || a === 'horas' || a === 'generador') switchTab(a);
+    if (a === 'equipo' || a === 'horas' || a === 'generador' || a === 'entrevistas') switchTab(a);
     else if (a === 'evento') openEvento({ iso: isoDia() });
     else if (a === 'revisar') { switchTab('mes'); openRevision(); }
     else if (a === 'deshacer') deshacer();
