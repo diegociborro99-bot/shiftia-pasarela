@@ -107,9 +107,24 @@ try {
   ok(`y el KPI vuelve a ${evAntes.n}`, await llega(pg, n => { const k = [...document.querySelectorAll('#kpis .kpi')].find(x => /eventos/i.test(x.textContent)); return !!k && k.querySelector('.knum').textContent.trim() === String(n); }, evAntes.n, 3000) >= 0, await kpiEventos());
   ok('el historial registra el evento y el deshecho', await pg.evaluate(() => (S.historial || []).some(h => /Evento: Juega el Barcelona/.test(h.txt)) && (S.historial || []).some(h => h.tipo === 'undo' && /evento/.test(h.txt))));
 
-  // 5) Generador: vaciar el periodo, vista previa, aplicar e historial
+  // 5) Generador semanal (modo por defecto): la planilla de la semana como el prototipo del cliente
   await vista(pg, 'generador');
   await pg.waitForSelector('#genPrevia', { timeout: 5000 });
+  ok('Generador: arranca en modo Semana con el lunes de la semana en pantalla', await pg.evaluate(() => GEN.modo === 'semana' && !!GEN.lunes && isoDow(GEN.lunes) === 1 && !!document.querySelector('.segm [data-modo="semana"].on')));
+  await pg.evaluate(() => { GEN.opts.desdeHoy = false; });
+  await pg.click('#genPrevia');
+  await pg.waitForSelector('.gsemwrap table.gsem', { timeout: 8000 });
+  ok('semana: una tabla por local y la de «quién libra», 7 columnas de días', await pg.evaluate(() => document.querySelectorAll('.gsemwrap table.gsem').length === 5 && document.querySelector('table.gsem thead tr').children.length === 8));
+  ok('semana: KPIs (turnos, plazas, huecos, condiciones, máximo de días, descansos) y botón Aplicar', await pg.evaluate(() => document.querySelectorAll('.genk').length === 6 && !!document.querySelector('#genAplicar')));
+  ok('semana: las casillas llevan posiciones numeradas y la cocina marcada', await pg.evaluate(() => document.querySelectorAll('.gslot > b').length > 100 && document.querySelectorAll('.gslot .gcoc').length >= 20));
+  ok('semana: la lista de condiciones comprobadas está y las nuevas van marcadas', await pg.evaluate(() => document.querySelectorAll('.gcond').length >= 30 && document.querySelectorAll('.gcond .gnueva').length >= 3));
+  ok('semana: «Qué ha cambiado» y «Huecos» tienen su columna', await pg.evaluate(() => [...document.querySelectorAll('.gscol h3')].map(h => h.textContent).join('|').includes('Qué ha cambiado') && [...document.querySelectorAll('.gscol h3')].map(h => h.textContent).join('|').includes('Huecos')));
+  ok('semana: «Condiciones que comprueba» abre el catálogo', await pg.click('#gsCond').then(() => pg.waitForSelector('#condGenOvl', { timeout: 3000 })).then(() => pg.evaluate(() => document.querySelectorAll('#condGenOvl .gcond').length >= 30)).catch(() => false));
+  await pg.evaluate(() => { const o = document.getElementById('condGenOvl'); if (o) o.remove(); });
+
+  // 6) Generador por periodo libre: vaciar el periodo, vista previa, aplicar e historial
+  await pg.click('.segm [data-modo="periodo"]');
+  await pg.waitForSelector('#genD1', { timeout: 5000 });
   const rango = await pg.evaluate(() => ({ desde: GEN.desde, hasta: GEN.hasta }));
   ok(`Generador: el periodo por defecto es la semana en pantalla (${rango.desde} → ${rango.hasta})`, !!rango.desde && !!rango.hasta && rango.desde <= rango.hasta);
   if (await pg.isChecked('#genDesdeHoy')) await pg.uncheck('#genDesdeHoy');   // toda la semana, no solo desde hoy

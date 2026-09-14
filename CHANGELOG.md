@@ -1,5 +1,30 @@
 # Changelog — Shiftia · Grupo Pasarela
 
+## v0.3.0 · 15/09/2026 — Generador semanal con las condiciones del cliente
+
+Sale del prototipo que pasó el cliente (planilla corregida del 14 al 20 de
+septiembre, 11/09): el generador que el grupo quiere es el **semanal**, y su
+resultado tiene que verse así.
+
+- **Reglas nuevas** (30–32 del prototipo): el primero de cada franja hace turno
+  completo (quien viene de la mañana no abre la tarde, salvo turno continuo, que
+  se marca C); Cristian no hace la tarde completa; Leo nunca sale el primero.
+  La cocina conserva su posición y solo abre si nadie más puede.
+- **Posiciones en toda la app**: 1.º abre, ▸ sale el primero (fijo), ◆ cocina,
+  P partido, C continuo, □ comodín, «por X» y notas, y **hueco disponible** en la
+  1.ª posición cuando nadie de la plantilla puede abrir (Hoy, Semana, impresión).
+- **Generador semanal** (pestaña Generador, modo Semana): planilla por local con
+  la cuenta n/mín*, posiciones, huecos con motivo y por qué nadie puede, «qué ha
+  cambiado» respecto a lo que había, quién libra cada día, las condiciones
+  comprobadas (✓/✗, las nuevas marcadas), aplicar con deshacer e impresión de la
+  planilla propuesta en dos páginas. El modo «Periodo libre» sigue para el mes.
+- **Equipo modificable con interruptores**: reglas del grupo activables o
+  desactivables, cada característica de una ficha se puede apagar (el generador
+  deja de tenerla en cuenta), campo «no sale nunca el primero» y catálogo
+  numerado de condiciones derivado de locales y fichas.
+- **Semana tipo y fichas actualizadas** a la planilla corregida del 11/09; un
+  test reproduce esa semana casilla a casilla (huecos incluidos).
+
 ## v0.2.0 · 15/09/2026 — Listo para desplegar: mes de demostración, e2e, compartir por WhatsApp
 
 - **Primer arranque con contenido**: en un servidor recién creado (y con `?demo=1`

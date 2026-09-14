@@ -3,12 +3,16 @@
 // + relleno de mínimos con razones, determinista, funciona sin conexión) y el
 // núcleo Shiftia (CP-SAT, vía el servidor, cuando está configurado). Siempre con
 // vista previa: nada se aplica sin verlo; todo se deshace con Ctrl+Z.
-const GEN = { desde: null, hasta: null, titulo: '', motor: 'local', previa: null, opts: { desdeHoy: true, permitirPartido: false, sinPatron: false }, nucleo: null, ocupado: false };
+const GEN = { modo: 'semana', lunes: null, desde: null, hasta: null, titulo: '', motor: 'local', previa: null, opts: { desdeHoy: true, permitirPartido: false, sinPatron: false }, nucleo: null, ocupado: false };
 
 function irAGenerador(o) {
   GEN.desde = o.desde; GEN.hasta = o.hasta; GEN.titulo = o.titulo || 'Generar'; GEN.previa = null; GEN.refuerzo = !!o.refuerzo;
+  // una semana entera (lunes a domingo) va al generador semanal, el de la planilla del grupo
+  if (o.desde && o.hasta && isoDow(o.desde) === 1 && o.hasta === addDias(o.desde, 6)) { GEN.modo = 'semana'; GEN.lunes = o.desde; }
+  else if (o.desde) GEN.modo = 'periodo';
   switchTab('generador');
 }
+const htmlModoGen = () => `<div class="segm" role="tablist"><button type="button" class="${GEN.modo === 'semana' ? 'on' : ''}" data-modo="semana" role="tab">Semana</button><button type="button" class="${GEN.modo === 'periodo' ? 'on' : ''}" data-modo="periodo" role="tab">Periodo libre</button></div>`;
 function rangoPorDefecto() {
   if (GEN.desde && GEN.hasta) return;
   GEN.desde = mondayOf(isoDia()); GEN.hasta = addDias(GEN.desde, 6); GEN.titulo = 'Generar esta semana';
@@ -18,6 +22,7 @@ async function comprobarNucleo() {
   try { const r = await api('GET', '/api/nucleo/salud'); GEN.nucleo = r.ok ? r.datos : { configurado: false }; } catch (e) { GEN.nucleo = { configurado: false }; }
 }
 function renderGenerador() {
+  if (GEN.modo === 'semana') { renderGeneradorSemana(); return; }
   rangoPorDefecto();
   const root = $('#genRoot');
   const nDias = Math.round((fechaLocal(GEN.hasta) - fechaLocal(GEN.desde)) / 864e5) + 1;
@@ -25,6 +30,7 @@ function renderGenerador() {
   const nuc = GEN.nucleo;
   root.innerHTML = `<div class="gengrid">
     <div class="genpanel">
+      ${htmlModoGen()}
       <span class="micro">${esc(GEN.titulo)}</span>
       <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <label class="pinlbl" style="margin:0">Desde<input type="date" id="genD1" class="logininp" value="${GEN.desde}" data-libre></label>
@@ -50,7 +56,7 @@ function renderGenerador() {
   root.querySelector('#genDesdeHoy').addEventListener('change', e => { GEN.opts.desdeHoy = e.target.checked; });
   root.querySelector('#genPatron').addEventListener('change', e => { GEN.opts.sinPatron = !e.target.checked; });
   root.querySelector('#genPartido').addEventListener('change', e => { GEN.opts.permitirPartido = e.target.checked; });
-  root.addEventListener('click', e => {
+  root.querySelector('.gengrid').addEventListener('click', e => {   // en el contenedor recién pintado: cada render trae su listener, sin acumular
     const rg = e.target.closest('[data-rango]');
     if (rg) {
       const k = rg.dataset.rango;
@@ -59,6 +65,8 @@ function renderGenerador() {
       else { GEN.desde = hoy > est.days[0].iso ? hoy : est.days[0].iso; GEN.hasta = est.days[est.days.length - 1].iso; GEN.titulo = 'Resto del mes'; }
       GEN.previa = null; renderGenerador(); return;
     }
+    const md = e.target.closest('[data-modo]');
+    if (md) { GEN.modo = md.dataset.modo; GEN.previa = null; if (GEN.modo === 'semana' && !GEN.lunes) GEN.lunes = mondayOf(isoDia()); renderGenerador(); return; }
     const mo = e.target.closest('[data-motor]');
     if (mo && !mo.disabled) { GEN.motor = mo.dataset.motor; GEN.previa = null; renderGenerador(); return; }
     if (e.target.id === 'genPrevia') { generarPrevia(); return; }
@@ -206,4 +214,132 @@ function vaciarGenerado() {
   registrarCambio(`Vaciado lo generado del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}: ${n} plaza(s)`, 'cambio');
   saveState(); GEN.previa = null; renderGenerador();
   toast(`${n} plaza(s) retiradas · Ctrl+Z para deshacer`, 'warn');
+}
+
+
+// ================= GENERADOR SEMANAL (el de la planilla del grupo) =================
+// Genera la semana con la semana tipo y las fichas y la enseña como el prototipo del
+// cliente (11/09): una tabla por local con las posiciones numeradas (1.º abre y hace
+// turno completo, ◆ cocina en su posición, P partido, C continuo, □ comodín, «por X»),
+// la cuenta n/mín* de cada casilla, los huecos disponibles con su motivo, qué ha
+// cambiado respecto a lo que había, quién libra cada día y las condiciones comprobadas.
+// estado «virtual» de una semana: sus siete días apuntan a los objetos del mes al que
+// pertenecen (una semana puede cruzar de mes); escribible=true los crea si faltan
+function estadoSemana(lunes, escribible) {
+  const e = { y: +lunes.slice(0, 4), m: +lunes.slice(5, 7), days: [], asig: {}, apertura: {}, manual: {}, festivos: [], virtual: true };
+  for (let k = 0; k < 7; k++) {
+    const iso = addDias(lunes, k);
+    const me = estadoDeIso(iso, escribible);
+    e.days.push(me.days.find(x => x.iso === iso));
+    if (escribible) { me.asig[iso] = me.asig[iso] || {}; me.apertura[iso] = me.apertura[iso] || {}; me.manual = me.manual || {}; me.manual[iso] = me.manual[iso] || {}; }
+    if (me.asig[iso]) e.asig[iso] = me.asig[iso];
+    if (me.apertura[iso]) e.apertura[iso] = me.apertura[iso];
+    if (me.manual && me.manual[iso]) e.manual[iso] = me.manual[iso];
+    if (me.festivos) for (const f of me.festivos) if (!e.festivos.includes(f)) e.festivos.push(f);
+  }
+  return e;
+}
+function opcionesSemana() { return { simular: false, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron }; }
+function tituloSemana(lunes) { const fin = addDias(lunes, 6); const m1 = +lunes.slice(5, 7), m2 = +fin.slice(5, 7); return `${+lunes.slice(8, 10)}${m1 !== m2 ? ' ' + MES3[m1 - 1] : ''} – ${+fin.slice(8, 10)} de ${MESES[m2 - 1].toLowerCase()} ${fin.slice(0, 4)}`; }
+function renderGeneradorSemana() {
+  if (!GEN.lunes) GEN.lunes = mondayOf(isoDia());
+  const lunes = GEN.lunes;
+  const root = $('#genRoot');
+  root.innerHTML = `<div class="gengrid">
+    <div class="genpanel">
+      ${htmlModoGen()}
+      <span class="micro">PLANILLA SEMANAL</span>
+      <div class="dnav gsnav"><div class="arrows"><button class="mbtn" id="gsPrev" aria-label="Semana anterior">‹</button><button class="mbtn" id="gsHoy" title="Semana de hoy">Hoy</button><button class="mbtn" id="gsNext" aria-label="Semana siguiente">›</button></div><div><span class="dkick">Semana del</span><div class="dbig gsbig"><b>${esc(tituloSemana(lunes))}</b></div></div></div>
+      <label class="genopt"><input type="checkbox" id="genDesdeHoy" ${GEN.opts.desdeHoy ? 'checked' : ''} data-libre> <span><b>Solo desde hoy</b> · no toca los días ya pasados</span></label>
+      <label class="genopt"><input type="checkbox" id="genPatron" ${GEN.opts.sinPatron ? '' : 'checked'} data-libre> <span><b>Partir de la semana tipo</b> · las plazas fijas del grupo primero</span></label>
+      <label class="genopt"><input type="checkbox" id="genPartido" ${GEN.opts.permitirPartido ? 'checked' : ''} data-libre> <span><b>Permitir partidos no declarados</b> · y avisarlos</span></label>
+      <p class="revsub" style="margin:0">Usa las fichas y los ajustes de cada local: mínimos, cocina en su posición, quién abre (turno completo), «nunca con», partidos declarados, días que libra… Lo que no cuadra queda como <b>hueco disponible</b> con el motivo: es mejor un hueco señalado que un nombre que no puede estar ahí. Nunca quita a nadie. ${mesCerrado(lunes) ? '<b style="color:var(--warn)">El mes está cerrado para la nómina.</b>' : ''}</p>
+      <button class="btn btn-cta" id="genPrevia" ${GEN.ocupado ? 'disabled' : ''}>${GEN.ocupado ? 'Generando…' : '✦ Generar la semana'}</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-mini ghost" id="gsCond">Condiciones que comprueba</button><button class="btn-mini ghost" id="genLimpiar" title="Quita de la semana todo lo que no se puso a mano">Vaciar lo generado…</button></div>
+    </div>
+    <div class="genres" id="genRes">${GEN.previa && GEN.previa.semana ? htmlSemanaGenerada(GEN.previa) : `<div class="genvacio">Elige la semana y pulsa <b>Generar la semana</b>. Verás la planilla completa por local con las posiciones, los huecos que quedan disponibles y por qué, qué cambia respecto a lo que hay, quién libra cada día y las condiciones comprobadas. Nada se aplica hasta que lo confirmes.</div>`}</div>
+  </div>`;
+  root.querySelector('#genDesdeHoy').addEventListener('change', e => { GEN.opts.desdeHoy = e.target.checked; });
+  root.querySelector('#genPatron').addEventListener('change', e => { GEN.opts.sinPatron = !e.target.checked; });
+  root.querySelector('#genPartido').addEventListener('change', e => { GEN.opts.permitirPartido = e.target.checked; });
+  root.querySelector('.gengrid').addEventListener('click', e => {   // en el contenedor recién pintado: cada render trae su listener, sin acumular
+    const md = e.target.closest('[data-modo]');
+    if (md) { GEN.modo = md.dataset.modo; GEN.previa = null; renderGenerador(); return; }
+    if (e.target.id === 'gsPrev' || e.target.id === 'gsNext') { GEN.lunes = addDias(GEN.lunes, e.target.id === 'gsPrev' ? -7 : 7); GEN.previa = null; renderGeneradorSemana(); return; }
+    if (e.target.id === 'gsHoy') { GEN.lunes = mondayOf(isoHoy()); GEN.previa = null; renderGeneradorSemana(); return; }
+    if (e.target.id === 'genPrevia') { generarPreviaSemana(); return; }
+    if (e.target.id === 'genLimpiar') { GEN.desde = GEN.lunes; GEN.hasta = addDias(GEN.lunes, 6); vaciarGenerado(); return; }
+    if (e.target.id === 'gsCond') { openCondicionesGen(); return; }
+    if (e.target.id === 'genAplicar') { aplicarSemana(); return; }
+    if (e.target.id === 'gsPrint') { if (typeof abrirImpresionSemanaGenerada === 'function' && GEN.previa) abrirImpresionSemanaGenerada(GEN.previa, { titulo: 'Planilla propuesta' }); else toast('La hoja imprimible de la planilla generada estará disponible en breve', 'warn'); return; }
+    const ir = e.target.closest('[data-irdia]');
+    if (ir) irAIso(ir.dataset.irdia);
+  });
+}
+function generarPreviaSemana() {
+  if (GEN.ocupado) return;
+  GEN.ocupado = true; renderGeneradorSemana();
+  try {
+    const base = clonarEstado(estadoSemana(GEN.lunes, false));
+    const res = generarSemana(S, S.staff, base, GEN.lunes, opcionesSemana());
+    res.semana = true; res.ts = Date.now();
+    GEN.previa = res;
+  } catch (e) { toast('No se pudo generar: ' + (e && e.message ? e.message : e), 'bad'); }
+  finally { GEN.ocupado = false; renderGeneradorSemana(); }
+}
+function aplicarSemana() {
+  const p = GEN.previa; if (!p || !p.semana) return;
+  if (!confirmarSiCerrado(GEN.lunes)) return;
+  pushUndo(`generar la semana del ${fmtDM(GEN.lunes)}`, { otrosMeses: true });
+  const real = estadoSemana(GEN.lunes, true);
+  const res = generarSemana(S, S.staff, real, GEN.lunes, opcionesSemana());
+  registrarCambio(`Generador semanal: semana del ${fmtDM(GEN.lunes)} al ${fmtDM(addDias(GEN.lunes, 6))} — ${res.aplicados} plaza(s) nuevas, ${res.huecos.length} hueco(s) disponibles, ${res.resumen.condicionesRotas} condición(es) sin cumplir`, 'ia');
+  saveState(); GEN.previa = null;
+  toast(`${res.aplicados} plaza(s) aplicadas${res.huecos.length ? ` · ${res.huecos.length} hueco(s) quedan disponibles` : ''} · Ctrl+Z para deshacer`, res.huecos.length ? 'warn' : 'ok');
+  renderGeneradorSemana(); pintaRevDot();
+}
+function htmlSemanaGenerada(res) {
+  const r = res.resumen;
+  const dl = iso => `${DIAS_L[isoDow(iso)].slice(0, 3)} ${+iso.slice(8, 10)}`;
+  const nc = pid => esc(nombreCorto(nombrePid(pid)));
+  const lp = tid => { const { localId, franja } = partirTurno(tid); return `<span class="lpill" style="--lc:${colorLocal(localId)}">${esc((localDe(S, localId) || {}).corto || localId)}·${franja}</span>`; };
+  const slot = s => s.hueco
+    ? `<div class="gslot ghueco" data-tipstr="${esc(s.motivo || '')}"><b>${s.pos}</b><span><i class="gtit">Hueco disponible</i><small>abre · turno completo</small></span></div>`
+    : `<div class="gslot"><b>${s.pos}</b><span style="--pc:${avColor(s.pid)}"><i class="gdot"></i>${s.abreFijo ? '<u class="gfijo" title="sale el primero (fijo)">▸</u>' : ''}${s.cocina ? '<u class="gcoc" title="cocina">◆</u>' : ''}${esc(nombreCorto(s.nombre))}${s.partido ? '<em class="gm" title="partido">P</em>' : s.continuo ? '<em class="gm gc" title="turno continuo">C</em>' : ''}${s.comodin ? '<em class="gm" title="comodín">□</em>' : ''}${s.cocina ? '<em class="gm gcoct">cocina</em>' : ''}${s.por ? `<small>por ${nc(s.por)}</small>` : s.nota ? `<small>${esc(s.nota)}</small>` : s.supuesto ? '<small>plaza supuesta</small>' : ''}</span></div>`;
+  const celda = d => {
+    if (!d.abierto) return '<td class="gcerr"><span>Cerrado</span></td>';
+    const hueco = d.slots.some(x => x.hueco);
+    return `<td class="${d.cambiado ? 'gcamb' : ''}${d.faltan ? ' gfalta' : ''}"><div class="gcab"><span class="gcnt${d.faltan ? ' bad' : ''}">${d.n}/${d.min}${d.supuesto ? '*' : ''}${d.refuerzo ? '<i title="refuerzo por evento"> +' + d.refuerzo + '</i>' : ''}</span>${hueco ? '<span class="ghk">+1 hueco</span>' : ''}${d.faltan ? `<span class="ghk">faltan ${d.faltan}</span>` : ''}${d.cambiado ? '<span class="gcorr">cambia</span>' : ''}<button class="glink gir" data-irdia="${d.iso}" title="Ver el día">→</button></div>${d.slots.map(slot).join('')}</td>`;
+  };
+  const tablas = res.locales.map(l => `<table class="gsem" style="--lc:${esc(l.color)}"><thead><tr><th class="gl"><i></i>${esc(l.nombre)}<small>${esc(l.cocina)}</small></th>${res.dias.map(iso => `<th>${dl(iso)}</th>`).join('')}</tr></thead><tbody>${l.franjas.map(f => `<tr><th class="gfr">${FRANJA_LBL[f.franja]}<small>${f.franja === 'M' ? 'apertura' : 'tarde y noche'}</small></th>${f.dias.map(celda).join('')}</tr>`).join('')}</tbody></table>`).join('');
+  const libran = `<table class="gsem glib" style="--lc:var(--ink3)"><thead><tr><th class="gl"><i></i>Quién libra cada día<small>de baja: ${r.deBaja.map(nc).join(' y ') || 'nadie'}</small></th>${res.dias.map(iso => `<th>${dl(iso)}</th>`).join('')}</tr></thead><tbody><tr><th class="gfr">Libran</th>${res.dias.map(iso => `<td><small class="gln">${res.libran[iso].length} libran</small>${res.libran[iso].map(pid => `<span class="glchip" style="--pc:${avColor(pid)}">${nc(pid)}</span>`).join('') || '<em class="gnadie">nadie</em>'}</td>`).join('')}</tr></tbody></table>`;
+  const cambios = res.cambios.map(c => `<li>${lp(c.turnoId)} <b>${dl(c.iso)}</b>: ${c.antes.length ? '<s>' + c.antes.map(nc).join(', ') + '</s> → ' : '<em>nueva:</em> '}${c.despues.map(nc).join(', ') || 'vacía'}</li>`).join('');
+  const huecos = res.huecos.map(h => { const pq = Object.entries(h.porQueNadie || {}).slice(0, 6).map(([m, q]) => `<b>${esc(m)}</b>: ${esc(q.slice(0, 5).join(', '))}${q.length > 5 ? ' +' + (q.length - 5) : ''}`).join(' · '); return `<div class="ghitem">${lp(h.turnoId)} <b>${dl(h.iso)}</b> · ${h.tipo === 'primero' ? '1.ª posición vacante' : `faltan ${h.faltan} de ${h.minimo}`}<p>${esc(h.motivo || '')}</p><small>${pq || 'nadie de la plantilla puede'}</small></div>`; }).join('');
+  const grupos = [['minimos', 'Mínimos'], ['cocina', 'Cocina'], ['persona', 'Fichas'], ['regla', 'Reglas del grupo']];
+  const conds = grupos.map(([t, lbl]) => { const xs = res.condiciones.filter(c => c.tipo === t); return xs.length ? `<div class="gcgrp">${lbl} · ${xs.length}</div>` + xs.map(c => `<div class="gcond${c.ok ? '' : ' rota'}"><i>${c.ok ? '✓' : '✗'}</i><span><b>${c.num}</b> ${esc(c.texto)}${c.nueva ? ' <em class="gnueva">NUEVA</em>' : ''}${c.ok ? '' : `<small>${esc(c.detalle)}</small>`}</span></div>`).join('') : ''; }).join('');
+  return `<div class="genkpis">
+      <div class="genk ok"><b>${r.turnos}</b><span>turnos abiertos</span></div>
+      <div class="genk"><b>${res.aplicados}</b><span>plazas nuevas</span></div>
+      <div class="genk ${r.huecos ? 'bad' : 'ok'}"><b>${r.huecos}</b><span>huecos disponibles</span></div>
+      <div class="genk ${r.condicionesRotas ? 'warn' : 'ok'}"><b>${r.condiciones - r.condicionesRotas}/${r.condiciones}</b><span>condiciones cumplidas</span></div>
+      <div class="genk ${r.maxDias > 6 ? 'warn' : ''}"><b>${r.maxDias}</b><span>días como máximo por persona</span></div>
+      <div class="genk"><b>${r.descansos}</b><span>descansos</span></div>
+    </div>
+    <p class="revsub gsres">${r.huecos ? `La semana sale con <b>${pl(r.huecos, 'hueco disponible', 'huecos disponibles')}</b>: ninguna de las ${activos().length} personas puede ocupar esa posición sin romper una condición, así que se deja señalada para ofrecérsela a quien pueda.` : 'La semana sale completa: todos los turnos tienen su gente mínima, su cocina y quien abre.'} ${r.condicionesRotas ? `<b style="color:var(--warn)">${pl(r.condicionesRotas, 'condición no se cumple', 'condiciones no se cumplen')}</b> (lo puesto a mano no se toca).` : `Se cumplen las ${r.condiciones} condiciones.`} ${res.cambios.length ? `${pl(res.cambios.length, 'casilla cambia', 'casillas cambian')} respecto a lo que había.` : 'Nada cambia respecto a lo que había.'}</p>
+    <div class="genbar"><button class="btn btn-cta" id="genAplicar" ${res.aplicados ? '' : 'disabled'}>Aplicar ${res.aplicados} plaza(s)</button><button class="btn btn-sec" id="gsPrint">Imprimir la planilla propuesta</button><span class="revsub" style="margin:0">Ctrl+Z lo deshace. Los huecos siguen en rojo en Hoy y Semana hasta que alguien los coja.</span></div>
+    <div class="gsemwrap">${tablas}${libran}</div>
+    <div class="gsleg"><span><b>1</b> orden en la casilla: el primero abre y hace turno completo</span><span><u class="gfijo">▸</u> sale el primero (fijo)</span><span><u class="gcoc">◆</u> cocina</span><span><em class="gm">P</em> partido</span><span><em class="gm gc">C</em> turno continuo</span><span><em class="gm">□</em> comodín</span><span class="gcnt">n/mín*</span> mínimo supuesto</span><span class="gcorr">cambia</span> respecto a lo que había</span><span class="ghk">hueco</span> nadie puede ocupar la posición</span></div>
+    <div class="gscols">
+      <div class="gscol"><h3>Qué ha cambiado · ${res.cambios.length}</h3>${res.cambios.length ? `<ul class="gcamblist">${cambios}</ul>` : '<p class="revsub">Nada: la semana ya estaba como la propone el generador.</p>'}</div>
+      <div class="gscol"><h3>Huecos que quedan disponibles · ${res.huecos.length}</h3>${huecos || '<p class="revsub">Ninguno.</p>'}${res.rechazados && res.rechazados.length ? `<h3>Plazas de la semana tipo que no se pudieron poner · ${res.rechazados.length}</h3>${res.rechazados.slice(0, 8).map(x => `<div class="ghitem">${lp(x.turnoId)} <b>${dl(x.iso)}</b> · ${nc(x.pid)}<p>${esc(x.motivo)}</p></div>`).join('')}` : ''}</div>
+      <div class="gscol"><h3>Condiciones comprobadas · ${r.condiciones - r.condicionesRotas} de ${r.condiciones}</h3><div class="gcondlist">${conds}</div></div>
+    </div>`;
+}
+function openCondicionesGen() {
+  const cs = condicionesDe(S, S.staff);
+  const grupos = [['minimos', 'Mínimos por local, franja y día'], ['cocina', 'Cocina'], ['persona', 'Condiciones de las fichas'], ['regla', 'Reglas del grupo']];
+  const html = `<span class="micro">LO QUE COMPRUEBA EL GENERADOR</span><h2 class="revh2" style="margin-top:8px">${cs.length} condiciones activas</h2>
+    <p class="revsub">Salen de los ajustes de cada local y de las fichas de Equipo. Cada una se puede apagar desde allí (o desde Equipo → Condiciones) y el generador deja de comprobarla.</p>
+    ${grupos.map(([t, lbl]) => { const xs = cs.filter(c => c.tipo === t); return xs.length ? `<div class="revgrp"><span class="dot" style="background:var(--accent)"></span>${lbl.toUpperCase()} · ${xs.length}</div>${xs.map(c => `<div class="gcond"><i>·</i><span><b>${c.num}</b> ${esc(c.texto)}${c.nueva ? ' <em class="gnueva">NUEVA</em>' : ''}</span></div>`).join('')}` : ''; }).join('')}`;
+  abrirOverlay('condGenOvl', html, { ancho: 680 });
 }

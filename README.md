@@ -28,17 +28,22 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   propone quién viene).
 - **Equipo**: ficha de cada persona con todas sus condiciones editables
   (locales, franjas, días que libra, partidos, cocina titular o reserva, quién
-  abre, «nunca con», «cubre a», vetos, contrato, ausencias, notas) y los ajustes
-  de cada local (aperturas, mínimos, cocina, horarios, quién abre).
+  abre, «nunca con», «cubre a», vetos, «no sale nunca el primero», contrato,
+  ausencias, notas), cada una **activable o desactivable** por el administrador,
+  las reglas del grupo con interruptor, el catálogo numerado de condiciones que
+  comprueba el generador, y los ajustes de cada local (aperturas, mínimos,
+  cocina, horarios, quién abre).
 - **Contador de horas**: horas del mes por persona a partir de la planilla y de
   los ajustes del encargado (horas extra, horario distinto), con nocturnas,
   domingos y festivos, saldo frente a contrato, desglose por local, Excel,
   impresión y **cierre de mes** para la nómina.
-- **Generador de planillas**: semana tipo + coberturas «cubre a» + relleno de
-  mínimos con razón por plaza, vista previa antes de aplicar, huecos explicados
-  (por qué nadie puede y candidatos con aviso a un clic), deshacer. Motor local
-  determinista o **núcleo Shiftia (CP-SAT)** vía el servidor cuando está
-  configurado.
+- **Generador semanal**: la planilla de la semana con las condiciones del cliente
+  (semana tipo + fichas + ajustes de cada local): posiciones numeradas (1.º abre y
+  hace turno completo, ◆ cocina en su posición, P partido, C continuo, □ comodín),
+  huecos disponibles con motivo cuando nadie puede ocupar una posición, qué ha
+  cambiado, quién libra cada día y las condiciones comprobadas; vista previa,
+  aplicar con deshacer e impresión de la planilla propuesta. Modo «Periodo libre»
+  para el mes, con motor local o **núcleo Shiftia (CP-SAT)** vía el servidor.
 - **Entrevistas**: sección del administrador reservada para la base de datos de
   entrevistas y sus funciones (por importar); de momento visible y «en construcción».
 - **Revisar el mes**, historial de cambios, deshacer (Ctrl+Z), tema claro y

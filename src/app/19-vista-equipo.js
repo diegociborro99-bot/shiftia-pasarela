@@ -22,39 +22,76 @@ function tchip(lbl, txt, cls, title) {
   return `<span class="tchip${cls ? ' ' + cls : ''}"${title ? ` title="${esc(title)}"` : ''}><b>${esc(lbl)}</b><i>${txt}</i></span>`;
 }
 
+// etiqueta legible de una característica (CARACTERISTICAS del modelo)
+function lblCaracteristica(k) { const c = CARACTERISTICAS.find(x => x.k === k); return c ? c.lbl : k; }
+// «nunca 1.º de tarde»: texto corto de p.noPrimero para chips y fichas
+function lblNoPrimero(fr) {
+  const f = Array.isArray(fr) ? fr : [];
+  if (f.includes('M') && f.includes('T')) return 'de mañana ni de tarde';
+  return f.includes('M') ? 'de mañana' : f.includes('T') ? 'de tarde' : '';
+}
+// Enciende o apaga una característica en la ficha (p.inactivas). «Nunca con» es
+// mutua (el modelo bloquea si cualquiera de los dos la tiene activa), así que se
+// apaga o enciende también en la ficha de cada incompatible; devuelve sus nombres.
+function setCaracteristica(p, k, activa) {
+  const pon = x => {
+    x.inactivas = Array.isArray(x.inactivas) ? x.inactivas : [];
+    const i = x.inactivas.indexOf(k);
+    if (!activa && i < 0) x.inactivas.push(k);
+    if (activa && i >= 0) x.inactivas.splice(i, 1);
+    if (!x.inactivas.length) delete x.inactivas;
+  };
+  pon(p);
+  const otros = [];
+  if (k === 'nuncaCon') for (const q of p.nuncaCon || []) { const qp = personaDeId(q); if (qp && caracteristicaActiva(qp, k) !== activa) { pon(qp); otros.push(qp.nombre); } }
+  return otros;
+}
+// desde la interfaz (panel de condiciones): deshacer, historial y guardado
+function alternarCaracteristicaUI(pid, k, activa) {
+  const p = personaDeId(pid); if (!p) return false;
+  pushUndo(`ficha de ${p.nombre}`, { staff: true });
+  const otros = setCaracteristica(p, k, activa);
+  registrarCambio(`Ficha de ${p.nombre}: «${lblCaracteristica(k)}» ${activa ? 'activada' : 'desactivada'}${otros.length ? ` (también en ${otros.join(', ')})` : ''}`, 'equipo');
+  saveState();
+  return true;
+}
+
 // Todas las condiciones de una persona como chips. Es la «hoja de condiciones»
 // que el encargado revisa antes de generar: si algo no está aquí, el generador
-// no lo sabe.
+// no lo sabe. Las características apagadas en la ficha salen tachadas.
 function chipsCondiciones(p) {
   const h = [];
+  const off = k => (caracteristicaActiva(p, k) ? '' : ' off');
+  const tc = (k, lbl, txt, cls, title) => tchip(lbl, txt, (cls || '') + off(k), caracteristicaActiva(p, k) ? title : `${lblCaracteristica(k)}: desactivada en la ficha, el generador no la tiene en cuenta`);
   const locs = p.locales || [];
-  if (locs.length) for (const id of locs) h.push(tchip('Local', chipLocal(id), 'loc'));
+  if (locs.length) for (const id of locs) h.push(tc('locales', 'Local', chipLocal(id), 'loc'));
   else h.push(tchip('Local', 'cualquiera (comodín)', 'teal'));
-  h.push(tchip('Franja', esc(lblFranjas(p.franjas))));
+  h.push(tc('franjas', 'Franja', esc(lblFranjas(p.franjas))));
   const pd = p.partido || {};
-  if (pd.siempre) h.push(tchip('Partido', 'siempre', 'fix'));
-  else if ((pd.dias || []).length) h.push(tchip('Partido', esc(lblDows(pd.dias))));
-  if (p.libreVariable) h.push(tchip('Libra', 'libre variable', 'warn'));
-  else if ((p.libra || []).length) h.push(tchip('Libra', esc(lblDows(p.libra))));
+  if (pd.siempre) h.push(tc('partido', 'Partido', 'siempre', 'fix'));
+  else if ((pd.dias || []).length) h.push(tc('partido', 'Partido', esc(lblDows(pd.dias))));
+  if (p.libreVariable) h.push(tc('libra', 'Libra', 'libre variable', 'warn'));
+  else if ((p.libra || []).length) h.push(tc('libra', 'Libra', esc(lblDows(p.libra))));
   const c = p.cocina || {};
-  if (c.nunca) h.push(tchip('Cocina', 'nunca', 'warn'));
+  if (c.nunca) h.push(tc('cocina', 'Cocina', 'nunca', 'warn'));
   else {
-    for (const id of c.titular || []) h.push(tchip('Cocina', chipLocal(id, '· titular'), 'loc'));
-    for (const id of c.reserva || []) h.push(tchip('Cocina', chipLocal(id, '· reserva'), 'loc'));
-    if (p.puesto === 'cocina' && !(c.titular || []).length && !(c.reserva || []).length) h.push(tchip('Cocina', 'por su puesto'));
-    if ((c.soloDias || []).length) h.push(tchip('Cocina', 'solo ' + esc(c.soloDias.map(lblDowPl).join(' y ')), 'warn'));
+    for (const id of c.titular || []) h.push(tc('cocina', 'Cocina', chipLocal(id, '· titular'), 'loc'));
+    for (const id of c.reserva || []) h.push(tc('cocina', 'Cocina', chipLocal(id, '· reserva'), 'loc'));
+    if (p.puesto === 'cocina' && !(c.titular || []).length && !(c.reserva || []).length) h.push(tc('cocina', 'Cocina', 'por su puesto'));
+    if ((c.soloDias || []).length) h.push(tc('cocina', 'Cocina', 'solo ' + esc(c.soloDias.map(lblDowPl).join(' y ')), 'warn'));
   }
-  for (const [lid, fr] of Object.entries(p.abre || {})) if ((fr || []).length) h.push(tchip('Abre', chipLocal(lid, fr.map(f => FRANJA_LBL[f].toLowerCase()).join(' y ')), 'loc'));
-  for (const lid of p.noAbre || []) h.push(tchip('No abre', chipLocal(lid), 'loc warn'));
-  if ((p.nuncaCon || []).length) h.push(tchip('Nunca con', esc(p.nuncaCon.map(nombrePid).join(', ')), 'warn'));
+  for (const [lid, fr] of Object.entries(p.abre || {})) if ((fr || []).length) h.push(tc('abre', 'Abre', chipLocal(lid, fr.map(f => FRANJA_LBL[f].toLowerCase()).join(' y ')), 'loc'));
+  for (const lid of p.noAbre || []) h.push(tc('noAbre', 'No abre', chipLocal(lid), 'loc warn'));
+  if ((p.noPrimero || []).length) h.push(tc('noPrimero', 'Nunca 1.º', esc(lblNoPrimero(p.noPrimero)), 'warn', 'no sale nunca el primero en esa franja: entra a partir del segundo puesto'));
+  if ((p.nuncaCon || []).length) h.push(tc('nuncaCon', 'Nunca con', esc(p.nuncaCon.map(nombrePid).join(', ')), 'warn'));
   for (const cb of p.cubreA || []) {
     const cuando = [cb.dow ? lblDowPl(cb.dow) : '', cb.turnoId ? lblTurno(cb.turnoId) : ''].filter(Boolean).join(' · ');
-    h.push(tchip('Cubre a', esc(nombrePid(cb.pid)) + (cuando ? ` <small>(${esc(cuando)})</small>` : ''), 'fix'));
+    h.push(tc('cubreA', 'Cubre a', esc(nombrePid(cb.pid)) + (cuando ? ` <small>(${esc(cuando)})</small>` : ''), 'fix'));
   }
-  for (const v of p.vetos || []) h.push(tchip('No hace', chipLocal(v.localId, v.franja === 'M' ? 'mañanas' : 'tardes'), 'loc warn'));
-  if (p.contrato && +p.contrato.horasSemana > 0) h.push(tchip('Contrato', `${+p.contrato.horasSemana} h/semana`));
-  if (p.prefs && (p.prefs.evitaDows || []).length) h.push(tchip('Prefiere no', esc(lblDows(p.prefs.evitaDows)), 'teal', 'criterio personal: no bloquea, el generador lo respeta al priorizar'));
-  if (p.prefs && p.prefs.nota) h.push(tchip('Criterio', esc(p.prefs.nota), 'teal'));
+  for (const v of p.vetos || []) h.push(tc('vetos', 'No hace', chipLocal(v.localId, v.franja === 'M' ? 'mañanas' : 'tardes'), 'loc warn'));
+  if (p.contrato && +p.contrato.horasSemana > 0) h.push(tc('contrato', 'Contrato', `${+p.contrato.horasSemana} h/semana`));
+  if (p.prefs && (p.prefs.evitaDows || []).length) h.push(tc('prefs', 'Prefiere no', esc(lblDows(p.prefs.evitaDows)), 'teal', 'criterio personal: no bloquea, el generador lo respeta al priorizar'));
+  if (p.prefs && p.prefs.nota) h.push(tc('prefs', 'Criterio', esc(p.prefs.nota), 'teal'));
   for (const s of p.supuestos || []) h.push(tchip('Supuesto', esc(s), 'warn', 'decidido por Highkey, pendiente de confirmar con el grupo'));
   if (p.nota) h.push(tchip('Nota', esc(p.nota), '', p.nota));
   return h.join('');
@@ -448,6 +485,158 @@ function openAjustesLocales(localId) {
   }
 }
 
+// ---------- condiciones del grupo ----------
+// El catálogo que comprueba el generador (condicionesDe: mínimos, cocina, fichas y
+// reglas), con un interruptor por regla del grupo (S.reglas[k]) y otro por
+// característica de cada ficha (p.inactivas). Lo apagado se ve tachado y se
+// puede volver a encender desde aquí. Cada toque guarda y deja huella en el historial.
+const TIPO_COND = { minimos: 'Mínimos por local', cocina: 'Cocina de los locales', persona: 'Personas (sus fichas)', regla: 'Reglas del grupo' };
+// a qué regla del grupo obedece cada condición (null: no depende de ninguna)
+function reglaDeCondicion(c) {
+  if (c.tipo === 'minimos') return 'minimos';
+  if (c.tipo === 'cocina') return 'cocina';
+  if (c.tipo === 'regla') return c.k;
+  return ['libra', 'partido', 'vetos', 'nuncaCon', 'cubreA', 'cocina', 'abre', 'noPrimero'].includes(c.k) ? c.k : null;
+}
+// el mismo catálogo con TODO encendido: de ahí salen los textos de lo apagado
+function condicionesTodas() {
+  return condicionesDe(Object.assign({}, S, { reglas: {} }), S.staff.map(p => Object.assign({}, p, { inactivas: [] })));
+}
+function htmlToggle(on, attrs, lbl) {
+  return `<label class="tgl"><input type="checkbox" role="switch" aria-checked="${on ? 'true' : 'false'}" aria-label="${esc(lbl)}" data-libre ${attrs}${on ? ' checked' : ''}><span class="tglk"></span><span class="tgll">${on ? 'Activa' : 'Apagada'}</span></label>`;
+}
+function openCondiciones() {
+  S.reglas = S.reglas && typeof S.reglas === 'object' ? S.reglas : {};
+  let q = '';
+  const ov = abrirOverlay('condOvl', `<span class="micro">EQUIPO</span>
+    <h2 class="revh2">Condiciones del grupo</h2>
+    <p class="revsub">Lo que el generador comprueba, sacado de los locales y de las fichas. Apaga una regla para todo el grupo o una característica de una ficha; lo apagado no lo mira nadie (ni el generador, ni el selector, ni la revisión) hasta que lo vuelvas a encender. Se guarda al momento.</p>
+    <div class="condtop"><span class="condcount" id="condCount" aria-live="polite"></span><input type="search" class="logininp condq" id="condQ" data-libre placeholder="Filtra por persona, local o texto…" aria-label="Filtrar condiciones"></div>
+    <div id="condBody"></div>
+    <div class="bar" style="display:flex;justify-content:flex-end;margin-top:14px"><button type="button" class="btn btn-cta" data-ovx>Listo</button></div>`, { ancho: 720 });
+  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const fila = (c, ctrl, extra) => {
+    const x = extra || {};
+    return `<div class="condrow${c.informativa ? ' info' : ''}${x.off ? ' off' : ''}" data-cid="${esc(c.id)}" data-q="${esc(norm(c.texto + ' ' + (x.q || '')))}">
+      <span class="condnum">${x.off ? '—' : c.num}</span>
+      <span class="condtx">${esc(c.texto)}${c.nueva ? ' <span class="condnew">NUEVA</span>' : ''}${c.informativa ? ' <small class="condinfo">informativa: no bloquea</small>' : ''}${x.nota ? ` <small class="condinfo">${esc(x.nota)}</small>` : ''}</span>
+      ${ctrl || ''}</div>`;
+  };
+  const pinta = () => {
+    const activas = condicionesDe(S, S.staff);
+    const ids = new Set(activas.map(c => c.id));
+    const todas = condicionesTodas();
+    // ---- reglas del grupo ----
+    let h = `<div class="revgrp"><span class="dot" style="background:var(--accent)"></span>REGLAS DEL GRUPO</div>
+      <p class="filltxt" style="margin:0 0 6px">Cada regla vale para todo el grupo. Apagada, ninguna ficha ni local la aplica.</p>`;
+    let reglasOff = 0;
+    for (const r of REGLAS) {
+      const on = regla(S, r.k); if (!on) reglasOff++;
+      h += `<div class="condrow regla${on ? '' : ' off'}" data-regla-row="${r.k}" data-q="${esc(norm(r.lbl))}"><span class="condnum">${on ? '●' : '○'}</span><span class="condtx">${esc(r.lbl)}${r.nueva ? ' <span class="condnew">NUEVA</span>' : ''}</span>${htmlToggle(on, `data-regla="${r.k}"`, `Regla: ${r.lbl}`)}</div>`;
+    }
+    // ---- condiciones activas, por tipo ----
+    h += `<div class="revgrp" style="margin-top:18px"><span class="dot" style="background:var(--teal)"></span>CONDICIONES ACTIVAS · ${activas.length}</div>
+      <p class="filltxt" style="margin:0 0 6px">Numeradas como en la hoja del generador. Las de una ficha se apagan aquí mismo; las de un local se cambian en sus ajustes.</p>`;
+    for (const tipo of Object.keys(TIPO_COND)) {
+      const lista = activas.filter(c => c.tipo === tipo);
+      if (!lista.length) continue;
+      h += `<div class="condgrp" data-grp="${tipo}"><b>${esc(TIPO_COND[tipo])}</b> <span class="micro">${lista.length}</span></div>`;
+      for (const c of lista) {
+        let ctrl = '';
+        if (c.tipo === 'persona') {
+          const p = personaDeId(c.pid);
+          const q = c.k === 'nuncaCon' && c.otro ? ` y ${nombrePid(c.otro)}` : '';
+          ctrl = htmlToggle(true, `data-car="${esc(c.pid)}|${esc(c.k)}"`, `«${lblCaracteristica(c.k)}» en la ficha de ${p ? p.nombre : c.pid}${q}`);
+        } else if (c.tipo === 'minimos' || c.tipo === 'cocina') ctrl = `<button type="button" class="condlnk" data-condlocal="${esc(c.localId)}">Ajustes del local</button>`;
+        else if (c.tipo === 'regla') ctrl = `<button type="button" class="condlnk" data-irregla="${esc(c.k)}">Regla del grupo ↑</button>`;
+        h += fila(c, ctrl, { q: c.tipo === 'persona' ? nombrePid(c.pid) + ' ' + lblCaracteristica(c.k) : c.localId ? nombreLocal(c.localId) : '' });
+      }
+    }
+    // ---- apagadas: características de fichas (p.inactivas) y reglas del grupo ----
+    const off = [], porId = {};
+    const lblRegla = rk => (REGLAS.find(r => r.k === rk) || { lbl: rk }).lbl;
+    for (const p of S.staff) for (const k of p.inactivas || []) {
+      // «nunca con» es un par: la misma condición puede estar apagada en las dos fichas y sale una vez
+      const textos = todas.filter(c => c.tipo === 'persona' && c.k === k && (c.pid === p.id || c.otro === p.id));
+      const porRegla = reglaDeCondicion({ tipo: 'persona', k }) && !regla(S, k);
+      const base = { tipo: 'persona', pid: p.id, k, nueva: k === 'noPrimero', fichas: [p.nombre] };
+      if (!textos.length) { off.push(Object.assign({ id: `off:${p.id}:${k}`, texto: `${p.nombre}: ${lblCaracteristica(k).toLowerCase()} (sin datos en la ficha)` }, base)); continue; }
+      for (const c of textos) {
+        if (porId[c.id]) { porId[c.id].fichas.push(p.nombre); continue; }
+        off.push(porId[c.id] = Object.assign({}, c, base, { id: `off:${p.id}:${k}:${c.id}`, fichas: [p.nombre], porRegla }));
+      }
+    }
+    for (const o of off) o.nota = `apagada en la${o.fichas.length > 1 ? 's fichas' : ' ficha'} de ${o.fichas.join(' y ')}${o.porRegla ? ' · y la regla del grupo también' : ''}`;
+    // lo que falta del catálogo porque su regla del grupo está apagada
+    for (const c of todas) {
+      if (ids.has(c.id) || porId[c.id]) continue;
+      const rk = reglaDeCondicion(c); if (!rk || regla(S, rk)) continue;
+      if (c.tipo === 'persona' && off.some(o => o.pid === c.pid && o.k === c.k)) continue;
+      off.push(Object.assign({}, c, { id: `off:regla:${c.id}`, rk, nota: `la regla «${lblRegla(rk)}» está apagada` }));
+    }
+    const nOffFichas = S.staff.reduce((a, p) => a + (p.inactivas || []).length, 0);
+    h += `<div class="revgrp" style="margin-top:18px"><span class="dot" style="background:var(--ink3)"></span>APAGADAS · ${off.length}</div>`;
+    if (!off.length) h += '<div class="festvacio">Nada apagado: el generador lo comprueba todo.</div>';
+    else {
+      h += '<p class="filltxt" style="margin:0 0 6px">Tachado lo que el generador no está mirando. Enciéndelo desde aquí cuando quieras.</p>';
+      for (const c of off) {
+        const ctrl = c.tipo === 'persona' && !c.rk ? htmlToggle(false, `data-car="${esc(c.pid)}|${esc(c.k)}"`, `«${lblCaracteristica(c.k)}» en la ficha de ${nombrePid(c.pid)}`)
+          : htmlToggle(false, `data-regla="${esc(c.rk)}"`, `Regla: ${lblRegla(c.rk)}`);
+        h += fila(c, ctrl, { off: true, nota: c.nota, q: c.pid ? nombrePid(c.pid) + ' ' + lblCaracteristica(c.k) : '' });
+      }
+    }
+    ov.querySelector('#condBody').innerHTML = h;
+    ov.querySelector('#condCount').innerHTML = `<b>${activas.length}</b> condiciones activas · <b>${nOffFichas + reglasOff}</b> apagadas${reglasOff ? ` <small>(${reglasOff} ${reglasOff === 1 ? 'regla' : 'reglas'})</small>` : ''}`;
+    filtra();
+  };
+  const filtra = () => {
+    const qq = norm(q).trim();
+    let vistos = 0;
+    for (const r of ov.querySelectorAll('.condrow')) { const ok = !qq || (r.dataset.q || '').includes(qq); r.hidden = !ok; if (ok) vistos++; }
+    for (const g of ov.querySelectorAll('.condgrp')) { let n = g.nextElementSibling, alguno = false; while (n && n.classList.contains('condrow')) { if (!n.hidden) { alguno = true; break; } n = n.nextElementSibling; } g.hidden = !alguno; }
+    const av = ov.querySelector('#condSinRes'); if (av) av.remove();
+    if (qq && !vistos) ov.querySelector('#condBody').insertAdjacentHTML('beforeend', '<div class="festvacio" id="condSinRes">Nada coincide con el filtro.</div>');
+  };
+  pinta();
+  ov.addEventListener('input', e => { if (e.target.id === 'condQ') { q = e.target.value; filtra(); } });
+  ov.addEventListener('change', e => {
+    const t = e.target; const ds = t.dataset || {};
+    if (ds.regla) {
+      const r = REGLAS.find(x => x.k === ds.regla); if (!r) return;
+      const on = t.checked;
+      S.reglas[r.k] = on;
+      registrarCambio(`Regla «${r.lbl}» ${on ? 'activada' : 'desactivada'}`, 'equipo');
+      saveState(); renderVistaActiva(); pinta();
+      toast(`Regla ${on ? 'activada' : 'desactivada'} para todo el grupo`, on ? 'ok' : 'warn');
+      return;
+    }
+    if (ds.car) {
+      const [pid, k] = ds.car.split('|');
+      if (alternarCaracteristicaUI(pid, k, t.checked)) { renderVistaActiva(); pinta(); }
+    }
+  });
+  ov.addEventListener('click', e => {
+    const t = e.target;
+    if (t === ov || t.closest('[data-ovx]')) return;   // lo cierra abrirOverlay
+    const ll = t.closest('[data-condlocal]');
+    if (ll) {
+      openAjustesLocales(ll.dataset.condlocal);
+      // al cerrar los ajustes (repintan Equipo) se refresca este catálogo: los mínimos pueden haber cambiado
+      new MutationObserver((m, obs) => { if (!document.getElementById('localesOvl')) { obs.disconnect(); if (ov.isConnected) pinta(); } }).observe(document.body, { childList: true });
+      return;
+    }
+    const ir = t.closest('[data-irregla]');
+    if (ir) {
+      const row = ov.querySelector(`[data-regla-row="${CSS.escape(ir.dataset.irregla)}"]`); if (!row) return;
+      row.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 1400);
+      const inp = row.querySelector('input'); if (inp) inp.focus({ preventScroll: true });
+    }
+  });
+  setTimeout(() => { const i = ov.querySelector('#condQ'); if (i && !matchMedia('(hover:none)').matches) i.focus(); }, 60);
+  return ov;
+}
+
 // ---------- eventos de la vista ----------
 document.addEventListener('click', e => {
   const root = $('#equipoRoot'); if (!root || !root.contains(e.target)) return;
@@ -490,5 +679,11 @@ document.addEventListener('change', e => {
 });
 {
   const bp = $('#btnPersonas'); if (bp) bp.addEventListener('click', () => openPersonas());
-  const bl = $('#btnLocales'); if (bl) bl.addEventListener('click', () => openAjustesLocales());
+  const bl = $('#btnLocales');
+  if (bl) {
+    bl.addEventListener('click', () => openAjustesLocales());
+    // el botón de las condiciones vive junto al de los locales (la plantilla no lo trae)
+    if (!$('#btnCondiciones')) bl.insertAdjacentHTML('beforebegin', '<button type="button" class="btn btn-sec" id="btnCondiciones" title="Reglas del grupo y condiciones que comprueba el generador">Condiciones</button>');
+    $('#btnCondiciones').addEventListener('click', () => openCondiciones());
+  }
 }

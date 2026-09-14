@@ -11,14 +11,15 @@ function openFicha(pid) {
   p.cocina = p.cocina || { titular: [], reserva: [], soloDias: [] }; p.cocina.titular = p.cocina.titular || []; p.cocina.reserva = p.cocina.reserva || []; p.cocina.soloDias = p.cocina.soloDias || [];
   p.abre = p.abre || {}; p.noAbre = p.noAbre || []; p.nuncaCon = p.nuncaCon || []; p.cubreA = p.cubreA || []; p.vetos = p.vetos || [];
   p.contrato = p.contrato || { horasSemana: null }; p.ausencias = p.ausencias || []; p.prefs = p.prefs || {}; p.supuestos = p.supuestos || [];
+  p.noPrimero = Array.isArray(p.noPrimero) ? p.noPrimero : []; if (p.inactivas !== undefined && !Array.isArray(p.inactivas)) delete p.inactivas;
 
   let tocada = false, undoHecho = false;
   // un registro por cambio; deshacer con una sola instantánea por ficha abierta
-  const guarda = (campo, mut) => {
+  const guarda = (campo, mut, tipo) => {
     if (!undoHecho) { pushUndo(`ficha de ${p.nombre}`, { staff: true }); undoHecho = true; }
     mut(p);
     tocada = true;
-    registrarCambio(`Ficha de ${p.nombre}: ${campo}`, 'cambio');
+    registrarCambio(`Ficha de ${p.nombre}: ${campo}`, tipo || 'cambio');
     saveState();
   };
   const alterna = (arr, v) => { const i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); if (typeof v === 'number') arr.sort((a, b) => a - b); };
@@ -45,41 +46,53 @@ function openFicha(pid) {
   const selTurno = (attr, sel) => `<select class="logininp" ${attr} data-libre><option value="">cualquier turno</option>${turnosDe(S).map(t => `<option value="${esc(t.id)}"${sel === t.id ? ' selected' : ''}>${esc(lblTurno(t.id))}</option>`).join('')}</select>`;
   const sec = (id, titulo, sub, html) => `<details class="pmore fsec" data-sec="${id}" open><summary>${esc(titulo)}${sub ? ` <small>${esc(sub)}</small>` : ''}</summary><div class="fsecb">${html}</div></details>`;
   const fila = (info, sub, ctrl, rmAttr) => `<div class="festrow"><span class="festinfo"><b>${info}</b>${sub ? `<small>${sub}</small>` : ''}</span>${ctrl || ''}<button type="button" class="festrm" ${rmAttr} aria-label="Quitar">✕</button></div>`;
+  // Cada característica (CARACTERISTICAS del modelo) va en un bloque con su
+  // interruptor arriba a la derecha: apagada, el generador no la mira, pero se
+  // sigue editando. Escribe p.inactivas.
+  const act = k => caracteristicaActiva(p, k);
+  const car = (k, titulo, sub, html, opts) => {
+    const on = act(k), o = opts || {};
+    return `<div class="fcar${on ? '' : ' off'}" data-car="${k}">
+      <div class="fcarh"><span class="fcart">${titulo ? esc(titulo) : ''}${o.nueva ? ' <span class="condnew">NUEVA</span>' : ''}${sub ? ` <small>${sub}</small>` : ''}</span>
+        <label class="tgl" title="${on ? 'Activa: el generador la tiene en cuenta' : 'Desactivada: el generador no la tiene en cuenta'}"><input type="checkbox" role="switch" aria-checked="${on ? 'true' : 'false'}" aria-label="«${esc(lblCaracteristica(k))}» activa" data-car-tgl="${k}" data-libre${on ? ' checked' : ''}><span class="tglk"></span><span class="tgll">${on ? 'Activa' : 'Apagada'}</span></label></div>
+      <div class="fcarb">${html}</div>
+      ${on ? '' : '<p class="fcaroff">Desactivada: el generador no la tiene en cuenta. Se puede seguir editando y volver a activar cuando haga falta.</p>'}</div>`;
+  };
+  const subOff = (k, sub) => (act(k) ? '' : 'desactivada · ') + sub;
 
   const pinta = () => {
     const abiertas = {}; body.querySelectorAll('details[data-sec]').forEach(d => { abiertas[d.dataset.sec] = d.open; });
     const c = p.cocina, pd = p.partido;
     let h = '';
     h += sec('donde', 'Dónde y cuándo', 'locales, franjas, libra y partido',
-      `<div class="pinlbl">Locales <small>(ninguno = cualquiera, comodín)</small></div><div class="locset">${locChips(p.locales, 'tloc')}</div>
-       <div class="pinlbl">Franjas</div><div class="segrow">${franjaChips(p.franjas, 'tfranja')}</div>
-       <div class="pinlbl">Libra</div><div class="dowset">${dowSet(p.libra, 'tlibra')}</div>
-       ${chk('libreVariable', !!p.libreVariable, 'Día libre variable (se decide cada semana)')}
-       <div class="pinlbl">Hace partido (mañana y tarde el mismo día) los…</div><div class="dowset">${dowSet(pd.dias, 'tpartido')}</div>
-       ${chk('partidoSiempre', !!pd.siempre, 'Siempre partido')}`);
-    h += sec('cocina', 'Cocina', c.nunca ? 'nunca cocina' : `${c.titular.length + c.reserva.length ? 'titular o reserva' : p.puesto === 'cocina' ? 'por su puesto' : 'no cocina'}`,
-      `<div class="pinlbl">Titular de cocina en</div><div class="locset">${locChips(c.titular, 'tcoct')}</div>
+      car('locales', 'Locales', '(ninguno = cualquiera, comodín)', `<div class="locset">${locChips(p.locales, 'tloc')}</div>`) +
+      car('franjas', 'Franjas', '', `<div class="segrow">${franjaChips(p.franjas, 'tfranja')}</div>`) +
+      car('libra', 'Libra', '', `<div class="dowset">${dowSet(p.libra, 'tlibra')}</div>
+       ${chk('libreVariable', !!p.libreVariable, 'Día libre variable (se decide cada semana)')}`) +
+      car('partido', 'Hace partido', '(mañana y tarde el mismo día) los…', `<div class="dowset">${dowSet(pd.dias, 'tpartido')}</div>
+       ${chk('partidoSiempre', !!pd.siempre, 'Siempre partido')}`));
+    h += sec('cocina', 'Cocina', subOff('cocina', c.nunca ? 'nunca cocina' : `${c.titular.length + c.reserva.length ? 'titular o reserva' : p.puesto === 'cocina' ? 'por su puesto' : 'no cocina'}`),
+      car('cocina', '', '', `<div class="pinlbl">Titular de cocina en</div><div class="locset">${locChips(c.titular, 'tcoct')}</div>
        <div class="pinlbl">Reserva de cocina en</div><div class="locset">${locChips(c.reserva, 'tcocr')}</div>
        <div class="pinlbl">Solo cocina estos días <small>(ninguno = cualquiera)</small></div><div class="dowset">${dowSet(c.soloDias, 'tcocd')}</div>
-       ${chk('cocinaNunca', !!c.nunca, 'Nunca cocina')}`);
-    h += sec('abre', 'Abre el local', 'quién sale primero',
-      S.locales.map(l => `<div class="abrerow" style="--lc:${esc(l.color)}"><span class="abrenm"><i class="ldot"></i>${esc(l.nombre)}</span><span class="segrow" style="margin:0">${FRANJAS.map(f => `<button type="button" class="segk${((p.abre[l.id] || []).includes(f)) ? ' on' : ''}" data-tabre="${esc(l.id)}|${f}" data-libre>${FRANJA_LBL[f]}</button>`).join('')}</span></div>`).join('') +
-      `<div class="pinlbl">No abre nunca en</div><div class="locset">${locChips(p.noAbre, 'tnoabre')}</div>`);
+       ${chk('cocinaNunca', !!c.nunca, 'Nunca cocina')}`));
+    h += sec('abre', 'Abre el local', 'quién sale primero, quién no',
+      car('abre', 'Sale el primero en', '', S.locales.map(l => `<div class="abrerow" style="--lc:${esc(l.color)}"><span class="abrenm"><i class="ldot"></i>${esc(l.nombre)}</span><span class="segrow" style="margin:0">${FRANJAS.map(f => `<button type="button" class="segk${((p.abre[l.id] || []).includes(f)) ? ' on' : ''}" data-tabre="${esc(l.id)}|${f}" data-libre>${FRANJA_LBL[f]}</button>`).join('')}</span></div>`).join('')) +
+      car('noAbre', 'No abre nunca en', '', `<div class="locset">${locChips(p.noAbre, 'tnoabre')}</div>`) +
+      car('noPrimero', 'No sale nunca el primero', '(entra a partir del segundo puesto en esas franjas)', `<div class="segrow">${franjaChips(p.noPrimero, 'tnoprimero')}</div>${p.noPrimero.length ? `<div class="festvacio">Nunca 1.º ${esc(lblNoPrimero(p.noPrimero))}${p.noPrimero.includes('T') ? ': no hace la tarde completa' : ''}.</div>` : '<div class="festvacio">Puede salir el primero en las dos franjas.</div>'}`, { nueva: true }));
     h += sec('reglas', 'Reglas con otras personas', `${p.nuncaCon.length ? p.nuncaCon.length + ' incompatibles' : 'sin incompatibles'} · cubre a ${p.cubreA.length}`,
-      `<div class="pinlbl">Nunca coincide con</div>
-       <div class="chiprow">${p.nuncaCon.map((q, i) => `<span class="tchip warn"><i>${esc(nombrePid(q))}</i><button type="button" class="festrm" data-rmnunca="${i}" aria-label="Quitar">✕</button></span>`).join('') || '<span class="festvacio">Con nadie en especial.</span>'}</div>
-       <span class="addrow">${selPersonas('fNuncaSel', p.nuncaCon)}<button type="button" class="btn-mini" data-addnunca>Añadir</button></span>
-       <div class="pinlbl">Cubre a <small>(ocupa su sitio cuando falta)</small></div>
-       ${p.cubreA.map((cb, i) => fila(esc(nombrePid(cb.pid)), '', `<span class="cubrectl">${selDia(`data-cubred="${i}"`, cb.dow)}${selTurno(`data-cubret="${i}"`, cb.turnoId)}</span>`, `data-rmcubre="${i}"`)).join('') || '<div class="festvacio">No cubre a nadie en concreto.</div>'}
-       <span class="addrow addrow3">${selPersonas('fCubreP')}${selDia('id="fCubreD"')}${selTurno('id="fCubreT"')}<button type="button" class="btn-mini" data-addcubre>Añadir</button></span>`);
-    h += sec('vetos', 'Vetos', p.vetos.length ? `${p.vetos.length} franja(s) que no hace` : 'ninguno',
-      (p.vetos.map((v, i) => fila(`<i class="ldot" style="--lc:${esc(colorLocal(v.localId))}"></i>${esc(nombreLocal(v.localId))}`, `no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'}`, '', `data-rmveto="${i}"`)).join('') || '<div class="festvacio">Sin vetos: puede ir a cualquier franja de sus locales.</div>') +
-      `<span class="addrow"><select class="logininp" id="fVetoL" data-libre>${S.locales.map(l => `<option value="${esc(l.id)}">${esc(l.nombre)}</option>`).join('')}</select><select class="logininp" id="fVetoF" data-libre>${FRANJAS.map(f => `<option value="${f}">${FRANJA_LBL[f]}s</option>`).join('')}</select><button type="button" class="btn-mini" data-addveto>Añadir veto</button></span>`);
-    h += sec('contrato', 'Contrato', p.contrato.horasSemana ? `${+p.contrato.horasSemana} h/semana` : 'sin horas fijadas',
-      `<label class="pinlbl">Horas por semana <small>(el contador de horas compara con esto)</small><input type="number" class="logininp" min="0" max="60" step="0.5" inputmode="decimal" data-num="horasSemana" data-libre value="${p.contrato.horasSemana !== null && p.contrato.horasSemana !== undefined ? esc(p.contrato.horasSemana) : ''}" placeholder="sin fijar"></label>`);
-    h += sec('prefs', 'Preferencias', 'no bloquean: el generador las respeta al priorizar',
-      `<div class="pinlbl">Prefiere no trabajar los…</div><div class="dowset">${dowSet(p.prefs.evitaDows || [], 'tevita')}</div>
-       <label class="pinlbl">Criterio personal<input type="text" class="logininp" data-txt="prefsNota" data-libre value="${esc(p.prefs.nota || '')}" placeholder="p. ej. concilia los lunes"></label>`);
+      car('nuncaCon', 'Nunca coincide con', '(es mutua: se apaga también en su ficha)', `<div class="chiprow">${p.nuncaCon.map((q, i) => `<span class="tchip warn"><i>${esc(nombrePid(q))}</i><button type="button" class="festrm" data-rmnunca="${i}" aria-label="Quitar">✕</button></span>`).join('') || '<span class="festvacio">Con nadie en especial.</span>'}</div>
+       <span class="addrow">${selPersonas('fNuncaSel', p.nuncaCon)}<button type="button" class="btn-mini" data-addnunca>Añadir</button></span>`) +
+      car('cubreA', 'Cubre a', '(ocupa su sitio cuando falta)', `${p.cubreA.map((cb, i) => fila(esc(nombrePid(cb.pid)), '', `<span class="cubrectl">${selDia(`data-cubred="${i}"`, cb.dow)}${selTurno(`data-cubret="${i}"`, cb.turnoId)}</span>`, `data-rmcubre="${i}"`)).join('') || '<div class="festvacio">No cubre a nadie en concreto.</div>'}
+       <span class="addrow addrow3">${selPersonas('fCubreP')}${selDia('id="fCubreD"')}${selTurno('id="fCubreT"')}<button type="button" class="btn-mini" data-addcubre>Añadir</button></span>`));
+    h += sec('vetos', 'Vetos', subOff('vetos', p.vetos.length ? `${p.vetos.length} franja(s) que no hace` : 'ninguno'),
+      car('vetos', '', '', (p.vetos.map((v, i) => fila(`<i class="ldot" style="--lc:${esc(colorLocal(v.localId))}"></i>${esc(nombreLocal(v.localId))}`, `no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'}`, '', `data-rmveto="${i}"`)).join('') || '<div class="festvacio">Sin vetos: puede ir a cualquier franja de sus locales.</div>') +
+      `<span class="addrow"><select class="logininp" id="fVetoL" data-libre>${S.locales.map(l => `<option value="${esc(l.id)}">${esc(l.nombre)}</option>`).join('')}</select><select class="logininp" id="fVetoF" data-libre>${FRANJAS.map(f => `<option value="${f}">${FRANJA_LBL[f]}s</option>`).join('')}</select><button type="button" class="btn-mini" data-addveto>Añadir veto</button></span>`));
+    h += sec('contrato', 'Contrato', subOff('contrato', p.contrato.horasSemana ? `${+p.contrato.horasSemana} h/semana` : 'sin horas fijadas'),
+      car('contrato', '', '', `<label class="pinlbl">Horas por semana <small>(el contador de horas compara con esto)</small><input type="number" class="logininp" min="0" max="60" step="0.5" inputmode="decimal" data-num="horasSemana" data-libre value="${p.contrato.horasSemana !== null && p.contrato.horasSemana !== undefined ? esc(p.contrato.horasSemana) : ''}" placeholder="sin fijar"></label>`));
+    h += sec('prefs', 'Preferencias', subOff('prefs', 'no bloquean: el generador las respeta al priorizar'),
+      car('prefs', '', '', `<div class="pinlbl">Prefiere no trabajar los…</div><div class="dowset">${dowSet(p.prefs.evitaDows || [], 'tevita')}</div>
+       <label class="pinlbl">Criterio personal<input type="text" class="logininp" data-txt="prefsNota" data-libre value="${esc(p.prefs.nota || '')}" placeholder="p. ej. concilia los lunes"></label>`));
     h += sec('aus', 'Ausencias', p.ausencias.length ? `${p.ausencias.length} registrada(s)` : 'ninguna',
       (p.ausencias.map((a, i) => fila(`<span class="abschip a-${esc(a.tipo)}">${esc((AUS_LBL[a.tipo] || { label: a.tipo }).label)}</span> del ${fmtDM(a.desde)}${a.hasta ? (a.hasta !== a.desde ? ' al ' + fmtDM(a.hasta) : '') : ' sin fecha de fin'}`, esc(a.detalle || ''), '', `data-rmaus="${i}"`)).join('') || '<div class="festvacio">Sin ausencias registradas.</div>') +
       `<div class="absform ausalta" style="display:grid">
@@ -128,9 +141,13 @@ function openFicha(pid) {
     const cs = t.closest('[data-color]');
     if (cs) { guarda('color', x => { x.color = +cs.dataset.color; }); pintaCabecera(); return; }
     const d = t.dataset || {};
-    const el = t.closest('[data-tloc],[data-tfranja],[data-tlibra],[data-tpartido],[data-tcoct],[data-tcocr],[data-tcocd],[data-tabre],[data-tnoabre],[data-tevita],[data-rmnunca],[data-addnunca],[data-rmcubre],[data-addcubre],[data-rmveto],[data-addveto],[data-rmaus],[data-addaus],[data-rmsup],[data-addsup]');
+    const el = t.closest('[data-tloc],[data-tfranja],[data-tlibra],[data-tpartido],[data-tcoct],[data-tcocr],[data-tcocd],[data-tabre],[data-tnoabre],[data-tnoprimero],[data-tevita],[data-rmnunca],[data-addnunca],[data-rmcubre],[data-addcubre],[data-rmveto],[data-addveto],[data-rmaus],[data-addaus],[data-rmsup],[data-addsup]');
     if (!el) return;
     const ds = el.dataset;
+    if (ds.tnoprimero !== undefined) {
+      const f = ds.tnoprimero, quita = p.noPrimero.includes(f);
+      guarda(`nunca el primero de ${FRANJA_LBL[f].toLowerCase()} ${quita ? 'quitado' : 'añadido'}`, x => { alterna(x.noPrimero, f); x.noPrimero.sort(); }, 'equipo'); pinta(); return;
+    }
     if (ds.tloc !== undefined) { guarda(`local ${nombreLocal(ds.tloc)} ${p.locales.includes(ds.tloc) ? 'quitado' : 'añadido'}`, x => alterna(x.locales, ds.tloc)); pinta(); return; }
     if (ds.tfranja !== undefined) {
       if (p.franjas.length === 1 && p.franjas[0] === ds.tfranja) { toast('Tiene que hacer al menos una franja', 'warn'); return; }
@@ -181,6 +198,14 @@ function openFicha(pid) {
   });
   ov.addEventListener('change', e => {
     const t = e.target; const ds = t.dataset || {};
+    if (ds.carTgl) {
+      // interruptor de una característica: escribe p.inactivas (y, en «nunca con», la de los incompatibles)
+      const k = ds.carTgl, on = t.checked;
+      const otros = k === 'nuncaCon' ? p.nuncaCon.map(personaDeId).filter(q => q && caracteristicaActiva(q, k) !== on).map(q => q.nombre) : [];
+      guarda(`«${lblCaracteristica(k)}» ${on ? 'activada' : 'desactivada'}${otros.length ? ` (también en ${otros.join(', ')})` : ''}`, x => setCaracteristica(x, k, on), 'equipo');
+      if (otros.length) toast(`«${lblCaracteristica(k)}» ${on ? 'activada' : 'desactivada'} también en ${otros.join(', ')}: la regla es mutua`, on ? 'ok' : 'warn');
+      pinta(); return;
+    }
     if (ds.chk) {
       const on = t.checked;
       if (ds.chk === 'libreVariable') guarda(`libre variable ${on ? 'sí' : 'no'}`, x => { if (on) x.libreVariable = true; else delete x.libreVariable; });

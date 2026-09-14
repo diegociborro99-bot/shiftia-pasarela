@@ -102,8 +102,79 @@
 .festrow.coc .pmini{width:30px;height:30px;font-size:13px}
 .festrow.coc .pmini:disabled{opacity:.3;cursor:default}
 
+/* ---------- interruptor (toggle) ----------
+   <label class="tgl"><input type="checkbox" role="switch"><span class="tglk"></span><span class="tgll">Activa</span></label>
+   El input sigue en el DOM (teclado, lector de pantalla); la pista y el mando
+   se pintan con los tokens: --border apagado, --accent encendido. */
+.tgl{display:inline-flex;align-items:center;gap:8px;cursor:pointer;flex:none;position:relative;min-height:28px;user-select:none;-webkit-user-select:none}
+.tgl input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.tglk{position:relative;display:inline-block;width:38px;height:22px;border-radius:999px;background:var(--border);border:1.5px solid var(--border);transition:background .15s,border-color .15s;flex:none}
+.tglk::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.28);transition:transform .16s var(--ease)}
+.tgl input:checked+.tglk{background:var(--accent);border-color:var(--accent)}
+.tgl input:checked+.tglk::after{transform:translateX(16px)}
+.tgl:hover .tglk{border-color:var(--accent)}
+.tgl input:focus-visible+.tglk{outline:2px solid var(--accent);outline-offset:2px}
+.tgll{font-family:var(--mono);font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);min-width:52px}
+.tgl input:checked~.tgll{color:var(--accent)}
+@media (prefers-reduced-motion:reduce){.tglk,.tglk::after{transition:none}}
+
+/* ---------- características apagadas en las tarjetas ---------- */
+.tchip.off{text-decoration:line-through;text-decoration-color:var(--ink3);opacity:.55;background:var(--surface2);border-color:var(--border);color:var(--ink3)}
+.tchip.off b{color:var(--ink3)}
+
+/* ---------- ficha: bloque por característica con su interruptor ---------- */
+.fcar{border:1px solid var(--border2);border-radius:12px;background:var(--surface);padding:6px 10px 8px;margin:6px 0 8px;transition:opacity .15s,background .15s}
+.fcarh{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:32px}
+.fcart{font-size:11px;font-family:var(--mono);font-weight:700;color:var(--ink3);flex:1;min-width:0;line-height:1.3}
+.fcart small{font-family:var(--font);text-transform:none;letter-spacing:0;font-weight:600;color:var(--ink3)}
+.fcarb{min-width:0}
+.fcarb>.pinlbl:first-child,.fcarb>.locset:first-child,.fcarb>.segrow:first-child,.fcarb>.dowset:first-child{margin-top:2px}
+.fcar.off{background:var(--surface3);border-style:dashed}
+.fcar.off .fcarb{opacity:.45;filter:grayscale(.6)}
+.fcar.off .fcart{text-decoration:line-through}
+.fcaroff{font-size:11px;color:var(--warn);font-weight:600;margin:6px 0 0;line-height:1.4}
+.fsec summary small{flex:1}
+
+/* ---------- panel «Condiciones del grupo» ---------- */
+.condtop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 8px}
+.condcount{font-size:12.5px;color:var(--ink2);font-weight:600;flex:1 1 200px}
+.condcount b{font-family:var(--mono);font-size:15px;color:var(--ink)}
+.condcount small{font-size:11px;color:var(--ink3);font-weight:600}
+.condq{flex:1 1 220px;padding:9px 12px;font-size:13px;min-width:0}
+.condgrp{display:flex;align-items:baseline;gap:8px;margin:12px 0 4px;font-size:12.5px;color:var(--ink)}
+.condgrp .micro{font-size:9.5px}
+.condrow{display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid var(--border2);border-radius:11px;background:var(--surface3);margin-bottom:4px;min-height:40px;font-size:12.5px;line-height:1.4;transition:background .3s,border-color .3s}
+.condrow.regla{background:var(--surface);border-color:var(--border)}
+.condnum{flex:none;width:26px;text-align:right;font-family:var(--mono);font-size:11px;font-weight:800;color:var(--accent)}
+.condrow.regla .condnum{color:var(--ink3);font-size:9px;width:14px}
+.condtx{flex:1;min-width:0;overflow-wrap:anywhere;color:var(--ink)}
+.condinfo{display:inline-block;font-size:10.5px;color:var(--ink3);font-weight:600;margin-left:4px}
+.condnew{display:inline-block;vertical-align:1px;font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.1em;border-radius:6px;padding:2px 6px;margin-left:5px;background:color-mix(in srgb,var(--teal) 18%,transparent);color:var(--teal-tx)}
+.condrow.info .condtx{color:var(--ink3)}
+.condrow.info .condnum{color:var(--ink3)}
+.condrow.off{background:var(--surface2);border-style:dashed}
+.condrow.off .condtx{text-decoration:line-through;text-decoration-color:var(--ink3);color:var(--ink3)}
+.condrow.off .condtx .condinfo{text-decoration:none}
+.condrow.off .condnum{color:var(--ink3)}
+.condrow .tgll{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}   /* solo para el lector de pantalla */
+.condlnk{flex:none;border:1px solid var(--border);background:var(--surface);color:var(--accent);font-size:11px;font-weight:700;border-radius:8px;padding:6px 10px;cursor:pointer;min-height:30px;white-space:nowrap}
+.condlnk:hover{border-color:var(--accent);background:var(--accent-l)}
+.condrow.flash{background:var(--accent-l);border-color:var(--accent)}
+
 /* ---------- móvil: dedos y una columna ---------- */
 @media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .tgl{min-height:44px;padding:0 2px}
+  .tglk{width:44px;height:26px}
+  .tglk::after{width:19px;height:19px}
+  .tgl input:checked+.tglk::after{transform:translateX(18px)}
+  .tgll{font-size:10.5px}
+  .fcarh{min-height:44px}
+  .condrow{min-height:48px;padding:6px 8px;font-size:13px;flex-wrap:wrap}
+  .condrow .condtx{flex:1 1 180px}
+  .condlnk{min-height:40px;padding:8px 12px}
+  .condtop{flex-direction:column;align-items:stretch}
+  .condq{min-height:46px;font-size:16px}
+  .condrow .tgl{margin-left:auto}
   .locgrid2{grid-template-columns:minmax(0,1fr)}
   .locchip,.fsec summary{min-height:44px}
   .fsecb .dowk,.abretab .dowk{width:44px;height:44px}

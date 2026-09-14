@@ -19,8 +19,32 @@ falta de dato, y las preguntas que siguen abiertas para el grupo.
 | B9 | Fútbol | Diálogo de refuerzo por local (tarde por defecto, con el último valor recordado por equipo) y «proponer quién viene». |
 | B10 | Planilla actual | No la tienen: solo el PDF. Vistas e impresión siguen la estructura del piloto y el cuadrante 8 filas × 7 días. |
 
+## El prototipo del 11/09 (planilla corregida del 14 al 20 de septiembre)
+
+El cliente pasó el resultado que espera del generador semanal: por local, las
+posiciones numeradas de cada casilla (el 1.º abre y hace turno completo, ▸ sale
+el primero fijo, ◆ cocina en su posición, P partido, C continuo, □ comodín),
+la cuenta n/mín* (asterisco = mínimo no fijado por el cliente), «por X» cuando
+alguien cubre a otro, **hueco disponible** en la 1.ª posición cuando nadie de la
+plantilla puede abrir sin romper una condición, qué ha cambiado, quién libra
+cada día y la lista de las 32 condiciones comprobadas. Tres condiciones nuevas:
+
+- **30** Cristian no hace turno de tarde completo: nunca es el primero de la tarde.
+- **31** El primero de cada franja hace turno completo: quien ha trabajado la
+  mañana no puede ser el primero de la tarde; los partidos entran a partir del
+  segundo puesto; si sale primero en mañana y tarde del mismo local es turno
+  continuo (C).
+- **32** Leo no va nunca de primero, ni de mañana ni de tarde.
+
+La semana tipo de la app es esa planilla corregida, y un test del modelo la
+reproduce casilla a casilla, con los dos huecos (Pasarela lunes tarde y El 33
+martes tarde). Las decisiones del prototipo que el cliente aún no ha confirmado
+(Cristian a seis días, quién abre El 33, Zapatillera y el Mónaco por la mañana,
+horarios reales) siguen marcadas como supuestos.
+
 ## Cómo se aplican las reglas
 
+- **Interruptores**: cada regla del grupo y cada característica de una ficha se puede apagar desde Equipo; lo apagado no lo comprueba nadie (ni el generador, ni la revisión, ni el selector).
 - **Duras** (nunca las rompe el generador; a mano solo con «forzar» y motivo, salvo cierres, ausencias y estar dos veces en la misma casilla, que no se pueden forzar): cierres de cada local por día, ausencias, franja que no trabaja, vetos local + franja, días que libra, «nunca con», cocina obligatoria en el Mónaco.
 - **Blandas** (avisan): no es su local habitual, partido no declarado, día que evita, más turnos que su contrato, cocina de reserva en vez de titular.
 - **Mínimos**: los del PDF; los que llevaban asterisco se marcan **supuesto** y se ven así en toda la app. Un evento con refuerzo sube el mínimo de esas casillas ese día.

@@ -72,6 +72,8 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 
 `puedeEstar` devuelve `{ok, motivo, avisos}`: **duras** (cierre del local ese día, ausencia, ya está en esa casilla, no trabaja esa franja, veto local+franja, libra ese día, «nunca con» alguien ya en la casilla, mínimo de cocina obligatoria…) y **blandas** (no es su local, partido no declarado, día que evita…) que se pueden **forzar** desde la interfaz con motivo, y quedan marcadas. `revisarTurno` / `revisionMes` resumen faltas, sin cocina, sin nadie que abra, incompatibles y forzados.
 
+`puedePrimero` / `primeroDe` / `posicionesDe` deciden quién ocupa la 1.ª posición (abre y turno completo) y pintan la casilla con sus marcas; si nadie puede abrir, la 1.ª es un hueco. `condicionesDe` deriva el catálogo de condiciones de locales y fichas (respetando `cfg.reglas` y `p.inactivas`), `verificarSemana` lo comprueba sobre una semana y `generarSemana` devuelve la planilla semanal completa (locales × franjas × días con posiciones, huecos, cambios, quién libra, condiciones).
+
 `generarPlanilla` es aditivo y determinista: instancia la semana tipo (saltando ausentes, con «cubre a» como primera alternativa), y rellena los mínimos con `candidatosPara` (puntuación con razones). Devuelve aplicados, huecos con `porQueNadie`, coberturas y rechazados. `toProblem` / `desdeSolucion` traducen al formato del núcleo Shiftia (CP-SAT) y de vuelta.
 
 ## Flujo de trabajo

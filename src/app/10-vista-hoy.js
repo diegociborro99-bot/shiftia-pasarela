@@ -4,13 +4,21 @@
 // posición. Es la pantalla que el encargado abre cada mañana.
 const ORIGEN_LBL = { patron: 'semana tipo', generador: 'generador', manual: 'a mano', nucleo: 'núcleo', refuerzo: 'refuerzo', cubre: 'cobertura' };
 
-function chipPersona(iso, tid, e, i, opts) {
-  const p = personaDeId(e.pid); if (!p) return '';
-  const razon = [e.razon, e.avisos && e.avisos.length ? 'aviso: ' + e.avisos.join(', ') : '', e.supuesto ? 'plaza supuesta (pendiente de confirmar con el grupo)' : '', `origen: ${ORIGEN_LBL[e.origen] || e.origen || 'a mano'}`].filter(Boolean).join('\n');
-  return `<span class="pchip${e.forzado ? ' forzado' : ''}" data-pid="${e.pid}" data-turno="${iso}|${tid}" style="--pc:${avColor(e.pid)}" data-tipstr="${esc(razon)}" role="button" tabindex="0">
-    <span class="pos">${i + 1}</span><span class="avq">${esc(initials(p.nombre))}</span><span class="pnom">${esc(p.nombre)}</span>
-    ${e.abre ? '<span class="bdg abre">ABRE</span>' : ''}${e.cocina ? '<span class="bdg cocina">COCINA</span>' : ''}${e.forzado ? '<span class="bdg forz" title="Asignación forzada: rompe una regla">!</span>' : ''}${e.supuesto ? '<span class="bdg sup" title="Supuesto: pendiente de confirmar">?</span>' : ''}${e.origen === 'refuerzo' ? '<span class="bdg ref">REFUERZO</span>' : ''}
-    ${opts && opts.soloLectura ? '' : `<button class="rmx" data-un="${iso}|${tid}|${e.pid}" aria-label="Quitar a ${esc(p.nombre)}">×</button>`}
+function chipPersona(iso, tid, s, opts) {
+  const p = personaDeId(s.pid); if (!p) return '';
+  const e = asignados(estadoDeIso(iso), iso, tid).find(x => x.pid === s.pid) || {};
+  const razon = [e.razon, e.avisos && e.avisos.length ? 'aviso: ' + e.avisos.join(', ') : '', s.supuesto ? 'plaza supuesta (pendiente de confirmar con el grupo)' : '', s.continuo ? 'turno continuo: abre la mañana y la tarde del mismo local' : s.partido ? 'partido: mañana y tarde' : '', s.comodin ? 'comodín (sin local fijo)' : '', `origen: ${ORIGEN_LBL[s.origen] || s.origen || 'a mano'}`].filter(Boolean).join('\n');
+  return `<span class="pchip${s.forzado ? ' forzado' : ''}${s.abre ? ' primero' : ''}" data-pid="${s.pid}" data-turno="${iso}|${tid}" style="--pc:${avColor(s.pid)}" data-tipstr="${esc(razon)}" role="button" tabindex="0">
+    <span class="pos">${s.pos}</span><span class="avq">${esc(initials(p.nombre))}</span><span class="pnom">${s.abreFijo ? '<i class="mk fijo" title="sale el primero (fijo)">▸</i>' : ''}${esc(p.nombre)}${s.por ? `<small class="por">por ${esc(nombreCorto(nombrePid(s.por)))}</small>` : s.nota ? `<small class="por">${esc(s.nota)}</small>` : ''}</span>
+    ${s.abre ? '<span class="bdg abre">ABRE</span>' : ''}${s.cocina ? '<span class="bdg cocina">◆ COCINA</span>' : ''}${s.continuo ? '<span class="bdg cont" title="turno continuo: abre mañana y tarde">C</span>' : s.partido ? '<span class="bdg part" title="partido: mañana y tarde">P</span>' : ''}${s.comodin ? '<span class="bdg com" title="comodín">□</span>' : ''}${s.forzado ? '<span class="bdg forz" title="Asignación forzada: rompe una regla">!</span>' : ''}${s.supuesto ? '<span class="bdg sup" title="Supuesto: pendiente de confirmar">?</span>' : ''}${s.origen === 'refuerzo' ? '<span class="bdg ref">REFUERZO</span>' : ''}
+    ${opts && opts.soloLectura ? '' : `<button class="rmx" data-un="${iso}|${tid}|${s.pid}" aria-label="Quitar a ${esc(p.nombre)}">×</button>`}
+  </span>`;
+}
+// la 1.ª posición sin nadie que pueda abrir: hueco disponible (prototipo del 11/09)
+function chipHueco(iso, tid, s, opts) {
+  const { franja } = partirTurno(tid);
+  return `<span class="pchip hueco" ${opts && opts.soloLectura ? '' : `data-pick="${iso}|${tid}" role="button" tabindex="0" aria-haspopup="true"`} data-tipstr="${esc(s.motivo || '')}">
+    <span class="pos">${s.pos}</span><span class="pnom"><b>Hueco disponible</b><small class="por">abre la ${FRANJA_LBL[franja].toLowerCase()} · turno completo${s.motivo ? ' — ' + esc(s.motivo.replace(/^nadie de la casilla puede abrir:?\s*/i, '')) : ''}</small></span>
   </span>`;
 }
 function htmlCasilla(iso, tid, opts) {
@@ -26,10 +34,10 @@ function htmlCasilla(iso, tid, opts) {
     ${abierto && r.supuesto ? '<span class="sup" data-tipstr="Mínimo supuesto por Highkey Labs: pendiente de confirmar con el grupo">supuesto</span>' : ''}
     ${abierto && r.refuerzo ? `<span class="ref" data-tipstr="${esc('Refuerzo: +' + r.refuerzo + ' por ' + minimoDe(S, iso, tid).eventos.map(x => x.nombre).join(', '))}">+${r.refuerzo}</span>` : ''}
     ${abierto && r.sinCocina ? `<span class="bdg ${r.cocinaObligatoria ? 'forz' : 'sup'}" data-tipstr="${r.cocinaObligatoria ? 'La cocina es obligatoria en este local' : 'Este local suele llevar cocina'}">sin cocina</span>` : ''}
-    ${abierto && r.sinAbre ? '<span class="bdg gen" data-tipstr="Nadie definido para abrir: el grupo aún no ha dicho quién sale primero">¿abre?</span>' : ''}
+    ${abierto && r.sinAbre ? '<span class="bdg forz" data-tipstr="' + esc(r.motivoAbre || '') + '">hueco</span>' : ''}
     ${h ? `<span class="hor">${esc(h.ini)}–${esc(h.fin)}${l.horarioSupuesto ? '*' : ''}</span>` : ''}</div>`;
   if (!abierto) return `<div class="casilla cerrada">${cab}<div class="cascerr">Cerrado ${DOW_PL[isoDow(iso)].replace('los ', 'el ')} ${opts && opts.soloLectura ? '' : `<button data-abrir="${iso}|${tid}">abrir hoy</button>`}</div></div>`;
-  let cuerpo = lista.map((x, i) => chipPersona(iso, tid, x, i, opts)).join('');
+  let cuerpo = posicionesDe(S, S.staff, e, iso, tid).map(x => x.hueco ? chipHueco(iso, tid, x, opts) : chipPersona(iso, tid, x, opts)).join('');
   if (!(opts && opts.soloLectura)) {
     if (r.faltan) {
       cuerpo += `<button class="addchip corta" data-pick="${iso}|${tid}" aria-haspopup="true">＋ Asignar · faltan ${r.faltan}</button>`;
