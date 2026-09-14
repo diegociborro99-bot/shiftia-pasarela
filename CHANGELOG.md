@@ -1,5 +1,26 @@
 # Changelog — Shiftia · Grupo Pasarela
 
+## v0.2.0 · 15/09/2026 — Listo para desplegar: mes de demostración, e2e, compartir por WhatsApp
+
+- **Primer arranque con contenido**: en un servidor recién creado (y con `?demo=1`
+  en local) la planilla nace con el mes en curso y el siguiente generados con la
+  semana tipo y un partido de muestra el próximo sábado (`sembrarDemo` en el
+  modelo, con test). Se puede vaciar desde el Generador.
+- **Compartir semana** por WhatsApp: botón en Semana (y en cada local de Hoy) que
+  genera una imagen PNG nítida de la planilla, general o por local, y abre la hoja
+  de compartir del móvil; en escritorio la descarga.
+- **Baterías e2e en el repo** (`tests/e2e-app.mjs`, `tests/e2e-servidor.mjs`,
+  `tests/e2e-compartir.mjs`): las siete vistas, selector, eventos, generador,
+  impresión, móvil, y el modo servidor real (acceso del programador, persistencia,
+  sincronización entre pestañas, modo empleado). `npm run test:e2e`; el CI ya no
+  las ignora si fallan.
+- **Despliegue**: `tools/comprobar-despliegue.mjs URL` verifica desde fuera un
+  despliegue (salud, volumen, acceso servido sin sesión, API cerrada, versión,
+  cabeceras); `.env.example` y checklist del despliegue en `DEPLOY-SERVIDOR.md`.
+- **Pasada visual**: tema oscuro en todas las vistas, móvil (Mes con los botones de
+  fútbol en fila, Equipo, Horas, Generador), vista del empleado con la navegación
+  de mes corregida, y las cuatro hojas imprimibles.
+
 ## v0.1.2 · 14/09/2026 — Logo del grupo, sección Entrevistas visual y acceso del programador
 
 - Pie de la pantalla de acceso: «© 2026 Shiftia» y «coded by Highkey Labs»; el nombre

@@ -8,7 +8,7 @@ conexión como PWA.
 ```
 src/
   index.template.html      shell HTML (barra superior con los dos logos, pestañas,
-                           seis vistas, barra inferior móvil) con marcadores
+                           siete vistas, barra inferior móvil) con marcadores
                            <!--INJECT:STYLES--> / <!--INJECT:SCRIPT--> / <!--INJECT:GLOGO-->
   login.template.html      pantalla de acceso → login.html (se sirve sin sesión)
   styles/*.css             estilos por área; 01–20 vienen del piloto (tokens, topbar,
@@ -26,7 +26,9 @@ estado-servidor.js         proyección del estado por rol (el empleado recibe lo
 push*.js                   notificaciones push sin dependencias (del piloto; fase 3)
 tools/build.mjs            ensambla src/ → index.html + login.html (embebe el logo)
 tools/check-parity.mjs     el modelo embebido === modelo.js
-tests/                     tests del servidor y de seguridad (node:test)
+tests/                     tests del servidor y de seguridad (node:test) y baterías
+                           e2e-*.mjs (Playwright; se saltan sin Chromium)
+tools/comprobar-despliegue.mjs  verifica un despliegue desde fuera (salud, volumen, acceso, versión)
 assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 ```
 
@@ -42,12 +44,14 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 | `13-vista-semana.js` | Cuadrante semanal (8 filas × 7 días) con pie de descansos; «guardar como semana tipo». |
 | `14-impresiones.js` | Hojas imprimibles: semana general, por local, mes por persona, informe de horas. |
 | `15-export-xlsx.js` · `15-export-pdf.js` | Excel de la semana y de las horas; PDF. |
+| `16-compartir.js` | Compartir la semana (general o por local) como imagen PNG: hoja de compartir del móvil o descarga. |
 | `17-vista-mes.js` | Mes personas × días, KPIs, leyenda, fila de control, ausencias, botones de fútbol. |
 | `18-eventos.js` | Evento con refuerzo (partidos y otros): refuerzo por local, equipos editables. |
 | `19-vista-equipo.js` · `20-ficha-persona.js` | Equipo: personas, altas y bajas, ficha con todas las condiciones editables, ajustes de los locales. |
 | `21-vista-horas.js` | Contador de horas: tabla del mes, horas extra, cierre y reapertura del mes. |
 | `22-generador.js` | Generador: periodo, opciones, motor local o núcleo, vista previa, aplicar, vaciar lo generado. |
 | `23-revision.js` | Revisión del mes y punto rojo de avisos. |
+| `24-entrevistas.js` | Sección Entrevistas (en construcción): vista previa de la base de datos que llegará de Notion. |
 | `25-cuenta.js` | Contraseña, usuarios (servidor), copia de seguridad y versiones. |
 | `29-avisos-e-historial.js` | Historial de cambios. |
 | `30-modo-servidor.js` | Detección del servidor, sesión, envío del estado con versionado, SSE, conflictos. |

@@ -228,3 +228,10 @@ tr.frow td.pname .lp{display:inline-block;width:8px;height:8px;border-radius:2px
 .modo-empleado #view-entrevistas{display:none!important}
 @media (max-width:900px){.evhero{grid-template-columns:1fr;padding:22px 20px}.evhero-art{height:150px}.evgrid{grid-template-columns:1fr}.evhero h2{font-size:22px}}
 @media (prefers-reduced-motion:reduce){.evdiamond.d2,.sk{animation:none}}
+
+/* móvil: los botones de fútbol en fila con salto de línea, sin estirar «Imprimir» y «Generar» */
+@media (max-width:640px){
+  #view-mes .dacts{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px}
+  #view-mes .futbol{display:flex;flex-wrap:wrap;gap:6px;width:100%;flex-direction:row}
+  #view-mes .dacts>.btn{flex:1 1 auto;align-self:flex-start}
+}

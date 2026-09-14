@@ -850,6 +850,37 @@ function semillaPasarela() {
   return { locales, staff, patron, equipos, eventos: [], extras: [], festivos: [], cierres: {} };
 }
 
+// ---------- mes de demostración ----------
+// Primer arranque del servidor (o ?demo=1): el mes en curso y el siguiente se
+// generan con la semana tipo, y se marca un partido el próximo sábado para que
+// Hoy, Semana, Mes y Horas enseñen algo real desde el primer minuto. Nunca pisa
+// un mes que ya tenga algo; si no había nada que generar, tampoco añade el partido.
+function sembrarDemo(S, hoyIso) {
+  const hoy = hoyIso || fechaMadrid();
+  const r = { meses: [], aplicados: 0, evento: null };
+  S.meses = S.meses || {};
+  let y = +hoy.slice(0, 4), m = +hoy.slice(5, 7);
+  for (let i = 0; i < 2; i++) {
+    const k = claveMes(y, m);
+    const e = estadoDesde(S.meses, S.festivos || [], y, m);
+    if (!Object.keys(e.asig).length) {
+      const g = generarPlanilla(S, S.staff, e, e.days[0].iso, e.days[e.days.length - 1].iso, {});
+      S.meses[k] = { apertura: e.apertura, asig: e.asig, manual: e.manual };
+      r.meses.push(k); r.aplicados += g.aplicados.length;
+    }
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  if (r.meses.length) {
+    const q = (S.equipos || [])[0];
+    let sab = hoy; while (isoDow(sab) !== 6) sab = addDias(sab, 1);
+    if (q && !(S.eventos || []).some(ev => ev.iso === sab)) {
+      (S.eventos = S.eventos || []).push({ id: 'ev_demo_' + sab, iso: sab, tipo: 'partido', equipo: q.id, nombre: `Juega el ${q.nombre}`, franja: q.franja || 'T', refuerzo: Object.assign({}, q.refuerzo || {}), hora: '21:00', ts: Date.now() });
+      r.evento = sab;
+    }
+  }
+  return r;
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     fechaLocal, isoDow, addDias, diasDelMes, isoDe, claveMes, mondayOf, semanaDe, fechaMadrid, rangoIso,
@@ -865,7 +896,7 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, horarioDe, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
-    fusionarEstado, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
+    fusionarEstado, sembrarDemo, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,
   };
 }

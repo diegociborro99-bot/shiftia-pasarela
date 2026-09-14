@@ -454,4 +454,26 @@ ok('fusionarEstado: si solo cambiaron avisos o peticiones en el servidor, se fun
   assert.ok(!M.fusionarEstado(base, srv2, local).ok, 'otro administrador tocó la planilla: manda el servidor');
 });
 
+// ---------- mes de demostración (primer arranque del servidor y ?demo=1) ----------
+ok('sembrarDemo: genera el mes en curso y el siguiente con la semana tipo, marca un partido y es idempotente', () => {
+  const S = Object.assign(M.semillaPasarela(), { meses: {}, eventos: [] });
+  const r = M.sembrarDemo(S, '2026-09-14');
+  assert.deepEqual(r.meses, ['2026-09', '2026-10']);
+  assert.ok(Object.keys(S.meses['2026-09'].asig).length >= 25, 'septiembre generado día a día');
+  assert.ok(Object.keys(S.meses['2026-10'].asig).length >= 25, 'octubre generado día a día');
+  assert.ok(r.aplicados > 200, 'cientos de plazas puestas: ' + r.aplicados);
+  const ev = S.eventos.find(x => x.tipo === 'partido');
+  assert.ok(ev && ev.iso >= '2026-09-14' && M.isoDow(ev.iso) === 6 && ev.equipo === 'barcelona' && ev.refuerzo.EL33 >= 1, 'partido el próximo sábado con refuerzo');
+  assert.equal(r.evento, ev.iso);
+  // segunda llamada: nada que hacer (no pisa lo que ya hay ni duplica el partido)
+  const antes = JSON.stringify(S.meses), nEv = S.eventos.length;
+  const r2 = M.sembrarDemo(S, '2026-09-14');
+  assert.deepEqual(r2.meses, []); assert.equal(r2.evento, null);
+  assert.equal(JSON.stringify(S.meses), antes); assert.equal(S.eventos.length, nEv);
+  // con un mes ya trabajado solo se genera el que falta
+  const S2 = Object.assign(M.semillaPasarela(), { meses: { '2026-09': { asig: { '2026-09-01': { EL33_M: [{ pid: 'noe', origen: 'manual' }] } }, apertura: {}, manual: {} } }, eventos: [] });
+  assert.deepEqual(M.sembrarDemo(S2, '2026-09-14').meses, ['2026-10']);
+  assert.equal(S2.meses['2026-09'].asig['2026-09-01'].EL33_M.length, 1, 'septiembre intacto');
+});
+
 console.log(`\n${n} tests OK`);

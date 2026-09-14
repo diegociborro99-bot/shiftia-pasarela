@@ -62,7 +62,7 @@ function activarModoEmpleado() {
   sec.innerHTML = `<div class="fichead" style="margin-top:6px"><span class="fichav" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span>
       <span><h2>${esc(p.nombre)}</h2><span class="sub">${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${esc(locs)}${p.libra && p.libra.length ? ' · libra ' + p.libra.map(d => DIAS_L[d].toLowerCase()).join(' y ') : ''}</span></span>
       <span style="margin-left:auto;display:flex;gap:6px"><button class="btn-mini ghost" id="perfCuenta">Contraseña</button><button class="btn-mini ghost" id="perfSalir">Salir</button></span></div>
-    <div class="vhead" style="margin-top:12px"><button class="navb" id="perfPrev" aria-label="Mes anterior">‹</button><h1 class="vtitle"><b>${MESES[S.m - 1]}</b> <small>${S.y}</small></h1><button class="navb" id="perfNext" aria-label="Mes siguiente">›</button></div>
+    <div class="dnav" style="margin-top:12px"><div class="arrows"><button class="mbtn" id="perfPrev" aria-label="Mes anterior">‹</button><button class="mbtn" id="perfNext" aria-label="Mes siguiente">›</button></div><div><span class="dkick">Mi mes</span><div class="dbig"><b>${MESES[S.m - 1]}</b> <small>${S.y}</small></div></div></div>
     <div class="kpis" style="margin:10px 0 14px">
       <div class="kpi"><div class="micro">Turnos</div><div class="knum">${h.turnos}</div><div class="kcap">${h.mananas} mañanas · ${h.tardes} tardes${h.partidos ? ' · ' + h.partidos + ' partidos' : ''}</div></div>
       <div class="kpi"><div class="micro">Horas del mes</div><div class="knum">${fmtHoras(h.minutos / 60)}</div><div class="kcap">${h.extrasMin ? '+ ' + fmtHoras(h.extrasMin / 60) + ' extra' : 'según horario de cada local'}</div></div>

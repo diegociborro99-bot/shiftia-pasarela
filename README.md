@@ -19,8 +19,8 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   Asignar con el selector (puede / con aviso / no puede, con «forzar» y motivo),
   reordenar, marcar cocina o quién abre, horario distinto en una casilla.
 - **Semana**: el cuadrante que el grupo conoce (ocho filas local × franja por
-  siete días) con el pie de descansos y ausencias, editable, imprimible y
-  exportable a Excel. «Guardar como semana tipo» convierte la semana en la base
+  siete días) con el pie de descansos y ausencias, editable, imprimible,
+  exportable a Excel y **compartible por WhatsApp** como imagen (general o por local). «Guardar como semana tipo» convierte la semana en la base
   del generador.
 - **Mes**: personas × días con una píldora por día (M, T, P o doble, en el color
   del local), ausencias, fila de control por local y los botones
@@ -55,11 +55,13 @@ Lo que el grupo no ha confirmado se marca «supuesto».
 - `server.js` — Node ≥ 22.13 sin dependencias: SQLite, usuarios con roles
   (programador, admin, empleado), versionado de la planilla, SSE, proxy al
   núcleo. Tests en `tests/`.
-- `npm run build` · `npm test` · `npm start`.
+- `npm run build` · `npm test` · `npm run test:e2e` (Playwright, se salta sin Chromium) · `npm start`.
 
 Sin servidor, `index.html` funciona solo (los datos viven en el navegador;
 contraseña inicial del modo local: `pasarela2026`). Con `?demo=1` el mes en
-pantalla se genera con la semana tipo. Despliegue: `DEPLOY-SERVIDOR.md`.
+curso y el siguiente se generan con la semana tipo. En un servidor recién
+creado la primera planilla nace igual de generada. Despliegue:
+`DEPLOY-SERVIDOR.md`; comprobación desde fuera: `node tools/comprobar-despliegue.mjs URL`.
 
 ## Acceso
 

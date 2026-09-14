@@ -1,0 +1,21 @@
+/* ============ COMPARTIR LA SEMANA (imagen para WhatsApp) ============ */
+/* Dos piezas: el popover de elección (toda la semana o un local, cada uno con su
+   color --lc) y el modo de captura de #printRoot. La hoja se monta con la misma
+   cascada que al imprimir (tokens claros de 23-pasarela-impresion.css) pero fuera de
+   la pantalla, para que html2canvas la dibuje sin que la vista previa llegue a verse.
+   En el móvil el popover es hoja inferior (colocarPop añade .sheet). */
+.popcompartir{width:340px}
+.popcompartir .shareopt{display:flex;align-items:center;gap:11px;text-align:left;line-height:1.25}
+.popcompartir .shareopt>span{display:flex;flex-direction:column;min-width:0;color:var(--ink)}
+.popcompartir .shareopt small{font-size:10.5px;font-weight:600;color:var(--ink3);margin-top:2px}
+.popcompartir .shareopt:hover>span{color:var(--accent)}
+.popcompartir .shareopt:disabled{opacity:.5;cursor:default;transform:none}
+.shdot{flex:none;width:14px;height:14px;border-radius:50%;background:var(--lc,var(--ink3));box-shadow:0 0 0 3px color-mix(in srgb,var(--lc,var(--ink3)) 22%,transparent)}
+.shdot.todos{background:var(--grad);box-shadow:0 0 0 3px var(--accent-l)}
+.sharepie{font-size:11px;color:var(--ink3);line-height:1.45;margin-top:10px;padding-top:9px;border-top:1px solid var(--border)}
+
+/* ---- captura: #printRoot fuera de la pantalla, la hoja al ancho de papel y sin sombra ---- */
+#printRoot.capturando{left:-4000px;right:auto;top:0;bottom:auto;width:auto;height:auto;padding:0;overflow:visible;background:#fff;pointer-events:none}
+#printRoot.capturando .pxpage{margin:0;min-height:0;box-shadow:none;border-radius:0}
+/* html2canvas no dibuja border-image: la regla degradada de la cabecera pasa a una línea del azul de la marca */
+#printRoot.capturando .pxhead{border-image:none;border-bottom-color:#2980b9}

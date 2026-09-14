@@ -37,6 +37,25 @@ dependencias npm** (Node ≥ 22.13 estándar; `nixpacks.toml` fija Node 22).
 4. `railway.json` declara el *healthcheck* en `/api/salud` y el reinicio ante
    fallo.
 
+## Checklist del despliegue (15/09, 8:00)
+
+1. Railway → New Project → Deploy from GitHub → `diegociborro99-bot/shiftia-pasarela`, rama `main`.
+2. Service → Volumes → Add Volume, mount path `/data`.
+3. Service → Variables (hay una plantilla en `.env.example`): `DATA_DIR=/data`,
+   `SESSION_SECRET` (cadena larga aleatoria), `ADMIN_PASSWORD` (la del encargado;
+   si la dejas vacía nace con `pasarela2026` y cambio obligatorio). `PROGRAMADOR_PASSWORD`
+   vacía = `12345678` provisional.
+4. Settings → Networking → Generate Domain (o el dominio propio; entonces
+   `HOST_CANONICO=ese-dominio`).
+5. Deploy. En el log tiene que salir `usuario programador «diego» creado`.
+6. Desde el repo: `node tools/comprobar-despliegue.mjs https://TU-URL` → todo ✓
+   (salud, `persistencia: volumen`, acceso servido sin sesión, API cerrada,
+   versión igual a la del repo, cabeceras).
+7. Entra como `diego` / `12345678`: al ser el servidor nuevo, la app crea la planilla
+   con el mes en curso y el siguiente ya generados con la semana tipo y un partido
+   de muestra el próximo sábado (todo se puede vaciar desde el Generador).
+8. Pásale la URL a Highkey para la pasada e2e contra el servidor real.
+
 ## Primer arranque
 
 - **Programador**: usuario `diego`, contraseña `12345678` (provisional hasta que la cambie desde Cuenta → Seguridad). **Encargado**: usuario `admin` con `ADMIN_PASSWORD` o, si no se definió, la genérica `pasarela2026` con cambio obligatorio al entrar.

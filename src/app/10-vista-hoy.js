@@ -42,7 +42,7 @@ function htmlCasilla(iso, tid, opts) {
 function htmlLocal(iso, l, opts) {
   return `<div class="loccard" style="--lc:${esc(l.color)}">
     <div class="lochd"><span class="ldot"></span><b>${esc(l.nombre)}</b>
-      <span class="lmini">${opts && opts.soloLectura ? '' : `<button class="btn-mini ghost" data-printlocal="${l.id}" title="Imprimir la semana de este local">Imprimir</button>`}</span></div>
+      <span class="lmini">${opts && opts.soloLectura ? '' : `<button class="btn-mini ghost" data-printlocal="${l.id}" title="Imprimir la semana de este local">Imprimir</button><button class="btn-mini ghost" data-sharelocal="${l.id}" title="Imagen de la semana de este local para WhatsApp">Compartir</button>`}</span></div>
     ${htmlCasilla(iso, turnoId(l.id, 'M'), opts)}${htmlCasilla(iso, turnoId(l.id, 'T'), opts)}
   </div>`;
 }
@@ -120,6 +120,8 @@ document.addEventListener('click', e => {
   if (ch && !e.target.closest('.rmx')) { const [iso, tid] = ch.dataset.turno.split('|'); openMenuTurno(iso, tid, ch.dataset.pid, ch); return; }
   const pr = e.target.closest('[data-printlocal]');
   if (pr) { if (typeof abrirImpresionLocal === 'function') abrirImpresionLocal(pr.dataset.printlocal); return; }
+  const sh = e.target.closest('[data-sharelocal]');
+  if (sh) { if (typeof compartirSemana === 'function') compartirSemana(sh.dataset.sharelocal); return; }
   const ig = e.target.closest('[data-irgen]');
   if (ig) { irAGenerador({ desde: ig.dataset.irgen, hasta: ig.dataset.irgen, titulo: 'Completar el día' }); return; }
   const rm = e.target.closest('[data-rmev]');

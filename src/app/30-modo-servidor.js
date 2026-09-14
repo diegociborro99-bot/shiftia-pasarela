@@ -294,9 +294,12 @@ function ofrecerMigracion() {
   const empezar = async () => {
     // «Empezar de cero»: el servidor arranca con el equipo de fábrica y nada de
     // lo que hubiera en este navegador (demo, pruebas) — y se guarda ya
-    S = freshState(); migrarEstado(S); cargarMes();
+    S = freshState(); migrarEstado(S);
+    const d = sembrarDemo(S, isoHoy());   // el mes en curso y el siguiente, generados con la semana tipo: la app enseña algo desde el primer minuto
+    cargarMes();
+    if (d.meses.length) registrarCambio(`Primer arranque: ${d.meses.join(' y ')} generados con la semana tipo (${d.aplicados} plazas)${d.evento ? ' y partido de muestra el ' + fmtDM(d.evento) : ''}`, 'ia');
     const r = await api('PUT', '/api/estado', { baseVersion: SRV.version, estado: S });
-    if (r.ok) { recibirEstado({ version: r.datos.version, estado: r.datos.estado || S }); toast('Planilla nueva creada en el servidor', 'ok'); }
+    if (r.ok) { recibirEstado({ version: r.datos.version, estado: r.datos.estado || S }); toast(d.meses.length ? 'Planilla creada en el servidor: el mes en curso y el siguiente vienen generados con la semana tipo (se pueden vaciar desde el Generador)' : 'Planilla nueva creada en el servidor', 'ok'); }
     else toast(r.datos && r.datos.error || 'No se pudo crear la planilla', 'bad');
   };
   if (!(S.staff || []).length || !Object.keys(S.meses || {}).some(k => Object.keys((S.meses[k] || {}).asig || {}).length)) { empezar(); return; }

@@ -17,15 +17,13 @@ if (window.visualViewport) {
   migrarEstado(S);
   restaurarNav();
   cargarMes();
-  // ?demo=1 → el mes en pantalla se genera con la semana tipo (solo si está vacío).
-  // En modo servidor el estado real llega tras el login y pisa esta siembra local.
+  // ?demo=1 → el mes en curso y el siguiente se generan con la semana tipo (solo lo
+  // que esté vacío) y se marca un partido de muestra. En modo servidor el estado
+  // real llega tras el login y pisa esta siembra local.
   try {
-    if (new URLSearchParams(location.search).has('demo') && !Object.keys(est.asig).length) {
-      const r = generarPlanilla(S, S.staff, est, est.days[0].iso, est.days[est.days.length - 1].iso, {});
-      registrarCambio(`Mes de muestra generado (${r.aplicados.length} plazas, ${r.huecos.length} casillas cortas)`, 'ia');
-      const q = (S.equipos || [])[0];
-      const sab = est.days.find(d => d.dow === 6 && d.d > 7);
-      if (q && sab && !(S.eventos || []).some(ev => ev.iso === sab.iso)) (S.eventos = S.eventos || []).push({ id: 'ev_demo', iso: sab.iso, tipo: 'partido', equipo: q.id, nombre: `Juega el ${q.nombre}`, franja: 'T', refuerzo: Object.assign({}, q.refuerzo), hora: '21:00', ts: Date.now() });
+    if (new URLSearchParams(location.search).has('demo')) {
+      const r = sembrarDemo(S, isoHoy());
+      if (r.meses.length) registrarCambio(`Mes de muestra: ${r.meses.join(' y ')} generados con la semana tipo (${r.aplicados} plazas)${r.evento ? ', partido de muestra el ' + fmtDM(r.evento) : ''}`, 'ia');
     }
   } catch (e) {}
   if (S.day > est.days.length) S.day = 1;

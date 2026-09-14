@@ -26,4 +26,4 @@ jobs:
         run: npx --yes playwright-core@1.47.0 install chromium || true
       - name: Batería e2e (se salta sola sin Chromium)
         run: |
-          for f in tests/e2e-*.mjs; do [ -f "$f" ] && node "$f" || true; done
+          for f in tests/e2e-*.mjs; do [ -f "$f" ] || continue; node "$f" || exit 1; done
