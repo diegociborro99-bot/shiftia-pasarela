@@ -10,7 +10,7 @@
 //   src/app/*.js              → la app, un fichero por sección; el orden lo fija
 //                               src/app/_orden.json. Comparten scope: el build
 //                               los concatena dentro de un solo <script>.
-//   assets/pasarela-logo.png  → logo del grupo (si existe) embebido en base64
+//   assets/pasarela-logo.png (o .svg) → logo del grupo embebido en base64; el PNG manda
 //
 // Sin dependencias. Uso: node tools/build.mjs  (--check solo valida)
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
@@ -45,8 +45,10 @@ function ensamblar() {
 
   // --- logo del grupo: desde el fichero, nunca pegado a mano; si aún no está,
   // el shell enseña el nombre del grupo en texto (14/09: Diego lo sube más tarde)
-  const logoPath = join(RAIZ, 'assets', 'pasarela-logo.png');
-  const logoData = existsSync(logoPath) ? 'data:image/png;base64,' + readFileSync(logoPath).toString('base64') : '';
+  // el PNG del grupo (cuando lo suban) manda sobre el SVG hecho a imitación del original
+  const logoPng = join(RAIZ, 'assets', 'pasarela-logo.png'), logoSvg = join(RAIZ, 'assets', 'pasarela-logo.svg');
+  const logoData = existsSync(logoPng) ? 'data:image/png;base64,' + readFileSync(logoPng).toString('base64')
+    : existsSync(logoSvg) ? 'data:image/svg+xml;base64,' + readFileSync(logoSvg).toString('base64') : '';
 
   // HUELLA DEL BUILD: 10 caracteres del hash de lo ensamblado. Cambia con cualquier
   // cambio de estilos, modelo o app; la caché del service worker lleva nombre propio.
@@ -57,7 +59,7 @@ function ensamblar() {
     .replace('<!--INJECT:STYLES-->', `<style>\n${css}\n</style>`)
     .replace('<!--INJECT:SCRIPT-->', `<script>\nconst APP_VERSION = ${JSON.stringify(version)}, APP_BUILD = ${JSON.stringify(version + '+' + build)}, LOGO_PASARELA = ${JSON.stringify(logoData)};\n${script}\n</script>`)
     .replace('<!--INJECT:BUILD-->', `<meta name="shiftia-build" content="${version}+${build}">`)
-    .replace(/<!--INJECT:GLOGO-->/g, logoData);
+    .replace(/<!--INJECT:GLOGO-->/g, logoData).replace(/<!--INJECT:GLOGO-HIDDEN-->/g, logoData ? '' : ' hidden').replace(/<!--INJECT:GWORD-HIDDEN-->/g, logoData ? ' hidden' : '');
 
   // --- pantalla de acceso independiente (login.html): sin sesión, sin modelo ---
   const icono = (shell.match(/^<link rel="icon"[^>]*>$/m) || [''])[0];
@@ -65,7 +67,7 @@ function ensamblar() {
     .replace('<!--INJECT:STYLES-->', `<style>\n${css}\n</style>`)
     .replace('<!--INJECT:ICON-->', icono)
     .replace('<!--INJECT:PWA-->', (shell.match(/^<(?:meta name="(?:apple-)?mobile-web-app-[^"]+"|link rel="apple-touch-icon")[^>]*>$/gm) || []).join('\n'))
-    .replace(/<!--INJECT:GLOGO-->/g, logoData)
+    .replace(/<!--INJECT:GLOGO-->/g, logoData).replace(/<!--INJECT:GLOGO-HIDDEN-->/g, logoData ? '' : ' hidden').replace(/<!--INJECT:GWORD-HIDDEN-->/g, logoData ? ' hidden' : '')
     .replace('<!--INJECT:BUILD-->', `<meta name="shiftia-build" content="${version}+${build}">`);
   return { html, login, build, version };
 }

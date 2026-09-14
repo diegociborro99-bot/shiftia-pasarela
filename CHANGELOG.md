@@ -1,5 +1,21 @@
 # Changelog — Shiftia · Grupo Pasarela
 
+## v0.1.2 · 14/09/2026 — Logo del grupo, sección Entrevistas visual y acceso del programador
+
+- **Logo del Grupo Pasarela** en SVG (`assets/pasarela-logo.svg`), hecho a imitación
+  del original: cuadrado gris, rombo y «Grupo Pasarela» en caligrafía convertida a
+  trazados (no depende de fuentes). El build lo embebe en la barra superior, la
+  pantalla de acceso y las hojas impresas; si se sube el PNG original
+  (`assets/pasarela-logo.png`) manda sobre el SVG. La barra muestra el logo en vez
+  del texto cuando existe.
+- **Entrevistas** más visual: cabecera con el motivo del rombo, pasos (sección
+  creada → importar la base de datos → funciones), y vista previa con datos de
+  muestra de candidaturas, entrevistas de la semana y decisiones.
+- **Acceso del programador**: sin `PROGRAMADOR_PASSWORD`, el usuario `diego` nace con
+  la contraseña provisional `12345678` y sin cambio obligatorio (la cambia desde
+  Cuenta). El encargado (`admin`) sigue con la genérica y cambio obligatorio.
+  Test nuevo en `tests/server.test.mjs`.
+
 ## v0.1.1 · 14/09/2026 — Sección «Entrevistas» (en construcción)
 
 - Nueva pestaña **Entrevistas** en el panel del administrador (y en «Más» del

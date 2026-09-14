@@ -61,11 +61,20 @@ Sin servidor, `index.html` funciona solo (los datos viven en el navegador;
 contraseña inicial del modo local: `pasarela2026`). Con `?demo=1` el mes en
 pantalla se genera con la semana tipo. Despliegue: `DEPLOY-SERVIDOR.md`.
 
+## Acceso
+
+- **Programador** (Diego): usuario `diego`, contraseña provisional `12345678`
+  (se cambia desde Cuenta; o define `PROGRAMADOR_PASSWORD` antes del primer arranque).
+- **Encargado**: usuario `admin`, contraseña `ADMIN_PASSWORD` o la genérica
+  `pasarela2026` con cambio obligatorio al entrar.
+- Sin servidor (abrir `index.html` a pelo): usuario `admin`, contraseña `pasarela2026`.
+
 ## Logo del grupo
 
-El build embebe `assets/pasarela-logo.png` si existe (junto al de Shiftia en la
-barra superior y en la pantalla de acceso). Basta con subir el fichero y
-ejecutar `npm run build`.
+`assets/pasarela-logo.svg` imita el logo original (cuadrado gris, rombo y
+«Grupo Pasarela» caligráfico). Cuando se suba el original como
+`assets/pasarela-logo.png`, el build lo usará en su lugar: basta con subir el
+fichero y ejecutar `npm run build`.
 
 ## Documentos
 

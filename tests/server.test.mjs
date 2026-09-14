@@ -696,6 +696,24 @@ test('núcleo configurado: salud sondea /healthz sin exponer la clave; solve ree
   }
 });
 
+test('sin PROGRAMADOR_PASSWORD, el programador «diego» entra con 12345678 y no se le obliga a cambiarla (la cambia él cuando quiera)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shiftia-prog-'));
+  const entrar = (s, usuario, pass) => fetch(s.base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario, password: pass }) });
+  const s = await arrancar(dir, { PROGRAMADOR_PASSWORD: '', ADMIN_PASSWORD: '' });
+  try {
+    assert.match(s.log(), /programador «diego» creado con la contraseña provisional 12345678/);
+    const r = await entrar(s, 'diego', '12345678');
+    assert.equal(r.status, 200);
+    const d = await r.json();
+    assert.equal(d.rol, 'programador');
+    assert.equal(d.cambiar, false, 'no hay cambio obligatorio: la cambia el programador desde Cuenta');
+    // el encargado sigue naciendo con la genérica y cambio obligatorio: es la cuenta del cliente
+    const a = await entrar(s, 'admin', 'pasarela2026');
+    assert.equal(a.status, 200); assert.equal((await a.json()).cambiar, true);
+    assert.equal((await entrar(s, 'diego', 'pasarela2026')).status, 401, 'la genérica no abre la cuenta del programador');
+  } finally { await s.parar(); rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('ADMIN_RESET y ADMIN_PROMOTE: la puerta de vuelta si el encargado pierde su contraseña, y el ascenso por variable', async () => {
   // ADMIN_PASSWORD solo actúa con la tabla de usuarios vacía, así que cambiarla no
   // recupera nada; y /api/usuarios/reset exige sesión de encargado. Sin esto, perder

@@ -112,6 +112,7 @@ try { db.exec('ALTER TABLE users ADD COLUMN gen INTEGER NOT NULL DEFAULT 0'); } 
 // contraseña genérica de alta: todos los usuarios nuevos la comparten hasta
 // que cada uno la cambie desde su Cuenta (la app se lo pide al entrar)
 const PASS_GENERICA = process.env.PASSWORD_GENERICA || 'pasarela2026';
+const PASS_PROGRAMADOR = '12345678';   // provisional del programador hasta que la cambie (14/09)
 const TRUST_PROXY = +(process.env.TRUST_PROXY || 1); // Railway/Cloudflare = 1 proxy delante
 // notificaciones push (claves VAPID por entorno o generadas y guardadas en meta)
 const PUSH = pushServidor(db, { publica: process.env.VAPID_PUBLIC, privada: process.env.VAPID_PRIVATE, contacto: process.env.VAPID_CONTACTO });
@@ -150,10 +151,12 @@ if (!db.prepare('SELECT COUNT(*) c FROM users').get().c) {
   if (usuProg === 'admin' || !USUARIO_RE.test(usuProg)) {
     console.error(`[shiftia] PROGRAMADOR_USUARIO «${usuProg}» no vale (3-30 minúsculas/números, distinto de admin): no se crea la cuenta del programador`);
   } else {
-    crearUsuario(usuProg, process.env.PROGRAMADOR_PASSWORD || PASS_GENERICA, 'programador', null, !process.env.PROGRAMADOR_PASSWORD);
+    // sin PROGRAMADOR_PASSWORD nace con la provisional 12345678 (petición de Diego,
+    // 14/09) y sin cambio obligatorio: la cambia él desde Cuenta cuando quiera.
+    crearUsuario(usuProg, process.env.PROGRAMADOR_PASSWORD || PASS_PROGRAMADOR, 'programador', null, false);
     console.log(process.env.PROGRAMADOR_PASSWORD
       ? `[shiftia] usuario programador «${usuProg}» creado con PROGRAMADOR_PASSWORD`
-      : `[shiftia] AVISO: programador «${usuProg}» creado con la contraseña genérica — la app pedirá cambiarla al primer acceso; mejor define PROGRAMADOR_PASSWORD`);
+      : `[shiftia] AVISO: programador «${usuProg}» creado con la contraseña provisional ${PASS_PROGRAMADOR} — cámbiala desde Cuenta o define PROGRAMADOR_PASSWORD`);
   }
 }
 

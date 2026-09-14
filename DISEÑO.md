@@ -14,7 +14,7 @@ falta de dato, y las preguntas que siguen abiertas para el grupo.
 | B4 | Alcance | Fase 1 del PDF + contador de horas + botones de fútbol, con ausencias simples (baja, vacaciones, día libre, permiso). |
 | B5 | Generador | Generador propio: JavaScript determinista en el navegador, partiendo de la semana tipo editable precargada del PDF; **inteligente y potente**: razones por plaza, huecos explicados, candidatos con aviso, y opción de núcleo CP-SAT vía servidor. |
 | B6 | Simulador del PDF | No existe: se construía con shiftia-core y las variables del PDF. La semana tipo y las reglas se han reconstruido del PDF y verificadas con tests. |
-| B7 | Logo | Shiftia en la barra superior con el logo del Grupo Pasarela al lado en pequeño (se embebe `assets/pasarela-logo.png` cuando se suba) y «coded by Highkey Labs» en el pie. |
+| B7 | Logo | Shiftia en la barra superior con el logo del Grupo Pasarela al lado en pequeño (mientras no llegue el original, un SVG hecho a imitación; `assets/pasarela-logo.png` manda cuando se suba) y «coded by Highkey Labs» en el pie. |
 | B8 | Horas | Turnos × horario por local y franja (editable, marcado «supuesto» hasta que el grupo lo confirme), ajustes a mano por casilla y horas extra aparte. |
 | B9 | Fútbol | Diálogo de refuerzo por local (tarde por defecto, con el último valor recordado por equipo) y «proponer quién viene». |
 | B10 | Planilla actual | No la tienen: solo el PDF. Vistas e impresión siguen la estructura del piloto y el cuadrante 8 filas × 7 días. |

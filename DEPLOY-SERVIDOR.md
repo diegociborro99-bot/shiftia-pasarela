@@ -13,7 +13,7 @@ dependencias npm** (Node ≥ 22.13 estándar; `nixpacks.toml` fija Node 22).
 | `SESSION_SECRET` | generado y guardado en la BD | Firma de las cookies de sesión. Mejor fijarla (cadena larga aleatoria). |
 | `ADMIN_PASSWORD` | genérica + cambio obligatorio | Contraseña inicial del usuario `admin` (el encargado). Solo actúa al crear la BD. |
 | `PROGRAMADOR_USUARIO` | `diego` | Usuario de la cuenta del programador (3–30 minúsculas/números). |
-| `PROGRAMADOR_PASSWORD` | genérica + cambio obligatorio | Contraseña inicial del programador. Solo actúa al crear la BD. |
+| `PROGRAMADOR_PASSWORD` | `12345678` (provisional, sin cambio obligatorio) | Contraseña inicial del programador. Solo actúa al crear la BD; después se cambia desde Cuenta. |
 | `PASSWORD_GENERICA` | `pasarela2026` | Contraseña genérica de las altas (la app obliga a cambiarla al primer acceso) y valor vetado como contraseña definitiva. |
 | `ADMIN_RESET` / `ADMIN_RESET_USUARIO` | — / `admin` | Puerta de rescate: contraseña temporal (≥ 8 caracteres) que se aplica **una vez** al arrancar a esa cuenta y revoca sus sesiones. Bórrala después de entrar. |
 | `ADMIN_PROMOTE` / `ADMIN_PROMOTE_ROL` | — / `admin` | Asciende un usuario existente a `admin` o `programador` al arrancar (una vez por valor). |
@@ -39,6 +39,7 @@ dependencias npm** (Node ≥ 22.13 estándar; `nixpacks.toml` fija Node 22).
 
 ## Primer arranque
 
+- **Programador**: usuario `diego`, contraseña `12345678` (provisional hasta que la cambie desde Cuenta → Seguridad). **Encargado**: usuario `admin` con `ADMIN_PASSWORD` o, si no se definió, la genérica `pasarela2026` con cambio obligatorio al entrar.
 - Entra como `admin` (el encargado) o con el usuario del programador. Si el
   servidor está vacío, la app crea la planilla de fábrica (locales, equipo,
   semana tipo del PDF) o, si ese navegador tenía una planilla local con meses,
