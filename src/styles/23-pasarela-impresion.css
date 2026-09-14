@@ -99,6 +99,7 @@
 .pxg-pag{color:#1a2a33}
 .pxg-pag+.pxg-pag{margin-top:0}
 .pxpage.apaisado .pxg-pag{min-height:198.5mm}   /* en pantalla y en el PDF: cada bloque ocupa justo una página (194 mm útiles × 297/279) */
+.pxpage.apaisado .pxg-pag:last-child{min-height:0}   /* la última no empuja nada: así el PDF no arrastra una tercera página vacía */
 .pxg-head{display:flex;align-items:flex-start;gap:12px;padding-bottom:6px;margin-bottom:8px;border-bottom:1.5px solid #1a2a33}
 .pxg-marca{flex:none;margin-top:6px} .pxg-marca svg{display:block;width:30px;height:30px;border-radius:7px}
 .pxg-ht{flex:1;min-width:0}

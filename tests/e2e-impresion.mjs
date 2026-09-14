@@ -96,7 +96,7 @@ try {
   const gen = await pg.evaluate(lunes => {
     const res = generarSemana(S, S.staff, estadoDeIso(lunes), lunes, { simular: true });
     abrirImpresionSemanaGenerada(res, {});
-    return { huecos: res.huecos.length, cambios: res.cambios.length, condiciones: res.condiciones.length, nuevas: res.condiciones.filter(c => c.nueva).length, resumen: res.resumen };
+    return { huecos: res.huecos.length, primeros: res.huecos.filter(h => h.tipo === 'primero').length, cambios: res.cambios.length, condiciones: res.condiciones.length, nuevas: res.condiciones.filter(c => c.nueva).length, resumen: res.resumen };
   }, LUNES);
   ok(`generarSemana simula la semana (${gen.condiciones} condiciones, ${gen.nuevas} nuevas, ${gen.huecos} huecos, ${gen.cambios} cambios)`, gen.condiciones >= 30 && gen.nuevas === 3);
   ok('abrirImpresionSemanaGenerada monta una hoja apaisada con dos páginas .pxg-pag', await llega(pg, () => { const r = document.getElementById('printRoot'); return !!r && !r.classList.contains('hidden') && r.querySelectorAll('.pxpage.apaisado .pxg-pag').length === 2; }, null, 4000) >= 0);
@@ -107,7 +107,7 @@ try {
   ok(`página 1: título «${p1.h1}»`, /^Planilla propuesta · semana del 14 al 20 de septiembre de 2026$/.test(p1.h1), p1.h1);
   ok('página 1: la línea de cabecera nombra Shiftia y los cuatro locales', /SHIFTIA/.test(p1.kick) && /El 33/.test(p1.kick) && /Pasarela/.test(p1.kick), p1.kick);
   ok('página 1: 4 tablas de locales, «Quién libra cada día» y la leyenda', p1.tablas === 4 && p1.libran && /nadie/.test(p1.libV || '') && /Hueco disponible|hueco disponible/.test(p1.ley || ''), JSON.stringify(p1));
-  ok(`página 1: casillas con hueco en rojo (${p1.huecos}) = huecos de 1.ª posición del modelo`, p1.huecos === gen.resumen.huecos - (await pg.evaluate(() => 0)) || p1.huecos >= 1, JSON.stringify({ p1: p1.huecos, gen: gen.huecos }));
+  ok(`página 1: casillas con hueco en rojo (${p1.huecos}) = huecos de 1.ª posición del modelo (${gen.primeros})`, p1.huecos === gen.primeros && p1.huecos >= 1, JSON.stringify({ p1: p1.huecos, gen: gen.primeros }));
   const g33 = await cas('2026-09-15', 'EL33_T');
   ok('página 1: El 33 martes tarde con «Hueco disponible», «+1 hueco» y Noe ◆ en 2.ª', !!g33 && g33.slots[0] && g33.slots[0].hueco && /\+1 hueco/.test(g33.cuenta) && g33.slots[1] && /Noe/.test(g33.slots[1].nombre) && g33.slots[1].coc, JSON.stringify(g33));
   const p2 = await pg.evaluate(() => {
