@@ -6,7 +6,7 @@
 <title>Shiftia · Grupo Pasarela</title>
 <meta name="description" content="Shiftia · Grupo Pasarela — planificación de turnos de los cuatro locales: planilla, equipo, horas y generador.">
 <meta name="robots" content="noindex,nofollow">
-<meta name="shiftia-build" content="0.3.0+7e8ace5450">
+<meta name="shiftia-build" content="0.3.0+3e18749c09">
 <meta name="theme-color" content="#f8f6f3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2085,8 +2085,10 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 /* Complementa 13-impresion-formato-del-excel.css (mecánica común: .pxpage, .pxhead,
    .pxw, .pxm, compactación, @media print). Aquí va lo propio del grupo: la pareja de
    logos, las filas por local con su color (--lc llega en el style de la fila desde
-   l.color), las marcas abre / cocina, el turno corto en ámbar, el pie de descansos,
-   la hoja de un local en grande, las píldoras del mes y la tabla de horas.
+   l.color), la casilla del prototipo del 11/09 (número de posición, ▸ ◆ □, P/C, hueco
+   en rojo), el turno corto en ámbar, el pie de descansos, la hoja de un local en
+   grande, la planilla generada de dos páginas (clases pxg-*), las píldoras del mes y
+   la tabla de horas.
    La hoja es siempre blanca: dentro de #printRoot los tokens semánticos se fijan a los
    del tema claro, para que el ámbar o el verde no salgan pálidos con la app en oscuro. */
 #printRoot{--warn:#96580a;--warn-bg:rgba(212,136,58,.14);--ok:#1c7c43;--ok-bg:rgba(39,174,96,.12);--bad:#b03333;--bad-bg:rgba(204,68,68,.10);
@@ -2098,7 +2100,11 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 
 /* ---- semana general: una sección por local con su color ---- */
 .pxw tr.pxloc td.sec{background:var(--lc)}
+.pxw tr.pxloc td.sec small{font-weight:600;font-size:7px;letter-spacing:.02em;text-transform:none;opacity:.9;margin-left:8px}
 .pxw tr.pxloc td.lblp{border-left-color:var(--lc)}
+.pxw td.hueco,.pxlocal td.hueco{background:#fff4f2;border-left:3px solid #d9534f}
+.pxw td.corta{border-left:3px solid #e0a02a}
+.pxw td[data-cas]{padding-top:2px;padding-bottom:2.5px}
 .pxw th.pxd span small{font-size:7.5px;font-weight:600;color:#c8d3da;margin-left:2px;letter-spacing:0}
 .pxw th.pxd i.ev{display:block;font-style:normal;font-size:6.5px;font-weight:700;letter-spacing:.02em;text-transform:none;color:#ffd48a;white-space:normal;line-height:1.1;margin-top:1px}
 .pxw td .nm+.nm{margin-top:1px}
@@ -2107,21 +2113,39 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .pxw td .falta{display:block;font-size:6.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);margin-top:1px;white-space:nowrap}
 .pxw td .falta i{font-style:normal;font-weight:600;letter-spacing:0;text-transform:none}
 .pxvacio{color:#b9c2c9;font-size:7.5px;font-style:italic}
-/* marcas junto al nombre: llave = abre / sale primero; cocina */
-.nm em.mk{display:inline-flex;align-items:center;gap:2px;font-style:normal;font-variant:small-caps;font-size:7px;font-weight:800;letter-spacing:.05em;border-radius:3px;padding:0 3px;margin-left:2px;line-height:1.5}
-.nm em.mk-abre{background:#fff1cf;color:#7a5200}
-.nm em.mk-coc{background:#e3f1e6;color:#25603a}
-.nm em.mk svg{width:7px;height:7px}
 /* tipos de ausencia que no estaban en el piloto */
 .pxw .nm.a-PERM em{background:var(--for-bg);color:var(--for-tx)}
 .pxw .nm.a-OTRO em{background:var(--otr-bg);color:var(--otr-tx)}
 /* pie de descansos */
 .pxw tr.pxdesc td.sec{background:#5c6b75}
 .pxw tr.pxdesc td.lblp{border-left-color:#5c6b75}
-/* leyenda */
+/* leyenda del mes */
 .pxchip .nm{display:inline-flex}
-.pxchip.corta{background:var(--warn-bg);color:var(--warn)}
-.pxchip.corta b{font-size:6.5px;letter-spacing:.06em;text-transform:uppercase}
+
+/* ---- la casilla del prototipo (hojas semanales y planilla generada): tamaños en em
+   para que escalen con la tabla (8.5px en la semana, 12.5px en la hoja del local) ---- */
+.pxg-cnt{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8em;color:#8a97a0;letter-spacing:.02em;line-height:1.25;margin-bottom:.15em;white-space:nowrap}
+.pxg-cnt b{color:#b8741a;font-weight:800}
+.pxg-cnt em{font-style:normal;font-weight:800;margin-left:.6em;font-family:'Inter','DM Sans',Arial,sans-serif;letter-spacing:0}
+.pxg-cnt em.hue{color:#c0392b} .pxg-cnt em.cor,.pxg-cnt em.fal{color:#a3610c}
+.pxg-s{display:flex;gap:.4em;align-items:flex-start;line-height:1.25;margin-top:.2em}
+.pxg-n{flex:none;display:inline-flex;align-items:center;justify-content:center;width:1.3em;height:1.3em;border-radius:.3em;background:#e9eef2;color:#5c6b75;font-size:.78em;font-weight:800;font-style:normal;margin-top:.15em;line-height:1}
+.pxg-b{min-width:0;flex:1}
+.pxg-nm{font-weight:600;color:#1a2a33;white-space:nowrap}
+.pxg-s.abre .pxg-nm{font-weight:700}
+.pxg-mk{font-weight:700;margin-right:.12em;font-style:normal}
+.pxg-mk.abre{color:#1a2a33} .pxg-mk.coc{color:#c2651a} .pxg-mk.com{color:#8a97a0;font-weight:400}
+.pxg-tag{display:inline-block;font-style:normal;font-size:.68em;font-weight:800;line-height:1.5;padding:0 .4em;border-radius:.3em;margin-left:.45em;vertical-align:.12em;letter-spacing:.02em}
+.pxg-tag.p{background:#fff1cf;color:#7a5200} .pxg-tag.c{background:#e3f1e6;color:#25603a}
+.pxg-coc{font-size:.78em;color:#c2651a;margin-left:.45em;font-weight:600}
+.pxg-sub{display:block;font-size:.78em;color:#8a97a0;line-height:1.2;white-space:nowrap}
+.pxg-sub.bad{color:#c0392b} .pxg-sub.warn{color:var(--warn)}
+.pxg-hb{display:inline-block;border:1px dashed #d9534f;color:#c0392b;font-weight:700;border-radius:.35em;padding:0 .5em;line-height:1.5;background:#fff}
+.pxg-ley{display:flex;flex-wrap:wrap;gap:3px 6px;margin-top:6px;font-size:7px;color:#3d4f5a;align-items:center}
+.pxg-ley>span{display:inline-flex;align-items:center;gap:3px;border-radius:5px;padding:1px 6px 1px 4px;background:#f3f5f7}
+.pxg-ley .pxg-n{font-size:6px;margin:0} .pxg-ley .pxg-tag{margin:0;font-size:6px} .pxg-ley .ast{color:#b8741a}
+.pxg-ley>span.hue{background:#fff4f2;color:#c0392b} .pxg-ley>span.fal{background:var(--warn-bg);color:var(--warn)} .pxg-ley>span.cor{background:#fff7e0;color:#a3610c}
+.pxw td .pxvacio{display:block;margin-top:2px}
 
 /* ---- hoja de un local: vertical, letra grande, para leer de pie desde la barra ---- */
 .pxlocal{font-size:12.5px}
@@ -2142,9 +2166,9 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .pxlocal td .falta{font-size:8.5px;margin-top:3px}
 .pxlocal .nm{font-size:13.5px;line-height:1.4;gap:6px}
 .pxlocal .nm i{width:8px;height:8px}
-.pxlocal .nm em.mk{font-size:9px;padding:0 5px;line-height:1.55}
-.pxlocal .nm em.mk svg{width:9px;height:9px}
 .pxlocal td .nm+.nm{margin-top:2px}
+.pxlocal td[data-cas]{vertical-align:top}
+.pxlocal .pxg-s{margin-top:.3em} .pxlocal .pxg-cnt{margin-bottom:.3em}
 .pxh3{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#5c6b75;margin:12px 0 5px}
 /* pie de descansos del local: tabla pequeña debajo */
 .pxdesct{font-size:10px}
@@ -2153,6 +2177,97 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .pxdesct td.lbld{width:120px;font-weight:700;background:#fafbfc;border-left:4px solid var(--lc);white-space:nowrap}
 .pxdesct td .nm{display:inline-flex;margin:1px 8px 1px 0;font-size:10px}
 .pxdesct td .nm+.nm{margin-top:1px}
+
+/* ---- planilla generada: las dos páginas del prototipo del cliente (11/09) ---- */
+.pxg-pag{color:#1a2a33}
+.pxg-pag+.pxg-pag{margin-top:0}
+.pxpage.apaisado .pxg-pag{min-height:198.5mm}   /* en pantalla y en el PDF: cada bloque ocupa justo una página (194 mm útiles × 297/279) */
+.pxg-head{display:flex;align-items:flex-start;gap:12px;padding-bottom:6px;margin-bottom:8px;border-bottom:1.5px solid #1a2a33}
+.pxg-marca{flex:none;margin-top:6px} .pxg-marca svg{display:block;width:30px;height:30px;border-radius:7px}
+.pxg-ht{flex:1;min-width:0}
+.pxg-kick{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:7px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#5c6b75;line-height:1.3}
+.pxg-kick b{font-weight:700}
+.pxg-h1{font-size:18px;font-weight:800;letter-spacing:-.3px;line-height:1.15;margin:2px 0 2px;color:#1a2a33}
+.pxg-h1 span{font-weight:400;color:#5c6b75}
+.pxg-sub{font-size:8.5px;color:#5c6b75;line-height:1.3}
+.pxg-hr{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:3px;margin-top:4px}
+.pxg-hr .pxglogo{height:26px} .pxg-hr .pxgword{font-size:12px}
+.pxg-hr small{font-size:6.5px;color:#8a97a0;letter-spacing:.06em;text-transform:uppercase}
+/* título de cada local: punto de su color, nombre en su color y la regla de cocina */
+.pxg-loc{display:flex;align-items:center;gap:5px;margin:5px 0 2px;font-size:9.5px;line-height:1.2}
+.pxg-loc i{width:7px;height:7px;border-radius:50%;background:var(--lc,#8a97a0);flex:none}
+.pxg-loc b{color:var(--lc,#1a2a33);font-weight:800}
+.pxg-loc span{font-size:7px;color:#8a97a0}
+.pxg-loc.gris{--lc:#8a97a0} .pxg-loc.gris b{color:#1a2a33}
+table.pxg-tab{border-collapse:collapse;width:100%;font-size:8px;table-layout:fixed;border:1px solid #d9e0e6}
+.pxg-tab th,.pxg-tab td{border:1px solid #e2e8ec;padding:2px 4px;text-align:left;vertical-align:top}
+.pxg-tab th{background:#eef2f5;font-size:6.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#3d4f5a;padding:2.5px 4px;line-height:1.2}
+.pxg-tab th span{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600;color:#8a97a0;letter-spacing:0;font-size:7px}
+.pxg-tab th.pxg-turno,.pxg-tab td.pxg-lbl{width:58px}
+.pxg-tab td.pxg-lbl{background:#fafbfc;vertical-align:top}
+.pxg-tab td.pxg-lbl b{display:block;font-size:8.5px;line-height:1.15}
+.pxg-tab td.pxg-lbl small{display:block;font-size:6.5px;color:#8a97a0;line-height:1.2;margin-top:1px}
+.pxg-tab td.pxg-c{padding:2px 4px 3px}
+.pxg-tab td.cerr{background:#fafbfc} .pxg-tab td.cerr span{font-size:7.5px;font-style:italic;color:#b9c2c9}
+.pxg-tab td.corr{background:#fff7e0;border-left:3px solid #e0a02a}
+.pxg-tab td.corta{background:#fff7e0}
+.pxg-tab td.hueco{background:#fff4f2;border-left:3px solid #d9534f}
+.pxg-chips{display:flex;flex-wrap:wrap;gap:2px 3px;margin-top:1px}
+.pxg-chips span{display:inline-flex;align-items:center;gap:3px;border:1px solid #d9e0e6;border-radius:3px;padding:0 3px;font-size:6.5px;line-height:1.55;color:#3d4f5a;background:#fff;white-space:nowrap}
+.pxg-chips span i{width:5px;height:5px;border-radius:50%;flex:none}
+.pxw td .pxg-chips{margin-top:1px}
+.pxg-lib td.pxg-c .pxvacio{display:block;margin-top:1px}
+/* página 2: tres columnas, cajas de huecos, condiciones nuevas, preguntas, lista y pie */
+.pxg-p2 .pxg-h1 span{font-weight:400}
+.pxg-cols{display:grid;grid-template-columns:1.15fr 1.3fr 1fr;gap:0 16px;align-items:start}
+.pxg-col{min-width:0}
+/* con más de dos huecos, la columna central se ensancha y los reparte en dos subcolumnas */
+.pxg-cols.muchos{grid-template-columns:.85fr 2.2fr .95fr}
+.pxg-cols.muchos .pxg-col:nth-child(2) .pxg-hueco{break-inside:avoid;page-break-inside:avoid}
+.pxg-cols.muchos .pxg-col:nth-child(2){column-count:2;column-gap:10px}
+.pxg-cols.muchos .pxg-col:nth-child(2) .pxg-h2{column-span:all}
+.pxg-h2{font-size:9.5px;font-weight:800;margin:4px 0 4px;padding-bottom:2px;border-bottom:1px solid #d9e0e6;color:#1a2a33;line-height:1.2}
+.pxg-h2c{margin-top:7px}
+.pxg-p{font-size:7.2px;line-height:1.4;color:#3d4f5a;margin:0 0 3px}
+.pxg-p.mut{color:#8a97a0;font-style:italic}
+.pxg-p.pq b{font-weight:700;color:#3d4f5a}
+.pxg-p .bad,.pxg-hueco .bad{color:#c0392b}
+.pxg-cambio{margin:0 0 6px}
+.pxg-cambio h4{font-size:8px;font-weight:800;margin:0 0 2px;color:#1a2a33}
+.pxg-antes{font-size:6.8px;color:#8a97a0;line-height:1.35} .pxg-antes s{color:#8a97a0}
+.pxg-ahora{font-size:6.8px;color:#1a2a33;font-weight:700;line-height:1.35} .pxg-ahora b{color:#1c7c43}
+.pxg-nueva-cas{font-style:normal;font-weight:800;color:#1c7c43;text-transform:uppercase;font-size:6px;letter-spacing:.06em}
+.pxg-hueco{border:1px solid #e8b4ae;background:#fff7f6;border-radius:5px;padding:5px 7px 4px;margin:0 0 6px}
+.pxg-hueco h4{font-size:8px;font-weight:800;margin:0 0 2px;color:#c0392b}
+.pxg-hueco .pxg-p{margin-bottom:2.5px}
+.pxg-des{font-size:6.8px;color:#5c6b75;line-height:1.4;margin:3px 0 0;padding-top:3px;border-top:1px dashed #e8b4ae}
+.pxg-des b{color:#1a2a33}
+.pxg-nueva{display:flex;gap:6px;margin:0 0 5px;align-items:flex-start}
+.pxg-nueva i{flex:none;font-style:normal;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:7px;font-weight:800;color:#1c7c43;margin-top:1px;min-width:11px}
+.pxg-nueva p{margin:0;font-size:7.2px;line-height:1.4;color:#3d4f5a} .pxg-nueva p b{color:#1a2a33}
+.pxg-nueva p small{display:block;font-size:6.5px;color:#c0392b;margin-top:1px}
+.pxg-preg{display:flex;gap:6px;margin:0 0 5px;align-items:flex-start}
+.pxg-preg i{flex:none;width:7px;height:7px;border:1.5px solid #1c7c43;border-radius:50%;margin-top:2px}
+.pxg-preg p{margin:0;font-size:7.2px;line-height:1.4;color:#3d4f5a} .pxg-preg p b{color:#1a2a33}
+.pxg-conds{column-count:4;column-gap:14px;margin-top:2px}
+.pxg-conds.muchas{column-count:5;column-gap:10px}
+.pxg-cond{display:flex;gap:3px;align-items:flex-start;break-inside:avoid;font-size:6.5px;line-height:1.3;color:#3d4f5a;margin-bottom:1.5px}
+.pxg-cond i{flex:none;font-style:normal;font-family:ui-monospace,Menlo,Consolas,monospace;color:#8a97a0;min-width:11px;text-align:right;font-size:6px;padding-top:.5px}
+.pxg-cond b{flex:none;font-weight:800;font-size:6.5px;width:7px} .pxg-cond b.ok{color:#1c7c43} .pxg-cond b.ko{color:#c0392b}
+.pxg-cond span{min-width:0}
+.pxg-cond.info{color:#6f7d87}
+.pxg-cond em.nueva{font-style:normal;font-weight:800;color:#1c7c43;font-size:5.5px;letter-spacing:.06em;margin-left:2px}
+.pxg-cond small{display:block;color:#c0392b;font-size:6.2px;line-height:1.25}
+.pxg-fin{margin-top:7px;border:1px solid #bfe3cf;background:#f2faf5;border-radius:5px;padding:5px 8px;font-size:7.4px;line-height:1.45;color:#3d4f5a}
+.pxg-fin b{color:#1c7c43}
+.pxg-foot{margin-top:8px;font-size:6.5px;color:#8a97a0}
+/* compactación (montarImpresion la pone si una página no cabe) */
+.compacto .pxg-tab{font-size:7.4px} .compacto .pxg-tab td.pxg-c{padding:1px 3px 2px} .compacto .pxg-loc{margin:3px 0 1px}
+.compacto .pxg-cond{font-size:6px} .compacto .pxg-p,.compacto .pxg-nueva p,.compacto .pxg-preg p,.compacto .pxg-des{font-size:6.7px}
+.compacto .pxg-hueco{padding:3px 6px 3px;margin-bottom:4px} .compacto .pxg-fin{font-size:7px;padding:4px 7px}
+.compacto2 .pxg-tab{font-size:6.8px} .compacto2 .pxg-tab td.pxg-c{padding:1px 2px} .compacto2 .pxg-h1{font-size:15px}
+.compacto2 .pxg-cond{font-size:5.6px} .compacto2 .pxg-conds{column-count:5} .compacto2 .pxg-p,.compacto2 .pxg-nueva p,.compacto2 .pxg-preg p,.compacto2 .pxg-des{font-size:6.2px}
+.pxpage.compacto .pxsem{font-size:8px} .pxpage.compacto2 .pxsem{font-size:7.4px}
 
 /* ---- tablón del mes: píldora con el color del local; dos colores si dobla ---- */
 .pxm td .pm,.pxchip .pm{display:inline-block;min-width:15px;padding:0 3px;border-radius:4px;background:var(--lc);color:#fff;font-weight:800;font-size:7.5px;line-height:1.7;letter-spacing:.02em;text-align:center}
@@ -2186,10 +2301,12 @@ table.pxh{border-collapse:separate;border-spacing:0;width:100%;font-size:9px;bor
 .pxpage.compacto2 table.pxh{font-size:7.4px} .pxpage.compacto2 .pxh th,.pxpage.compacto2 .pxh td{padding:1px 4px}
 .pxpage.compacto .pxlocal{font-size:11px} .pxpage.compacto .pxlocal .nm{font-size:11.5px} .pxpage.compacto .pxlocal th,.pxpage.compacto .pxlocal td{padding:4px 8px}
 .pxpage.compacto2 .pxlocal{font-size:10px} .pxpage.compacto2 .pxlocal .nm{font-size:10.5px} .pxpage.compacto2 .pxlocal th,.pxpage.compacto2 .pxlocal td{padding:3px 7px}
-.pxpage.compacto .pxsem .falta{font-size:6px} .pxpage.compacto2 .pxsem .nm em.mk{font-size:6px;padding:0 2px}
 @media print{
-  .pxh tr,.pxlocal tr,.pxdesct tr{break-inside:avoid;page-break-inside:avoid}
+  .pxh tr,.pxlocal tr,.pxdesct tr,.pxg-tab tr{break-inside:avoid;page-break-inside:avoid}
   .pxh thead{display:table-header-group}
+  .pxpage.apaisado .pxg-pag{min-height:0}
+  .pxg-pag+.pxg-pag{page-break-before:always;break-before:page}
+  .pxg-hueco,.pxg-cambio,.pxg-nueva,.pxg-preg,.pxg-fin{break-inside:avoid;page-break-inside:avoid}
 }
 
 /* 24-pasarela-horas.css */
@@ -2426,7 +2543,7 @@ table.htab{border-collapse:separate;border-spacing:0;width:100%;min-width:820px;
 <div id="tip" role="tooltip"></div>
 <div id="printRoot" class="hidden"></div>
 <script>
-const APP_VERSION = "0.3.0", APP_BUILD = "0.3.0+7e8ace5450", LOGO_PASARELA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTYgMjU2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IkdydXBvIFBhc2FyZWxhIj4KICA8cmVjdCB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgcng9IjM0IiBmaWxsPSIjOGY4ZjhmIi8+CiAgPGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIuNCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgb3BhY2l0eT0iLjkyIj4KICAgIDxwYXRoIGQ9Ik0xMjggMTggTDIzOCAxMjggTDEyOCAyMzggTDE4IDEyOCBaIi8+CiAgICA8cGF0aCBkPSJNMTI4IDM0IEwyMjIgMTI4IEwxMjggMjIyIEwzNCAxMjggWiIgc3Ryb2tlLXdpZHRoPSIxLjIiIG9wYWNpdHk9Ii41NSIvPgogIDwvZz4KICA8ZyBmaWxsPSIjZmZmIj4KICAgIDxwYXRoIGQ9Ik04NiAxMzEuM1E4My4zIDEzMS4zIDgxLjcgMTMwLjNRODAuMSAxMjkuMyA4MC4xIDEyNy43UTgwLjEgMTI2LjIgODEuMiAxMjQuOVE4Mi4zIDEyMy43IDg0LjEgMTIyLjZRODUuOCAxMjEuNiA4Ny45IDEyMC44UTkwIDEyMCA5MiAxMTkuNVE5NCAxMTguOSA5NS41IDExOC43UTk3IDExOC41IDk4LjcgMTE4LjRRMTAwLjQgMTE4LjIgMTAyLjIgMTE4LjFRMTA0IDExOCAxMDUuNCAxMThRMTA3LjEgMTE1LjEgMTA4LjIgMTEyLjVRMTA5LjMgMTEwIDExMC4xIDEwNi42TDExMC4zIDEwNS45UTEwOS40IDEwNi43IDEwNy44IDEwNy45UTEwNi4yIDEwOSAxMDQuMSAxMTAuMlExMDIgMTExLjQgOTkuNyAxMTIuMlE5Ny4zIDExMi45IDk0LjggMTEyLjlROTEuNSAxMTIuOSA4OS4yIDExMS40UTg2LjggMTA5LjggODUuNSAxMDdRODQuMyAxMDQuMiA4NC4zIDEwMC42UTg0LjMgOTguNSA4NC44IDk2UTg1LjQgOTMuNSA4Ni42IDkxUTg1LjIgODkuNSA4NC40IDg3LjdRODMuNiA4NS45IDgzLjYgODRRODMuNiA4Mi40IDg0LjMgODAuN1E4NSA3OS4xIDg2LjQgNzcuNlE4Ni45IDc3LjEgODcuMiA3Ny4xUTg3LjQgNzcuMSA4Ny40IDc3LjNRODcuNCA3Ny42IDg3LjEgNzcuOVE4NiA3OS4yIDg1LjUgODAuN1E4NSA4Mi4xIDg1IDgzLjVRODUgODUuMSA4NS42IDg2LjdRODYuMyA4OC4yIDg3LjQgODkuNlE4OC42IDg3IDkwLjcgODQuN1E5Mi44IDgyLjMgOTUuNiA4MC40UTk4LjQgNzguNCAxMDEuNyA3Ny4zUTEwNSA3Ni4yIDEwOC42IDc2LjJRMTEzLjQgNzYuMiAxMTYuMiA3OC4zUTExOSA4MC4zIDExOSA4NC41UTExOSA4Ni41IDExNy45IDg4LjVRMTE2LjggOTAuNCAxMTQuNiA5Mi4xUTExMi40IDkzLjggMTA5LjIgOTQuOFExMDUuOSA5NS44IDEwMS43IDk1LjlROTguMyA5NS45IDk1IDk1UTkxLjggOTQuMSA4OS41IDkyLjdRODguNCA5NS4xIDg3LjggOTcuNFE4Ny4zIDk5LjcgODcuMyAxMDEuOFE4Ny4zIDEwNi40IDg5LjYgMTA4LjhROTEuOSAxMTEuMyA5NS43IDExMS4zUTk3LjggMTExLjMgOTkuOCAxMTAuN1ExMDEuOSAxMTAgMTAzLjcgMTA5UTEwNS41IDEwOCAxMDYuOCAxMDYuOVExMDguMSAxMDUuOCAxMDguNSAxMDQuOFExMDkuNSAxMDIuNCAxMTAuNiAxMDEuNVExMTEuNiAxMDAuNSAxMTIuNCAxMDAuNVExMTMuMSAxMDAuNSAxMTMuNiAxMDEuMVExMTQuMSAxMDEuOCAxMTMuOSAxMDIuOFExMTMuNSAxMDYuNiAxMTEuOSAxMTAuMlExMTAuMiAxMTMuOCAxMDcuNiAxMThRMTEwLjggMTE4IDExMy4zIDExOC4zUTExNS44IDExOC42IDExNy44IDExOS4yUTExOC40IDExOS4zIDExOC42IDExOS41UTExOC44IDExOS43IDExOC44IDExOS44UTExOC44IDEyMC4yIDExOC4yIDEyMC4yUTExNy45IDEyMC4yIDExNy40IDEyMFExMTYuNCAxMTkuOCAxMTQuNiAxMTkuNVExMTIuOSAxMTkuMyAxMTAuOSAxMTkuMlExMDguOSAxMTkuMiAxMDcgMTE5LjJRMTA1LjEgMTIxLjkgMTAyLjUgMTI0LjFROTkuOCAxMjYuNCA5Ni45IDEyOFE5My45IDEyOS42IDkxLjEgMTMwLjRRODguMiAxMzEuMyA4NiAxMzEuM1pNMTAwLjQgOTQuNVExMDMuNiA5NC41IDEwNi41IDkzLjdRMTA5LjQgOTIuOCAxMTEuOCA5MS40UTExNC4xIDg5LjkgMTE1LjUgODcuOVExMTYuOSA4NiAxMTYuOSA4My44UTExNi45IDgxLjggMTE1LjggODAuM1ExMTQuNyA3OC45IDExMi45IDc4LjFRMTExLjIgNzcuMyAxMDkuMiA3Ny4zUTEwNi4xIDc3LjMgMTAzLjIgNzguNVExMDAuNCA3OS43IDk3LjkgODEuN1E5NS41IDgzLjcgOTMuNSA4Ni4yUTkxLjUgODguNyA5MC4xIDkxLjRROTIgOTIuOCA5NC43IDkzLjdROTcuNCA5NC41IDEwMC40IDk0LjVaTTg1LjkgMTMwLjFRODcuNyAxMzAuMSA5MC4xIDEyOS40UTkyLjYgMTI4LjcgOTUuMiAxMjcuM1E5Ny45IDEyNS45IDEwMC40IDEyMy45UTEwMi44IDEyMS45IDEwNC43IDExOS4yUTEwMi40IDExOS4zIDEwMC4zIDExOS41UTk4LjIgMTE5LjYgOTYuMSAxMjBROTQuOSAxMjAuMiA5My4yIDEyMC43UTkxLjUgMTIxLjIgODkuOCAxMjJRODggMTIyLjcgODYuNCAxMjMuN1E4NC44IDEyNC43IDgzLjggMTI1LjhRODIuOCAxMjYuOSA4Mi44IDEyOFE4Mi44IDEyOC45IDgzLjUgMTI5LjVRODQuMiAxMzAuMSA4NS45IDEzMC4xWiBNMTE3LjMgMTA1UTExNy42IDEwNC4yIDExOC4yIDEwMi41UTExOC44IDEwMC44IDExOS41IDk4LjZRMTIwLjEgOTYuNSAxMjAuNCA5NC42UTEyMC42IDkzLjkgMTIwLjkgOTMuNlExMjEuMyA5My4yIDEyMS43IDkzLjJRMTIyLjMgOTMuMiAxMjIuOCA5My44UTEyMy4zIDk0LjQgMTIzLjMgOTUuNFExMjMuMyA5Ni43IDEyMi42IDk3LjZRMTIxLjggOTguNSAxMjAuNyA5OS40UTEyMS4yIDk5LjQgMTIxLjcgOTkuNFExMjIuMiA5OS41IDEyMi44IDk5LjVRMTI0LjkgOTkuNSAxMjcuMSA5OS4yUTEyNy4xIDk5LjUgMTI3LjEgOTkuNlExMjcuMSAxMDAuMiAxMjYuOCAxMDEuMVExMjYuNSAxMDIgMTI2LjEgMTAyLjhRMTI1LjkgMTAzLjIgMTI1LjQgMTA0LjNRMTI0LjggMTA1LjQgMTI0LjIgMTA2LjdRMTIzLjUgMTA4LjEgMTIzLjEgMTA5LjRRMTIyLjYgMTEwLjcgMTIyLjYgMTExLjZRMTIyLjYgMTEyLjggMTIzLjYgMTEyLjhRMTI0LjQgMTEyLjggMTI2IDExMC44UTEyNy42IDEwOC43IDEyOS4xIDEwNS4xUTEyOS43IDEwNS4xIDEyOS43IDEwNS41UTEyOS4yIDEwNi44IDEyOC40IDEwOC4yUTEyNy43IDEwOS43IDEyNi43IDExMVExMjUuOCAxMTIuMyAxMjQuOCAxMTMuMlExMjMuNyAxMTQgMTIyLjUgMTE0UTEyMS43IDExNCAxMjAuOCAxMTMuM1ExMTkuOSAxMTIuNiAxMTkuOSAxMTFRMTE5LjkgMTA5LjYgMTIwLjUgMTA4LjJRMTIxIDEwNi45IDEyMS43IDEwNS43UTEyMi40IDEwNC41IDEyMyAxMDMuNlExMjMuNSAxMDIuNiAxMjMuNSAxMDIuMVExMjMuNSAxMDEuMyAxMjIuNSAxMDAuOVExMjEuNCAxMDAuNSAxMTkuOCAxMDAuNVExMTkgMTAyLjYgMTE4LjUgMTAzLjZRMTE4LjEgMTA0LjYgMTE3LjggMTA1LjVRMTE3IDEwNS41IDExNy4zIDEwNVogTTEzMC41IDExNFExMzAgMTE0IDEyOS4yIDExMy44UTEyOC41IDExMy41IDEyOCAxMTIuOVExMjcuNSAxMTIuMyAxMjcuNSAxMTEuMVExMjcuNSAxMDkuOSAxMjguMyAxMDguM1ExMjkgMTA2LjcgMTI5LjYgMTA1LjVRMTI5LjEgMTA1LjUgMTI5LjEgMTA1LjFRMTI5LjIgMTA1IDEyOS41IDEwNC4yUTEyOS45IDEwMy41IDEzMC40IDEwMi41UTEzMC45IDEwMS41IDEzMS40IDEwMC41UTEzMS45IDk5LjYgMTMyLjIgOTkuMVExMzIuNyA5OC4xIDEzMy45IDk4LjFIMTM2LjhRMTM2IDk4LjcgMTM1LjQgOTkuNFExMzQuNyAxMDAuMSAxMzMuOCAxMDJRMTMzLjggMTAyIDEzMy41IDEwMi42UTEzMy4yIDEwMy4zIDEzMi43IDEwNC4zUTEzMi4yIDEwNS4zIDEzMS43IDEwNi4zUTEzMS4yIDEwNy4zIDEzMC45IDEwOFExMzAuMyAxMDkuMyAxMzAuMSAxMTBRMTMwIDExMC44IDEzMCAxMTEuNFExMzAgMTEyLjkgMTMxIDExMi45UTEzMi4xIDExMi45IDEzMy42IDExMS4xUTEzNC45IDEwOS42IDEzNi4yIDEwNy41UTEzNy40IDEwNS40IDEzOC41IDEwMy4xUTEzOS43IDEwMC45IDE0MC41IDk5LjFRMTQxIDk4LjEgMTQyLjMgOTguMUgxNDQuOVExNDMuOCA5OC45IDE0Mi44IDEwMC42UTE0MS44IDEwMi4yIDE0MC41IDEwNC44UTE0MC4yIDEwNS41IDEzOS43IDEwNi41UTEzOS4yIDEwNy42IDEzOC44IDEwOC44UTEzOC40IDExMCAxMzguNCAxMTEuMlExMzguNCAxMTIuOCAxMzkuNiAxMTIuOFExNDEuMSAxMTIuOCAxNDIuNiAxMTAuNlExNDQuMSAxMDguNSAxNDUuNSAxMDUuMVExNDUuOSAxMDUuMSAxNDUuOSAxMDUuMlExNDYgMTA1LjIgMTQ2LjEgMTA1LjVRMTQ1LjUgMTA2LjggMTQ0LjggMTA4LjJRMTQ0LjEgMTA5LjcgMTQzLjIgMTExUTE0Mi4zIDExMi4zIDE0MS4yIDExMy4yUTE0MC4yIDExNCAxMzguOSAxMTRRMTM3LjcgMTE0IDEzNyAxMTMuMVExMzYuMyAxMTIuMyAxMzYuMyAxMTAuN1ExMzYuMyAxMDkuNSAxMzYuNyAxMDguMVExMzUuOSAxMDkuNCAxMzQuOSAxMTAuOFExMzMuOSAxMTIuMiAxMzIuOCAxMTMuMVExMzEuNiAxMTQgMTMwLjUgMTE0WiBNMTM4LjMgMTI2LjZRMTM3LjcgMTI2LjYgMTM3LjIgMTI2LjRRMTM2LjYgMTI2LjIgMTM2IDEyNi4zUTEzNi4zIDEyNi4xIDEzNyAxMjQuN1ExMzcuOCAxMjMuNCAxMzguOSAxMjEuNVExMzkuOSAxMTkuNSAxNDEuMSAxMTcuMlExNDIuMiAxMTUgMTQzLjIgMTEyLjdRMTQ0LjMgMTEwLjUgMTQ1LjEgMTA4LjZRMTQ1LjggMTA2LjcgMTQ2LjEgMTA1LjVRMTQ1LjggMTA1LjUgMTQ1LjYgMTA1LjRRMTQ1LjUgMTA1LjQgMTQ1LjUgMTA1LjFRMTQ1LjUgMTA1LjEgMTQ1LjggMTA0LjNRMTQ2LjEgMTAzLjUgMTQ2LjMgMTAyLjNRMTQ2LjYgMTAxLjEgMTQ2LjYgMTAwLjJRMTQ2LjYgOTkuNSAxNDYuNSA5OS4xUTE0Ni4zIDk4LjYgMTQ2IDk4LjVMMTQ4LjMgOTguMlExNDguNSA5OC4xIDE0OC44IDk4LjFRMTQ5IDk4LjEgMTQ5LjIgOTguMVExNDkuNiA5OC4xIDE0OS44IDk4LjRRMTQ5LjkgOTguNyAxNDkuOSA5OS42UTE0OS45IDEwMC44IDE0OS41IDEwMi41UTE0OS4xIDEwNC4zIDE0OC42IDEwNS42UTE0OS4xIDEwNC44IDE0OS45IDEwMy41UTE1MC43IDEwMi4yIDE1MS44IDEwMC45UTE1Mi45IDk5LjYgMTU0IDk4LjdRMTU1LjIgOTcuOCAxNTYuMyA5Ny44UTE1Ni41IDk3LjggMTU2LjkgOTcuOVExNTguMiA5OC4yIDE1OC43IDk5LjFRMTU5LjIgMTAwLjEgMTU5LjIgMTAxLjNRMTU5LjIgMTAyLjcgMTU4LjcgMTA0LjRRMTU4LjIgMTA2IDE1Ny4zIDEwNy42UTE1Ni40IDEwOS4yIDE1NS4zIDExMC41UTE1NC4xIDExMi4xIDE1Mi4zIDExMy4xUTE1MC41IDExNCAxNDguNiAxMTRRMTQ2LjkgMTE0IDE0NS40IDExMy4yTDE0MSAxMjQuMlExNDAuNCAxMjUuNSAxMzkuOCAxMjYuMVExMzkuMiAxMjYuNiAxMzguMyAxMjYuNlpNMTQ3LjEgMTEzLjFRMTQ4LjQgMTEzLjEgMTUwIDExMS45UTE1MS42IDExMC43IDE1My4xIDEwOC44UTE1NC42IDEwNyAxNTUuNiAxMDUuMVExNTYuMyAxMDMuOCAxNTYuNiAxMDIuN1ExNTcgMTAxLjYgMTU3IDEwMC44UTE1NyA5OSAxNTUuNyA5OVExNTUuMSA5OSAxNTQuMSA5OS43UTE1My4yIDEwMC4zIDE1MS45IDEwMlExNTAuNiAxMDMuOSAxNDkgMTA2LjdRMTQ3LjQgMTA5LjQgMTQ1LjggMTEyLjVRMTQ2LjMgMTEzLjEgMTQ3LjEgMTEzLjFaIE0xNjMuNyAxMTRRMTYxLjggMTE0IDE2MC45IDExMi42UTE2MCAxMTEuMyAxNjAgMTA5LjRRMTYwIDEwNy42IDE2MC43IDEwNS42UTE2MS41IDEwMy41IDE2Mi44IDEwMS44UTE2NC4xIDEwMCAxNjUuNyA5OC45UTE2Ny4zIDk3LjkgMTY4LjggOTcuOVExNzAuNyA5Ny45IDE3MS42IDk5LjFRMTcyLjUgMTAwLjQgMTcyLjUgMTAyLjRRMTcyLjUgMTAzLjggMTcyIDEwNS4zUTE3MS42IDEwNi44IDE3MC44IDEwOC4zUTE3MS40IDEwOC45IDE3Mi41IDEwOC45UTE3My44IDEwOC45IDE3NC43IDEwOC4xUTE3NS42IDEwNy4yIDE3Ni41IDEwNS4xUTE3Ny4xIDEwNS4xIDE3Ny4xIDEwNS41UTE3Ni4yIDEwNy43IDE3NS4xIDEwOC42UTE3My45IDEwOS42IDE3Mi4yIDEwOS42UTE3MS4xIDEwOS42IDE3MC40IDEwOVExNjkuMSAxMTEuMSAxNjcuNCAxMTIuNlExNjUuNiAxMTQgMTYzLjcgMTE0Wk0xNjQuNCAxMTNRMTY1LjQgMTEzIDE2Ni41IDExMi4xUTE2Ny41IDExMS4yIDE2OC40IDExMFExNjkuMyAxMDguOSAxNjkuNyAxMDguMVExNjguOSAxMDYuNyAxNjguOCAxMDYuMVExNjguNyAxMDUuNCAxNjguNyAxMDUuMVExNjguNyAxMDQuMiAxNjkuMSAxMDMuN1ExNjkuNiAxMDMuMyAxNzAuMSAxMDMuM1ExNzAuNyAxMDMuMyAxNzEuMiAxMDMuOFExNzEuMyAxMDMuMyAxNzEuMyAxMDIuOVExNzEuNCAxMDIuNSAxNzEuNCAxMDJRMTcxLjQgMTAwLjggMTcwLjkgMTAwLjFRMTcwLjUgOTkuMyAxNjkuNiA5OS4zUTE2OC42IDk5LjMgMTY3LjUgMTAwLjJRMTY2LjUgMTAxIDE2NS41IDEwMi40UTE2NC42IDEwMy43IDE2My45IDEwNS40UTE2My4zIDEwNi45IDE2MyAxMDguMVExNjIuNyAxMDkuNCAxNjIuNyAxMTAuNVExNjIuNyAxMTEuNiAxNjMuMSAxMTIuM1ExNjMuNSAxMTMgMTY0LjQgMTEzWiIvPgogICAgPHBhdGggZD0iTTMyLjQgMTc0LjhRMzAuOCAxNzQuOCAyOS4zIDE3NC42UTI0LjggMTc0IDIyLjYgMTcxLjlRMjAuNSAxNjkuOCAyMC41IDE2Ny40UTIwLjUgMTY0LjcgMjIuOSAxNjIuNlEyNS4zIDE2MC40IDI5LjcgMTYwLjRRMzEuMSAxNjAuNCAzMi42IDE2MC43UTM0LjIgMTYwLjkgMzUuOSAxNjEuNVEzNi44IDE2MS44IDM2LjggMTYyLjNRMzYuOCAxNjIuNiAzNi4zIDE2Mi42UTM1LjkgMTYyLjYgMzUuNiAxNjIuNFEzNC41IDE2MiAzMy40IDE2MS44UTMyLjQgMTYxLjYgMzEuNCAxNjEuNlEyOC40IDE2MS42IDI2LjcgMTYzLjRRMjUuMSAxNjUuMiAyNS4xIDE2Ny4yUTI1LjEgMTY5LjMgMjYuOCAxNzAuOVEyOC40IDE3Mi42IDMyIDE3Mi42UTM2LjYgMTcyLjYgNDAuNCAxNzAuNVE0NC4zIDE2OC40IDQ3LjcgMTY1UTUxLjQgMTYxLjQgNTQuNCAxNTYuM1E1Ny40IDE1MS4zIDYwLjQgMTQ1LjVRNjMuNCAxMzkuNyA2Ni45IDEzMy44UTcwLjUgMTI3LjkgNzUuMSAxMjIuN1E3NiAxMjEuNyA3NyAxMjAuNlE3OCAxMTkuNCA3OC45IDExOC42UTc2LjQgMTE4LjMgNzMuOSAxMTguMVE3MS4zIDExNy45IDY4LjcgMTE3LjlRNjUgMTE3LjkgNjEuNyAxMTguM1E1OC4zIDExOC42IDU1IDExOS4yUTUxLjYgMTE5LjggNDcuNCAxMjEuMlE0My4zIDEyMi41IDM5LjMgMTI0LjdRMzUuNCAxMjYuOSAzMi42IDEzMFEyOS45IDEzMy4xIDI5LjIgMTM3LjJRMjkuMSAxMzcuNSAyOS4xIDEzNy45UTI5LjEgMTM4LjMgMjkuMSAxMzguN1EyOS4xIDE0MiAzMS4zIDE0NC4xUTMzLjYgMTQ2LjMgMzYuNiAxNDYuM1EzOC45IDE0Ni4zIDQxIDE0NS4xUTQzIDE0My45IDQ0LjcgMTQxLjlRNDYuNCAxNDAgNDcuMSAxMzcuNlE0Ny4yIDEzNi45IDQ3LjcgMTM2LjlRNDguMiAxMzYuOSA0OC4yIDEzNy43UTQ4LjEgMTQwLjggNDYuMyAxNDMuMVE0NC42IDE0NS40IDQxLjkgMTQ2LjZRMzkuMiAxNDcuOCAzNi41IDE0Ny44UTMzLjcgMTQ3LjggMzEuMiAxNDYuNlEyOC42IDE0NS40IDI3LjEgMTQzLjFRMjUuNSAxNDAuOCAyNS41IDEzNy4zUTI1LjUgMTMzLjMgMjcuNSAxMzAuMlEyOS40IDEyNy4xIDMyLjcgMTI0LjdRMzYuMSAxMjIuNCAzOS45IDEyMC44UTQzLjggMTE5LjIgNDcuNyAxMTguMlE1MS42IDExNy4yIDU0LjggMTE2LjdRNTggMTE2LjIgNjEuNSAxMTUuOVE2NSAxMTUuNiA2OC42IDExNS42UTcxLjcgMTE1LjYgNzQuOCAxMTUuOVE3Ny45IDExNi4yIDgwLjggMTE2LjhRODIuMSAxMTUuOCA4My40IDExNS4xUTg0LjcgMTE0LjQgODYuMiAxMTMuOFE4Ny4yIDExMy40IDg3LjggMTEzLjRRODguMiAxMTMuNCA4OC4yIDExMy43UTg4LjIgMTE0LjIgODcgMTE0LjlRODYuNSAxMTUuMiA4NS42IDExNS45UTg0LjcgMTE2LjYgODMuNyAxMTcuNlE4OC40IDExOC43IDkyLjEgMTIxUTk2LjIgMTIzLjUgOTggMTI2LjJROTkuOCAxMjguOSA5OS44IDEzMS44UTk5LjggMTM1LjEgOTcuOCAxMzguNFE5NS43IDE0MS43IDkyLjUgMTQ0LjVRODkuMyAxNDcuMyA4NS40IDE0OS40UTgxLjUgMTUxLjQgNzcuNyAxNTIuM1E3NCAxNTMuMyA3MC4zIDE1My43UTY2LjUgMTU0LjEgNjMuNiAxNTQuMVE2My4xIDE1NC4xIDYyLjUgMTU0LjFRNjIgMTU0LjEgNjEuNSAxNTQuMVE1OSAxNTcuNSA1Ni40IDE2MC44UTUzLjggMTY0LjEgNTAuNiAxNjcuMlE0Ni42IDE3MC45IDQyIDE3Mi45UTM3LjMgMTc0LjggMzIuNCAxNzQuOFpNNjIuNSAxNTIuNVE2NS4yIDE1Mi42IDY4LjYgMTUyLjFRNzIgMTUxLjYgNzUuNCAxNTAuNVE4MSAxNDguOCA4NS41IDE0NS42UTkwIDE0Mi4zIDkyLjYgMTM4LjRROTUuMiAxMzQuNCA5NS4yIDEzMC42UTk1LjIgMTI4LjMgOTQuMSAxMjYuMlE5MyAxMjQuMSA5MC41IDEyMi41UTg4LjggMTIxLjQgODYuNyAxMjAuNlE4NC43IDExOS44IDgyLjQgMTE5LjNRNzguNyAxMjQuNSA3NS41IDEzMC4xUTcyLjMgMTM1LjcgNjkuMSAxNDEuNFE2NiAxNDcuMSA2Mi41IDE1Mi41WiBNMTA2LjcgMTcyLjJRMTA1IDE3Mi4yIDEwMy44IDE3MS4zUTEwMi41IDE3MC4zIDEwMi41IDE2Ny41UTEwMi41IDE2Ni4yIDEwMi43IDE2NS4yUTEwMi45IDE2NC4xIDEwMy4yIDE2Mi45UTEwMi41IDE2My45IDEwMS40IDE2NS41UTEwMC4yIDE2Ny4xIDk4LjggMTY4LjZROTcuNCAxNzAuMSA5NS45IDE3MS4xUTk0LjQgMTcyLjEgOTMuMiAxNzIuMVE5MS4zIDE3Mi4xIDkwLjEgMTcwLjVRODkgMTY4LjggODkgMTY2UTg5IDE2My4xIDkwLjMgMTU5LjdROTEuNyAxNTYuMyA5NC4xIDE1My4yUTk2LjUgMTUwLjEgOTkuNiAxNDguMlExMDIuNyAxNDYuMiAxMDYgMTQ2LjJRMTA3LjcgMTQ2LjIgMTA5LjIgMTQ2LjhRMTEwLjcgMTQ3LjMgMTExLjkgMTQ4LjVRMTEyLjQgMTQ5IDExMi40IDE0OS43UTExMi40IDE1MC4xIDExMiAxNTAuNFExMTEuNyAxNTAuNyAxMTEuMSAxNTAuNVExMTAuMyAxNDggMTA3LjcgMTQ4UTEwNi41IDE0OCAxMDQuOSAxNDguOFExMDIuOSAxNDkuOCAxMDAuNyAxNTJROTguNiAxNTQuMiA5Ni42IDE1N1E5NC43IDE1OS44IDkzLjUgMTYyLjZROTIuMyAxNjUuNCA5Mi4zIDE2Ny43UTkyLjMgMTcwLjEgOTQuMSAxNzAuMVE5NS43IDE3MC4xIDk3LjQgMTY4LjVROTkuMSAxNjcgMTAwLjYgMTY0LjhRMTAyLjIgMTYyLjUgMTAzLjQgMTYwLjNRMTA0LjcgMTU4IDEwNS41IDE1Ni43UTEwNi41IDE1NC43IDEwNy41IDE1My40UTEwOC40IDE1Mi4xIDExMC4xIDE1Mi4xUTExMC45IDE1Mi4xIDExMS43IDE1Mi4zUTExMi41IDE1Mi42IDExMy40IDE1Mi40UTExMS4yIDE1NC42IDEwOS42IDE1Ny41UTEwOCAxNjAuNSAxMDcuMSAxNjMuM1ExMDYuMyAxNjYuMiAxMDYuMyAxNjguMVExMDYuMyAxNzAuMyAxMDcuNyAxNzAuM1ExMDguOCAxNzAuMyAxMTAuMiAxNjlRMTExLjUgMTY3LjcgMTEyLjggMTY1LjdRMTE0IDE2My43IDExNS4xIDE2MS43UTExNi4yIDE1OS42IDExNi44IDE1OC4xUTExNy4yIDE1OC4xIDExNy41IDE1OC4yUTExNy43IDE1OC4yIDExNy43IDE1OC44UTExNy42IDE1OSAxMTcuNSAxNTkuNFExMTcuMyAxNTkuNyAxMTYuOSAxNjAuNVExMTYuMyAxNjEuNiAxMTUuMyAxNjMuNlExMTQuMyAxNjUuNSAxMTMgMTY3LjVRMTExLjYgMTY5LjUgMTEwIDE3MC44UTEwOC40IDE3Mi4yIDEwNi43IDE3Mi4yWiBNMTE4LjQgMTcyLjNRMTE1LjQgMTcyLjMgMTEzLjYgMTcwLjVRMTExLjcgMTY4LjYgMTExLjcgMTY2LjZRMTExLjcgMTY0LjkgMTEyLjYgMTYzLjVRMTEzLjQgMTYyLjEgMTE0LjggMTYyLjFMMTE0LjggMTYyUTExNi40IDE1OS4xIDExNy45IDE1Ni4xUTExOS40IDE1My4xIDEyMS4yIDE0OS44UTEyMi43IDE0Ni45IDEyNC40IDE0NS4xUTEyNi4yIDE0My4zIDEyOC42IDE0My4zUTEyOS4yIDE0My4zIDEzMC4yIDE0My42UTEzMS4yIDE0My44IDEzMS4yIDE0NC42UTEzMS4yIDE0NS4yIDEzMC41IDE0NS4yUTEzMCAxNDUuMiAxMjkuNCAxNDQuOVExMjguOCAxNDQuNiAxMjguNCAxNDQuNlExMjcuMSAxNDQuNiAxMjYuMSAxNDYuMlExMjUuMiAxNDcuOCAxMjUuMiAxNDkuNlExMjUuMiAxNTEuNiAxMjUuOCAxNTMuMVExMjYuNSAxNTQuNiAxMjcuNCAxNTYuMVExMjguMiAxNTcuNSAxMjguOSAxNTlRMTI5LjUgMTYwLjUgMTI5LjUgMTYyLjJRMTI5LjUgMTY1LjcgMTI4LjIgMTY3LjhRMTI2LjggMTY5LjkgMTI0LjcgMTcxSDEyNC44UTEyOC42IDE3MSAxMzEuMSAxNjcuNFExMzMuNSAxNjMuOSAxMzYgMTU4LjFRMTM2LjkgMTU4LjEgMTM2LjkgMTU4LjhRMTM1LjUgMTYyIDEzMy44IDE2NS4xUTEzMi4yIDE2OC4yIDEyOS45IDE3MC4yUTEyNy43IDE3Mi4yIDEyNC41IDE3Mi4yUTEyMy4xIDE3Mi4yIDEyMiAxNzEuOVExMjAuMyAxNzIuMyAxMTguNCAxNzIuM1pNMTE3LjMgMTY0LjdRMTE3LjMgMTY2LjQgMTE4LjEgMTY4UTExOC45IDE2OS42IDEyMC45IDE3MC4zUTEyMi44IDE2OS4zIDEyMy45IDE2N1ExMjQuOSAxNjQuNyAxMjQuOSAxNjIuM1ExMjQuOSAxNjAuMyAxMjQuNSAxNTguMlExMjQgMTU2LjEgMTIzLjYgMTU0LjFRMTIzLjEgMTUyLjEgMTIzLjEgMTUwLjVRMTIzLjEgMTUwIDEyMy4xIDE0OS42UTEyMy4yIDE0OS4yIDEyMy4yIDE0OC44UTEyMiAxNTAuOCAxMjAuNiAxNTMuNFExMTkuMyAxNTUuOSAxMTguMSAxNTguM1ExMTYuOCAxNjAuNyAxMTUuOCAxNjIuMlExMTcuMyAxNjIuNCAxMTcuMyAxNjQuN1pNMTE0LjkgMTY4LjNRMTE0LjkgMTY5LjQgMTE1LjcgMTcwLjNRMTE2LjUgMTcxLjEgMTE4LjEgMTcxLjFRMTE4LjggMTcxLjEgMTE5LjQgMTcxUTExNy45IDE3MC4xIDExNyAxNjguNlExMTYuMSAxNjcuMiAxMTYuMSAxNjUuM1ExMTUuNSAxNjYgMTE1LjIgMTY2LjhRMTE0LjkgMTY3LjUgMTE0LjkgMTY4LjNaIE0xNTEuNyAxNzIuMlExNTAgMTcyLjIgMTQ4LjggMTcxLjNRMTQ3LjUgMTcwLjMgMTQ3LjUgMTY3LjVRMTQ3LjUgMTY2LjIgMTQ3LjcgMTY1LjJRMTQ3LjkgMTY0LjEgMTQ4LjIgMTYyLjlRMTQ3LjUgMTYzLjkgMTQ2LjQgMTY1LjVRMTQ1LjIgMTY3LjEgMTQzLjggMTY4LjZRMTQyLjQgMTcwLjEgMTQwLjkgMTcxLjFRMTM5LjQgMTcyLjEgMTM4LjIgMTcyLjFRMTM2LjMgMTcyLjEgMTM1LjEgMTcwLjVRMTM0IDE2OC44IDEzNCAxNjZRMTM0IDE2My4xIDEzNS4zIDE1OS43UTEzNi43IDE1Ni4zIDEzOS4xIDE1My4yUTE0MS41IDE1MC4xIDE0NC42IDE0OC4yUTE0Ny43IDE0Ni4yIDE1MSAxNDYuMlExNTIuNyAxNDYuMiAxNTQuMiAxNDYuOFExNTUuNyAxNDcuMyAxNTYuOSAxNDguNVExNTcuNCAxNDkgMTU3LjQgMTQ5LjdRMTU3LjQgMTUwLjEgMTU3IDE1MC40UTE1Ni43IDE1MC43IDE1Ni4xIDE1MC41UTE1NS4zIDE0OCAxNTIuNyAxNDhRMTUxLjUgMTQ4IDE0OS45IDE0OC44UTE0Ny45IDE0OS44IDE0NS43IDE1MlExNDMuNiAxNTQuMiAxNDEuNiAxNTdRMTM5LjcgMTU5LjggMTM4LjUgMTYyLjZRMTM3LjMgMTY1LjQgMTM3LjMgMTY3LjdRMTM3LjMgMTcwLjEgMTM5LjEgMTcwLjFRMTQwLjcgMTcwLjEgMTQyLjQgMTY4LjVRMTQ0LjEgMTY3IDE0NS42IDE2NC44UTE0Ny4yIDE2Mi41IDE0OC40IDE2MC4zUTE0OS43IDE1OCAxNTAuNSAxNTYuN1ExNTEuNSAxNTQuNyAxNTIuNSAxNTMuNFExNTMuNCAxNTIuMSAxNTUuMSAxNTIuMVExNTUuOSAxNTIuMSAxNTYuNyAxNTIuM1ExNTcuNSAxNTIuNiAxNTguNCAxNTIuNFExNTYuMiAxNTQuNiAxNTQuNiAxNTcuNVExNTMgMTYwLjUgMTUyLjEgMTYzLjNRMTUxLjMgMTY2LjIgMTUxLjMgMTY4LjFRMTUxLjMgMTcwLjMgMTUyLjcgMTcwLjNRMTUzLjggMTcwLjMgMTU1LjIgMTY5UTE1Ni41IDE2Ny43IDE1Ny44IDE2NS43UTE1OSAxNjMuNyAxNjAuMSAxNjEuN1ExNjEuMiAxNTkuNiAxNjEuOCAxNTguMVExNjIuMiAxNTguMSAxNjIuNSAxNTguMlExNjIuNyAxNTguMiAxNjIuNyAxNTguOFExNjIuNiAxNTkgMTYyLjUgMTU5LjRRMTYyLjMgMTU5LjcgMTYxLjkgMTYwLjVRMTYxLjMgMTYxLjYgMTYwLjMgMTYzLjZRMTU5LjMgMTY1LjUgMTU4IDE2Ny41UTE1Ni42IDE2OS41IDE1NSAxNzAuOFExNTMuNCAxNzIuMiAxNTEuNyAxNzIuMlogTTE2MS45IDE1Ny45UTE2Mi41IDE1Ni43IDE2My40IDE1NFExNjQuNCAxNTEuMyAxNjUuNCAxNDhRMTY2LjQgMTQ0LjYgMTY2LjkgMTQxLjdRMTY3LjEgMTQwLjUgMTY3LjcgMTQwUTE2OC4yIDEzOS41IDE2OC45IDEzOS41UTE2OS44IDEzOS41IDE3MC42IDE0MC40UTE3MS40IDE0MS4zIDE3MS40IDE0Mi45UTE3MS40IDE0NC45IDE3MC4yIDE0Ni40UTE2OSAxNDcuOCAxNjcuMyAxNDkuMVExNjggMTQ5LjIgMTY4LjggMTQ5LjJRMTY5LjYgMTQ5LjIgMTcwLjYgMTQ5LjJRMTczLjkgMTQ5LjIgMTc3LjIgMTQ4LjhRMTc3LjQgMTQ5LjIgMTc3LjQgMTQ5LjVRMTc3LjQgMTUwLjQgMTc2LjkgMTUxLjhRMTc2LjMgMTUzLjMgMTc1LjcgMTU0LjRRMTc1LjQgMTU1LjEgMTc0LjYgMTU2LjhRMTczLjcgMTU4LjUgMTcyLjcgMTYwLjZRMTcxLjcgMTYyLjcgMTcxIDE2NC44UTE3MC4zIDE2Ni44IDE3MC4zIDE2OC4zUTE3MC4zIDE3MC4xIDE3MS44IDE3MC4xUTE3My4xIDE3MC4xIDE3NS42IDE2Ni45UTE3OCAxNjMuNyAxODAuNSAxNTguMVExODEuNCAxNTguMSAxODEuNCAxNTguOFExODAuNiAxNjAuNyAxNzkuNCAxNjNRMTc4LjIgMTY1LjMgMTc2LjcgMTY3LjRRMTc1LjMgMTY5LjQgMTczLjYgMTcwLjdRMTcyIDE3Mi4xIDE3MC4yIDE3Mi4xUTE2OC44IDE3Mi4xIDE2Ny41IDE3MVExNjYuMSAxNjkuOCAxNjYuMSAxNjcuM1ExNjYuMSAxNjUuMSAxNjcgMTYzUTE2Ny44IDE2MC44IDE2OC45IDE1OVExNzAgMTU3LjEgMTcwLjggMTU1LjdRMTcxLjcgMTU0LjIgMTcxLjcgMTUzLjRRMTcxLjcgMTUyLjEgMTcwLjEgMTUxLjVRMTY4LjUgMTUwLjkgMTY1LjkgMTUwLjhRMTY0LjYgMTU0LjEgMTYzLjkgMTU1LjdRMTYzLjMgMTU3LjMgMTYyLjcgMTU4LjhRMTYxLjYgMTU4LjggMTYxLjkgMTU3LjlaIE0xODUuNyAxNzIuM1ExODMgMTcyLjMgMTgwLjkgMTcwLjZRMTc4LjggMTY4LjggMTc4LjggMTY1LjNRMTc4LjggMTYyLjQgMTgwLjEgMTU5UTE4MS40IDE1NS43IDE4My42IDE1Mi44UTE4NS44IDE0OS45IDE4OC41IDE0OC4xUTE5MS4yIDE0Ni4yIDE5NCAxNDYuMlExOTUuMyAxNDYuMiAxOTYuNiAxNDdRMTk3LjkgMTQ3LjggMTk3LjkgMTQ5LjhRMTk3LjkgMTUxLjYgMTk2LjUgMTUzLjdRMTk1LjIgMTU1LjkgMTkyLjcgMTU3LjdRMTkxLjYgMTU4LjUgMTg5LjkgMTU5LjNRMTg4LjMgMTYwIDE4Ni42IDE2MC40UTE4NSAxNjAuOSAxODMuOSAxNjAuOVExODMuNSAxNjEuOCAxODMuMiAxNjMuMlExODIuOSAxNjQuNyAxODIuOSAxNjYuMlExODIuOSAxNjggMTgzLjYgMTY5LjRRMTg0LjMgMTcwLjggMTg2LjIgMTcwLjhRMTg4LjYgMTcwLjggMTkwLjcgMTY5LjVRMTkyLjcgMTY4LjEgMTk0LjMgMTY2UTE5NiAxNjMuOSAxOTcuMSAxNjEuOFExOTguMyAxNTkuNiAxOTguOSAxNTguMVExOTkuOCAxNTguMSAxOTkuOCAxNTguOFExOTguOCAxNjAuOCAxOTcuNyAxNjMuMVExOTYuNSAxNjUuNSAxOTQuOSAxNjcuNlExOTMuMiAxNjkuNiAxOTEgMTcxUTE4OC43IDE3Mi4zIDE4NS43IDE3Mi4zWk0xODQuNCAxNTkuNlExODUuNCAxNTkuNiAxODcuOCAxNTguOVExOTAuMSAxNTguMSAxOTIuMSAxNTYuNFExOTQgMTU0LjggMTk1IDE1Mi44UTE5NiAxNTAuOCAxOTYgMTQ5LjVRMTk2IDE0Ny45IDE5NC44IDE0Ny45UTE5NCAxNDcuOSAxOTIuNCAxNDlRMTkwLjkgMTUwLjIgMTg4LjcgMTUyLjlRMTg3LjMgMTU0LjYgMTg2LjEgMTU2LjdRMTg0LjkgMTU4LjcgMTg0LjQgMTU5LjZaIE0yMDIuMyAxNzIuMlExOTkuNiAxNzIuMiAxOTguNCAxNzAuNlExOTcuMSAxNjkgMTk3LjEgMTY2LjdRMTk3LjEgMTY0LjQgMTk3LjggMTYyUTE5OC40IDE1OS41IDE5OC45IDE1Ny45UTIwMC4xIDE1My45IDIwMS44IDE0OS4zUTIwMy42IDE0NC43IDIwNS43IDE0MC4zUTIwNy44IDEzNS45IDIwOS45IDEzMi4zUTIxMS42IDEyOS41IDIxMy41IDEyOC4xUTIxNS40IDEyNi43IDIxNi44IDEyNi43UTIxOCAxMjYuNyAyMTguNyAxMjcuNVEyMTkuNCAxMjguNCAyMTkuNCAxMzBRMjE5LjQgMTMxLjIgMjE5IDEzMi44UTIxOC42IDEzNC4zIDIxNy42IDEzNi40UTIxNS4xIDE0MiAyMTEuNiAxNDcuNlEyMDguMSAxNTMuMiAyMDIuOCAxNTguMVEyMDEuOSAxNjAuMSAyMDEuNCAxNjIuNFEyMDAuOCAxNjQuNyAyMDAuOCAxNjYuMlEyMDAuOCAxNzAuNiAyMDMuOCAxNzAuNlEyMDYuMSAxNzAuNiAyMDguOSAxNjcuM1EyMTEuNyAxNjMuOSAyMTQuMyAxNTguMVEyMTQuNSAxNTguMSAyMTQuOCAxNTguMlEyMTUuMSAxNTguMyAyMTUuMSAxNTguOFEyMTQuMyAxNjAuNyAyMTMuMSAxNjNRMjEyIDE2NS40IDIxMC40IDE2Ny41UTIwOC45IDE2OS42IDIwNi44IDE3MC45UTIwNC44IDE3Mi4yIDIwMi4zIDE3Mi4yWk0yMDMuNCAxNTUuOFEyMDYgMTUzLjEgMjA4LjQgMTQ5LjZRMjEwLjkgMTQ2LjIgMjEzIDE0Mi40UTIxNS4xIDEzOC42IDIxNi42IDEzNS4yUTIxNy4xIDEzNC4xIDIxNy40IDEzMi44UTIxNy43IDEzMS41IDIxNy43IDEzMC43UTIxNy43IDEyOS43IDIxNy4yIDEyOS43UTIxNi45IDEyOS43IDIxNi4zIDEzMC4yUTIxNS44IDEzMC43IDIxNC44IDEzMlEyMTMuNSAxMzMuOCAyMTEuOCAxMzYuOVEyMTAuMiAxNDAgMjA4LjYgMTQzLjZRMjA2LjkgMTQ3LjEgMjA1LjUgMTUwLjRRMjA0LjIgMTUzLjYgMjAzLjQgMTU1LjhaIE0yMjkuOSAxNzIuMlEyMjguMiAxNzIuMiAyMjcgMTcxLjNRMjI1LjcgMTcwLjMgMjI1LjcgMTY3LjVRMjI1LjcgMTY2LjIgMjI1LjkgMTY1LjJRMjI2LjEgMTY0LjEgMjI2LjQgMTYyLjlRMjI1LjcgMTYzLjkgMjI0LjYgMTY1LjVRMjIzLjQgMTY3LjEgMjIyIDE2OC42UTIyMC42IDE3MC4xIDIxOS4xIDE3MS4xUTIxNy42IDE3Mi4xIDIxNi4zIDE3Mi4xUTIxNC41IDE3Mi4xIDIxMy4zIDE3MC41UTIxMi4yIDE2OC44IDIxMi4yIDE2NlEyMTIuMiAxNjMuMSAyMTMuNSAxNTkuN1EyMTQuOSAxNTYuMyAyMTcuMyAxNTMuMlEyMTkuNyAxNTAuMSAyMjIuOCAxNDguMlEyMjUuOCAxNDYuMiAyMjkuMiAxNDYuMlEyMzAuOSAxNDYuMiAyMzIuNCAxNDYuOFEyMzMuOSAxNDcuMyAyMzUuMSAxNDguNVEyMzUuNiAxNDkgMjM1LjYgMTQ5LjdRMjM1LjYgMTUwLjEgMjM1LjIgMTUwLjRRMjM0LjggMTUwLjcgMjM0LjMgMTUwLjVRMjMzLjUgMTQ4IDIzMC45IDE0OFEyMjkuNyAxNDggMjI4LjEgMTQ4LjhRMjI2LjEgMTQ5LjggMjIzLjkgMTUyUTIyMS43IDE1NC4yIDIxOS44IDE1N1EyMTcuOSAxNTkuOCAyMTYuNyAxNjIuNlEyMTUuNSAxNjUuNCAyMTUuNSAxNjcuN1EyMTUuNSAxNzAuMSAyMTcuMyAxNzAuMVEyMTguOSAxNzAuMSAyMjAuNiAxNjguNVEyMjIuMiAxNjcgMjIzLjggMTY0LjhRMjI1LjMgMTYyLjUgMjI2LjYgMTYwLjNRMjI3LjkgMTU4IDIyOC43IDE1Ni43UTIyOS43IDE1NC43IDIzMC43IDE1My40UTIzMS42IDE1Mi4xIDIzMy4zIDE1Mi4xUTIzNC4xIDE1Mi4xIDIzNC45IDE1Mi4zUTIzNS43IDE1Mi42IDIzNi42IDE1Mi40UTIzNC40IDE1NC42IDIzMi44IDE1Ny41UTIzMS4yIDE2MC41IDIzMC4zIDE2My4zUTIyOS40IDE2Ni4yIDIyOS40IDE2OC4xUTIyOS40IDE3MC4zIDIzMC45IDE3MC4zUTIzMiAxNzAuMyAyMzMuNCAxNjlRMjM0LjcgMTY3LjcgMjM2IDE2NS43UTIzNy4yIDE2My43IDIzOC4zIDE2MS43UTIzOS40IDE1OS42IDI0MCAxNTguMVEyNDAuNCAxNTguMSAyNDAuNiAxNTguMlEyNDAuOSAxNTguMiAyNDAuOSAxNTguOFEyNDAuOCAxNTkgMjQwLjYgMTU5LjRRMjQwLjUgMTU5LjcgMjQwLjEgMTYwLjVRMjM5LjUgMTYxLjYgMjM4LjUgMTYzLjZRMjM3LjUgMTY1LjUgMjM2LjEgMTY3LjVRMjM0LjggMTY5LjUgMjMzLjIgMTcwLjhRMjMxLjYgMTcyLjIgMjI5LjkgMTcyLjJaIi8+CiAgPC9nPgo8L3N2Zz4K";
+const APP_VERSION = "0.3.0", APP_BUILD = "0.3.0+3e18749c09", LOGO_PASARELA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTYgMjU2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IkdydXBvIFBhc2FyZWxhIj4KICA8cmVjdCB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgcng9IjM0IiBmaWxsPSIjOGY4ZjhmIi8+CiAgPGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIuNCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgb3BhY2l0eT0iLjkyIj4KICAgIDxwYXRoIGQ9Ik0xMjggMTggTDIzOCAxMjggTDEyOCAyMzggTDE4IDEyOCBaIi8+CiAgICA8cGF0aCBkPSJNMTI4IDM0IEwyMjIgMTI4IEwxMjggMjIyIEwzNCAxMjggWiIgc3Ryb2tlLXdpZHRoPSIxLjIiIG9wYWNpdHk9Ii41NSIvPgogIDwvZz4KICA8ZyBmaWxsPSIjZmZmIj4KICAgIDxwYXRoIGQ9Ik04NiAxMzEuM1E4My4zIDEzMS4zIDgxLjcgMTMwLjNRODAuMSAxMjkuMyA4MC4xIDEyNy43UTgwLjEgMTI2LjIgODEuMiAxMjQuOVE4Mi4zIDEyMy43IDg0LjEgMTIyLjZRODUuOCAxMjEuNiA4Ny45IDEyMC44UTkwIDEyMCA5MiAxMTkuNVE5NCAxMTguOSA5NS41IDExOC43UTk3IDExOC41IDk4LjcgMTE4LjRRMTAwLjQgMTE4LjIgMTAyLjIgMTE4LjFRMTA0IDExOCAxMDUuNCAxMThRMTA3LjEgMTE1LjEgMTA4LjIgMTEyLjVRMTA5LjMgMTEwIDExMC4xIDEwNi42TDExMC4zIDEwNS45UTEwOS40IDEwNi43IDEwNy44IDEwNy45UTEwNi4yIDEwOSAxMDQuMSAxMTAuMlExMDIgMTExLjQgOTkuNyAxMTIuMlE5Ny4zIDExMi45IDk0LjggMTEyLjlROTEuNSAxMTIuOSA4OS4yIDExMS40UTg2LjggMTA5LjggODUuNSAxMDdRODQuMyAxMDQuMiA4NC4zIDEwMC42UTg0LjMgOTguNSA4NC44IDk2UTg1LjQgOTMuNSA4Ni42IDkxUTg1LjIgODkuNSA4NC40IDg3LjdRODMuNiA4NS45IDgzLjYgODRRODMuNiA4Mi40IDg0LjMgODAuN1E4NSA3OS4xIDg2LjQgNzcuNlE4Ni45IDc3LjEgODcuMiA3Ny4xUTg3LjQgNzcuMSA4Ny40IDc3LjNRODcuNCA3Ny42IDg3LjEgNzcuOVE4NiA3OS4yIDg1LjUgODAuN1E4NSA4Mi4xIDg1IDgzLjVRODUgODUuMSA4NS42IDg2LjdRODYuMyA4OC4yIDg3LjQgODkuNlE4OC42IDg3IDkwLjcgODQuN1E5Mi44IDgyLjMgOTUuNiA4MC40UTk4LjQgNzguNCAxMDEuNyA3Ny4zUTEwNSA3Ni4yIDEwOC42IDc2LjJRMTEzLjQgNzYuMiAxMTYuMiA3OC4zUTExOSA4MC4zIDExOSA4NC41UTExOSA4Ni41IDExNy45IDg4LjVRMTE2LjggOTAuNCAxMTQuNiA5Mi4xUTExMi40IDkzLjggMTA5LjIgOTQuOFExMDUuOSA5NS44IDEwMS43IDk1LjlROTguMyA5NS45IDk1IDk1UTkxLjggOTQuMSA4OS41IDkyLjdRODguNCA5NS4xIDg3LjggOTcuNFE4Ny4zIDk5LjcgODcuMyAxMDEuOFE4Ny4zIDEwNi40IDg5LjYgMTA4LjhROTEuOSAxMTEuMyA5NS43IDExMS4zUTk3LjggMTExLjMgOTkuOCAxMTAuN1ExMDEuOSAxMTAgMTAzLjcgMTA5UTEwNS41IDEwOCAxMDYuOCAxMDYuOVExMDguMSAxMDUuOCAxMDguNSAxMDQuOFExMDkuNSAxMDIuNCAxMTAuNiAxMDEuNVExMTEuNiAxMDAuNSAxMTIuNCAxMDAuNVExMTMuMSAxMDAuNSAxMTMuNiAxMDEuMVExMTQuMSAxMDEuOCAxMTMuOSAxMDIuOFExMTMuNSAxMDYuNiAxMTEuOSAxMTAuMlExMTAuMiAxMTMuOCAxMDcuNiAxMThRMTEwLjggMTE4IDExMy4zIDExOC4zUTExNS44IDExOC42IDExNy44IDExOS4yUTExOC40IDExOS4zIDExOC42IDExOS41UTExOC44IDExOS43IDExOC44IDExOS44UTExOC44IDEyMC4yIDExOC4yIDEyMC4yUTExNy45IDEyMC4yIDExNy40IDEyMFExMTYuNCAxMTkuOCAxMTQuNiAxMTkuNVExMTIuOSAxMTkuMyAxMTAuOSAxMTkuMlExMDguOSAxMTkuMiAxMDcgMTE5LjJRMTA1LjEgMTIxLjkgMTAyLjUgMTI0LjFROTkuOCAxMjYuNCA5Ni45IDEyOFE5My45IDEyOS42IDkxLjEgMTMwLjRRODguMiAxMzEuMyA4NiAxMzEuM1pNMTAwLjQgOTQuNVExMDMuNiA5NC41IDEwNi41IDkzLjdRMTA5LjQgOTIuOCAxMTEuOCA5MS40UTExNC4xIDg5LjkgMTE1LjUgODcuOVExMTYuOSA4NiAxMTYuOSA4My44UTExNi45IDgxLjggMTE1LjggODAuM1ExMTQuNyA3OC45IDExMi45IDc4LjFRMTExLjIgNzcuMyAxMDkuMiA3Ny4zUTEwNi4xIDc3LjMgMTAzLjIgNzguNVExMDAuNCA3OS43IDk3LjkgODEuN1E5NS41IDgzLjcgOTMuNSA4Ni4yUTkxLjUgODguNyA5MC4xIDkxLjRROTIgOTIuOCA5NC43IDkzLjdROTcuNCA5NC41IDEwMC40IDk0LjVaTTg1LjkgMTMwLjFRODcuNyAxMzAuMSA5MC4xIDEyOS40UTkyLjYgMTI4LjcgOTUuMiAxMjcuM1E5Ny45IDEyNS45IDEwMC40IDEyMy45UTEwMi44IDEyMS45IDEwNC43IDExOS4yUTEwMi40IDExOS4zIDEwMC4zIDExOS41UTk4LjIgMTE5LjYgOTYuMSAxMjBROTQuOSAxMjAuMiA5My4yIDEyMC43UTkxLjUgMTIxLjIgODkuOCAxMjJRODggMTIyLjcgODYuNCAxMjMuN1E4NC44IDEyNC43IDgzLjggMTI1LjhRODIuOCAxMjYuOSA4Mi44IDEyOFE4Mi44IDEyOC45IDgzLjUgMTI5LjVRODQuMiAxMzAuMSA4NS45IDEzMC4xWiBNMTE3LjMgMTA1UTExNy42IDEwNC4yIDExOC4yIDEwMi41UTExOC44IDEwMC44IDExOS41IDk4LjZRMTIwLjEgOTYuNSAxMjAuNCA5NC42UTEyMC42IDkzLjkgMTIwLjkgOTMuNlExMjEuMyA5My4yIDEyMS43IDkzLjJRMTIyLjMgOTMuMiAxMjIuOCA5My44UTEyMy4zIDk0LjQgMTIzLjMgOTUuNFExMjMuMyA5Ni43IDEyMi42IDk3LjZRMTIxLjggOTguNSAxMjAuNyA5OS40UTEyMS4yIDk5LjQgMTIxLjcgOTkuNFExMjIuMiA5OS41IDEyMi44IDk5LjVRMTI0LjkgOTkuNSAxMjcuMSA5OS4yUTEyNy4xIDk5LjUgMTI3LjEgOTkuNlExMjcuMSAxMDAuMiAxMjYuOCAxMDEuMVExMjYuNSAxMDIgMTI2LjEgMTAyLjhRMTI1LjkgMTAzLjIgMTI1LjQgMTA0LjNRMTI0LjggMTA1LjQgMTI0LjIgMTA2LjdRMTIzLjUgMTA4LjEgMTIzLjEgMTA5LjRRMTIyLjYgMTEwLjcgMTIyLjYgMTExLjZRMTIyLjYgMTEyLjggMTIzLjYgMTEyLjhRMTI0LjQgMTEyLjggMTI2IDExMC44UTEyNy42IDEwOC43IDEyOS4xIDEwNS4xUTEyOS43IDEwNS4xIDEyOS43IDEwNS41UTEyOS4yIDEwNi44IDEyOC40IDEwOC4yUTEyNy43IDEwOS43IDEyNi43IDExMVExMjUuOCAxMTIuMyAxMjQuOCAxMTMuMlExMjMuNyAxMTQgMTIyLjUgMTE0UTEyMS43IDExNCAxMjAuOCAxMTMuM1ExMTkuOSAxMTIuNiAxMTkuOSAxMTFRMTE5LjkgMTA5LjYgMTIwLjUgMTA4LjJRMTIxIDEwNi45IDEyMS43IDEwNS43UTEyMi40IDEwNC41IDEyMyAxMDMuNlExMjMuNSAxMDIuNiAxMjMuNSAxMDIuMVExMjMuNSAxMDEuMyAxMjIuNSAxMDAuOVExMjEuNCAxMDAuNSAxMTkuOCAxMDAuNVExMTkgMTAyLjYgMTE4LjUgMTAzLjZRMTE4LjEgMTA0LjYgMTE3LjggMTA1LjVRMTE3IDEwNS41IDExNy4zIDEwNVogTTEzMC41IDExNFExMzAgMTE0IDEyOS4yIDExMy44UTEyOC41IDExMy41IDEyOCAxMTIuOVExMjcuNSAxMTIuMyAxMjcuNSAxMTEuMVExMjcuNSAxMDkuOSAxMjguMyAxMDguM1ExMjkgMTA2LjcgMTI5LjYgMTA1LjVRMTI5LjEgMTA1LjUgMTI5LjEgMTA1LjFRMTI5LjIgMTA1IDEyOS41IDEwNC4yUTEyOS45IDEwMy41IDEzMC40IDEwMi41UTEzMC45IDEwMS41IDEzMS40IDEwMC41UTEzMS45IDk5LjYgMTMyLjIgOTkuMVExMzIuNyA5OC4xIDEzMy45IDk4LjFIMTM2LjhRMTM2IDk4LjcgMTM1LjQgOTkuNFExMzQuNyAxMDAuMSAxMzMuOCAxMDJRMTMzLjggMTAyIDEzMy41IDEwMi42UTEzMy4yIDEwMy4zIDEzMi43IDEwNC4zUTEzMi4yIDEwNS4zIDEzMS43IDEwNi4zUTEzMS4yIDEwNy4zIDEzMC45IDEwOFExMzAuMyAxMDkuMyAxMzAuMSAxMTBRMTMwIDExMC44IDEzMCAxMTEuNFExMzAgMTEyLjkgMTMxIDExMi45UTEzMi4xIDExMi45IDEzMy42IDExMS4xUTEzNC45IDEwOS42IDEzNi4yIDEwNy41UTEzNy40IDEwNS40IDEzOC41IDEwMy4xUTEzOS43IDEwMC45IDE0MC41IDk5LjFRMTQxIDk4LjEgMTQyLjMgOTguMUgxNDQuOVExNDMuOCA5OC45IDE0Mi44IDEwMC42UTE0MS44IDEwMi4yIDE0MC41IDEwNC44UTE0MC4yIDEwNS41IDEzOS43IDEwNi41UTEzOS4yIDEwNy42IDEzOC44IDEwOC44UTEzOC40IDExMCAxMzguNCAxMTEuMlExMzguNCAxMTIuOCAxMzkuNiAxMTIuOFExNDEuMSAxMTIuOCAxNDIuNiAxMTAuNlExNDQuMSAxMDguNSAxNDUuNSAxMDUuMVExNDUuOSAxMDUuMSAxNDUuOSAxMDUuMlExNDYgMTA1LjIgMTQ2LjEgMTA1LjVRMTQ1LjUgMTA2LjggMTQ0LjggMTA4LjJRMTQ0LjEgMTA5LjcgMTQzLjIgMTExUTE0Mi4zIDExMi4zIDE0MS4yIDExMy4yUTE0MC4yIDExNCAxMzguOSAxMTRRMTM3LjcgMTE0IDEzNyAxMTMuMVExMzYuMyAxMTIuMyAxMzYuMyAxMTAuN1ExMzYuMyAxMDkuNSAxMzYuNyAxMDguMVExMzUuOSAxMDkuNCAxMzQuOSAxMTAuOFExMzMuOSAxMTIuMiAxMzIuOCAxMTMuMVExMzEuNiAxMTQgMTMwLjUgMTE0WiBNMTM4LjMgMTI2LjZRMTM3LjcgMTI2LjYgMTM3LjIgMTI2LjRRMTM2LjYgMTI2LjIgMTM2IDEyNi4zUTEzNi4zIDEyNi4xIDEzNyAxMjQuN1ExMzcuOCAxMjMuNCAxMzguOSAxMjEuNVExMzkuOSAxMTkuNSAxNDEuMSAxMTcuMlExNDIuMiAxMTUgMTQzLjIgMTEyLjdRMTQ0LjMgMTEwLjUgMTQ1LjEgMTA4LjZRMTQ1LjggMTA2LjcgMTQ2LjEgMTA1LjVRMTQ1LjggMTA1LjUgMTQ1LjYgMTA1LjRRMTQ1LjUgMTA1LjQgMTQ1LjUgMTA1LjFRMTQ1LjUgMTA1LjEgMTQ1LjggMTA0LjNRMTQ2LjEgMTAzLjUgMTQ2LjMgMTAyLjNRMTQ2LjYgMTAxLjEgMTQ2LjYgMTAwLjJRMTQ2LjYgOTkuNSAxNDYuNSA5OS4xUTE0Ni4zIDk4LjYgMTQ2IDk4LjVMMTQ4LjMgOTguMlExNDguNSA5OC4xIDE0OC44IDk4LjFRMTQ5IDk4LjEgMTQ5LjIgOTguMVExNDkuNiA5OC4xIDE0OS44IDk4LjRRMTQ5LjkgOTguNyAxNDkuOSA5OS42UTE0OS45IDEwMC44IDE0OS41IDEwMi41UTE0OS4xIDEwNC4zIDE0OC42IDEwNS42UTE0OS4xIDEwNC44IDE0OS45IDEwMy41UTE1MC43IDEwMi4yIDE1MS44IDEwMC45UTE1Mi45IDk5LjYgMTU0IDk4LjdRMTU1LjIgOTcuOCAxNTYuMyA5Ny44UTE1Ni41IDk3LjggMTU2LjkgOTcuOVExNTguMiA5OC4yIDE1OC43IDk5LjFRMTU5LjIgMTAwLjEgMTU5LjIgMTAxLjNRMTU5LjIgMTAyLjcgMTU4LjcgMTA0LjRRMTU4LjIgMTA2IDE1Ny4zIDEwNy42UTE1Ni40IDEwOS4yIDE1NS4zIDExMC41UTE1NC4xIDExMi4xIDE1Mi4zIDExMy4xUTE1MC41IDExNCAxNDguNiAxMTRRMTQ2LjkgMTE0IDE0NS40IDExMy4yTDE0MSAxMjQuMlExNDAuNCAxMjUuNSAxMzkuOCAxMjYuMVExMzkuMiAxMjYuNiAxMzguMyAxMjYuNlpNMTQ3LjEgMTEzLjFRMTQ4LjQgMTEzLjEgMTUwIDExMS45UTE1MS42IDExMC43IDE1My4xIDEwOC44UTE1NC42IDEwNyAxNTUuNiAxMDUuMVExNTYuMyAxMDMuOCAxNTYuNiAxMDIuN1ExNTcgMTAxLjYgMTU3IDEwMC44UTE1NyA5OSAxNTUuNyA5OVExNTUuMSA5OSAxNTQuMSA5OS43UTE1My4yIDEwMC4zIDE1MS45IDEwMlExNTAuNiAxMDMuOSAxNDkgMTA2LjdRMTQ3LjQgMTA5LjQgMTQ1LjggMTEyLjVRMTQ2LjMgMTEzLjEgMTQ3LjEgMTEzLjFaIE0xNjMuNyAxMTRRMTYxLjggMTE0IDE2MC45IDExMi42UTE2MCAxMTEuMyAxNjAgMTA5LjRRMTYwIDEwNy42IDE2MC43IDEwNS42UTE2MS41IDEwMy41IDE2Mi44IDEwMS44UTE2NC4xIDEwMCAxNjUuNyA5OC45UTE2Ny4zIDk3LjkgMTY4LjggOTcuOVExNzAuNyA5Ny45IDE3MS42IDk5LjFRMTcyLjUgMTAwLjQgMTcyLjUgMTAyLjRRMTcyLjUgMTAzLjggMTcyIDEwNS4zUTE3MS42IDEwNi44IDE3MC44IDEwOC4zUTE3MS40IDEwOC45IDE3Mi41IDEwOC45UTE3My44IDEwOC45IDE3NC43IDEwOC4xUTE3NS42IDEwNy4yIDE3Ni41IDEwNS4xUTE3Ny4xIDEwNS4xIDE3Ny4xIDEwNS41UTE3Ni4yIDEwNy43IDE3NS4xIDEwOC42UTE3My45IDEwOS42IDE3Mi4yIDEwOS42UTE3MS4xIDEwOS42IDE3MC40IDEwOVExNjkuMSAxMTEuMSAxNjcuNCAxMTIuNlExNjUuNiAxMTQgMTYzLjcgMTE0Wk0xNjQuNCAxMTNRMTY1LjQgMTEzIDE2Ni41IDExMi4xUTE2Ny41IDExMS4yIDE2OC40IDExMFExNjkuMyAxMDguOSAxNjkuNyAxMDguMVExNjguOSAxMDYuNyAxNjguOCAxMDYuMVExNjguNyAxMDUuNCAxNjguNyAxMDUuMVExNjguNyAxMDQuMiAxNjkuMSAxMDMuN1ExNjkuNiAxMDMuMyAxNzAuMSAxMDMuM1ExNzAuNyAxMDMuMyAxNzEuMiAxMDMuOFExNzEuMyAxMDMuMyAxNzEuMyAxMDIuOVExNzEuNCAxMDIuNSAxNzEuNCAxMDJRMTcxLjQgMTAwLjggMTcwLjkgMTAwLjFRMTcwLjUgOTkuMyAxNjkuNiA5OS4zUTE2OC42IDk5LjMgMTY3LjUgMTAwLjJRMTY2LjUgMTAxIDE2NS41IDEwMi40UTE2NC42IDEwMy43IDE2My45IDEwNS40UTE2My4zIDEwNi45IDE2MyAxMDguMVExNjIuNyAxMDkuNCAxNjIuNyAxMTAuNVExNjIuNyAxMTEuNiAxNjMuMSAxMTIuM1ExNjMuNSAxMTMgMTY0LjQgMTEzWiIvPgogICAgPHBhdGggZD0iTTMyLjQgMTc0LjhRMzAuOCAxNzQuOCAyOS4zIDE3NC42UTI0LjggMTc0IDIyLjYgMTcxLjlRMjAuNSAxNjkuOCAyMC41IDE2Ny40UTIwLjUgMTY0LjcgMjIuOSAxNjIuNlEyNS4zIDE2MC40IDI5LjcgMTYwLjRRMzEuMSAxNjAuNCAzMi42IDE2MC43UTM0LjIgMTYwLjkgMzUuOSAxNjEuNVEzNi44IDE2MS44IDM2LjggMTYyLjNRMzYuOCAxNjIuNiAzNi4zIDE2Mi42UTM1LjkgMTYyLjYgMzUuNiAxNjIuNFEzNC41IDE2MiAzMy40IDE2MS44UTMyLjQgMTYxLjYgMzEuNCAxNjEuNlEyOC40IDE2MS42IDI2LjcgMTYzLjRRMjUuMSAxNjUuMiAyNS4xIDE2Ny4yUTI1LjEgMTY5LjMgMjYuOCAxNzAuOVEyOC40IDE3Mi42IDMyIDE3Mi42UTM2LjYgMTcyLjYgNDAuNCAxNzAuNVE0NC4zIDE2OC40IDQ3LjcgMTY1UTUxLjQgMTYxLjQgNTQuNCAxNTYuM1E1Ny40IDE1MS4zIDYwLjQgMTQ1LjVRNjMuNCAxMzkuNyA2Ni45IDEzMy44UTcwLjUgMTI3LjkgNzUuMSAxMjIuN1E3NiAxMjEuNyA3NyAxMjAuNlE3OCAxMTkuNCA3OC45IDExOC42UTc2LjQgMTE4LjMgNzMuOSAxMTguMVE3MS4zIDExNy45IDY4LjcgMTE3LjlRNjUgMTE3LjkgNjEuNyAxMTguM1E1OC4zIDExOC42IDU1IDExOS4yUTUxLjYgMTE5LjggNDcuNCAxMjEuMlE0My4zIDEyMi41IDM5LjMgMTI0LjdRMzUuNCAxMjYuOSAzMi42IDEzMFEyOS45IDEzMy4xIDI5LjIgMTM3LjJRMjkuMSAxMzcuNSAyOS4xIDEzNy45UTI5LjEgMTM4LjMgMjkuMSAxMzguN1EyOS4xIDE0MiAzMS4zIDE0NC4xUTMzLjYgMTQ2LjMgMzYuNiAxNDYuM1EzOC45IDE0Ni4zIDQxIDE0NS4xUTQzIDE0My45IDQ0LjcgMTQxLjlRNDYuNCAxNDAgNDcuMSAxMzcuNlE0Ny4yIDEzNi45IDQ3LjcgMTM2LjlRNDguMiAxMzYuOSA0OC4yIDEzNy43UTQ4LjEgMTQwLjggNDYuMyAxNDMuMVE0NC42IDE0NS40IDQxLjkgMTQ2LjZRMzkuMiAxNDcuOCAzNi41IDE0Ny44UTMzLjcgMTQ3LjggMzEuMiAxNDYuNlEyOC42IDE0NS40IDI3LjEgMTQzLjFRMjUuNSAxNDAuOCAyNS41IDEzNy4zUTI1LjUgMTMzLjMgMjcuNSAxMzAuMlEyOS40IDEyNy4xIDMyLjcgMTI0LjdRMzYuMSAxMjIuNCAzOS45IDEyMC44UTQzLjggMTE5LjIgNDcuNyAxMTguMlE1MS42IDExNy4yIDU0LjggMTE2LjdRNTggMTE2LjIgNjEuNSAxMTUuOVE2NSAxMTUuNiA2OC42IDExNS42UTcxLjcgMTE1LjYgNzQuOCAxMTUuOVE3Ny45IDExNi4yIDgwLjggMTE2LjhRODIuMSAxMTUuOCA4My40IDExNS4xUTg0LjcgMTE0LjQgODYuMiAxMTMuOFE4Ny4yIDExMy40IDg3LjggMTEzLjRRODguMiAxMTMuNCA4OC4yIDExMy43UTg4LjIgMTE0LjIgODcgMTE0LjlRODYuNSAxMTUuMiA4NS42IDExNS45UTg0LjcgMTE2LjYgODMuNyAxMTcuNlE4OC40IDExOC43IDkyLjEgMTIxUTk2LjIgMTIzLjUgOTggMTI2LjJROTkuOCAxMjguOSA5OS44IDEzMS44UTk5LjggMTM1LjEgOTcuOCAxMzguNFE5NS43IDE0MS43IDkyLjUgMTQ0LjVRODkuMyAxNDcuMyA4NS40IDE0OS40UTgxLjUgMTUxLjQgNzcuNyAxNTIuM1E3NCAxNTMuMyA3MC4zIDE1My43UTY2LjUgMTU0LjEgNjMuNiAxNTQuMVE2My4xIDE1NC4xIDYyLjUgMTU0LjFRNjIgMTU0LjEgNjEuNSAxNTQuMVE1OSAxNTcuNSA1Ni40IDE2MC44UTUzLjggMTY0LjEgNTAuNiAxNjcuMlE0Ni42IDE3MC45IDQyIDE3Mi45UTM3LjMgMTc0LjggMzIuNCAxNzQuOFpNNjIuNSAxNTIuNVE2NS4yIDE1Mi42IDY4LjYgMTUyLjFRNzIgMTUxLjYgNzUuNCAxNTAuNVE4MSAxNDguOCA4NS41IDE0NS42UTkwIDE0Mi4zIDkyLjYgMTM4LjRROTUuMiAxMzQuNCA5NS4yIDEzMC42UTk1LjIgMTI4LjMgOTQuMSAxMjYuMlE5MyAxMjQuMSA5MC41IDEyMi41UTg4LjggMTIxLjQgODYuNyAxMjAuNlE4NC43IDExOS44IDgyLjQgMTE5LjNRNzguNyAxMjQuNSA3NS41IDEzMC4xUTcyLjMgMTM1LjcgNjkuMSAxNDEuNFE2NiAxNDcuMSA2Mi41IDE1Mi41WiBNMTA2LjcgMTcyLjJRMTA1IDE3Mi4yIDEwMy44IDE3MS4zUTEwMi41IDE3MC4zIDEwMi41IDE2Ny41UTEwMi41IDE2Ni4yIDEwMi43IDE2NS4yUTEwMi45IDE2NC4xIDEwMy4yIDE2Mi45UTEwMi41IDE2My45IDEwMS40IDE2NS41UTEwMC4yIDE2Ny4xIDk4LjggMTY4LjZROTcuNCAxNzAuMSA5NS45IDE3MS4xUTk0LjQgMTcyLjEgOTMuMiAxNzIuMVE5MS4zIDE3Mi4xIDkwLjEgMTcwLjVRODkgMTY4LjggODkgMTY2UTg5IDE2My4xIDkwLjMgMTU5LjdROTEuNyAxNTYuMyA5NC4xIDE1My4yUTk2LjUgMTUwLjEgOTkuNiAxNDguMlExMDIuNyAxNDYuMiAxMDYgMTQ2LjJRMTA3LjcgMTQ2LjIgMTA5LjIgMTQ2LjhRMTEwLjcgMTQ3LjMgMTExLjkgMTQ4LjVRMTEyLjQgMTQ5IDExMi40IDE0OS43UTExMi40IDE1MC4xIDExMiAxNTAuNFExMTEuNyAxNTAuNyAxMTEuMSAxNTAuNVExMTAuMyAxNDggMTA3LjcgMTQ4UTEwNi41IDE0OCAxMDQuOSAxNDguOFExMDIuOSAxNDkuOCAxMDAuNyAxNTJROTguNiAxNTQuMiA5Ni42IDE1N1E5NC43IDE1OS44IDkzLjUgMTYyLjZROTIuMyAxNjUuNCA5Mi4zIDE2Ny43UTkyLjMgMTcwLjEgOTQuMSAxNzAuMVE5NS43IDE3MC4xIDk3LjQgMTY4LjVROTkuMSAxNjcgMTAwLjYgMTY0LjhRMTAyLjIgMTYyLjUgMTAzLjQgMTYwLjNRMTA0LjcgMTU4IDEwNS41IDE1Ni43UTEwNi41IDE1NC43IDEwNy41IDE1My40UTEwOC40IDE1Mi4xIDExMC4xIDE1Mi4xUTExMC45IDE1Mi4xIDExMS43IDE1Mi4zUTExMi41IDE1Mi42IDExMy40IDE1Mi40UTExMS4yIDE1NC42IDEwOS42IDE1Ny41UTEwOCAxNjAuNSAxMDcuMSAxNjMuM1ExMDYuMyAxNjYuMiAxMDYuMyAxNjguMVExMDYuMyAxNzAuMyAxMDcuNyAxNzAuM1ExMDguOCAxNzAuMyAxMTAuMiAxNjlRMTExLjUgMTY3LjcgMTEyLjggMTY1LjdRMTE0IDE2My43IDExNS4xIDE2MS43UTExNi4yIDE1OS42IDExNi44IDE1OC4xUTExNy4yIDE1OC4xIDExNy41IDE1OC4yUTExNy43IDE1OC4yIDExNy43IDE1OC44UTExNy42IDE1OSAxMTcuNSAxNTkuNFExMTcuMyAxNTkuNyAxMTYuOSAxNjAuNVExMTYuMyAxNjEuNiAxMTUuMyAxNjMuNlExMTQuMyAxNjUuNSAxMTMgMTY3LjVRMTExLjYgMTY5LjUgMTEwIDE3MC44UTEwOC40IDE3Mi4yIDEwNi43IDE3Mi4yWiBNMTE4LjQgMTcyLjNRMTE1LjQgMTcyLjMgMTEzLjYgMTcwLjVRMTExLjcgMTY4LjYgMTExLjcgMTY2LjZRMTExLjcgMTY0LjkgMTEyLjYgMTYzLjVRMTEzLjQgMTYyLjEgMTE0LjggMTYyLjFMMTE0LjggMTYyUTExNi40IDE1OS4xIDExNy45IDE1Ni4xUTExOS40IDE1My4xIDEyMS4yIDE0OS44UTEyMi43IDE0Ni45IDEyNC40IDE0NS4xUTEyNi4yIDE0My4zIDEyOC42IDE0My4zUTEyOS4yIDE0My4zIDEzMC4yIDE0My42UTEzMS4yIDE0My44IDEzMS4yIDE0NC42UTEzMS4yIDE0NS4yIDEzMC41IDE0NS4yUTEzMCAxNDUuMiAxMjkuNCAxNDQuOVExMjguOCAxNDQuNiAxMjguNCAxNDQuNlExMjcuMSAxNDQuNiAxMjYuMSAxNDYuMlExMjUuMiAxNDcuOCAxMjUuMiAxNDkuNlExMjUuMiAxNTEuNiAxMjUuOCAxNTMuMVExMjYuNSAxNTQuNiAxMjcuNCAxNTYuMVExMjguMiAxNTcuNSAxMjguOSAxNTlRMTI5LjUgMTYwLjUgMTI5LjUgMTYyLjJRMTI5LjUgMTY1LjcgMTI4LjIgMTY3LjhRMTI2LjggMTY5LjkgMTI0LjcgMTcxSDEyNC44UTEyOC42IDE3MSAxMzEuMSAxNjcuNFExMzMuNSAxNjMuOSAxMzYgMTU4LjFRMTM2LjkgMTU4LjEgMTM2LjkgMTU4LjhRMTM1LjUgMTYyIDEzMy44IDE2NS4xUTEzMi4yIDE2OC4yIDEyOS45IDE3MC4yUTEyNy43IDE3Mi4yIDEyNC41IDE3Mi4yUTEyMy4xIDE3Mi4yIDEyMiAxNzEuOVExMjAuMyAxNzIuMyAxMTguNCAxNzIuM1pNMTE3LjMgMTY0LjdRMTE3LjMgMTY2LjQgMTE4LjEgMTY4UTExOC45IDE2OS42IDEyMC45IDE3MC4zUTEyMi44IDE2OS4zIDEyMy45IDE2N1ExMjQuOSAxNjQuNyAxMjQuOSAxNjIuM1ExMjQuOSAxNjAuMyAxMjQuNSAxNTguMlExMjQgMTU2LjEgMTIzLjYgMTU0LjFRMTIzLjEgMTUyLjEgMTIzLjEgMTUwLjVRMTIzLjEgMTUwIDEyMy4xIDE0OS42UTEyMy4yIDE0OS4yIDEyMy4yIDE0OC44UTEyMiAxNTAuOCAxMjAuNiAxNTMuNFExMTkuMyAxNTUuOSAxMTguMSAxNTguM1ExMTYuOCAxNjAuNyAxMTUuOCAxNjIuMlExMTcuMyAxNjIuNCAxMTcuMyAxNjQuN1pNMTE0LjkgMTY4LjNRMTE0LjkgMTY5LjQgMTE1LjcgMTcwLjNRMTE2LjUgMTcxLjEgMTE4LjEgMTcxLjFRMTE4LjggMTcxLjEgMTE5LjQgMTcxUTExNy45IDE3MC4xIDExNyAxNjguNlExMTYuMSAxNjcuMiAxMTYuMSAxNjUuM1ExMTUuNSAxNjYgMTE1LjIgMTY2LjhRMTE0LjkgMTY3LjUgMTE0LjkgMTY4LjNaIE0xNTEuNyAxNzIuMlExNTAgMTcyLjIgMTQ4LjggMTcxLjNRMTQ3LjUgMTcwLjMgMTQ3LjUgMTY3LjVRMTQ3LjUgMTY2LjIgMTQ3LjcgMTY1LjJRMTQ3LjkgMTY0LjEgMTQ4LjIgMTYyLjlRMTQ3LjUgMTYzLjkgMTQ2LjQgMTY1LjVRMTQ1LjIgMTY3LjEgMTQzLjggMTY4LjZRMTQyLjQgMTcwLjEgMTQwLjkgMTcxLjFRMTM5LjQgMTcyLjEgMTM4LjIgMTcyLjFRMTM2LjMgMTcyLjEgMTM1LjEgMTcwLjVRMTM0IDE2OC44IDEzNCAxNjZRMTM0IDE2My4xIDEzNS4zIDE1OS43UTEzNi43IDE1Ni4zIDEzOS4xIDE1My4yUTE0MS41IDE1MC4xIDE0NC42IDE0OC4yUTE0Ny43IDE0Ni4yIDE1MSAxNDYuMlExNTIuNyAxNDYuMiAxNTQuMiAxNDYuOFExNTUuNyAxNDcuMyAxNTYuOSAxNDguNVExNTcuNCAxNDkgMTU3LjQgMTQ5LjdRMTU3LjQgMTUwLjEgMTU3IDE1MC40UTE1Ni43IDE1MC43IDE1Ni4xIDE1MC41UTE1NS4zIDE0OCAxNTIuNyAxNDhRMTUxLjUgMTQ4IDE0OS45IDE0OC44UTE0Ny45IDE0OS44IDE0NS43IDE1MlExNDMuNiAxNTQuMiAxNDEuNiAxNTdRMTM5LjcgMTU5LjggMTM4LjUgMTYyLjZRMTM3LjMgMTY1LjQgMTM3LjMgMTY3LjdRMTM3LjMgMTcwLjEgMTM5LjEgMTcwLjFRMTQwLjcgMTcwLjEgMTQyLjQgMTY4LjVRMTQ0LjEgMTY3IDE0NS42IDE2NC44UTE0Ny4yIDE2Mi41IDE0OC40IDE2MC4zUTE0OS43IDE1OCAxNTAuNSAxNTYuN1ExNTEuNSAxNTQuNyAxNTIuNSAxNTMuNFExNTMuNCAxNTIuMSAxNTUuMSAxNTIuMVExNTUuOSAxNTIuMSAxNTYuNyAxNTIuM1ExNTcuNSAxNTIuNiAxNTguNCAxNTIuNFExNTYuMiAxNTQuNiAxNTQuNiAxNTcuNVExNTMgMTYwLjUgMTUyLjEgMTYzLjNRMTUxLjMgMTY2LjIgMTUxLjMgMTY4LjFRMTUxLjMgMTcwLjMgMTUyLjcgMTcwLjNRMTUzLjggMTcwLjMgMTU1LjIgMTY5UTE1Ni41IDE2Ny43IDE1Ny44IDE2NS43UTE1OSAxNjMuNyAxNjAuMSAxNjEuN1ExNjEuMiAxNTkuNiAxNjEuOCAxNTguMVExNjIuMiAxNTguMSAxNjIuNSAxNTguMlExNjIuNyAxNTguMiAxNjIuNyAxNTguOFExNjIuNiAxNTkgMTYyLjUgMTU5LjRRMTYyLjMgMTU5LjcgMTYxLjkgMTYwLjVRMTYxLjMgMTYxLjYgMTYwLjMgMTYzLjZRMTU5LjMgMTY1LjUgMTU4IDE2Ny41UTE1Ni42IDE2OS41IDE1NSAxNzAuOFExNTMuNCAxNzIuMiAxNTEuNyAxNzIuMlogTTE2MS45IDE1Ny45UTE2Mi41IDE1Ni43IDE2My40IDE1NFExNjQuNCAxNTEuMyAxNjUuNCAxNDhRMTY2LjQgMTQ0LjYgMTY2LjkgMTQxLjdRMTY3LjEgMTQwLjUgMTY3LjcgMTQwUTE2OC4yIDEzOS41IDE2OC45IDEzOS41UTE2OS44IDEzOS41IDE3MC42IDE0MC40UTE3MS40IDE0MS4zIDE3MS40IDE0Mi45UTE3MS40IDE0NC45IDE3MC4yIDE0Ni40UTE2OSAxNDcuOCAxNjcuMyAxNDkuMVExNjggMTQ5LjIgMTY4LjggMTQ5LjJRMTY5LjYgMTQ5LjIgMTcwLjYgMTQ5LjJRMTczLjkgMTQ5LjIgMTc3LjIgMTQ4LjhRMTc3LjQgMTQ5LjIgMTc3LjQgMTQ5LjVRMTc3LjQgMTUwLjQgMTc2LjkgMTUxLjhRMTc2LjMgMTUzLjMgMTc1LjcgMTU0LjRRMTc1LjQgMTU1LjEgMTc0LjYgMTU2LjhRMTczLjcgMTU4LjUgMTcyLjcgMTYwLjZRMTcxLjcgMTYyLjcgMTcxIDE2NC44UTE3MC4zIDE2Ni44IDE3MC4zIDE2OC4zUTE3MC4zIDE3MC4xIDE3MS44IDE3MC4xUTE3My4xIDE3MC4xIDE3NS42IDE2Ni45UTE3OCAxNjMuNyAxODAuNSAxNTguMVExODEuNCAxNTguMSAxODEuNCAxNTguOFExODAuNiAxNjAuNyAxNzkuNCAxNjNRMTc4LjIgMTY1LjMgMTc2LjcgMTY3LjRRMTc1LjMgMTY5LjQgMTczLjYgMTcwLjdRMTcyIDE3Mi4xIDE3MC4yIDE3Mi4xUTE2OC44IDE3Mi4xIDE2Ny41IDE3MVExNjYuMSAxNjkuOCAxNjYuMSAxNjcuM1ExNjYuMSAxNjUuMSAxNjcgMTYzUTE2Ny44IDE2MC44IDE2OC45IDE1OVExNzAgMTU3LjEgMTcwLjggMTU1LjdRMTcxLjcgMTU0LjIgMTcxLjcgMTUzLjRRMTcxLjcgMTUyLjEgMTcwLjEgMTUxLjVRMTY4LjUgMTUwLjkgMTY1LjkgMTUwLjhRMTY0LjYgMTU0LjEgMTYzLjkgMTU1LjdRMTYzLjMgMTU3LjMgMTYyLjcgMTU4LjhRMTYxLjYgMTU4LjggMTYxLjkgMTU3LjlaIE0xODUuNyAxNzIuM1ExODMgMTcyLjMgMTgwLjkgMTcwLjZRMTc4LjggMTY4LjggMTc4LjggMTY1LjNRMTc4LjggMTYyLjQgMTgwLjEgMTU5UTE4MS40IDE1NS43IDE4My42IDE1Mi44UTE4NS44IDE0OS45IDE4OC41IDE0OC4xUTE5MS4yIDE0Ni4yIDE5NCAxNDYuMlExOTUuMyAxNDYuMiAxOTYuNiAxNDdRMTk3LjkgMTQ3LjggMTk3LjkgMTQ5LjhRMTk3LjkgMTUxLjYgMTk2LjUgMTUzLjdRMTk1LjIgMTU1LjkgMTkyLjcgMTU3LjdRMTkxLjYgMTU4LjUgMTg5LjkgMTU5LjNRMTg4LjMgMTYwIDE4Ni42IDE2MC40UTE4NSAxNjAuOSAxODMuOSAxNjAuOVExODMuNSAxNjEuOCAxODMuMiAxNjMuMlExODIuOSAxNjQuNyAxODIuOSAxNjYuMlExODIuOSAxNjggMTgzLjYgMTY5LjRRMTg0LjMgMTcwLjggMTg2LjIgMTcwLjhRMTg4LjYgMTcwLjggMTkwLjcgMTY5LjVRMTkyLjcgMTY4LjEgMTk0LjMgMTY2UTE5NiAxNjMuOSAxOTcuMSAxNjEuOFExOTguMyAxNTkuNiAxOTguOSAxNTguMVExOTkuOCAxNTguMSAxOTkuOCAxNTguOFExOTguOCAxNjAuOCAxOTcuNyAxNjMuMVExOTYuNSAxNjUuNSAxOTQuOSAxNjcuNlExOTMuMiAxNjkuNiAxOTEgMTcxUTE4OC43IDE3Mi4zIDE4NS43IDE3Mi4zWk0xODQuNCAxNTkuNlExODUuNCAxNTkuNiAxODcuOCAxNTguOVExOTAuMSAxNTguMSAxOTIuMSAxNTYuNFExOTQgMTU0LjggMTk1IDE1Mi44UTE5NiAxNTAuOCAxOTYgMTQ5LjVRMTk2IDE0Ny45IDE5NC44IDE0Ny45UTE5NCAxNDcuOSAxOTIuNCAxNDlRMTkwLjkgMTUwLjIgMTg4LjcgMTUyLjlRMTg3LjMgMTU0LjYgMTg2LjEgMTU2LjdRMTg0LjkgMTU4LjcgMTg0LjQgMTU5LjZaIE0yMDIuMyAxNzIuMlExOTkuNiAxNzIuMiAxOTguNCAxNzAuNlExOTcuMSAxNjkgMTk3LjEgMTY2LjdRMTk3LjEgMTY0LjQgMTk3LjggMTYyUTE5OC40IDE1OS41IDE5OC45IDE1Ny45UTIwMC4xIDE1My45IDIwMS44IDE0OS4zUTIwMy42IDE0NC43IDIwNS43IDE0MC4zUTIwNy44IDEzNS45IDIwOS45IDEzMi4zUTIxMS42IDEyOS41IDIxMy41IDEyOC4xUTIxNS40IDEyNi43IDIxNi44IDEyNi43UTIxOCAxMjYuNyAyMTguNyAxMjcuNVEyMTkuNCAxMjguNCAyMTkuNCAxMzBRMjE5LjQgMTMxLjIgMjE5IDEzMi44UTIxOC42IDEzNC4zIDIxNy42IDEzNi40UTIxNS4xIDE0MiAyMTEuNiAxNDcuNlEyMDguMSAxNTMuMiAyMDIuOCAxNTguMVEyMDEuOSAxNjAuMSAyMDEuNCAxNjIuNFEyMDAuOCAxNjQuNyAyMDAuOCAxNjYuMlEyMDAuOCAxNzAuNiAyMDMuOCAxNzAuNlEyMDYuMSAxNzAuNiAyMDguOSAxNjcuM1EyMTEuNyAxNjMuOSAyMTQuMyAxNTguMVEyMTQuNSAxNTguMSAyMTQuOCAxNTguMlEyMTUuMSAxNTguMyAyMTUuMSAxNTguOFEyMTQuMyAxNjAuNyAyMTMuMSAxNjNRMjEyIDE2NS40IDIxMC40IDE2Ny41UTIwOC45IDE2OS42IDIwNi44IDE3MC45UTIwNC44IDE3Mi4yIDIwMi4zIDE3Mi4yWk0yMDMuNCAxNTUuOFEyMDYgMTUzLjEgMjA4LjQgMTQ5LjZRMjEwLjkgMTQ2LjIgMjEzIDE0Mi40UTIxNS4xIDEzOC42IDIxNi42IDEzNS4yUTIxNy4xIDEzNC4xIDIxNy40IDEzMi44UTIxNy43IDEzMS41IDIxNy43IDEzMC43UTIxNy43IDEyOS43IDIxNy4yIDEyOS43UTIxNi45IDEyOS43IDIxNi4zIDEzMC4yUTIxNS44IDEzMC43IDIxNC44IDEzMlEyMTMuNSAxMzMuOCAyMTEuOCAxMzYuOVEyMTAuMiAxNDAgMjA4LjYgMTQzLjZRMjA2LjkgMTQ3LjEgMjA1LjUgMTUwLjRRMjA0LjIgMTUzLjYgMjAzLjQgMTU1LjhaIE0yMjkuOSAxNzIuMlEyMjguMiAxNzIuMiAyMjcgMTcxLjNRMjI1LjcgMTcwLjMgMjI1LjcgMTY3LjVRMjI1LjcgMTY2LjIgMjI1LjkgMTY1LjJRMjI2LjEgMTY0LjEgMjI2LjQgMTYyLjlRMjI1LjcgMTYzLjkgMjI0LjYgMTY1LjVRMjIzLjQgMTY3LjEgMjIyIDE2OC42UTIyMC42IDE3MC4xIDIxOS4xIDE3MS4xUTIxNy42IDE3Mi4xIDIxNi4zIDE3Mi4xUTIxNC41IDE3Mi4xIDIxMy4zIDE3MC41UTIxMi4yIDE2OC44IDIxMi4yIDE2NlEyMTIuMiAxNjMuMSAyMTMuNSAxNTkuN1EyMTQuOSAxNTYuMyAyMTcuMyAxNTMuMlEyMTkuNyAxNTAuMSAyMjIuOCAxNDguMlEyMjUuOCAxNDYuMiAyMjkuMiAxNDYuMlEyMzAuOSAxNDYuMiAyMzIuNCAxNDYuOFEyMzMuOSAxNDcuMyAyMzUuMSAxNDguNVEyMzUuNiAxNDkgMjM1LjYgMTQ5LjdRMjM1LjYgMTUwLjEgMjM1LjIgMTUwLjRRMjM0LjggMTUwLjcgMjM0LjMgMTUwLjVRMjMzLjUgMTQ4IDIzMC45IDE0OFEyMjkuNyAxNDggMjI4LjEgMTQ4LjhRMjI2LjEgMTQ5LjggMjIzLjkgMTUyUTIyMS43IDE1NC4yIDIxOS44IDE1N1EyMTcuOSAxNTkuOCAyMTYuNyAxNjIuNlEyMTUuNSAxNjUuNCAyMTUuNSAxNjcuN1EyMTUuNSAxNzAuMSAyMTcuMyAxNzAuMVEyMTguOSAxNzAuMSAyMjAuNiAxNjguNVEyMjIuMiAxNjcgMjIzLjggMTY0LjhRMjI1LjMgMTYyLjUgMjI2LjYgMTYwLjNRMjI3LjkgMTU4IDIyOC43IDE1Ni43UTIyOS43IDE1NC43IDIzMC43IDE1My40UTIzMS42IDE1Mi4xIDIzMy4zIDE1Mi4xUTIzNC4xIDE1Mi4xIDIzNC45IDE1Mi4zUTIzNS43IDE1Mi42IDIzNi42IDE1Mi40UTIzNC40IDE1NC42IDIzMi44IDE1Ny41UTIzMS4yIDE2MC41IDIzMC4zIDE2My4zUTIyOS40IDE2Ni4yIDIyOS40IDE2OC4xUTIyOS40IDE3MC4zIDIzMC45IDE3MC4zUTIzMiAxNzAuMyAyMzMuNCAxNjlRMjM0LjcgMTY3LjcgMjM2IDE2NS43UTIzNy4yIDE2My43IDIzOC4zIDE2MS43UTIzOS40IDE1OS42IDI0MCAxNTguMVEyNDAuNCAxNTguMSAyNDAuNiAxNTguMlEyNDAuOSAxNTguMiAyNDAuOSAxNTguOFEyNDAuOCAxNTkgMjQwLjYgMTU5LjRRMjQwLjUgMTU5LjcgMjQwLjEgMTYwLjVRMjM5LjUgMTYxLjYgMjM4LjUgMTYzLjZRMjM3LjUgMTY1LjUgMjM2LjEgMTY3LjVRMjM0LjggMTY5LjUgMjMzLjIgMTcwLjhRMjMxLjYgMTcyLjIgMjI5LjkgMTcyLjJaIi8+CiAgPC9nPgo8L3N2Zz4K";
 'use strict';
 /*MODELO_START*/
 // Modelo de planificación — Grupo Pasarela (El 33, Zapatillera, Bar Mónaco, Pasarela).
@@ -4293,15 +4410,20 @@ $('#wPatron').addEventListener('click', () => {
   actualizarUndoBtn();
 });
 // ================= IMPRESIÓN =================
-// Cuatro hojas: la semana general (apaisada, los cuatro locales), la hoja de un solo
-// local para colgar en el bar (vertical, letra grande), el tablón del mes personas ×
-// días y la tabla de horas del mes. Misma mecánica que el piloto: vista previa en
-// #printRoot, «Imprimir» (window.print) o «Descargar PDF» (15-export-pdf.js), y una
-// cabecera con la pareja de logos Shiftia + Grupo Pasarela. El color de cada local
-// sale de l.color (llega al CSS como --lc en la fila) y los fondos se fuerzan al
-// imprimir (print-color-adjust) para que salgan sin tocar «gráficos de fondo».
-// Comparte con 15-export-xlsx.js las piezas de la semana (columnas, casillas, pie de
-// descansos) para que el Excel y la hoja digan exactamente lo mismo.
+// Cinco hojas: la semana general (apaisada, los cuatro locales), la hoja de un solo
+// local para colgar en el bar (vertical, letra grande), la planilla GENERADA con sus
+// dos páginas (la planilla y «qué ha cambiado», el prototipo del cliente del 11/09),
+// el tablón del mes personas × días y la tabla de horas del mes. Misma mecánica que
+// el piloto: vista previa en #printRoot, «Imprimir» (window.print) o «Descargar PDF»
+// (15-export-pdf.js), y una cabecera con la pareja de logos Shiftia + Grupo Pasarela.
+// El color de cada local sale de l.color (llega al CSS como --lc en la fila) y los
+// fondos se fuerzan al imprimir (print-color-adjust) para que salgan sin tocar
+// «gráficos de fondo». Comparte con 15-export-xlsx.js las piezas de la semana
+// (columnas, pie de descansos) para que el Excel y la hoja digan lo mismo.
+// Las casillas se pintan con posicionesDe (modelo.js): número de posición, ▸ si sale
+// el primero (fijo), ◆ cocina, □ comodín, P partido / C continuo, «por Fulana» y la
+// nota en gris, y la 1.ª posición como HUECO DISPONIBLE en rojo cuando nadie de la
+// casilla puede abrir.
 function cerrarImpresion() {
   $('#printRoot').classList.add('hidden');
   document.body.classList.remove('printing');
@@ -4319,10 +4441,17 @@ function montarImpresion(h, apaisado, nombre) {
   st.textContent = apaisado ? '@page{size:A4 landscape;margin:8mm 9mm}' : '@page{size:A4;margin:9mm 10mm}';
   document.head.appendChild(st);
   // si el contenido no cabe en la hoja (semana con muchas ausencias, mes de 31 días con
-  // leyenda larga…), se compacta en dos pasos antes que partir en dos páginas
+  // leyenda larga…), se compacta en dos pasos antes que partir en dos páginas. En una
+  // hoja de varias páginas (.pxg-pag) se mide cada página por su contenido, no la suma.
   const pg = pr.querySelector('.pxpage');
   const altoHoja = (apaisado ? 210 : 297) * 96 / 25.4;
-  for (const cls of ['compacto', 'compacto2']) { if (pg.scrollHeight <= altoHoja) break; pg.classList.add(cls); }
+  const paginas = [...pg.querySelectorAll('.pxg-pag')];
+  const margen = (apaisado ? 16 : 19) * 96 / 25.4;   // los 2 rellenos verticales de .pxpage
+  const altoContenido = b => { const u = b.lastElementChild; return u ? u.getBoundingClientRect().bottom - b.getBoundingClientRect().top : b.scrollHeight; };
+  for (const bloque of paginas.length ? paginas : [pg]) {
+    const alto = () => paginas.length ? altoContenido(bloque) + margen : pg.scrollHeight;
+    for (const cls of ['compacto', 'compacto2']) { if (alto() <= altoHoja) break; bloque.classList.add(cls); }
+  }
   $('#pClose').addEventListener('click', cerrarImpresion);
   $('#pGo').addEventListener('click', () => { try { window.print(); } catch (e) { toast('Usa Ctrl+P para imprimir', 'warn'); } });
   $('#pPdf').addEventListener('click', () => exportarPdfHoja());
@@ -4330,9 +4459,6 @@ function montarImpresion(h, apaisado, nombre) {
 
 // ---------- piezas comunes ----------
 const PX_MARCA = `<svg viewBox="0 0 32 32" width="34" height="34"><defs><linearGradient id="lgHP" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#4ecdc4"/><stop offset="1" stop-color="#2980b9"/></linearGradient></defs><rect width="32" height="32" rx="7" fill="url(#lgHP)"/><path d="M16 26c-6-1.5-10-6-9-12s7-9 13-7.5c-4.5-0.7-9 2.2-9.7 6.7s3 9 7.5 10.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M14.5 8c6 1.5 10 6 9 12s-7 9-13 7.5c4.5 0.7 9-2.2 9.7-6.7s-3-9-7.5-10.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
-// marcas de la casilla: llave = abre / sale primero; «cocina» = lleva la cocina esa franja
-const PX_MK_ABRE = `<em class="mk mk-abre" title="Abre / sale primero"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M15 12v2.5"/></svg>abre</em>`;
-const PX_MK_COC = `<em class="mk mk-coc" title="Lleva la cocina">cocina</em>`;
 // el logo del grupo lo inyecta el build como data URI (assets/pasarela-logo.png); hasta
 // que Diego lo suba la variable está vacía y en su hueco va el nombre del grupo en texto
 function pxLogoGrupo() { return typeof LOGO_PASARELA === 'string' ? LOGO_PASARELA : ''; }
@@ -4353,10 +4479,10 @@ function pxPie(centro) {
 function pxNombre(pid, marcas) {
   const mk = marcas || {};
   const tipo = mk.tipo ? (AUS_LBL[mk.tipo] ? AUS_LBL[mk.tipo].label : mk.tipo) : '';
-  return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${esc(nombrePid(pid))}${mk.abre ? PX_MK_ABRE : ''}${mk.cocina ? PX_MK_COC : ''}${tipo ? `<em>${esc(tipo)}</em>` : ''}</span>`;
+  return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${mk.abre ? '<b class="pxg-mk abre">▸</b>' : ''}${mk.cocina ? '<b class="pxg-mk coc">◆</b>' : ''}${esc(nombrePid(pid))}${tipo ? `<em>${esc(tipo)}</em>` : ''}</span>`;
 }
 // la posición 1 de la casilla es quien abre / sale primero (vocabulario del grupo): si
-// nadie lleva la marca puesta, en la hoja se señala al primero para que no salga sin abre
+// nadie lleva la marca puesta, en el Excel se señala al primero para que no salga sin abre
 function abreEn(lista, i) { return !!(lista[i] && (lista[i].abre || (i === 0 && !lista.some(e => e.abre)))); }
 // «09:00–16:00», o «16:00–23:00 · V S 16:00–00:00» cuando algún día de la semana cambia
 function horarioTxt(l, franja) {
@@ -4405,39 +4531,59 @@ function pxDescansos(cols, personas) {
 }
 function pxFilasDescansos(cols, personas, colspan) {
   const { porDia, bajaToda } = pxDescansos(cols, personas);
-  let h = `<tr class="secrow pxdesc"><td class="sec" colspan="${colspan}"><span>Pie de descansos</span></td></tr>`;
-  h += `<tr class="pxdesc"><td class="lblp">Libran<small>sin turno ese día</small></td>${porDia.map(x => `<td>${x.libran.map(p => pxNombre(p.id)).join('') || '<span class="pxvacio">nadie</span>'}</td>`).join('')}</tr>`;
+  let h = `<tr class="secrow pxdesc"><td class="sec" colspan="${colspan}"><span>Pie de descansos · quién libra cada día</span></td></tr>`;
+  h += `<tr class="pxdesc"><td class="lblp">Libran<small>sin turno ese día</small></td>${porDia.map((x, i) => `<td data-libran="${cols[i].iso}"><div class="pxg-cnt">${x.libran.length} libra${x.libran.length === 1 ? '' : 'n'}</div>${x.libran.length ? `<div class="pxg-chips">${x.libran.map(p => `<span><i style="background:${avColor(p.id)}"></i>${esc(p.nombre)}</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`).join('')}</tr>`;
   h += `<tr class="pxdesc"><td class="lblp">Ausencias<small>vacaciones · permisos · libres</small></td>${porDia.map(x => `<td>${x.ausentes.map(({ p, a }) => pxNombre(p.id, { tipo: a.tipo })).join('') || '&nbsp;'}</td>`).join('')}</tr>`;
   if (bajaToda.length) h += `<tr class="pxdesc"><td class="lblp">De baja<small>toda la semana</small></td><td colspan="${colspan - 1}">${bajaToda.map(p => pxNombre(p.id, { tipo: 'BAJ' })).join('')}</td></tr>`;
   return h;
 }
-// una casilla (local × franja × día): nombres en el orden de la casilla, cerrado «—»,
-// y fondo ámbar con «falta n» si no llega al mínimo del día (con refuerzo de eventos)
+
+// ---------- la casilla tal como la enseña el prototipo del 11/09 ----------
+// Una posición: número, ▸ si sale el primero (fijo), ◆ cocina, □ comodín, el nombre,
+// P partido / C continuo, la palabra «cocina» y, debajo en gris, «por Fulana» y la nota.
+// El hueco de la 1.ª posición va en rojo: «Hueco disponible · abre la tarde · turno completo».
+function pxSlot(s, franja) {
+  if (s.hueco) return `<div class="pxg-s hueco" title="${esc(s.motivo || '')}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-hb">Hueco disponible</span><small class="pxg-sub bad">abre la ${franja === 'M' ? 'mañana' : 'tarde'} · turno completo</small></div></div>`;
+  const mk = (s.abreFijo ? '<b class="pxg-mk abre" title="Sale el primero (fijo)">▸</b>' : '') + (s.cocina ? '<b class="pxg-mk coc" title="Lleva la cocina">◆</b>' : '') + (s.comodin ? '<b class="pxg-mk com" title="Comodín colocado por Shiftia">□</b>' : '');
+  const tags = (s.continuo ? '<em class="pxg-tag c" title="Turno continuo: sale el primero de mañana y de tarde">C</em>' : s.partido ? '<em class="pxg-tag p" title="Turno partido: mañana y tarde">P</em>' : '') + (s.cocina ? '<span class="pxg-coc">cocina</span>' : '');
+  const subs = (s.por ? `<small class="pxg-sub">por ${esc(nombrePid(s.por))}</small>` : '') + (s.nota ? `<small class="pxg-sub">${esc(s.nota)}</small>` : '') + (s.forzado ? '<small class="pxg-sub warn">forzado a mano</small>' : '');
+  return `<div class="pxg-s${s.abre ? ' abre' : ''}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-nm">${mk}${esc(s.nombre)}</span>${tags}${subs}</div></div>`;
+}
+// la cuenta «n/min*» de arriba a la izquierda: * = mínimo supuesto; «+1 hueco» si la
+// 1.ª posición está vacante; «faltan n» si no llega al mínimo; «corregido» si cambió
+function pxCuenta(d) {
+  return `<div class="pxg-cnt">${d.n}/${d.min}${d.supuesto ? '<b>*</b>' : ''}${d.hueco ? '<em class="hue">+1 hueco</em>' : ''}${d.faltan ? `<em class="fal">falta${d.faltan > 1 ? 'n' : ''} ${d.faltan}${d.refuerzo ? ' · refuerzo' : ''}</em>` : ''}${d.cambiado ? '<em class="cor">corregido</em>' : ''}</div>`;
+}
+// una casilla (local × franja × día) de las hojas semanales: cerrado «—»; si no, la
+// cuenta y las posiciones. Fondo ámbar si no llega al mínimo, rojo si hay hueco.
 function pxCasilla(c, l, franja) {
   const tid = turnoId(l.id, franja);
-  if (!turnoAbierto(S, c.est, c.iso, tid)) return '<td class="cerr">—</td>';
-  const lista = asignados(c.est, c.iso, tid);
-  const m = minimoDe(S, c.iso, tid);
-  const faltan = Math.max(0, m.min - lista.length);
-  const nombres = lista.map((e, i) => pxNombre(e.pid, { abre: abreEn(lista, i), cocina: !!e.cocina })).join('');
-  const nota = faltan ? `<span class="falta">falta${faltan > 1 ? 'n' : ''} ${faltan}${m.supuesto ? ' <i>· mín. supuesto</i>' : ''}${m.refuerzo ? ' <i>· con refuerzo</i>' : ''}</span>` : '';
-  return `<td${faltan ? ' class="corta"' : ''}>${nombres}${nota}</td>`;
+  if (!turnoAbierto(S, c.est, c.iso, tid)) return `<td class="cerr" data-cas="${c.iso}|${tid}">—</td>`;
+  const r = revisarTurno(S, S.staff, c.est, c.iso, tid);
+  const slots = posicionesDe(S, S.staff, c.est, c.iso, tid);
+  const hueco = slots.some(s => s.hueco);
+  const cls = [hueco ? 'hueco' : '', r.faltan ? 'corta' : ''].filter(Boolean).join(' ');
+  return `<td${cls ? ` class="${cls}"` : ''} data-cas="${c.iso}|${tid}">${pxCuenta({ n: r.n, min: r.minimo, supuesto: r.supuesto, faltan: r.faltan, refuerzo: r.refuerzo, hueco })}${slots.map(s => pxSlot(s, franja)).join('')}</td>`;
 }
 function pxThDia(c) {
   return `<th class="pxd${c.dow >= 6 || c.festivo ? ' wk' : ''}"><b>${DIAS_L[c.dow].toUpperCase()}</b><span>${c.d}<small>${MES3[c.mes - 1]}</small></span>${c.festivo ? '<i>festivo</i>' : ''}${c.eventos.map(e => `<i class="ev">${esc(e.nombre || 'evento')}${e.franja && e.franja !== 'MT' && FRANJA_LBL[e.franja] ? ' · ' + FRANJA_LBL[e.franja].toLowerCase() : ''}</i>`).join('')}</th>`;
 }
-const PX_LEYENDA_SEMANA = () => `<div class="pxley"><span class="pxchip"><span class="nm">${PX_MK_ABRE}</span>abre / sale primero (posición 1 de la casilla)</span><span class="pxchip"><span class="nm">${PX_MK_COC}</span>lleva la cocina</span><span class="pxchip corta"><b>falta n</b>turno corto: faltan personas para el mínimo</span><span class="pxchip"><b>—</b>cerrado</span></div>`;
+// leyenda de las casillas (la misma en las tres hojas semanales); extra = chips propios de la hoja
+function pxLeyendaCasilla(extra) {
+  return `<div class="pxg-ley"><span><i class="pxg-n">1</i>orden en la casilla: el primero abre y hace turno completo; la cocina va en su posición</span><span><b class="pxg-mk abre">▸</b>sale el primero (fijo)</span><span><b class="pxg-mk coc">◆</b>cocina</span><span><em class="pxg-tag p">P</em>turno partido</span><span><em class="pxg-tag c">C</em>turno continuo</span><span><b class="pxg-mk com">□</b>comodín colocado por Shiftia</span><span><b class="ast">*</b>mínimo no fijado por el cliente</span>${extra || ''}<span class="hue"><b>rojo</b>· hueco disponible: nadie de la plantilla puede ocupar esa posición</span><span class="fal"><b>ámbar</b>· turno corto: faltan personas para el mínimo</span><span><b>—</b>cerrado</span></div>`;
+}
+const PX_LEYENDA_SEMANA = () => pxLeyendaCasilla('');
 
 // ---------- semana general: los cuatro locales, mañana y tarde ----------
 function abrirImpresion() {
   const lunes = S.semLunes || mondayOf(isoHoy());
   const cols = pxColsSemana(lunes);
   const supuesto = S.locales.some(l => l.horarioSupuesto);
-  let h = pxCabecera('Planilla semanal', 'Grupo Pasarela · los cuatro locales · mañana y tarde · nombres en el orden de la casilla',
+  let h = pxCabecera('Planilla semanal', 'Grupo Pasarela · los cuatro locales · mañana y tarde · posiciones de la casilla: el 1.º abre, la cocina en su sitio',
     `Semana ${rangoSemanaTxt(lunes)}`, supuesto ? 'Horarios de apertura aún sin confirmar por el grupo' : `${S.locales.length} locales`);
   h += `<table class="pxw pxsem"><thead><tr><th class="act">Local · franja</th>${cols.map(pxThDia).join('')}</tr></thead><tbody>`;
   for (const l of S.locales) {
-    h += `<tr class="secrow pxloc" style="--lc:${esc(l.color)}"><td class="sec" colspan="8"><span>${esc(l.nombre)}</span></td></tr>`;
+    h += `<tr class="secrow pxloc" style="--lc:${esc(l.color)}"><td class="sec" colspan="8"><span>${esc(l.nombre)}</span><small>${esc(descripcionCocina(S, l))}</small></td></tr>`;
     for (const f of FRANJAS) {
       h += `<tr class="pxloc" style="--lc:${esc(l.color)}"><td class="lblp">${FRANJA_LBL[f]}<small>${esc(horarioTxt(l, f)) || '&nbsp;'}</small></td>${cols.map(c => pxCasilla(c, l, f)).join('')}</tr>`;
     }
@@ -4445,7 +4591,7 @@ function abrirImpresion() {
   h += pxFilasDescansos(cols, S.staff, 8);
   h += '</tbody></table>';
   h += PX_LEYENDA_SEMANA();
-  h += pxPie('Cada nombre lleva el color de la persona. El pie de descansos dice quién libra cada día y quién está ausente.');
+  h += pxPie('El 1.º de cada casilla abre y hace turno completo; la cocina va en su posición. El pie de descansos dice quién libra cada día y quién está ausente.');
   montarImpresion(h, true, `Planilla_semana_${lunes}`);
 }
 
@@ -4458,7 +4604,7 @@ function abrirImpresionLocal(localId) {
   const lunes = S.semLunes || mondayOf(isoHoy());
   const cols = pxColsSemana(lunes);
   const gente = S.staff.filter(p => (p.locales || []).includes(l.id));
-  let h = pxCabecera(esc(l.nombre), 'Grupo Pasarela · planilla de la semana para colgar en el local', `Semana ${rangoSemanaTxt(lunes)}`,
+  let h = pxCabecera(esc(l.nombre), `Grupo Pasarela · planilla de la semana para colgar en el local · ${esc(descripcionCocina(S, l))}`, `Semana ${rangoSemanaTxt(lunes)}`,
     `Mañana ${esc(horarioTxt(l, 'M')) || '—'} · Tarde ${esc(horarioTxt(l, 'T')) || '—'}${l.horarioSupuesto ? ' (horario por confirmar)' : ''}`);
   h += `<table class="pxw pxlocal" style="--lc:${esc(l.color)}"><thead><tr><th class="act">Día</th><th class="pxd">Mañana<span>${esc(horarioTxt(l, 'M'))}</span></th><th class="pxd">Tarde<span>${esc(horarioTxt(l, 'T'))}</span></th></tr></thead><tbody>`;
   for (const c of cols) {
@@ -4474,8 +4620,235 @@ function abrirImpresionLocal(localId) {
   if (bajaToda.length) h += `<tr><td class="lbld"><b>De baja</b></td><td colspan="2">${bajaToda.map(p => pxNombre(p.id, { tipo: 'BAJ' })).join('')}</td></tr>`;
   h += '</tbody></table>';
   h += PX_LEYENDA_SEMANA();
-  h += pxPie(`${esc(l.nombre)} · quien está en la posición 1 abre y sale primero`);
+  h += pxPie(`${esc(l.nombre)} · quien está en la posición 1 abre y hace turno completo`);
   montarImpresion(h, false, `Planilla_${l.corto || l.nombre}_semana_${lunes}`);
+}
+
+// ---------- planilla generada: las dos páginas del prototipo del 11/09 ----------
+// res = resultado de generarSemana (modelo.js): locales con sus franjas, días y
+// posiciones; huecos con motivo y «por qué nadie»; cambios antes/después; quién libra;
+// las condiciones comprobadas (las nuevas marcadas) y el resumen. Página 1: la planilla
+// por local con la cuenta n/min*, las posiciones, los huecos en rojo, lo corregido en
+// ámbar, quién libra cada día y la leyenda. Página 2: qué ha cambiado, los huecos que
+// quedan disponibles (qué queda en la casilla y con qué se destraparía), las condiciones
+// nuevas, las preguntas para el cliente, la lista numerada completa y la conclusión.
+const PXG_NUM = ['ningún', 'un', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez'];
+const pxgNum = n => PXG_NUM[n] !== undefined ? PXG_NUM[n] : String(n);
+// «lunes 14»
+const pxgDia = iso => `${DIAS_L[isoDow(iso)].toLowerCase()} ${+iso.slice(8, 10)}`;
+// «1.ª» / «2.º» según el nombre (misma heurística que el modelo para «la primera»)
+const pxgOrd = (pos, nombre) => `${pos}.${/a$/i.test(String(nombre || '').split(' ')[0]) ? 'ª' : 'º'}`;
+// «El 33, Zapatillera y Bar Mónaco»
+const pxgLista = xs => xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1];
+const pxgCap = s => { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
+function pxgLocal(res, localId) { return res.locales.find(l => l.id === localId) || { id: localId, nombre: nombreLocal(localId), color: colorLocal(localId) }; }
+function pxgDiaDe(res, localId, franja, iso) {
+  const l = res.locales.find(x => x.id === localId); if (!l) return null;
+  const f = l.franjas.find(x => x.franja === franja); if (!f) return null;
+  return f.dias.find(d => d.iso === iso) || null;
+}
+// «1.ª posición vacante · 2.ª Noe de cocina · 3.º Leo»
+function pxgPosiciones(slots, nuevos) {
+  return slots.map(s => s.hueco ? `<b class="bad">${s.pos}.ª posición vacante</b>` : `${pxgOrd(s.pos, s.nombre)} ${nuevos && nuevos.includes(s.pid) ? `<b>${esc(s.nombre)}</b>` : esc(s.nombre)}${s.cocina ? ' de cocina' : ''}${s.continuo ? ', turno continuo' : s.partido ? (s.cocina ? ', partido' : ' de partido') : ''}`).join(' · ');
+}
+function pxgCabecera(res, titulo, sub, resumen, pagina) {
+  const kicker = `SHIFTIA · PLANILLA SEMANAL · ${res.locales.map(l => `<b style="color:${esc(l.color)}">${esc(l.nombre)}</b>`).join(' · ')}`;
+  const logo = pxLogoGrupo();
+  return `<div class="pxg-head"><span class="pxg-marca">${PX_MARCA}</span><div class="pxg-ht"><div class="pxg-kick">${kicker}</div><h1 class="pxg-h1">${esc(titulo)}<span> · ${sub}</span></h1><div class="pxg-sub">${resumen}</div></div><span class="pxg-hr">${logo ? `<img class="pxglogo" src="${logo}" alt="Grupo Pasarela">` : '<span class="pxgword">Grupo <b>Pasarela</b></span>'}<small>página ${pagina} de 2</small></span></div>`;
+}
+function pxgCabeceraTabla(res) {
+  return `<thead><tr><th class="pxg-turno">Turno</th>${res.dias.map(iso => `<th>${DIAS_L[isoDow(iso)].toUpperCase()} <span>${+iso.slice(8, 10)}</span></th>`).join('')}</tr></thead>`;
+}
+function pxgTablaLocal(res, l) {
+  const cfgL = localDe(S, l.id);
+  const subLbl = f => cfgL && !cfgL.horarioSupuesto && horarioTxt(cfgL, f) ? esc(horarioTxt(cfgL, f)) : (f === 'M' ? 'apertura a mediodía' : 'tarde y noche');
+  let h = `<div class="pxg-loc" style="--lc:${esc(l.color)}"><i></i><b>${esc(l.nombre)}</b><span>· ${esc(l.cocina)}</span></div>`;
+  h += `<table class="pxg-tab pxg-local" style="--lc:${esc(l.color)}">${pxgCabeceraTabla(res)}<tbody>`;
+  for (const f of l.franjas) {
+    h += `<tr><td class="pxg-lbl"><b>${FRANJA_LBL[f.franja]}</b><small>${subLbl(f.franja)}</small></td>`;
+    for (const d of f.dias) {
+      if (!d.abierto) { h += `<td class="pxg-c cerr" data-cas="${d.iso}|${d.tid}"><span>Cerrado</span></td>`; continue; }
+      const hueco = (d.slots || []).some(s => s.hueco);
+      const cls = ['pxg-c', hueco ? 'hueco' : '', d.cambiado ? 'corr' : '', d.faltan ? 'corta' : ''].filter(Boolean).join(' ');
+      h += `<td class="${cls}" data-cas="${d.iso}|${d.tid}">${pxCuenta({ n: d.n, min: d.min, supuesto: d.supuesto, faltan: d.faltan, refuerzo: d.refuerzo, hueco, cambiado: d.cambiado })}${(d.slots || []).map(s => pxSlot(s, f.franja)).join('')}</td>`;
+    }
+    h += '</tr>';
+  }
+  return h + '</tbody></table>';
+}
+function pxgLibran(res) {
+  const deBaja = (res.resumen && res.resumen.deBaja || []).map(nombrePid);
+  let h = `<div class="pxg-loc gris"><i></i><b>Quién libra cada día</b></div><table class="pxg-tab pxg-lib">${pxgCabeceraTabla(res)}<tbody><tr><td class="pxg-lbl"><b>Libran</b><small>${deBaja.length ? 'De baja: ' + esc(pxgLista(deBaja)) : 'sin turno ese día'}</small></td>`;
+  for (const iso of res.dias) {
+    const pids = res.libran[iso] || [];
+    h += `<td class="pxg-c" data-libran="${iso}"><div class="pxg-cnt">${pids.length} libra${pids.length === 1 ? '' : 'n'}</div>${pids.length ? `<div class="pxg-chips">${pids.map(pid => `<span>${esc(nombrePid(pid))}</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`;
+  }
+  return h + '</tr></tbody></table>';
+}
+// frase de resumen de la página 1: qué se ha corregido, turnos y condiciones, huecos
+function pxgResumen(res) {
+  const partes = [];
+  if (res.cambios.length) {
+    const porDia = {};
+    for (const c of res.cambios) { const { localId } = partirTurno(c.turnoId); (porDia[c.iso] = porDia[c.iso] || new Set()).add(pxgLocal(res, localId).nombre); }
+    partes.push('Corregido ' + Object.keys(porDia).sort().map(iso => `el ${pxgDia(iso)} en ${pxgLista([...porDia[iso]])}`).join(', '));
+  } else partes.push(res.aplicados ? `${res.aplicados} plazas nuevas sobre lo que había` : 'La semana ya estaba completa: nada que corregir');
+  partes.push(`${res.resumen.turnos} turnos y ${res.resumen.condiciones} condiciones`);
+  partes.push(res.huecos.length ? `${pxgNum(res.huecos.length)} hueco${res.huecos.length === 1 ? '' : 's'} que ninguna persona de la plantilla puede cubrir` : 'sin huecos');
+  return partes.map(esc).join(' · ');
+}
+// ---- página 2 ----
+function pxgCambios(res) {
+  if (!res.cambios.length) return `<p class="pxg-p mut">Ningún turno cambia respecto a lo que ya había en la planilla${res.aplicados ? `: la propuesta solo añade ${res.aplicados} plaza${res.aplicados === 1 ? '' : 's'}` : ''}.</p>`;
+  const grupos = new Map();
+  for (const c of res.cambios) { const { localId, franja } = partirTurno(c.turnoId); const k = c.iso + '|' + localId; if (!grupos.has(k)) grupos.set(k, { iso: c.iso, localId, franjas: [] }); grupos.get(k).franjas.push({ franja, c }); }
+  return [...grupos.values()].sort((a, b) => a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0).map(g => {
+    let h = `<div class="pxg-cambio"><h4>${esc(pxgLocal(res, g.localId).nombre)} · ${pxgDia(g.iso)}</h4>`;
+    for (const { franja, c } of g.franjas.sort((a, b) => a.franja < b.franja ? -1 : 1)) {
+      const d = pxgDiaDe(res, g.localId, franja, g.iso);
+      const nuevos = c.despues.filter(p => !c.antes.includes(p)), fuera = c.antes.filter(p => !c.despues.includes(p));
+      const fr = FRANJA_LBL[franja].toLowerCase();
+      const quien = [nuevos.length ? `entra${nuevos.length > 1 ? 'n' : ''} ${pxgLista(nuevos.map(nombrePid))}` : '', fuera.length ? `sale${fuera.length > 1 ? 'n' : ''} ${pxgLista(fuera.map(nombrePid))}` : ''].filter(Boolean).join(' · ');
+      h += `<p class="pxg-p">${pxgCap(fr)}: ${esc(quien)}.</p>`;
+      h += `<div class="pxg-antes">${fr} · antes: ${c.antes.length ? `<s>${esc(c.antes.map(nombrePid).join(', '))}</s>` : '<s>vacía</s>'}</div>`;
+      h += `<div class="pxg-ahora">${fr} · ahora: ${c.antes.length ? '' : '<em class="pxg-nueva-cas">nueva</em> '}${d && d.slots ? pxgPosiciones(d.slots, nuevos) : esc(c.despues.map(nombrePid).join(', '))}</div>`;
+    }
+    return h + '</div>';
+  }).join('');
+}
+// los turnos continuos de la semana (la misma persona sale primera de mañana y de tarde)
+function pxgContinuos(res) {
+  const out = [];
+  for (const l of res.locales) for (const f of l.franjas) { if (f.franja !== 'M') continue; for (const d of f.dias) for (const s of d.slots || []) if (s.continuo) out.push({ l, iso: d.iso, s }); }
+  if (!out.length) return '';
+  return `<h3 class="pxg-h2">${out.length === 1 ? 'El único turno continuo de la semana' : `Los ${pxgNum(out.length)} turnos continuos de la semana`}</h3>` + out.map(x => `<div class="pxg-cambio"><h4>${esc(x.l.nombre)} · ${pxgDia(x.iso)}</h4><p class="pxg-p">${esc(x.s.nombre)}${x.s.por ? ` cubre a ${esc(nombrePid(x.s.por))} y` : ''} sale ${/a$/i.test(x.s.nombre.split(' ')[0]) ? 'la primera' : 'el primero'} de mañana y de tarde: no es un partido, es un turno continuo y se marca <em class="pxg-tag c">C</em>.</p></div>`).join('');
+}
+// Personas a las que UNA sola condición les impide ocupar el hueco (y cuál): son la
+// pista de «se destraparía si…». Quien está ausente o ya colocado esa franja en otro
+// local no cuenta: eso no es una condición que se pueda levantar. Mismas reglas que
+// puedeEstar / puedePrimero, pero contadas todas y no solo la primera que salta.
+function pxgDestrapa(res, hu) {
+  const { localId, franja } = partirTurno(hu.turnoId);
+  const est = res.estado || estadoDeIso(hu.iso), iso = hu.iso, dow = isoDow(iso), l = localDe(S, localId);
+  const enCasilla = pidsEn(est, iso, hu.turnoId);
+  const otra = franja === 'M' ? 'T' : 'M';
+  const out = [];
+  for (const p of S.staff) {
+    if (ausenciaEn(p, iso)) continue;
+    const yaAqui = enCasilla.includes(p.id);
+    if (yaAqui && hu.tipo !== 'primero') continue;
+    if (turnosDe(S).some(t => t.franja === franja && t.id !== hu.turnoId && pidsEn(est, iso, t.id).includes(p.id))) continue;
+    const act = k => regla(S, k) && caracteristicaActiva(p, k);
+    const bl = [];
+    if (!yaAqui) {
+      if (act('locales') && (p.locales || []).length && !p.locales.includes(localId)) bl.push(`solo trabaja en ${lblLocales(S, p.locales)}`);
+      if (act('franjas') && (p.franjas || []).length && !p.franjas.includes(franja)) bl.push(franja === 'M' ? 'solo hace tardes' : 'solo hace mañanas');
+      if (act('libra') && (p.libra || []).includes(dow)) bl.push(`libra ${DOW_PL[dow]}`);
+      if (act('vetos') && (p.vetos || []).some(v => v.localId === localId && v.franja === franja)) bl.push(`no hace ${franja === 'M' ? 'mañanas' : 'tardes'} en ${l ? l.nombre : localId}`);
+      const enOtra = turnosDe(S).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(p.id));
+      if (act('partido') && enOtra && !((p.partido || {}).siempre || ((p.partido || {}).dias || []).includes(dow))) bl.push(`no hace partido ${DOW_PL[dow]}`);
+      if (regla(S, 'nuncaCon')) for (const q of enCasilla) { const qp = personaDeId(q); if (qp && ((caracteristicaActiva(p, 'nuncaCon') && (p.nuncaCon || []).includes(q)) || (caracteristicaActiva(qp, 'nuncaCon') && (qp.nuncaCon || []).includes(p.id)))) bl.push(`no coincide con ${qp.nombre}`); }
+    }
+    if (hu.tipo === 'primero') {
+      if (regla(S, 'noPrimero') && caracteristicaActiva(p, 'noPrimero') && (p.noPrimero || []).includes(franja)) bl.push(`no sale ${franja === 'M' ? 'el primero de la mañana' : 'el primero de la tarde'}`);
+      if (caracteristicaActiva(p, 'noAbre') && (p.noAbre || []).includes(localId)) bl.push(`no abre ${l ? l.nombre : localId}`);
+      if (franja === 'T' && regla(S, 'primeroCompleto')) {
+        const tm = turnosDe(S).find(t => t.franja === 'M' && pidsEn(est, iso, t.id).includes(p.id));
+        if (tm && !(tm.local.id === localId && primeroDe(S, S.staff, est, iso, tm.id) === p.id)) bl.push('viene de hacer la mañana y el primero de la tarde hace turno completo');
+      }
+    }
+    if (bl.length === 1) out.push({ nombre: p.nombre, motivo: bl[0] });
+  }
+  return out;
+}
+const PXG_DURO = /^ya en |^ya está|^de baja|^de vacaciones|^día libre|^de permiso|^ausente|^no existe|no abre la |^nadie de la casilla/;
+function pxgHuecos(res) {
+  if (!res.huecos.length) return '<p class="pxg-p mut">Todas las posiciones tienen nombre: no queda ningún hueco disponible.</p>';
+  const nPlantilla = S.staff.filter(p => !deBaja(p, res.lunes)).length;
+  return res.huecos.map(hu => {
+    const { localId, franja } = partirTurno(hu.turnoId);
+    const l = pxgLocal(res, localId), d = pxgDiaDe(res, localId, franja, hu.iso), slots = (d && d.slots) || [];
+    const fr = FRANJA_LBL[franja].toLowerCase();
+    let h = `<div class="pxg-hueco"><h4>${esc(l.nombre)} · ${pxgDia(hu.iso)} por la ${fr}</h4>`;
+    if (hu.tipo === 'primero') h += `<p class="pxg-p">Ninguna de las ${pxgNum(nPlantilla)} personas puede abrir esa ${fr}. ${esc(pxgCap(String(hu.motivo || '').replace(/^nadie de la casilla puede abrir:?\s*/i, 'En la casilla, ')))}${/[.!?]$/.test(hu.motivo || '') ? '' : '.'}</p>`;
+    else h += `<p class="pxg-p">Faltan ${pxgNum(hu.faltan)} para el mínimo de ${hu.minimo}${hu.supuesto ? ' (mínimo supuesto)' : ''}${d && d.refuerzo ? ', que ese día lleva refuerzo por el evento' : ''}: ninguna de las ${pxgNum(nPlantilla)} personas puede entrar.</p>`;
+    // el resto de la plantilla, por motivo (solo los que son condiciones; los ya colocados y los de baja, en una frase)
+    const pq = Object.entries(hu.porQueNadie || {}).filter(([m]) => !PXG_DURO.test(m) && !/viene de hacer la mañana|no sale el primero/.test(m));
+    const colocados = Object.entries(hu.porQueNadie || {}).filter(([m]) => /^ya en /.test(m)).reduce((a, [, qs]) => a + qs.length, 0);
+    if (pq.length && hu.tipo === 'primero') h += `<p class="pxg-p pq">El resto: ${pq.slice(0, 4).map(([m, qs]) => `<b>${esc(m)}</b> (${esc(pxgLista(qs))})`).join(' · ')}${pq.length > 4 ? ' · …' : ''}${colocados ? `; ${pxgNum(colocados)} más ya están colocados esa ${fr} en otro local` : ''}.</p>`;
+    if (slots.length) h += `<p class="pxg-p"><b>Queda:</b> ${pxgPosiciones(slots)}.${hu.tipo === 'primero' && d && d.n >= d.min ? ` El mínimo de ${pxgNum(d.min)} está cubierto; lo que falta es quien abra.` : ''}</p>`;
+    const des = pxgDestrapa(res, hu);
+    h += `<p class="pxg-des">${des.length ? `Se destraparía si se levantara una sola condición: ${des.map(x => `<b>${esc(x.nombre)}</b>, que ${esc(x.motivo)}`).join('; ')}. Decisión del cliente, no nuestra.` : `No se destrapa levantando una sola condición: a cada persona de la plantilla la frenan dos o más, o ya está colocada esa ${fr}.`}</p>`;
+    return h + '</div>';
+  }).join('');
+}
+function pxgCondicionesNuevas(res) {
+  const nuevas = res.condiciones.filter(c => c.nueva);
+  if (!nuevas.length) return '<p class="pxg-p mut">Esta semana no hay condiciones nuevas.</p>';
+  return nuevas.map(c => `<div class="pxg-nueva${c.ok ? '' : ' ko'}"><i>${c.num}</i><p><b>${esc(c.texto)}.</b>${c.ok ? '' : `<small class="bad">No se cumple: ${esc(c.detalle)}.</small>`}</p></div>`).join('');
+}
+function pxgPreguntas(res) {
+  const out = [];
+  const sin = { M: [], T: [] }, con = [];
+  for (const l of S.locales) for (const f of FRANJAS) {
+    if (!(l.abre && l.abre[f] && l.abre[f].length)) continue;
+    const fijo = (l.primero && l.primero[f]) || S.staff.some(p => caracteristicaActiva(p, 'abre') && p.abre && p.abre[l.id] && p.abre[l.id].includes(f));
+    if (fijo) con.push(`${l.nombre} (${FRANJA_LBL[f].toLowerCase()})`); else sin[f].push(l.nombre);
+  }
+  if (sin.M.length || sin.T.length) out.push(`<b>¿Quién sale el primero ${[sin.M.length ? `por la mañana en ${esc(pxgLista(sin.M))}` : '', sin.T.length ? `por la tarde en ${esc(pxgLista(sin.T))}` : ''].filter(Boolean).join(', y ')}?</b> ${con.length ? `Ya consta en ${esc(pxgLista(con))}. ` : ''}Ahora pesa más, porque el primero de la casilla define quién hace turno completo.`);
+  for (const p of S.staff) for (const s of p.supuestos || []) out.push(`<b>${esc(p.nombre)}:</b> ${esc(s)}.`);
+  const mins = [];
+  for (const l of S.locales) for (const f of FRANJAS) { const r = resumenMinimos(l, f); if (r && r.includes('*')) mins.push(`${l.nombre} por la ${FRANJA_LBL[f].toLowerCase()}: ${r}`); }
+  if (mins.length) out.push(`<b>¿Confirmáis los mínimos marcados con *?</b> Son los que no fijó el cliente: ${esc(mins.join(' · '))}.`);
+  if (S.locales.some(l => l.horarioSupuesto)) out.push('<b>Horarios reales de entrada y salida.</b> Sin ellos, «turno completo», «partido» y «continuo» son etiquetas en un papel y no horas que se puedan contar para nóminas.');
+  return out.length ? out.map(t => `<div class="pxg-preg"><i></i><p>${t}</p></div>`).join('') : '<p class="pxg-p mut">Sin preguntas pendientes.</p>';
+}
+function pxgCondicionesTodas(res) {
+  return `<div class="pxg-conds${res.condiciones.length > 60 ? ' muchas' : ''}">${res.condiciones.map(c => `<div class="pxg-cond${c.ok ? '' : ' ko'}${c.informativa ? ' info' : ''}"><i>${c.num}</i><b class="${c.ok ? 'ok' : 'ko'}">${c.ok ? '✓' : '✗'}</b><span>${esc(c.texto)}${c.nueva ? ' <em class="nueva">NUEVA</em>' : ''}${c.ok ? '' : `<small>${esc(c.detalle)}</small>`}</span></div>`).join('')}</div>`;
+}
+function pxgConclusion(res) {
+  const r = res.resumen, nH = res.huecos.length;
+  const cortos = [];
+  for (const l of res.locales) for (const f of l.franjas) for (const d of f.dias) if (d.abierto && d.faltan) cortos.push(`${l.nombre} ${pxgDia(d.iso)} por la ${FRANJA_LBL[f.franja].toLowerCase()}`);
+  const sinCocina = res.condiciones.some(c => c.tipo === 'cocina' && !c.ok);
+  const partes = [];
+  partes.push(`<b>La semana sale ${nH ? `con ${pxgNum(nH)} hueco${nH === 1 ? '' : 's'}` : 'sin huecos'}.</b>`);
+  partes.push(cortos.length ? `De los ${r.turnos} turnos, ${r.turnos - cortos.length} tienen su gente mínima y ${pxgNum(cortos.length)} se queda${cortos.length === 1 ? '' : 'n'} por debajo (${esc(pxgLista(cortos))})` : `Los ${r.turnos} turnos tienen su gente mínima${sinCocina ? '' : ' y su cocina'}`);
+  partes.push(r.condicionesRotas ? `se cumplen ${r.condiciones - r.condicionesRotas} de las ${r.condiciones} condiciones (${pxgNum(r.condicionesRotas)} no)` : `se cumplen las ${r.condiciones} condiciones`);
+  partes.push(`nadie pasa de ${pxgNum(r.maxDias)} días y los ${r.descansos} descansos caen donde tocan.`);
+  let txt = partes[0] + ' ' + partes.slice(1, -1).join(', ') + ' y ' + partes[partes.length - 1];
+  const primeros = res.huecos.filter(h => h.tipo === 'primero');
+  if (primeros.length) txt += ` Lo único que no sale es quién abre ${esc(pxgLista(primeros.map(h => { const { localId, franja } = partirTurno(h.turnoId); return `la ${FRANJA_LBL[franja].toLowerCase()} del ${pxgDia(h.iso)} en ${pxgLocal(res, localId).nombre}`; })))}: ninguna persona de la plantilla puede hacerlo sin romper una condición, así que ${primeros.length === 1 ? 'queda señalado' : 'quedan señalados'} como turno disponible.`;
+  return `<div class="pxg-fin">${txt}</div>`;
+}
+function abrirImpresionSemanaGenerada(res, opts) {
+  if (!res || !Array.isArray(res.dias) || !Array.isArray(res.locales)) { toast('No hay planilla generada que imprimir', 'warn'); return; }
+  const o = opts || {};
+  const titulo = o.titulo || 'Planilla propuesta';
+  const lunes = res.lunes || res.dias[0];
+  const nH = res.huecos.length;
+  // página 1: la planilla
+  let h1 = pxgCabecera(res, titulo, `semana ${rangoSemanaTxt(lunes)}`, pxgResumen(res), 1);
+  for (const l of res.locales) h1 += pxgTablaLocal(res, l);
+  h1 += pxgLibran(res);
+  h1 += pxLeyendaCasilla(`<span class="cor"><b>ámbar con marca</b>· turno corregido respecto a lo que había en la planilla</span>`);
+  // página 2: qué ha cambiado
+  const nC = res.cambios.length;
+  const subt = `y ${nH ? `${nH === 1 ? 'el hueco que queda disponible' : `los ${pxgNum(nH)} huecos que quedan disponibles`}` : 'ningún hueco por cubrir'}`;
+  const resumen2 = `${nC ? `${pxgCap(pxgNum(nC))} turno${nC === 1 ? '' : 's'} resuelto${nC === 1 ? '' : 's'}` : 'Ningún turno cambia'}, ${nH ? `${pxgNum(nH)} que ninguna persona de la plantilla puede cubrir` : 'ninguno sin cubrir'}, y las condiciones nuevas que lo gobiernan`;
+  const nuevas = res.condiciones.filter(c => c.nueva).length;
+  let h2 = pxgCabecera(res, 'Qué ha cambiado', subt, esc(resumen2), 2);
+  h2 += `<div class="pxg-cols${nH > 2 ? ' muchos' : ''}">
+    <div class="pxg-col"><h3 class="pxg-h2">${nC ? (nC === 1 ? 'El turno resuelto' : `Los ${pxgNum(nC)} turnos resueltos`) : 'Qué ha cambiado'}</h3>${pxgCambios(res)}${pxgContinuos(res)}</div>
+    <div class="pxg-col"><h3 class="pxg-h2">${nH ? (nH === 1 ? 'El hueco que queda disponible' : `Los ${pxgNum(nH)} huecos que quedan disponibles`) : 'Huecos disponibles'}</h3>${pxgHuecos(res)}</div>
+    <div class="pxg-col"><h3 class="pxg-h2">${nuevas ? (nuevas === 1 ? 'La condición nueva' : `Las ${pxgNum(nuevas)} condiciones nuevas`) : 'Condiciones nuevas'}</h3>${pxgCondicionesNuevas(res)}
+      <h3 class="pxg-h2">Preguntas para el cliente</h3>${pxgPreguntas(res)}
+      <h3 class="pxg-h2">Un turno sin solución no se rellena</h3><p class="pxg-p">Cuando nadie puede ocupar una posición sin romper una condición, el reparto no coloca a ningún nombre: deja la posición marcada como hueco disponible, con el motivo, y el turno queda a la vista para ofrecérselo a quien pueda cogerlo. Es preferible un hueco señalado a un nombre que no puede estar ahí.</p></div>
+  </div>`;
+  h2 += `<h3 class="pxg-h2 pxg-h2c">Las ${res.condiciones.length} condiciones que comprueba el simulador sobre cada semana que genera</h3>${pxgCondicionesTodas(res)}`;
+  h2 += pxgConclusion(res);
+  h2 += `<div class="pxg-foot">Propuesta generada por Shiftia con las condiciones facilitadas por el cliente · Highkey Labs · ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>`;
+  montarImpresion(`<div class="pxg-pag">${h1}</div><div class="pxg-pag pxg-p2">${h2}</div>`, true, `Planilla_semana_generada_${lunes}`);
 }
 
 // ---------- tablón del mes: personas × días ----------

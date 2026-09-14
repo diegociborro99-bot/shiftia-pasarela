@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Shiftia · Grupo Pasarela · Acceso</title>
 <meta name="robots" content="noindex,nofollow">
-<meta name="shiftia-build" content="0.3.0+7e8ace5450">
+<meta name="shiftia-build" content="0.3.0+3e18749c09">
 <meta name="theme-color" content="#f8f6f3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%2232%22%20y2%3D%2232%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234ecdc4%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%232980b9%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22url%28%23g%29%22/%3E%3Cpath%20d%3D%22M16%2026c-6-1.5-10-6-9-12s7-9%2013-7.5c-4.5-0.7-9%202.2-9.7%206.7s3%209%207.5%2010.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M14.5%208c6%201.5%2010%206%209%2012s-7%209-13%207.5c4.5%200.7%209-2.2%209.7-6.7s-3-9-7.5-10.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
@@ -2088,8 +2088,10 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 /* Complementa 13-impresion-formato-del-excel.css (mecánica común: .pxpage, .pxhead,
    .pxw, .pxm, compactación, @media print). Aquí va lo propio del grupo: la pareja de
    logos, las filas por local con su color (--lc llega en el style de la fila desde
-   l.color), las marcas abre / cocina, el turno corto en ámbar, el pie de descansos,
-   la hoja de un local en grande, las píldoras del mes y la tabla de horas.
+   l.color), la casilla del prototipo del 11/09 (número de posición, ▸ ◆ □, P/C, hueco
+   en rojo), el turno corto en ámbar, el pie de descansos, la hoja de un local en
+   grande, la planilla generada de dos páginas (clases pxg-*), las píldoras del mes y
+   la tabla de horas.
    La hoja es siempre blanca: dentro de #printRoot los tokens semánticos se fijan a los
    del tema claro, para que el ámbar o el verde no salgan pálidos con la app en oscuro. */
 #printRoot{--warn:#96580a;--warn-bg:rgba(212,136,58,.14);--ok:#1c7c43;--ok-bg:rgba(39,174,96,.12);--bad:#b03333;--bad-bg:rgba(204,68,68,.10);
@@ -2101,7 +2103,11 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 
 /* ---- semana general: una sección por local con su color ---- */
 .pxw tr.pxloc td.sec{background:var(--lc)}
+.pxw tr.pxloc td.sec small{font-weight:600;font-size:7px;letter-spacing:.02em;text-transform:none;opacity:.9;margin-left:8px}
 .pxw tr.pxloc td.lblp{border-left-color:var(--lc)}
+.pxw td.hueco,.pxlocal td.hueco{background:#fff4f2;border-left:3px solid #d9534f}
+.pxw td.corta{border-left:3px solid #e0a02a}
+.pxw td[data-cas]{padding-top:2px;padding-bottom:2.5px}
 .pxw th.pxd span small{font-size:7.5px;font-weight:600;color:#c8d3da;margin-left:2px;letter-spacing:0}
 .pxw th.pxd i.ev{display:block;font-style:normal;font-size:6.5px;font-weight:700;letter-spacing:.02em;text-transform:none;color:#ffd48a;white-space:normal;line-height:1.1;margin-top:1px}
 .pxw td .nm+.nm{margin-top:1px}
@@ -2110,21 +2116,39 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .pxw td .falta{display:block;font-size:6.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);margin-top:1px;white-space:nowrap}
 .pxw td .falta i{font-style:normal;font-weight:600;letter-spacing:0;text-transform:none}
 .pxvacio{color:#b9c2c9;font-size:7.5px;font-style:italic}
-/* marcas junto al nombre: llave = abre / sale primero; cocina */
-.nm em.mk{display:inline-flex;align-items:center;gap:2px;font-style:normal;font-variant:small-caps;font-size:7px;font-weight:800;letter-spacing:.05em;border-radius:3px;padding:0 3px;margin-left:2px;line-height:1.5}
-.nm em.mk-abre{background:#fff1cf;color:#7a5200}
-.nm em.mk-coc{background:#e3f1e6;color:#25603a}
-.nm em.mk svg{width:7px;height:7px}
 /* tipos de ausencia que no estaban en el piloto */
 .pxw .nm.a-PERM em{background:var(--for-bg);color:var(--for-tx)}
 .pxw .nm.a-OTRO em{background:var(--otr-bg);color:var(--otr-tx)}
 /* pie de descansos */
 .pxw tr.pxdesc td.sec{background:#5c6b75}
 .pxw tr.pxdesc td.lblp{border-left-color:#5c6b75}
-/* leyenda */
+/* leyenda del mes */
 .pxchip .nm{display:inline-flex}
-.pxchip.corta{background:var(--warn-bg);color:var(--warn)}
-.pxchip.corta b{font-size:6.5px;letter-spacing:.06em;text-transform:uppercase}
+
+/* ---- la casilla del prototipo (hojas semanales y planilla generada): tamaños en em
+   para que escalen con la tabla (8.5px en la semana, 12.5px en la hoja del local) ---- */
+.pxg-cnt{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8em;color:#8a97a0;letter-spacing:.02em;line-height:1.25;margin-bottom:.15em;white-space:nowrap}
+.pxg-cnt b{color:#b8741a;font-weight:800}
+.pxg-cnt em{font-style:normal;font-weight:800;margin-left:.6em;font-family:'Inter','DM Sans',Arial,sans-serif;letter-spacing:0}
+.pxg-cnt em.hue{color:#c0392b} .pxg-cnt em.cor,.pxg-cnt em.fal{color:#a3610c}
+.pxg-s{display:flex;gap:.4em;align-items:flex-start;line-height:1.25;margin-top:.2em}
+.pxg-n{flex:none;display:inline-flex;align-items:center;justify-content:center;width:1.3em;height:1.3em;border-radius:.3em;background:#e9eef2;color:#5c6b75;font-size:.78em;font-weight:800;font-style:normal;margin-top:.15em;line-height:1}
+.pxg-b{min-width:0;flex:1}
+.pxg-nm{font-weight:600;color:#1a2a33;white-space:nowrap}
+.pxg-s.abre .pxg-nm{font-weight:700}
+.pxg-mk{font-weight:700;margin-right:.12em;font-style:normal}
+.pxg-mk.abre{color:#1a2a33} .pxg-mk.coc{color:#c2651a} .pxg-mk.com{color:#8a97a0;font-weight:400}
+.pxg-tag{display:inline-block;font-style:normal;font-size:.68em;font-weight:800;line-height:1.5;padding:0 .4em;border-radius:.3em;margin-left:.45em;vertical-align:.12em;letter-spacing:.02em}
+.pxg-tag.p{background:#fff1cf;color:#7a5200} .pxg-tag.c{background:#e3f1e6;color:#25603a}
+.pxg-coc{font-size:.78em;color:#c2651a;margin-left:.45em;font-weight:600}
+.pxg-sub{display:block;font-size:.78em;color:#8a97a0;line-height:1.2;white-space:nowrap}
+.pxg-sub.bad{color:#c0392b} .pxg-sub.warn{color:var(--warn)}
+.pxg-hb{display:inline-block;border:1px dashed #d9534f;color:#c0392b;font-weight:700;border-radius:.35em;padding:0 .5em;line-height:1.5;background:#fff}
+.pxg-ley{display:flex;flex-wrap:wrap;gap:3px 6px;margin-top:6px;font-size:7px;color:#3d4f5a;align-items:center}
+.pxg-ley>span{display:inline-flex;align-items:center;gap:3px;border-radius:5px;padding:1px 6px 1px 4px;background:#f3f5f7}
+.pxg-ley .pxg-n{font-size:6px;margin:0} .pxg-ley .pxg-tag{margin:0;font-size:6px} .pxg-ley .ast{color:#b8741a}
+.pxg-ley>span.hue{background:#fff4f2;color:#c0392b} .pxg-ley>span.fal{background:var(--warn-bg);color:var(--warn)} .pxg-ley>span.cor{background:#fff7e0;color:#a3610c}
+.pxw td .pxvacio{display:block;margin-top:2px}
 
 /* ---- hoja de un local: vertical, letra grande, para leer de pie desde la barra ---- */
 .pxlocal{font-size:12.5px}
@@ -2145,9 +2169,9 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .pxlocal td .falta{font-size:8.5px;margin-top:3px}
 .pxlocal .nm{font-size:13.5px;line-height:1.4;gap:6px}
 .pxlocal .nm i{width:8px;height:8px}
-.pxlocal .nm em.mk{font-size:9px;padding:0 5px;line-height:1.55}
-.pxlocal .nm em.mk svg{width:9px;height:9px}
 .pxlocal td .nm+.nm{margin-top:2px}
+.pxlocal td[data-cas]{vertical-align:top}
+.pxlocal .pxg-s{margin-top:.3em} .pxlocal .pxg-cnt{margin-bottom:.3em}
 .pxh3{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#5c6b75;margin:12px 0 5px}
 /* pie de descansos del local: tabla pequeña debajo */
 .pxdesct{font-size:10px}
@@ -2156,6 +2180,97 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .pxdesct td.lbld{width:120px;font-weight:700;background:#fafbfc;border-left:4px solid var(--lc);white-space:nowrap}
 .pxdesct td .nm{display:inline-flex;margin:1px 8px 1px 0;font-size:10px}
 .pxdesct td .nm+.nm{margin-top:1px}
+
+/* ---- planilla generada: las dos páginas del prototipo del cliente (11/09) ---- */
+.pxg-pag{color:#1a2a33}
+.pxg-pag+.pxg-pag{margin-top:0}
+.pxpage.apaisado .pxg-pag{min-height:198.5mm}   /* en pantalla y en el PDF: cada bloque ocupa justo una página (194 mm útiles × 297/279) */
+.pxg-head{display:flex;align-items:flex-start;gap:12px;padding-bottom:6px;margin-bottom:8px;border-bottom:1.5px solid #1a2a33}
+.pxg-marca{flex:none;margin-top:6px} .pxg-marca svg{display:block;width:30px;height:30px;border-radius:7px}
+.pxg-ht{flex:1;min-width:0}
+.pxg-kick{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:7px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#5c6b75;line-height:1.3}
+.pxg-kick b{font-weight:700}
+.pxg-h1{font-size:18px;font-weight:800;letter-spacing:-.3px;line-height:1.15;margin:2px 0 2px;color:#1a2a33}
+.pxg-h1 span{font-weight:400;color:#5c6b75}
+.pxg-sub{font-size:8.5px;color:#5c6b75;line-height:1.3}
+.pxg-hr{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:3px;margin-top:4px}
+.pxg-hr .pxglogo{height:26px} .pxg-hr .pxgword{font-size:12px}
+.pxg-hr small{font-size:6.5px;color:#8a97a0;letter-spacing:.06em;text-transform:uppercase}
+/* título de cada local: punto de su color, nombre en su color y la regla de cocina */
+.pxg-loc{display:flex;align-items:center;gap:5px;margin:5px 0 2px;font-size:9.5px;line-height:1.2}
+.pxg-loc i{width:7px;height:7px;border-radius:50%;background:var(--lc,#8a97a0);flex:none}
+.pxg-loc b{color:var(--lc,#1a2a33);font-weight:800}
+.pxg-loc span{font-size:7px;color:#8a97a0}
+.pxg-loc.gris{--lc:#8a97a0} .pxg-loc.gris b{color:#1a2a33}
+table.pxg-tab{border-collapse:collapse;width:100%;font-size:8px;table-layout:fixed;border:1px solid #d9e0e6}
+.pxg-tab th,.pxg-tab td{border:1px solid #e2e8ec;padding:2px 4px;text-align:left;vertical-align:top}
+.pxg-tab th{background:#eef2f5;font-size:6.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#3d4f5a;padding:2.5px 4px;line-height:1.2}
+.pxg-tab th span{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600;color:#8a97a0;letter-spacing:0;font-size:7px}
+.pxg-tab th.pxg-turno,.pxg-tab td.pxg-lbl{width:58px}
+.pxg-tab td.pxg-lbl{background:#fafbfc;vertical-align:top}
+.pxg-tab td.pxg-lbl b{display:block;font-size:8.5px;line-height:1.15}
+.pxg-tab td.pxg-lbl small{display:block;font-size:6.5px;color:#8a97a0;line-height:1.2;margin-top:1px}
+.pxg-tab td.pxg-c{padding:2px 4px 3px}
+.pxg-tab td.cerr{background:#fafbfc} .pxg-tab td.cerr span{font-size:7.5px;font-style:italic;color:#b9c2c9}
+.pxg-tab td.corr{background:#fff7e0;border-left:3px solid #e0a02a}
+.pxg-tab td.corta{background:#fff7e0}
+.pxg-tab td.hueco{background:#fff4f2;border-left:3px solid #d9534f}
+.pxg-chips{display:flex;flex-wrap:wrap;gap:2px 3px;margin-top:1px}
+.pxg-chips span{display:inline-flex;align-items:center;gap:3px;border:1px solid #d9e0e6;border-radius:3px;padding:0 3px;font-size:6.5px;line-height:1.55;color:#3d4f5a;background:#fff;white-space:nowrap}
+.pxg-chips span i{width:5px;height:5px;border-radius:50%;flex:none}
+.pxw td .pxg-chips{margin-top:1px}
+.pxg-lib td.pxg-c .pxvacio{display:block;margin-top:1px}
+/* página 2: tres columnas, cajas de huecos, condiciones nuevas, preguntas, lista y pie */
+.pxg-p2 .pxg-h1 span{font-weight:400}
+.pxg-cols{display:grid;grid-template-columns:1.15fr 1.3fr 1fr;gap:0 16px;align-items:start}
+.pxg-col{min-width:0}
+/* con más de dos huecos, la columna central se ensancha y los reparte en dos subcolumnas */
+.pxg-cols.muchos{grid-template-columns:.85fr 2.2fr .95fr}
+.pxg-cols.muchos .pxg-col:nth-child(2) .pxg-hueco{break-inside:avoid;page-break-inside:avoid}
+.pxg-cols.muchos .pxg-col:nth-child(2){column-count:2;column-gap:10px}
+.pxg-cols.muchos .pxg-col:nth-child(2) .pxg-h2{column-span:all}
+.pxg-h2{font-size:9.5px;font-weight:800;margin:4px 0 4px;padding-bottom:2px;border-bottom:1px solid #d9e0e6;color:#1a2a33;line-height:1.2}
+.pxg-h2c{margin-top:7px}
+.pxg-p{font-size:7.2px;line-height:1.4;color:#3d4f5a;margin:0 0 3px}
+.pxg-p.mut{color:#8a97a0;font-style:italic}
+.pxg-p.pq b{font-weight:700;color:#3d4f5a}
+.pxg-p .bad,.pxg-hueco .bad{color:#c0392b}
+.pxg-cambio{margin:0 0 6px}
+.pxg-cambio h4{font-size:8px;font-weight:800;margin:0 0 2px;color:#1a2a33}
+.pxg-antes{font-size:6.8px;color:#8a97a0;line-height:1.35} .pxg-antes s{color:#8a97a0}
+.pxg-ahora{font-size:6.8px;color:#1a2a33;font-weight:700;line-height:1.35} .pxg-ahora b{color:#1c7c43}
+.pxg-nueva-cas{font-style:normal;font-weight:800;color:#1c7c43;text-transform:uppercase;font-size:6px;letter-spacing:.06em}
+.pxg-hueco{border:1px solid #e8b4ae;background:#fff7f6;border-radius:5px;padding:5px 7px 4px;margin:0 0 6px}
+.pxg-hueco h4{font-size:8px;font-weight:800;margin:0 0 2px;color:#c0392b}
+.pxg-hueco .pxg-p{margin-bottom:2.5px}
+.pxg-des{font-size:6.8px;color:#5c6b75;line-height:1.4;margin:3px 0 0;padding-top:3px;border-top:1px dashed #e8b4ae}
+.pxg-des b{color:#1a2a33}
+.pxg-nueva{display:flex;gap:6px;margin:0 0 5px;align-items:flex-start}
+.pxg-nueva i{flex:none;font-style:normal;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:7px;font-weight:800;color:#1c7c43;margin-top:1px;min-width:11px}
+.pxg-nueva p{margin:0;font-size:7.2px;line-height:1.4;color:#3d4f5a} .pxg-nueva p b{color:#1a2a33}
+.pxg-nueva p small{display:block;font-size:6.5px;color:#c0392b;margin-top:1px}
+.pxg-preg{display:flex;gap:6px;margin:0 0 5px;align-items:flex-start}
+.pxg-preg i{flex:none;width:7px;height:7px;border:1.5px solid #1c7c43;border-radius:50%;margin-top:2px}
+.pxg-preg p{margin:0;font-size:7.2px;line-height:1.4;color:#3d4f5a} .pxg-preg p b{color:#1a2a33}
+.pxg-conds{column-count:4;column-gap:14px;margin-top:2px}
+.pxg-conds.muchas{column-count:5;column-gap:10px}
+.pxg-cond{display:flex;gap:3px;align-items:flex-start;break-inside:avoid;font-size:6.5px;line-height:1.3;color:#3d4f5a;margin-bottom:1.5px}
+.pxg-cond i{flex:none;font-style:normal;font-family:ui-monospace,Menlo,Consolas,monospace;color:#8a97a0;min-width:11px;text-align:right;font-size:6px;padding-top:.5px}
+.pxg-cond b{flex:none;font-weight:800;font-size:6.5px;width:7px} .pxg-cond b.ok{color:#1c7c43} .pxg-cond b.ko{color:#c0392b}
+.pxg-cond span{min-width:0}
+.pxg-cond.info{color:#6f7d87}
+.pxg-cond em.nueva{font-style:normal;font-weight:800;color:#1c7c43;font-size:5.5px;letter-spacing:.06em;margin-left:2px}
+.pxg-cond small{display:block;color:#c0392b;font-size:6.2px;line-height:1.25}
+.pxg-fin{margin-top:7px;border:1px solid #bfe3cf;background:#f2faf5;border-radius:5px;padding:5px 8px;font-size:7.4px;line-height:1.45;color:#3d4f5a}
+.pxg-fin b{color:#1c7c43}
+.pxg-foot{margin-top:8px;font-size:6.5px;color:#8a97a0}
+/* compactación (montarImpresion la pone si una página no cabe) */
+.compacto .pxg-tab{font-size:7.4px} .compacto .pxg-tab td.pxg-c{padding:1px 3px 2px} .compacto .pxg-loc{margin:3px 0 1px}
+.compacto .pxg-cond{font-size:6px} .compacto .pxg-p,.compacto .pxg-nueva p,.compacto .pxg-preg p,.compacto .pxg-des{font-size:6.7px}
+.compacto .pxg-hueco{padding:3px 6px 3px;margin-bottom:4px} .compacto .pxg-fin{font-size:7px;padding:4px 7px}
+.compacto2 .pxg-tab{font-size:6.8px} .compacto2 .pxg-tab td.pxg-c{padding:1px 2px} .compacto2 .pxg-h1{font-size:15px}
+.compacto2 .pxg-cond{font-size:5.6px} .compacto2 .pxg-conds{column-count:5} .compacto2 .pxg-p,.compacto2 .pxg-nueva p,.compacto2 .pxg-preg p,.compacto2 .pxg-des{font-size:6.2px}
+.pxpage.compacto .pxsem{font-size:8px} .pxpage.compacto2 .pxsem{font-size:7.4px}
 
 /* ---- tablón del mes: píldora con el color del local; dos colores si dobla ---- */
 .pxm td .pm,.pxchip .pm{display:inline-block;min-width:15px;padding:0 3px;border-radius:4px;background:var(--lc);color:#fff;font-weight:800;font-size:7.5px;line-height:1.7;letter-spacing:.02em;text-align:center}
@@ -2189,10 +2304,12 @@ table.pxh{border-collapse:separate;border-spacing:0;width:100%;font-size:9px;bor
 .pxpage.compacto2 table.pxh{font-size:7.4px} .pxpage.compacto2 .pxh th,.pxpage.compacto2 .pxh td{padding:1px 4px}
 .pxpage.compacto .pxlocal{font-size:11px} .pxpage.compacto .pxlocal .nm{font-size:11.5px} .pxpage.compacto .pxlocal th,.pxpage.compacto .pxlocal td{padding:4px 8px}
 .pxpage.compacto2 .pxlocal{font-size:10px} .pxpage.compacto2 .pxlocal .nm{font-size:10.5px} .pxpage.compacto2 .pxlocal th,.pxpage.compacto2 .pxlocal td{padding:3px 7px}
-.pxpage.compacto .pxsem .falta{font-size:6px} .pxpage.compacto2 .pxsem .nm em.mk{font-size:6px;padding:0 2px}
 @media print{
-  .pxh tr,.pxlocal tr,.pxdesct tr{break-inside:avoid;page-break-inside:avoid}
+  .pxh tr,.pxlocal tr,.pxdesct tr,.pxg-tab tr{break-inside:avoid;page-break-inside:avoid}
   .pxh thead{display:table-header-group}
+  .pxpage.apaisado .pxg-pag{min-height:0}
+  .pxg-pag+.pxg-pag{page-break-before:always;break-before:page}
+  .pxg-hueco,.pxg-cambio,.pxg-nueva,.pxg-preg,.pxg-fin{break-inside:avoid;page-break-inside:avoid}
 }
 
 /* 24-pasarela-horas.css */
