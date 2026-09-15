@@ -361,11 +361,20 @@ function openAjustesLocales(localId) {
         ${FRANJAS.map(f => `<tr><th>${FRANJA_LBL[f]}</th>
           <td><input type="time" data-libre data-hor="${f}|ini" value="${esc((l.horario[f] || {}).ini || '')}" aria-label="Entrada ${esc(FRANJA_LBL[f])}"></td>
           <td><input type="time" data-libre data-hor="${f}|fin" value="${esc((l.horario[f] || {}).fin || '')}" aria-label="Salida ${esc(FRANJA_LBL[f])}"></td>
-          ${[5, 6].map(d => `<td><span class="horx"><input type="time" data-libre data-horx="${d}|${f}|ini" value="${esc(hx(d, f, 'ini'))}" aria-label="Entrada ${esc(FRANJA_LBL[f])} ${esc(DOW_PL[d])}"><input type="time" data-libre data-horx="${d}|${f}|fin" value="${esc(hx(d, f, 'fin'))}" aria-label="Salida ${esc(FRANJA_LBL[f])} ${esc(DOW_PL[d])}"></span></td>`).join('')}</tr>`).join('')}
+          ${[6, 7].map(d => `<td><span class="horx"><input type="time" data-libre data-horx="${d}|${f}|ini" value="${esc(hx(d, f, 'ini'))}" aria-label="Entrada ${esc(FRANJA_LBL[f])} ${esc(DOW_PL[d])}"><input type="time" data-libre data-horx="${d}|${f}|fin" value="${esc(hx(d, f, 'fin'))}" aria-label="Salida ${esc(FRANJA_LBL[f])} ${esc(DOW_PL[d])}"></span></td>`).join('')}</tr>`).join('')}
       </tbody></table></div>
-      <p class="filltxt" style="margin:4px 0 6px">Viernes y sábado: solo si cambia (p. ej. la tarde hasta las 00:00); en blanco, el horario normal.</p>
+      <p class="filltxt" style="margin:4px 0 6px">Sábado y domingo: solo si cambia (la mañana abre a las 08:00); en blanco, el horario normal.</p>
+      <div class="tscrollx"><table class="loctab hortab"><thead><tr><th>Turno partido</th><th>Entrada</th><th>Salida</th><th colspan="2">Quien hace mañana y tarde el mismo día</th></tr></thead><tbody>
+        ${FRANJAS.map(f => `<tr><th>${FRANJA_LBL[f]}</th>
+          <td><input type="time" data-libre data-horp="${f}|ini" value="${esc(((l.horarioPartido || {})[f] || {}).ini || '')}" aria-label="Entrada del partido, ${esc(FRANJA_LBL[f])}"></td>
+          <td><input type="time" data-libre data-horp="${f}|fin" value="${esc(((l.horarioPartido || {})[f] || {}).fin || '')}" aria-label="Salida del partido, ${esc(FRANJA_LBL[f])}"></td>
+          <td colspan="2" class="filltxt">${f === 'M' ? 'entra a mediodía, no a la apertura' : 'vuelve por la noche, no a las 16:00'}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="filltxt" style="margin:4px 0 6px">En un turno partido se cuentan estos dos tramos y no dos jornadas enteras. Quien <b>abre</b> la franja la hace entera. En blanco, el horario normal del local.</p>
       <div class="locgrid2">
         <label class="singchk chkrow"><input type="checkbox" data-libre data-lf="horarioConfirmado"${l.horarioSupuesto ? '' : ' checked'}> Horario confirmado por el grupo</label>
+        <label class="singchk chkrow"><input type="checkbox" data-libre data-lf="partidoConfirmado"${l.horarioPartidoSupuesto ? '' : ' checked'}> Tramos del partido confirmados</label>
+        <label class="singchk chkrow"><input type="checkbox" data-libre data-lf="cierreAprox"${l.cierreAprox ? ' checked' : ''}> La hora de cierre de la tarde es aproximada</label>
         <label class="pinlbl">Descanso por turno (minutos)<input type="number" class="logininp" min="0" max="180" step="5" inputmode="numeric" data-libre data-lf="descansoMin" value="${+l.descansoMin || 0}"></label>
       </div>
       <div class="revgrp"><span class="dot" style="background:${esc(l.color)}"></span>COCINA</div>
@@ -446,6 +455,8 @@ function openAjustesLocales(localId) {
       else if (k === 'color') { l.color = t.value; anota(l, 'color'); pinta(); }
       else if (k === 'descansoMin') { l.descansoMin = Math.max(0, +t.value || 0); anota(l, 'descanso'); }
       else if (k === 'horarioConfirmado') { l.horarioSupuesto = !t.checked; anota(l, t.checked ? 'horario confirmado' : 'horario marcado como supuesto'); }
+      else if (k === 'partidoConfirmado') { l.horarioPartidoSupuesto = !t.checked; anota(l, t.checked ? 'tramos del partido confirmados' : 'tramos del partido marcados como supuestos'); }
+      else if (k === 'cierreAprox') { l.cierreAprox = t.checked; anota(l, t.checked ? 'cierre de la tarde aproximado' : 'cierre de la tarde fijo'); }
       else if (k === 'partidoAbreT') { l.partidoAbre = Object.assign({ M: false, T: false }, l.partidoAbre || {}); l.partidoAbre.T = t.checked; anota(l, t.checked ? 'quien hace partido puede abrir la tarde' : 'el partido ya no abre la tarde'); }
       return;
     }
@@ -453,6 +464,12 @@ function openAjustesLocales(localId) {
       const [f, d] = t.dataset.min.split('|');
       l.minimos[f] = l.minimos[f] || {}; l.minimos[f][d] = Math.max(0, Math.min(20, +t.value || 0)); t.value = l.minimos[f][d];
       anota(l, `mínimos de ${FRANJA_LBL[f].toLowerCase()}`); return;
+    }
+    if (t.dataset.horp) {
+      const [f, k] = t.dataset.horp.split('|');
+      l.horarioPartido = l.horarioPartido || {};
+      l.horarioPartido[f] = Object.assign({ ini: '', fin: '' }, l.horarioPartido[f] || {}, { [k]: t.value });
+      anota(l, `tramo del partido de ${FRANJA_LBL[f].toLowerCase()}`); return;
     }
     if (t.dataset.hor) {
       const [f, k] = t.dataset.hor.split('|');

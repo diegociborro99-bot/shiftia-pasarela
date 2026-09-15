@@ -2,6 +2,17 @@
 
 ## v0.5.0 · 15/09/2026 — Lo que pidió el cliente en la reunión del 15/09
 
+- **Horarios reales del grupo** (WhatsApp de la encargada): mañana de 07:00 a 16:00, los
+  fines de semana desde las 08:00, y tarde de 16:00 hasta el cierre, «sobre las 00:00,
+  aunque depende» (queda marcado como aproximado). Ya no son horarios supuestos.
+- **El turno partido deja de contar como dos jornadas enteras**: se cuentan los dos tramos
+  del local (12:00–16:00 y 20:00–00:00 de fábrica, editables y marcados como supuestos),
+  salvo en la franja que la persona **abre**, que hace entera, y salvo horario puesto a
+  mano en la casilla. Adrián pasa de 358 h a 200 h en septiembre: cifras de un mes, no de
+  un año. El contador de horas explica arriba con qué horarios cuenta.
+- Las planillas ya guardadas se migran al cargarlas: solo se sustituyen los horarios que
+  seguían siendo los supuestos de fábrica; lo que el encargado tocó a mano no se pisa.
+
 - **Cobertura como en el papel**: desde Semana, Hoy o Mes, sobre la persona que va
   a faltar, «Falta estos días…» abre la hoja de cobertura con ella y el día ya
   marcados; una tira de dos semanas enseña sus turnos (M / T◆, en el color del

@@ -34,7 +34,9 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   comprueba el generador, y los ajustes de cada local (aperturas, mínimos,
   cocina, horarios, quién abre).
 - **Contador de horas**: horas del mes por persona a partir de la planilla y de
-  los ajustes del encargado (horas extra, horario distinto), con nocturnas,
+  los ajustes del encargado (horas extra, horario distinto), con los horarios del
+  grupo (mañana 07:00–16:00, fines de semana desde las 08:00; tarde 16:00 hasta el
+  cierre) y el turno partido contado por tramos, con nocturnas,
   domingos y festivos, saldo frente a contrato, desglose por local, Excel,
   impresión y **cierre de mes** para la nómina.
 - **Generador semanal**: la planilla de la semana con las condiciones del cliente

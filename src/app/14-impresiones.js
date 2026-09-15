@@ -394,6 +394,10 @@ function pxgPreguntas(res) {
   for (const l of S.locales) for (const f of FRANJAS) { const r = resumenMinimos(l, f); if (r && r.includes('*')) mins.push(`${l.nombre} por la ${FRANJA_LBL[f].toLowerCase()}: ${r}`); }
   if (mins.length) out.push(`<b>¿Confirmáis los mínimos marcados con *?</b> Son los que no fijó el cliente: ${esc(mins.join(' · '))}.`);
   if (S.locales.some(l => l.horarioSupuesto)) out.push('<b>Horarios reales de entrada y salida.</b> Sin ellos, «turno completo», «partido» y «continuo» son etiquetas en un papel y no horas que se puedan contar para nóminas.');
+  else {
+    const ca = S.locales.some(l => l.cierreAprox), ps = S.locales.some(l => l.horarioPartidoSupuesto);
+    if (ca || ps) out.push(`<b>${ca && ps ? 'La hora de cierre y los tramos del turno partido' : ca ? 'La hora de cierre de la tarde' : 'Los tramos del turno partido'}.</b> ${ca ? 'La mañana (07:00–16:00, los fines de semana desde las 08:00) y la entrada de la tarde ya están confirmadas; el cierre es «sobre las 00:00, aunque depende», y para la nómina hace falta la hora real por local y día. ' : ''}${ps ? 'Quien hace partido se cuenta con dos tramos, mediodía y noche, en vez de dos jornadas enteras: falta confirmar a qué hora entra y sale en cada uno.' : ''}`);
+  }
   return out.length ? out.map(t => `<div class="pxg-preg"><i></i><p>${t}</p></div>`).join('') : '<p class="pxg-p mut">Sin preguntas pendientes.</p>';
 }
 function pxgCondicionesTodas(res) {

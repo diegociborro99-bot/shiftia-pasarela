@@ -96,6 +96,7 @@ function migrarEstado(estado) {
     p.cocina = p.cocina || { titular: [], reserva: [], soloDias: [] }; p.abre = p.abre || {}; p.noAbre = p.noAbre || []; p.nuncaCon = p.nuncaCon || [];
     p.cubreA = p.cubreA || []; p.vetos = p.vetos || []; p.contrato = p.contrato || { horasSemana: null }; p.ausencias = p.ausencias || []; p.prefs = p.prefs || {}; p.supuestos = p.supuestos || [];
   }
+  migrarHorarios(estado);   // 15/09: los horarios que confirmó la encargada por WhatsApp
   asignarColores(estado.staff);
   estado.esquema = 1;
 }

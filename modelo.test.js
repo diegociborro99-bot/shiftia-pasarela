@@ -370,7 +370,7 @@ ok('horas de un turno: el horario por defecto es editable por local y franja y c
 
 ok('horasPersonaMes suma mañanas, tardes, partidos, horas por local, festivos, domingos, extras y saldo frente a contrato', () => {
   const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
-  for (const l of cfg.locales) { l.horario = { M: { ini: '09:00', fin: '16:00' }, T: { ini: '16:00', fin: '23:00' } }; l.descansoMin = 0; }
+  for (const l of cfg.locales) { l.horario = { M: { ini: '09:00', fin: '16:00' }, T: { ini: '16:00', fin: '23:00' } }; l.horarioPartido = null; l.descansoMin = 0; }   // sin tramos de partido: dos turnos enteros
   M.instanciarPatron(cfg, st, e, '2026-10-05', '2026-10-11');
   const meses = { '2026-10': { asig: e.asig } };
   const adr = st.find(p => p.id === 'adrian');
@@ -755,6 +755,80 @@ ok('vaciarPlanilla: borra todas las plazas y marcas del rango (a mano incluidas)
   assert.ok(M.deBaja(M.personaDe(st, 'laura'), '2026-09-14'), 'las bajas siguen');
   assert.ok(antes > 1);
   assert.equal(M.vaciarPlanilla(e, '2026-09-14', '2026-09-20').plazas, 0, 'vaciar dos veces no rompe');
+});
+
+
+// ---------- horarios reales del grupo (WhatsApp de la encargada, 15/09) ----------
+// «El turno de la mañana desde que abren las cafeterías a las 7 aunque fines de semana 8
+// y hasta las 16. Y luego por la tarde desde las 16 hasta que cierren la cafetería a lo
+// mejor sobre las 00 aunque depende.» El partido no son dos turnos enteros: quien lo hace
+// entra a mediodía y vuelve por la noche (Adrián, «solo viene como al mediodía»).
+ok('horarios reales: mañana 07:00–16:00 (fines de semana desde las 08:00) y tarde 16:00–00:00 en los cuatro locales', () => {
+  const cfg = cfgBase();
+  for (const l of cfg.locales) {
+    assert.deepEqual(M.horarioDe(l, 1, 'M'), { ini: '07:00', fin: '16:00' }, `${l.nombre}, lunes por la mañana`);
+    assert.deepEqual(M.horarioDe(l, 5, 'M'), { ini: '07:00', fin: '16:00' }, `${l.nombre}, viernes por la mañana`);
+    assert.deepEqual(M.horarioDe(l, 6, 'M'), { ini: '08:00', fin: '16:00' }, `${l.nombre}, sábado por la mañana`);
+    assert.deepEqual(M.horarioDe(l, 7, 'M'), { ini: '08:00', fin: '16:00' }, `${l.nombre}, domingo por la mañana`);
+    for (const d of M.TODOS) assert.deepEqual(M.horarioDe(l, d, 'T'), { ini: '16:00', fin: '00:00' }, `${l.nombre}, tarde del día ${d}`);
+    assert.equal(l.horarioSupuesto, false, `${l.nombre}: el horario ya lo confirmó el grupo`);
+    assert.equal(l.cierreAprox, true, `${l.nombre}: la hora de cierre es aproximada («a lo mejor sobre las 00, aunque depende»)`);
+  }
+  const l = M.localDe(cfg, 'ZAPA');
+  assert.equal(M.minutosTurno(l, 1, 'M'), 9 * 60, 'la mañana de un día de diario son 9 h');
+  assert.equal(M.minutosTurno(l, 6, 'M'), 8 * 60, 'la del sábado, 8 h');
+  assert.equal(M.minutosTurno(l, 1, 'T'), 8 * 60, 'la tarde, 8 h');
+  assert.equal(M.minutosNocturnos(l, 1, 'T'), 120, 'de las 22:00 a las 00:00, 2 h nocturnas');
+  assert.equal(M.minutosNocturnos(l, 1, 'M'), 0, 'la mañana no tiene nocturnas');
+});
+ok('turno partido: se cuentan los tramos del partido (mediodía y noche), no dos turnos enteros', () => {
+  const cfg = cfgBase(), st = staffDe(cfg);
+  const l = M.localDe(cfg, 'ZAPA');
+  assert.deepEqual(l.horarioPartido, { M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } });
+  assert.equal(l.horarioPartidoSupuesto, true, 'los tramos del partido siguen pendientes de confirmar con el grupo');
+  const e = M.nuevoEstado(2026, 10, { festivos: [] });   // viernes 9: Adrián, cocina de Zapatillera, partido
+  assert.ok(M.asignar(e, cfg, st, '2026-10-09', 'ZAPA_M', 'jacquelin', {}).ok);
+  assert.ok(M.asignar(e, cfg, st, '2026-10-09', 'ZAPA_M', 'adrian', { cocina: true }).ok);
+  assert.ok(M.asignar(e, cfg, st, '2026-10-09', 'ZAPA_T', 'sluna', {}).ok);
+  assert.ok(M.asignar(e, cfg, st, '2026-10-09', 'ZAPA_T', 'adrian', { cocina: true }).ok);
+  const h = M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'adrian', 2026, 10);
+  assert.equal(h.partidos, 1);
+  assert.equal(h.minutos, 8 * 60, `4 h a mediodía y 4 h por la noche, no 17 h (salieron ${h.minutos / 60} h)`);
+  assert.equal(h.nocturnosMin, 120, 'las dos últimas horas de la noche');
+  // el mismo día sin partido: el turno es el completo del local
+  const e2 = M.nuevoEstado(2026, 10, { festivos: [] });
+  assert.ok(M.asignar(e2, cfg, st, '2026-10-09', 'ZAPA_M', 'adrian', { cocina: true }).ok);
+  assert.equal(M.horasPersonaMes(cfg, st, { '2026-10': { asig: e2.asig } }, 'adrian', 2026, 10).minutos, 9 * 60);
+});
+ok('turno partido: quien abre una franja la hace entera, y el horario puesto a mano en la casilla manda sobre todo', () => {
+  const cfg = cfgBase(), st = staffDe(cfg);
+  const e = M.nuevoEstado(2026, 10, { festivos: [] });   // lunes 5: Mari Luz hace partido en Pasarela y abre la tarde
+  for (const [tid, pid] of [['PASARELA_M', 'lola'], ['PASARELA_M', 'mariluz'], ['PASARELA_M', 'tere'], ['PASARELA_T', 'mariluz'], ['PASARELA_T', 'leo']])
+    assert.ok(M.asignar(e, cfg, st, '2026-10-05', tid, pid, {}).ok, `${pid} en ${tid}`);
+  assert.equal(M.primeroDe(cfg, st, e, '2026-10-05', 'PASARELA_T'), 'mariluz', 'abre la tarde en partido (acuerdo del 15/09)');
+  const h = M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'mariluz', 2026, 10);
+  assert.equal(h.minutos, 4 * 60 + 8 * 60, `mañana de partido (4 h) + tarde entera porque la abre (8 h); salieron ${h.minutos / 60} h`);
+  const mm = M.asignados(e, '2026-10-05', 'PASARELA_M').find(x => x.pid === 'mariluz');
+  mm.ini = '10:00'; mm.fin = '15:00';
+  assert.equal(M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'mariluz', 2026, 10).minutos, 5 * 60 + 8 * 60, 'el horario a mano de la casilla manda');
+});
+ok('migrarHorarios: los locales guardados con el horario supuesto de fábrica pasan al real; lo editado a mano se respeta', () => {
+  const estado = M.semillaPasarela();
+  const vieja = () => ({ M: { ini: '09:00', fin: '16:00' }, T: { ini: '16:00', fin: '23:00' }, porDow: { 5: { T: { ini: '16:00', fin: '00:00' } }, 6: { T: { ini: '16:00', fin: '00:00' } } } });
+  for (const l of estado.locales) { l.horario = vieja(); l.horarioSupuesto = true; delete l.horarioPartido; delete l.horarioPartidoSupuesto; delete l.cierreAprox; }
+  const propio = estado.locales[1];
+  propio.horario.M = { ini: '10:00', fin: '15:00' };   // este lo tocó el encargado
+  const r = M.migrarHorarios(estado);
+  assert.equal(r.cambiados, 3, 'los tres que seguían con el horario supuesto de fábrica');
+  const l0 = estado.locales[0];
+  assert.deepEqual(M.horarioDe(l0, 1, 'M'), { ini: '07:00', fin: '16:00' });
+  assert.deepEqual(M.horarioDe(l0, 6, 'M'), { ini: '08:00', fin: '16:00' });
+  assert.deepEqual(M.horarioDe(l0, 3, 'T'), { ini: '16:00', fin: '00:00' });
+  assert.equal(l0.horarioSupuesto, false); assert.equal(l0.cierreAprox, true);
+  assert.deepEqual(propio.horario.M, { ini: '10:00', fin: '15:00' }, 'el horario editado a mano no se toca');
+  assert.equal(propio.horarioSupuesto, true, 'y sigue marcado como suyo, sin confirmar');
+  for (const l of estado.locales) assert.ok(l.horarioPartido && l.horarioPartido.M.ini === '12:00', `${l.nombre} gana los tramos del partido, que no existían`);
+  assert.equal(M.migrarHorarios(estado).cambiados, 0, 'idempotente');
 });
 
 console.log(`\n${n} tests OK`);

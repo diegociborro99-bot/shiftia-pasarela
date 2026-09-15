@@ -63,7 +63,7 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 
 ## Modelo de datos (resumen)
 
-- **Local**: `{id, nombre, corto, color, abre:{M:[dows],T:[dows]}, minimos:{M:{dow:n},T:{…}}, supuestos, cocina:{obligatoria, titulares, reservas, posicion}, primero:{M,T}, partidoAbre:{M,T}, horario:{M,T,porDow}, horarioSupuesto, descansoMin}`.
+- **Local**: `{id, nombre, corto, color, abre:{M:[dows],T:[dows]}, minimos:{M:{dow:n},T:{…}}, supuestos, cocina:{obligatoria, titulares, reservas, posicion}, primero:{M,T}, partidoAbre:{M,T}, horario:{M,T,porDow}, horarioSupuesto, cierreAprox, horarioPartido:{M,T}, horarioPartidoSupuesto, descansoMin}`. `horarioDe(l, dow, franja, partido)` devuelve el tramo del partido cuando toca; `migrarHorarios` pasa las planillas guardadas a los horarios confirmados el 15/09 sin pisar lo editado a mano.
 - **Persona**: `{id, nombre, puesto, locales, franjas, libra, partido:{dias}, cocina:{titular, reserva, soloDias}, abre:{localId:[franjas]}, noAbre, nuncaCon, cubreA, vetos, contrato:{horasSemana}, ausencias:[{tipo,desde,hasta?}], prefs, nota, supuestos, color}`.
 - **Casilla**: `est.asig[iso][turnoId] = [{pid, cocina, abre, origen, razon, supuesto, forzado?, avisos?, ini?, fin?}]`, con `turnoId = localId_franja`. Es una lista ordenada: la posición 1 abre. `est.manual[iso][turnoId]` recuerda lo que se tocó a mano.
 - **Semana tipo**: `S.patron[dow] = [{t: turnoId, p: pid, c?: cocina, a?: abre, s?: supuesto}]`.
