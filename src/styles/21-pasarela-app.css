@@ -313,3 +313,59 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .gcond b{font-family:var(--mono);color:var(--ink3);font-weight:600;margin-right:2px}
 .gnueva{font-family:var(--mono);font-size:8.5px;font-weight:800;color:var(--teal);letter-spacing:.08em;font-style:normal;border:1px solid color-mix(in srgb, var(--teal) 50%, transparent);border-radius:3px;padding:0 4px;margin-left:4px}
 @media (max-width:1100px){.gscols{grid-template-columns:1fr}}
+
+/* ---------- gestor de cobertura ---------- */
+.cobpers{display:flex;align-items:center;gap:10px;font-size:13px}
+.cobpers .av{width:34px;height:34px;border-radius:10px;font-size:11px;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.cobpers b{display:block;font-size:14px;color:var(--ink)}
+.cobpers small{display:block;font-size:11px;color:var(--ink3);line-height:1.3}
+.cobtipos{display:flex;flex-wrap:wrap;gap:5px}
+.cobtipos .abschip{border:1.5px solid transparent;cursor:pointer;font-family:inherit;padding:5px 10px;font-size:12px;opacity:.8}
+.cobtipos .abschip.on{border-color:var(--ink);opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.a-CAMBIO{background:var(--accent-l);color:var(--accent)}
+.cobfr{display:flex;gap:5px}
+.cobfr .dowk{width:auto;padding:0 12px;height:32px}
+.cobcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+.cobcard h3{font-family:var(--font-d);font-size:17px;margin:6px 0 8px;color:var(--ink)}
+.cobcard.cobok{border-color:color-mix(in srgb, var(--ok) 45%, var(--border));background:color-mix(in srgb, var(--ok) 6%, var(--surface))}
+.cobcard.cobvacia{border-style:dashed}
+.cobafs{display:flex;flex-wrap:wrap;gap:6px}
+.cobaf{display:inline-flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:4px 8px;background:var(--surface2);color:var(--ink)}
+.cobaf.ok{opacity:.7}
+.cobaf small{color:var(--ink3);font-size:10.5px}
+.cobaf .cobabre{font-style:normal;font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--accent);text-transform:uppercase}
+.cobaf .lpill,.cobth .lpill,.cobinter .lpill,.gcamblist .lpill{font-family:var(--mono);font-size:9.5px;font-weight:800;color:#fff;background:var(--lc);border-radius:6px;padding:2px 6px}
+.cobplanes{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px}
+@media (max-width:760px){.cobplanes{grid-template-columns:1fr}}
+.cobplan{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.cobplan.reco{border-color:color-mix(in srgb, var(--accent) 55%, var(--border));box-shadow:0 6px 22px color-mix(in srgb, var(--accent) 12%, transparent)}
+.cobph{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.cobph small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+.cobturno{border:1px solid var(--border2);border-radius:11px;overflow:hidden}
+.cobth{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface2);font-size:12px;color:var(--ink2)}
+.cobth b{color:var(--ink)}
+.cobrow{display:flex;align-items:flex-start;gap:9px;padding:8px 10px;border-top:1px solid var(--border2)}
+.cobrow .av{width:28px;height:28px;border-radius:9px;font-size:10px;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:none;background:var(--ink3)}
+.cobtxt{min-width:0;flex:1}
+.cobtxt>b{display:block;font-size:13px;color:var(--ink);line-height:1.3}
+.cobtxt small b{color:var(--ink2)}
+.cobtxt b .bdg{font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.06em;border-radius:5px;padding:1px 5px;vertical-align:middle;font-style:normal}
+.cobtxt b .bdg.abre{background:var(--accent-l);color:var(--accent)}
+.cobtxt b .bdg.cocina{background:rgba(39,174,96,.12);color:#1c7c43}
+.cobtxt b .bdg.forz{background:var(--warn-bg);color:var(--warn)}
+.cobtxt small{display:block;font-size:11px;color:var(--ink3);line-height:1.35;white-space:normal}
+.cobaviso{color:var(--warn)}
+.cobinter{color:var(--teal)!important;margin-top:2px}
+.cobrow.hueco{background:var(--bad-bg,rgba(204,68,68,.08))}
+.cobrow.hueco .av{background:var(--bad)}
+.cobrow.hueco .cobtxt b{color:var(--bad)}
+.cobrow.sobra .av{background:var(--ok)}
+.cobpf{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+.cobpers2{display:flex;flex-wrap:wrap;gap:0}
+.cobok .gcamblist li.bad{color:var(--bad)}
+.modo-empleado #view-cobertura{display:none!important}
+@media (max-width:640px){.cobph{flex-direction:column}.cobpf .btn{width:100%;justify-content:center}}
+/* el aviso del partido se puede ver y quitar desde el chip o el ⚽ de las cabeceras */
+.semt th .evb{cursor:pointer}
+.plan th.day .evd{cursor:pointer;font-size:10px;padding:1px 0}
+.evchip[data-evpop]{cursor:pointer}

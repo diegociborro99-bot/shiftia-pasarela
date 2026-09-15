@@ -32,7 +32,7 @@ function renderMes() {
   const wDia = getComputedStyle(document.documentElement).getPropertyValue('--w-dia').trim() || '62px';
   const wNom = getComputedStyle(document.documentElement).getPropertyValue('--w-nombre').trim() || '175px';
   let h = `<div class="mesev">${evs.map(chipEvento).join('')}</div><table class="plan" style="width:calc(${wNom} + ${est.days.length} * ${wDia})"><thead><tr><th class="pname">Persona</th>`;
-  for (const d of est.days) h += `<th class="day${d.dow >= 6 ? ' wk' : ''}${evPor[d.iso] ? ' evday' : ''}" data-irdia="${d.iso}" title="Ir al día"><span class="dn">${DOW_C[d.dow]}</span><span class="dd">${d.d}</span>${evPor[d.iso] ? '<span class="evd">⚽</span>' : ''}</th>`;
+  for (const d of est.days) h += `<th class="day${d.dow >= 6 ? ' wk' : ''}${evPor[d.iso] ? ' evday' : ''}" data-irdia="${d.iso}" title="Ir al día"><span class="dn">${DOW_C[d.dow]}</span><span class="dd">${d.d}</span>${evPor[d.iso] ? `<span class="evd" role="button" tabindex="0" data-evpop="${d.iso}" title="Ver o quitar el evento">⚽</span>` : ''}</th>`;
   h += '</tr></thead><tbody>';
   const grupos = [];
   for (const l of S.locales) grupos.push([l.nombre, S.staff.filter(p => !deBaja(p) && (p.locales || [])[0] === l.id), l.color]);
@@ -90,10 +90,12 @@ function shiftMonth(dir, dayPolicy) {
 }
 $('#mPrev').addEventListener('click', () => { if (shiftMonth(-1)) renderMes(); });
 $('#mNext').addEventListener('click', () => { if (shiftMonth(1)) renderMes(); });
+$('#mVaciar').addEventListener('click', () => vaciarRangoUI(est.days[0].iso, est.days[est.days.length - 1].iso, `${MESES[S.m - 1]} ${S.y}`, 'el mes'));
 $('#mGenerar').addEventListener('click', () => irAGenerador({ desde: est.days[0].iso, hasta: est.days[est.days.length - 1].iso, titulo: `Generar ${MESES[S.m - 1].toLowerCase()}` }));
 $('#futbolBtns').addEventListener('click', e => { const b = e.target.closest('[data-futbol]'); if (!b) return; openEvento({ equipo: b.dataset.futbol || undefined, iso: isoDia() }); });
 $('#mesRoot').addEventListener('click', e => {
   const ir = e.target.closest('[data-irdia]');
+  if (e.target.closest('[data-evpop]')) return;   // lo atiende el detalle del evento
   if (ir && !e.target.closest('[data-asig]')) { irAIso(ir.dataset.irdia); return; }
   const au = e.target.closest('[data-mesaus]');
   if (au) { openAusenciaMes(au.dataset.mesaus, au); return; }
@@ -115,6 +117,7 @@ function openDiaPersona(pid, iso, anchor) {
     ${cas.map(c => { const { localId, franja } = partirTurno(c.tid); return `<div class="festrow" style="border-left-color:${colorLocal(localId)}"><span class="festinfo"><b>${esc(nombreLocal(localId))} · ${FRANJA_LBL[franja].toLowerCase()}</b><small>${c.entry.abre ? 'abre · ' : ''}${c.entry.cocina ? 'cocina · ' : ''}${esc(c.entry.razon || ORIGEN_LBL[c.entry.origen] || '')}</small></span><button class="festrm" data-quita="${c.tid}" aria-label="Quitar">✕</button></div>`; }).join('') || '<div class="festvacio">Sin turno este día.</div>'}
     <button class="popb full" data-dp="dia">Ir al día</button>
     ${aus ? `<button class="popb full" data-dp="quitaraus">Quitar la ausencia de este día</button>` : `<button class="popb full" data-dp="aus">Marcar ausencia</button>`}
+    ${cas.length ? `<button class="popb full rec" data-dp="cobertura">Buscar quién cubre este día…</button>` : ''}
     ${S.locales.map(l => FRANJAS.filter(f => turnoAbierto(S, e, iso, turnoId(l.id, f)) && !cas.some(c => c.tid === turnoId(l.id, f))).map(f => `<button class="popb full" data-pon="${turnoId(l.id, f)}" style="border-left:4px solid ${esc(l.color)}">Poner en ${esc(l.nombre)} · ${FRANJA_LBL[f].toLowerCase()}</button>`).join('')).join('')}`;
   document.body.appendChild(pop);
   colocarPop(pop, anchor);
@@ -138,6 +141,7 @@ function openDiaPersona(pid, iso, anchor) {
     pop.remove();
     if (b.dataset.dp === 'dia') irAIso(iso);
     else if (b.dataset.dp === 'aus') openAusenciaMes(pid, anchor, iso);
+    else if (b.dataset.dp === 'cobertura') irACobertura({ pid, tipo: 'LD', desde: iso, hasta: iso });
     else if (b.dataset.dp === 'quitaraus') { pushUndo('quitar ausencia', { staff: true }); p.ausencias = quitarDiaDeAusencia(p.ausencias, iso); registrarCambio(`Ausencia retirada: ${p.nombre} el ${fmtDM(iso)}`, 'aus'); saveState(); renderVistaActiva(); }
   });
 }

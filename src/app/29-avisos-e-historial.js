@@ -5,7 +5,7 @@ const HIST_TIPO = {
   manual: ['var(--accent)', 'MANUAL'], asig: ['var(--accent)', 'ASIGNACIÓN'], forzado: ['var(--bad)', 'FORZADO'],
   ia: ['var(--teal)', 'GENERADOR'], undo: ['var(--ink3)', 'DESHECHO'], cambio: ['var(--ink3)', 'CAMBIO'],
   aus: ['var(--warn)', 'AUSENCIA'], aviso: ['var(--warn)', 'AVISO'], cierre: ['#7c5fb8', 'NÓMINA'], extra: ['#7c5fb8', 'HORAS EXTRA'],
-  rev: ['var(--teal)', 'REVISIÓN'], pub: ['var(--teal)', 'PUBLICACIÓN'], equipo: ['var(--accent)', 'EQUIPO'],
+  rev: ['var(--teal)', 'REVISIÓN'], pub: ['var(--teal)', 'PUBLICACIÓN'], equipo: ['var(--accent)', 'EQUIPO'], cobertura: ['var(--teal)', 'COBERTURA'],
 };
 function openHistorial() {
   const ex = document.getElementById('histOvl'); if (ex) ex.remove();

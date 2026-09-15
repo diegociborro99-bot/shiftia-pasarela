@@ -2,7 +2,7 @@
 // Las cuatro casillas de la mañana y las cuatro de la tarde del día en pantalla,
 // con el orden real de la planilla: quien abre va el primero y la cocina en su
 // posición. Es la pantalla que el encargado abre cada mañana.
-const ORIGEN_LBL = { patron: 'semana tipo', generador: 'generador', manual: 'a mano', nucleo: 'núcleo', refuerzo: 'refuerzo', cubre: 'cobertura' };
+const ORIGEN_LBL = { patron: 'semana tipo', generador: 'generador', manual: 'a mano', nucleo: 'núcleo', refuerzo: 'refuerzo', cubre: 'cobertura', cobertura: 'gestor de cobertura' };
 
 function chipPersona(iso, tid, s, opts) {
   const p = personaDeId(s.pid); if (!p) return '';
@@ -91,7 +91,7 @@ function chipEvento(ev) {
   const eq = (S.equipos || []).find(x => x.id === ev.equipo);
   const color = (eq && eq.color) || '#1a5a96';
   const ref = Object.entries(ev.refuerzo || {}).filter(([, n]) => n > 0).map(([lid, n]) => `${(localDe(S, lid) || { corto: lid }).corto} +${n}`).join(' · ');
-  return `<span class="evchip" style="--ec:${esc(color)}" data-ev="${esc(ev.id)}" data-tipstr="${esc((ev.hora ? ev.hora + ' · ' : '') + (ref || 'sin refuerzo'))}"><i>${ev.tipo === 'partido' ? '⚽' : '★'}</i>${esc(ev.nombre)}<small>${esc(ref)}</small><button class="rmx" data-rmev="${esc(ev.id)}" aria-label="Quitar evento">×</button></span>`;
+  return `<span class="evchip" style="--ec:${esc(color)}" data-ev="${esc(ev.id)}" data-evpop="${esc(ev.iso)}" role="button" tabindex="0" title="Ver o quitar el evento" data-tipstr="${esc((ev.hora ? ev.hora + ' · ' : '') + (ref || 'sin refuerzo'))}"><i>${ev.tipo === 'partido' ? '⚽' : '★'}</i>${esc(ev.nombre)}<small>${esc(ref)}</small><button class="rmx" data-rmev="${esc(ev.id)}" aria-label="Quitar evento">×</button></span>`;
 }
 // delegación de la vista Hoy (y de cualquier casilla pintada con htmlCasilla)
 document.addEventListener('click', e => {
@@ -136,10 +136,12 @@ document.addEventListener('click', e => {
   if (rm) {
     const ev = (S.eventos || []).find(x => x.id === rm.dataset.rmev); if (!ev) return;
     if (!confirm(`¿Quitar «${ev.nombre}» del ${fmtDM(ev.iso)}? Los refuerzos ya asignados se quedan en la casilla.`)) return;
+    cerrarPops();
     pushUndo('quitar evento', { eventos: true });
     S.eventos = S.eventos.filter(x => x.id !== ev.id);
     registrarCambio(`Evento retirado: ${ev.nombre} (${fmtDM(ev.iso)})`, 'cambio');
     saveState(); renderVistaActiva();
+    toast(`«${ev.nombre}» quitado del ${fmtDM(ev.iso)} · Ctrl+Z para deshacer`, 'warn');
     return;
   }
 });

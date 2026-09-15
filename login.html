@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Shiftia · Grupo Pasarela · Acceso</title>
 <meta name="robots" content="noindex,nofollow">
-<meta name="shiftia-build" content="0.3.0+7ed0ed4529">
+<meta name="shiftia-build" content="0.4.0+e0205f3e20">
 <meta name="theme-color" content="#f8f6f3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%2232%22%20y2%3D%2232%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234ecdc4%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%232980b9%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22url%28%23g%29%22/%3E%3Cpath%20d%3D%22M16%2026c-6-1.5-10-6-9-12s7-9%2013-7.5c-4.5-0.7-9%202.2-9.7%206.7s3%209%207.5%2010.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M14.5%208c6%201.5%2010%206%209%2012s-7%209-13%207.5c4.5%200.7%209-2.2%209.7-6.7s-3-9-7.5-10.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
@@ -1881,6 +1881,62 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .gcond b{font-family:var(--mono);color:var(--ink3);font-weight:600;margin-right:2px}
 .gnueva{font-family:var(--mono);font-size:8.5px;font-weight:800;color:var(--teal);letter-spacing:.08em;font-style:normal;border:1px solid color-mix(in srgb, var(--teal) 50%, transparent);border-radius:3px;padding:0 4px;margin-left:4px}
 @media (max-width:1100px){.gscols{grid-template-columns:1fr}}
+
+/* ---------- gestor de cobertura ---------- */
+.cobpers{display:flex;align-items:center;gap:10px;font-size:13px}
+.cobpers .av{width:34px;height:34px;border-radius:10px;font-size:11px;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.cobpers b{display:block;font-size:14px;color:var(--ink)}
+.cobpers small{display:block;font-size:11px;color:var(--ink3);line-height:1.3}
+.cobtipos{display:flex;flex-wrap:wrap;gap:5px}
+.cobtipos .abschip{border:1.5px solid transparent;cursor:pointer;font-family:inherit;padding:5px 10px;font-size:12px;opacity:.8}
+.cobtipos .abschip.on{border-color:var(--ink);opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.a-CAMBIO{background:var(--accent-l);color:var(--accent)}
+.cobfr{display:flex;gap:5px}
+.cobfr .dowk{width:auto;padding:0 12px;height:32px}
+.cobcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+.cobcard h3{font-family:var(--font-d);font-size:17px;margin:6px 0 8px;color:var(--ink)}
+.cobcard.cobok{border-color:color-mix(in srgb, var(--ok) 45%, var(--border));background:color-mix(in srgb, var(--ok) 6%, var(--surface))}
+.cobcard.cobvacia{border-style:dashed}
+.cobafs{display:flex;flex-wrap:wrap;gap:6px}
+.cobaf{display:inline-flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:4px 8px;background:var(--surface2);color:var(--ink)}
+.cobaf.ok{opacity:.7}
+.cobaf small{color:var(--ink3);font-size:10.5px}
+.cobaf .cobabre{font-style:normal;font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--accent);text-transform:uppercase}
+.cobaf .lpill,.cobth .lpill,.cobinter .lpill,.gcamblist .lpill{font-family:var(--mono);font-size:9.5px;font-weight:800;color:#fff;background:var(--lc);border-radius:6px;padding:2px 6px}
+.cobplanes{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px}
+@media (max-width:760px){.cobplanes{grid-template-columns:1fr}}
+.cobplan{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.cobplan.reco{border-color:color-mix(in srgb, var(--accent) 55%, var(--border));box-shadow:0 6px 22px color-mix(in srgb, var(--accent) 12%, transparent)}
+.cobph{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.cobph small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+.cobturno{border:1px solid var(--border2);border-radius:11px;overflow:hidden}
+.cobth{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface2);font-size:12px;color:var(--ink2)}
+.cobth b{color:var(--ink)}
+.cobrow{display:flex;align-items:flex-start;gap:9px;padding:8px 10px;border-top:1px solid var(--border2)}
+.cobrow .av{width:28px;height:28px;border-radius:9px;font-size:10px;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:none;background:var(--ink3)}
+.cobtxt{min-width:0;flex:1}
+.cobtxt>b{display:block;font-size:13px;color:var(--ink);line-height:1.3}
+.cobtxt small b{color:var(--ink2)}
+.cobtxt b .bdg{font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.06em;border-radius:5px;padding:1px 5px;vertical-align:middle;font-style:normal}
+.cobtxt b .bdg.abre{background:var(--accent-l);color:var(--accent)}
+.cobtxt b .bdg.cocina{background:rgba(39,174,96,.12);color:#1c7c43}
+.cobtxt b .bdg.forz{background:var(--warn-bg);color:var(--warn)}
+.cobtxt small{display:block;font-size:11px;color:var(--ink3);line-height:1.35;white-space:normal}
+.cobaviso{color:var(--warn)}
+.cobinter{color:var(--teal)!important;margin-top:2px}
+.cobrow.hueco{background:var(--bad-bg,rgba(204,68,68,.08))}
+.cobrow.hueco .av{background:var(--bad)}
+.cobrow.hueco .cobtxt b{color:var(--bad)}
+.cobrow.sobra .av{background:var(--ok)}
+.cobpf{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+.cobpers2{display:flex;flex-wrap:wrap;gap:0}
+.cobok .gcamblist li.bad{color:var(--bad)}
+.modo-empleado #view-cobertura{display:none!important}
+@media (max-width:640px){.cobph{flex-direction:column}.cobpf .btn{width:100%;justify-content:center}}
+/* el aviso del partido se puede ver y quitar desde el chip o el ⚽ de las cabeceras */
+.semt th .evb{cursor:pointer}
+.plan th.day .evd{cursor:pointer;font-size:10px;padding:1px 0}
+.evchip[data-evpop]{cursor:pointer}
 
 /* 22-pasarela-equipo.css */
 /* ============ PASARELA · EQUIPO, FICHA Y AJUSTES DE LOS LOCALES ============

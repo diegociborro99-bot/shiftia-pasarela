@@ -1,5 +1,32 @@
 # Changelog — Shiftia · Grupo Pasarela
 
+## v0.4.0 · 15/09/2026 — Gestor de cobertura, vaciar semana o mes, quitar el aviso del partido
+
+- **Gestor de cobertura** (pestaña Cobertura, y en «Más» del móvil): el encargado
+  dice quién va a faltar (baja, vacaciones, día libre, permiso, otro motivo o un
+  cambio de turno), en qué días y en qué franja, y la app propone el **plan A**
+  (recomendado) y el **plan B** (otras personas, o relajando lo relajable con
+  aviso) para cubrir cada turno afectado con las fichas y las reglas del grupo:
+  «cubre a» manda, luego comodines y apoyos que libren ese día, el local habitual,
+  la cocina si hace falta, quien pueda abrir si la persona abría, y quien menos
+  turnos lleve esa semana. Cada propuesta explica por qué; lo que nadie puede
+  ocupar queda como hueco con el porqué (o «no hace falta nadie» si la casilla
+  sigue completa). Aplicar registra la ausencia en la ficha, quita a la persona de
+  esos turnos y pone a quien cubre con «por X»; Ctrl+Z lo deshace. En un cambio de
+  turno puede proponer un **intercambio**: a cambio, la persona hace un turno
+  cercano de quien le cubre. Desde la hoja de persona del Mes: «Buscar quién cubre
+  este día…».
+- **Vaciar la semana / vaciar el mes** en Semana y Mes: quita todas las plazas
+  (también las puestas a mano) respetando bajas, vacaciones y demás ausencias, que
+  siguen en las fichas; eventos, cierres y aperturas se quedan. Con confirmación,
+  deshacer e historial.
+- **Quitar el aviso del partido**: al pulsar el chip del evento en Hoy o el ⚽ de
+  las cabeceras de Semana y Mes se abre el detalle con «Quitar el evento», «Ir al
+  día» y «Otro evento ese día».
+- Modelo: `TIPOS_INCIDENCIA`, `turnosAfectados`, `candidatosCobertura`,
+  `planesCobertura`, `aplicarCobertura`, `vaciarPlanilla` (9 tests nuevos);
+  `tests/cobertura.test.mjs`; batería e2e de la app ampliada.
+
 ## v0.3.0 · 15/09/2026 — Generador semanal con las condiciones del cliente
 
 Sale del prototipo que pasó el cliente (planilla corregida del 14 al 20 de

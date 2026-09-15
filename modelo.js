@@ -817,6 +817,232 @@ function generarSemana(cfg, staff, est, lunes, opts) {
     estado: target };
 }
 
+// ---------- gestor de cobertura: quién cubre a quien falta ----------
+// El encargado dice que alguien va a tener baja, vacaciones, día libre, permiso u
+// otro motivo (o un cambio de turno) en unos días, y la app propone dos planes para
+// cubrir cada turno afectado: el plan A (recomendado) y el plan B (alternativa con
+// otras personas, o relajando lo relajable: partidos no declarados, con aviso). Lo que
+// nadie puede ocupar sin romper una condición queda como hueco con el porqué. Nada se
+// aplica hasta que el encargado elige un plan; aplicar registra la ausencia en la
+// ficha, quita a la persona de esos turnos y pone a quien cubre con «por X».
+const TIPOS_INCIDENCIA = TIPOS_AUSENCIA.concat([{ id: 'CAMBIO', label: 'Cambio de turno', motivo: 'cambio de turno' }]);
+const MAX_DIAS_COBERTURA = 62;
+// turnos de la persona entre dos fechas (con cocina, si abre, y cómo queda la casilla sin ella)
+function turnosAfectados(cfg, staff, est, pid, desde, hasta, opts) {
+  const o = opts || {};
+  const out = [];
+  let n = 0;
+  for (const iso of rangoIso(desde, hasta || desde)) {
+    if (++n > MAX_DIAS_COBERTURA) break;
+    for (const t of turnosDe(cfg)) {
+      if (o.franjas && o.franjas.length && !o.franjas.includes(t.franja)) continue;
+      if (o.turnos && o.turnos.length && !o.turnos.includes(iso + '|' + t.id)) continue;
+      const e = asignados(est, iso, t.id).find(x => x.pid === pid);
+      if (!e) continue;
+      const rev = revisarTurno(cfg, staff, est, iso, t.id);
+      out.push({ iso, tid: t.id, localId: t.localId, franja: t.franja, cocina: !!e.cocina, abre: primeroDe(cfg, staff, est, iso, t.id) === pid, n: rev.n, min: rev.minimo, supuesto: rev.supuesto });
+    }
+  }
+  return out;
+}
+function turnosSemanaDe(est, pid, iso) {
+  const lunes = mondayOf(iso);
+  let n = 0;
+  for (let k = 0; k < 7; k++) { const d = addDias(lunes, k); for (const lista of Object.values(est.asig[d] || {})) if (lista.some(x => x.pid === pid)) n++; }
+  return n;
+}
+// candidatos para ocupar el sitio de faltaPid en una casilla, ordenados: «cubre a» primero,
+// luego comodines y apoyos, quien libra ese día antes que quien haría partido, el local
+// habitual, la cocina si hace falta, y menos turnos esa semana. opts: {cocina, primero,
+// permitirPartido, evitar:[pids], excluir:[pids]}
+function candidatosCobertura(cfg, staff, est, iso, tid, faltaPid, opts) {
+  const o = opts || {};
+  const { localId, franja } = partirTurno(tid);
+  const l = localDe(cfg, localId);
+  const dow = isoDow(iso);
+  const falta = personaDe(staff, faltaPid);
+  const out = [];
+  for (const p of staff) {
+    if (p.id === faltaPid || (o.excluir || []).includes(p.id)) continue;
+    const r = puedeEstar(cfg, staff, est, iso, tid, p.id, { permitirPartido: !!o.permitirPartido });
+    if (!r.ok) continue;
+    let score = 50; const razones = [];
+    if (o.primero) {
+      const pr = puedePrimero(cfg, staff, est, iso, tid, p.id);
+      if (!pr.ok) continue;
+      if ((l.primero && l.primero[franja] === p.id) || (p.abre && p.abre[localId] && p.abre[localId].includes(franja))) { score += 25; razones.push('sale el primero'); } else razones.push('puede abrir (turno completo)');
+    }
+    if (o.cocina) { const rc = rangoCocina(cfg, l, p, franja, iso); if (rc < 0) continue; score += 40 - Math.min(rc, 30); razones.push(rc < 100 ? `cocina titular de ${l.nombre}` : 'cocina de reserva'); }
+    const cubre = regla(cfg, 'cubreA') && caracteristicaActiva(p, 'cubreA') && falta && (p.cubreA || []).find(c => c.pid === faltaPid && (!c.dow || c.dow === dow) && (!c.turnoId || c.turnoId === tid));
+    if (cubre) { score += 60; razones.push(`cubre a ${falta.nombre}`); }
+    if (esComodin(p)) { score += 30; razones.push('comodín'); }
+    else if (p.puesto === 'apoyo') { score += 15; razones.push('apoyo'); }
+    if ((p.locales || []).length && p.locales[0] === localId) { score += 10; razones.push(`su local habitual es ${l.nombre}`); }
+    const trabajaHoy = turnosDe(cfg).some(t => pidsEn(est, iso, t.id).includes(p.id));
+    if (!trabajaHoy) { score += 20; razones.push('libre ese día'); } else razones.push('ya trabaja ese día (partido)');
+    const ns = turnosSemanaDe(est, p.id, iso);
+    score -= 4 * ns; razones.push(`${ns} turno${ns === 1 ? '' : 's'} esa semana`);
+    if (p.prefs && (p.prefs.evitaDows || []).includes(dow)) { score -= 40; razones.push(`prefiere no trabajar ${DOW_PL[dow]}`); }
+    if (r.avisos.length) { score -= 25; razones.push(...r.avisos); }
+    if ((o.evitar || []).includes(p.id)) score -= 1000;   // alternativa: otra persona si la hay
+    out.push({ pid: p.id, nombre: p.nombre, score, razones, avisos: r.avisos, libre: !trabajaHoy, turnosSemana: ns, cubre: !!cubre });
+  }
+  out.sort((a, b) => b.score - a.score || a.turnosSemana - b.turnosSemana || (a.pid < b.pid ? -1 : 1));
+  return out;
+}
+// un plan: sobre una copia, quita a la persona de sus turnos y va cubriendo cada uno
+// (primero los que menos candidatos tienen); estrategia = {permitirPartido, evitarDe: planBase}
+function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
+  const o = opts || {};
+  const e = clonarEstado(est);
+  const staffSim = inc.tipo === 'CAMBIO' ? staff : staff.map(p => p.id === inc.pid ? Object.assign({}, p, { ausencias: (p.ausencias || []).concat([{ tipo: inc.tipo, desde: inc.desde, hasta: inc.sinFin ? undefined : (inc.hasta || inc.desde) }]) }) : p);
+  for (const a of afectados) desasignar(e, a.iso, a.tid, inc.pid);
+  const plan = { id: null, titulo: '', estrategia: estrategia.permitirPartido ? 'con avisos: partidos no declarados' : 'con las reglas del grupo', relajado: !!estrategia.permitirPartido, asignaciones: [], huecos: [], sinCubrir: [], estado: e };
+  const evitarEn = (iso, tid) => estrategia.evitarDe ? estrategia.evitarDe.asignaciones.filter(x => x.iso === iso && x.tid === tid).map(x => x.pid) : [];
+  const sinLaPersona = pq => { const nombre = nombreDe(staff, inc.pid); for (const k of Object.keys(pq)) { pq[k] = pq[k].filter(n => n !== nombre); if (!pq[k].length) delete pq[k]; } return pq; };
+  const nCand = a => candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, { permitirPartido: !!estrategia.permitirPartido }).length;
+  const orden = afectados.map(a => ({ a, n: nCand(a) })).sort((x, y) => x.n - y.n || (x.a.iso < y.a.iso ? -1 : x.a.iso > y.a.iso ? 1 : 0));
+  const pon = (a, c, extra) => {
+    const r = asignar(e, cfg, staffSim, a.iso, a.tid, c.pid, Object.assign({ origen: 'cobertura', razon: `cubre a ${nombreDe(staff, inc.pid)}`, por: inc.pid, permitirPartido: !!estrategia.permitirPartido }, extra || {}));
+    if (!r.ok) return false;
+    plan.asignaciones.push({ iso: a.iso, tid: a.tid, localId: a.localId, franja: a.franja, pid: c.pid, nombre: c.nombre, razones: c.razones, avisos: c.avisos, cocina: !!(extra && extra.cocina), abre: primeroDe(cfg, staffSim, e, a.iso, a.tid) === c.pid, libre: c.libre, score: c.score });
+    return true;
+  };
+  for (const { a } of orden) {
+    const { localId, franja } = partirTurno(a.tid);
+    const l = localDe(cfg, localId);
+    let rev = revisarTurno(cfg, staffSim, e, a.iso, a.tid);
+    const necesitaCocina = rev.sinCocina && (rev.cocinaObligatoria || a.cocina || rev.faltan > 0) && l && localTieneCocina(l, franja);
+    const necesario = rev.faltan > 0 || necesitaCocina || rev.sinAbre;
+    if (!necesario && !o.siempre) { plan.sinCubrir.push({ iso: a.iso, tid: a.tid, localId, franja, n: rev.n, min: rev.minimo, motivo: `la casilla sigue completa (${rev.n} de ${rev.minimo})` }); continue; }
+    const base = { permitirPartido: !!estrategia.permitirPartido, evitar: evitarEn(a.iso, a.tid) };
+    if (necesitaCocina) {
+      const c = candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, Object.assign({ cocina: true }, base))[0];
+      if (c) pon(a, c, { cocina: true });
+      rev = revisarTurno(cfg, staffSim, e, a.iso, a.tid);
+    }
+    let vueltas = 0;
+    while ((rev.faltan > 0 || (o.siempre && !plan.asignaciones.some(x => x.iso === a.iso && x.tid === a.tid))) && vueltas++ < 6) {
+      const c = candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, Object.assign({ primero: rev.sinAbre }, base))[0] || (rev.sinAbre ? candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, base)[0] : null);
+      if (!c || !pon(a, c)) break;
+      rev = revisarTurno(cfg, staffSim, e, a.iso, a.tid);
+    }
+    if (rev.faltan > 0) plan.huecos.push({ iso: a.iso, tid: a.tid, localId, franja, tipo: 'faltan', faltan: rev.faltan, minimo: rev.minimo, supuesto: rev.supuesto, motivo: `faltan ${rev.faltan} de ${rev.minimo}`, porQueNadie: sinLaPersona(porQueNadie(cfg, staffSim, e, a.iso, a.tid)) });
+    if (rev.sinCocina && necesitaCocina) plan.huecos.push({ iso: a.iso, tid: a.tid, localId, franja, tipo: 'cocina', motivo: 'sin cocina', porQueNadie: sinLaPersona(porQueNadie(cfg, staffSim, e, a.iso, a.tid)) });
+    if (rev.sinAbre) {
+      const c = candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, Object.assign({ primero: true }, base))[0];
+      if (!(c && pon(a, c))) plan.huecos.push({ iso: a.iso, tid: a.tid, localId, franja, tipo: 'primero', pos: 1, motivo: motivoSinPrimero(cfg, staffSim, e, a.iso, a.tid), porQueNadie: sinLaPersona(porQueNadiePrimero(cfg, staffSim, e, a.iso, a.tid)) });
+    }
+  }
+  // cambio de turno: quien cubre puede ceder a cambio uno de sus turnos cercanos a la persona
+  if (inc.tipo === 'CAMBIO' && o.intercambio !== false) {
+    const usados = new Set();
+    for (const as of plan.asignaciones) {
+      const x = intercambioPara(cfg, staff, e, inc.pid, as, afectados, usados);
+      if (x) { as.intercambio = x; usados.add(x.iso + '|' + x.tid); }
+    }
+  }
+  plan.completo = !plan.huecos.length;
+  plan.avisos = plan.asignaciones.reduce((a, x) => a + x.avisos.length, 0);
+  plan.score = plan.asignaciones.reduce((a, x) => a + x.score, 0);
+  plan.personas = [...new Set(plan.asignaciones.map(x => x.pid))];
+  plan.resumen = { cubiertos: plan.asignaciones.length, huecos: plan.huecos.length, avisos: plan.avisos, sinCubrir: plan.sinCubrir.length, personas: plan.personas.length };
+  plan.firma = plan.asignaciones.map(x => `${x.iso}|${x.tid}|${x.pid}|${x.intercambio ? x.intercambio.iso + x.intercambio.tid : ''}`).sort().join(';');
+  return plan;
+}
+// turno de quien cubre que la persona podría hacer a cambio: la misma semana o la
+// siguiente, el mismo local y franja si puede ser, el más cercano; sin romper reglas
+function intercambioPara(cfg, staff, e, pid, as, afectados, usados) {
+  const lunes = mondayOf(as.iso);
+  const p = personaDe(staff, pid);
+  const cands = [];
+  for (let k = -7; k < 14; k++) {
+    const iso = addDias(lunes, k);
+    if (afectados.some(a => a.iso === iso) || ausenciaEn(p, iso)) continue;
+    for (const t of turnosDe(cfg)) {
+      if (!pidsEn(e, iso, t.id).includes(as.pid) || usados.has(iso + '|' + t.id)) continue;
+      const sim = clonarEstado(e); desasignar(sim, iso, t.id, as.pid);
+      const r = puedeEstar(cfg, staff, sim, iso, t.id, pid);
+      if (!r.ok || r.avisos.length) continue;
+      const dist = Math.abs(Math.round((fechaLocal(iso) - fechaLocal(as.iso)) / 864e5));
+      cands.push({ iso, tid: t.id, localId: t.localId, franja: t.franja, quita: as.pid, puntos: (t.localId === as.localId ? 20 : 0) + (t.franja === as.franja ? 10 : 0) - dist });
+    }
+  }
+  cands.sort((a, b) => b.puntos - a.puntos || (a.iso < b.iso ? -1 : 1));
+  return cands[0] || null;
+}
+// planes para una incidencia: inc = {pid, tipo, desde, hasta, sinFin?, franjas?, turnos?, detalle?};
+// opts = {siempre (reemplazar aunque la casilla siga completa), intercambio}
+function planesCobertura(cfg, staff, est, inc, opts) {
+  const o = opts || {};
+  const p = personaDe(staff, inc.pid);
+  const hasta = inc.hasta || inc.desde;
+  const afectados = p ? turnosAfectados(cfg, staff, est, inc.pid, inc.desde, hasta, { franjas: inc.franjas, turnos: inc.turnos }) : [];
+  const out = { pid: inc.pid, nombre: p ? p.nombre : inc.pid, tipo: inc.tipo, desde: inc.desde, hasta, afectados: [], planes: [], posible: true, necesarios: 0 };
+  if (!p) return Object.assign(out, { posible: false, error: 'no existe' });
+  // qué le pasa a cada casilla sin la persona
+  const sin = clonarEstado(est);
+  for (const a of afectados) desasignar(sin, a.iso, a.tid, inc.pid);
+  for (const a of afectados) {
+    const rev = revisarTurno(cfg, staff, sin, a.iso, a.tid);
+    const l = localDe(cfg, a.localId);
+    const necesitaCocina = rev.sinCocina && (rev.cocinaObligatoria || a.cocina || rev.faltan > 0) && l && localTieneCocina(l, a.franja);
+    out.afectados.push(Object.assign({}, a, { quedan: rev.n, faltan: rev.faltan, sinCocina: !!necesitaCocina, sinAbre: rev.sinAbre, necesario: rev.faltan > 0 || !!necesitaCocina || rev.sinAbre }));
+  }
+  out.necesarios = out.afectados.filter(a => a.necesario).length;
+  if (!afectados.length) return out;
+  const A0 = planCobertura(cfg, staff, est, inc, afectados, { permitirPartido: false }, o);
+  const B0 = planCobertura(cfg, staff, est, inc, afectados, { permitirPartido: false, evitarDe: A0 }, o);
+  const A1 = planCobertura(cfg, staff, est, inc, afectados, { permitirPartido: true }, o);
+  const B1 = planCobertura(cfg, staff, est, inc, afectados, { permitirPartido: true, evitarDe: A1 }, o);
+  const vistos = new Set(); const planes = [];
+  for (const pl of [A0, B0, A1, B1]) { if (vistos.has(pl.firma)) continue; vistos.add(pl.firma); planes.push(pl); }
+  planes.sort((x, y) => x.huecos.length - y.huecos.length || x.avisos - y.avisos || y.score - x.score);
+  out.planes = planes.slice(0, 2).map((pl, i) => Object.assign(pl, { id: i ? 'B' : 'A', titulo: i ? 'Plan B · alternativa' : 'Plan A · recomendado' }));
+  if (out.planes[1]) out.planes[1].distinto = out.planes[1].asignaciones.filter(x => !out.planes[0].asignaciones.some(y => y.iso === x.iso && y.tid === x.tid && y.pid === x.pid)).length;
+  out.posible = out.planes.some(pl => pl.completo);
+  return out;
+}
+// aplica un plan sobre el estado real: ausencia en la ficha (salvo cambio de turno),
+// la persona sale de sus turnos, entran quienes cubren (con «por») y los intercambios
+function aplicarCobertura(cfg, staff, est, inc, plan) {
+  const p = personaDe(staff, inc.pid);
+  const res = { ausencia: null, quitados: 0, asignados: [], rechazados: [], intercambios: [] };
+  if (!p) return res;
+  if (inc.tipo !== 'CAMBIO') {
+    const a = { tipo: inc.tipo, desde: inc.desde };
+    if (!inc.sinFin) a.hasta = inc.hasta || inc.desde;
+    if (inc.detalle) a.detalle = inc.detalle;
+    res.ausencia = anadirAusencia(p, a).ausencia;
+  }
+  const hasta = inc.hasta || inc.desde;
+  for (const a of turnosAfectados(cfg, staff, est, inc.pid, inc.desde, hasta, { franjas: inc.franjas, turnos: inc.turnos })) if (desasignar(est, a.iso, a.tid, inc.pid)) res.quitados++;
+  for (const as of (plan && plan.asignaciones) || []) {
+    const r = asignar(est, cfg, staff, as.iso, as.tid, as.pid, { origen: 'cobertura', razon: `cubre a ${p.nombre}`, por: inc.pid, cocina: as.cocina ? true : undefined, permitirPartido: true });
+    if (r.ok) res.asignados.push({ iso: as.iso, tid: as.tid, pid: as.pid, avisos: r.avisos }); else { res.rechazados.push({ iso: as.iso, tid: as.tid, pid: as.pid, motivo: r.motivo }); continue; }
+    if (as.intercambio && inc.tipo === 'CAMBIO') {
+      const x = as.intercambio;
+      if (desasignar(est, x.iso, x.tid, as.pid)) {
+        const r2 = asignar(est, cfg, staff, x.iso, x.tid, inc.pid, { origen: 'cobertura', razon: `cambio con ${nombreDe(staff, as.pid)}`, permitirPartido: true });
+        if (r2.ok) res.intercambios.push({ iso: x.iso, tid: x.tid, pid: inc.pid, quita: as.pid });
+        else { asignar(est, cfg, staff, x.iso, x.tid, as.pid, { origen: 'manual' }); res.rechazados.push({ iso: x.iso, tid: x.tid, pid: inc.pid, motivo: r2.motivo }); }
+      }
+    }
+  }
+  return res;
+}
+// vacía la planilla entre dos fechas: todas las plazas y marcas a mano; las ausencias
+// (bajas, vacaciones…) viven en las fichas y se respetan, igual que aperturas y eventos
+function vaciarPlanilla(est, desde, hasta) {
+  const r = { plazas: 0, dias: 0 };
+  for (const iso of rangoIso(desde, hasta || desde)) {
+    const porT = est.asig[iso];
+    if (porT) { for (const lista of Object.values(porT)) r.plazas += lista.length; if (r.plazas) r.dias++; delete est.asig[iso]; }
+    if (est.manual && est.manual[iso]) delete est.manual[iso];
+  }
+  return r;
+}
+
 // ---------- horas ----------
 function hm(s) { const [h, m] = String(s || '0:0').split(':').map(Number); return h * 60 + (m || 0); }
 function horarioDe(l, dow, franja) {
@@ -1197,6 +1423,7 @@ if (typeof module !== 'undefined') {
     fusionarEstado, sembrarDemo,
     CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
     resumenMinimos, descripcionCocina, condicionesDe, verificarSemana, generarSemana, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
+    TIPOS_INCIDENCIA, turnosAfectados, turnosSemanaDe, candidatosCobertura, planesCobertura, aplicarCobertura, vaciarPlanilla,
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,
   };
 }

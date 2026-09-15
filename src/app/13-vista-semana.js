@@ -19,7 +19,7 @@ function renderSemana() {
     const bloques = posicionesDe(S, S.staff, c.e, c.iso, tid).map(x => x.hueco ? `<button class="wav whueco" data-pick="${c.iso}|${tid}" data-tipstr="${esc('Hueco disponible: ' + (x.motivo || ''))}" aria-label="Hueco disponible">1·?</button>` : `<button class="wav${x.abre ? ' abre' : ''}${x.cocina ? ' cocina' : ''}${x.forzado ? ' forzado' : ''}${x.comodin ? ' comodin' : ''}" style="--pc:${avColor(x.pid)}" data-wpers="${c.iso}|${tid}|${x.pid}" data-tipstr="${esc(x.pos + '. ' + x.nombre + (x.abre ? (x.abreFijo ? ' · sale el primero (fijo)' : ' · abre') : '') + (x.cocina ? ' · cocina' : '') + (x.continuo ? ' · turno continuo' : x.partido ? ' · partido' : '') + (x.por ? ' · por ' + nombrePid(x.por) : '') + (x.nota ? ' · ' + x.nota : ''))}">${esc(initials(x.nombre))}${x.partido ? '<sup>P</sup>' : x.continuo ? '<sup>C</sup>' : ''}</button>`).join('');
     return `<td class="${c.dow >= 6 ? 'wk' : ''}${c.iso === hoy ? ' hoyc' : ''}${r.faltan ? ' wcorta' : ''}"><div class="wcell"><div class="wrowp">${bloques}<button class="wadd" data-pick="${c.iso}|${tid}" aria-label="Añadir persona">＋</button></div>${r.faltan ? `<span class="wfalta">faltan ${r.faltan}${r.supuesto ? '*' : ''}</span>` : ''}${r.sinCocina ? '<span class="wfalta">sin cocina</span>' : ''}</div></td>`;
   };
-  let h = `<table class="act semt"><thead><tr><th class="lbl">Local · franja</th>${cols.map(c => `<th class="${c.dow >= 6 ? 'wk' : ''}${c.iso === hoy ? ' hoyt' : ''}">${DIAS_L[c.dow].slice(0, 3)}<span class="dd">${c.d}</span>${c.evs.map(ev => `<span class="evb" data-tipstr="${esc(ev.nombre)}">⚽ ${esc(ev.nombre.replace(/^Juega el /, ''))}</span>`).join('')}${c.e.days.find(d => d.iso === c.iso).festivo ? '<span class="fbdg">FEST</span>' : ''}</th>`).join('')}</tr></thead><tbody>`;
+  let h = `<table class="act semt"><thead><tr><th class="lbl">Local · franja</th>${cols.map(c => `<th class="${c.dow >= 6 ? 'wk' : ''}${c.iso === hoy ? ' hoyt' : ''}">${DIAS_L[c.dow].slice(0, 3)}<span class="dd">${c.d}</span>${c.evs.map(ev => `<span class="evb" role="button" tabindex="0" data-evpop="${c.iso}" data-tipstr="${esc(ev.nombre + ' · pulsa para ver o quitar')}">⚽ ${esc(ev.nombre.replace(/^Juega el /, ''))}</span>`).join('')}${c.e.days.find(d => d.iso === c.iso).festivo ? '<span class="fbdg">FEST</span>' : ''}</th>`).join('')}</tr></thead><tbody>`;
   for (const l of S.locales) {
     h += `<tr class="locsec" style="--lc:${esc(l.color)}"><td colspan="8"><span class="secl"><i></i>${esc(l.nombre)}</span></td></tr>`;
     for (const f of FRANJAS) {
@@ -50,6 +50,7 @@ $('#semRoot').addEventListener('click', e => {
   const w = e.target.closest('[data-wpers]');
   if (w) { const [iso, tid, pid] = w.dataset.wpers.split('|'); openMenuTurno(iso, tid, pid, w); }
 });
+$('#wVaciar').addEventListener('click', () => vaciarRangoUI(S.semLunes, addDias(S.semLunes, 6), `la semana del ${fmtDM(S.semLunes)} al ${fmtDM(addDias(S.semLunes, 6))}`, 'la semana'));
 $('#wGenerar').addEventListener('click', () => irAGenerador({ desde: S.semLunes, hasta: addDias(S.semLunes, 6), titulo: 'Generar esta semana' }));
 $('#wPatron').addEventListener('click', () => {
   const lunes = S.semLunes;

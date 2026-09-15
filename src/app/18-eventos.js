@@ -73,3 +73,36 @@ function openEquipos() {
   });
   ov.addEventListener('change', e => { const c = e.target.closest('[data-eqcolor]'); if (c) { S.equipos[+c.dataset.eqcolor].color = c.value; saveState(); renderVistaActiva(); } });
 }
+// detalle de los eventos de un día al pulsar el chip o el ⚽ de las cabeceras: quitar el
+// aviso del partido (con confirmación y deshacer), ir al día o añadir otro evento
+function openEventosDia(iso, anchor) {
+  cerrarPops();
+  const evs = eventosDe(S, iso); if (!evs.length) return;
+  const pop = document.createElement('div');
+  pop.className = 'pop'; pop.id = 'evDiaPop'; pop.setAttribute('role', 'dialog');
+  const fila = ev => {
+    const eq = (S.equipos || []).find(x => x.id === ev.equipo);
+    const ref = Object.entries(ev.refuerzo || {}).filter(([, n]) => n > 0).map(([lid, n]) => `${nombreLocal(lid)} +${n}`).join(' · ') || 'sin refuerzo';
+    return `<div class="festrow" style="border-left-color:${esc((eq && eq.color) || '#1a5a96')}"><span class="festinfo"><b>${ev.tipo === 'partido' ? '⚽' : '★'} ${esc(ev.nombre)}</b><small>${ev.hora ? esc(ev.hora) + ' · ' : ''}${ev.franja === 'M' ? 'mañana' : ev.franja === 'MT' ? 'mañana y tarde' : 'tarde'} · ${esc(ref)}</small></span><button class="festrm" data-rmev="${esc(ev.id)}" aria-label="Quitar el evento" title="Quitar el evento">✕</button></div>`;
+  };
+  pop.innerHTML = `<div class="ph">${evs.length === 1 ? esc(evs[0].nombre) : 'Eventos del día'}</div><div class="pd">${fmtLargo(iso)}</div>
+    ${evs.map(fila).join('')}
+    ${evs.map(ev => `<button class="popb full" data-rmev="${esc(ev.id)}">Quitar «${esc(ev.nombre)}»</button>`).join('')}
+    <button class="popb full" data-dp="dia">Ir al día</button>
+    <button class="popb full" data-dp="nuevo">＋ Otro evento ese día</button>`;
+  document.body.appendChild(pop);
+  colocarPop(pop, anchor);
+  cierraFuera(pop);
+  pop.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-dp]'); if (!b) return;   // [data-rmev] lo atiende la delegación de Hoy
+    pop.remove();
+    if (b.dataset.dp === 'dia') irAIso(iso);
+    else if (b.dataset.dp === 'nuevo') openEvento({ iso });
+  });
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-rmev]')) return;
+  const b = e.target.closest('[data-evpop]'); if (!b) return;
+  if (document.getElementById('evDiaPop')) { cerrarPops(); return; }
+  openEventosDia(b.dataset.evpop, b);
+});

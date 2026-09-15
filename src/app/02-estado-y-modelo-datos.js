@@ -214,7 +214,24 @@ function desasignarUI(iso, tid, pid) {
 function renderVistaActiva() {
   const activa = document.querySelector('.tab[aria-selected="true"]');
   const v = activa ? activa.dataset.v : 'hoy';
-  const f = { hoy: () => renderDia(), semana: () => renderSemana(), mes: () => renderMes(), equipo: () => renderEquipo(), horas: () => renderHoras(), generador: () => renderGenerador(), entrevistas: () => renderEntrevistas() }[v];
+  const f = { hoy: () => renderDia(), semana: () => renderSemana(), mes: () => renderMes(), equipo: () => renderEquipo(), horas: () => renderHoras(), generador: () => renderGenerador(), cobertura: () => renderCobertura(), entrevistas: () => renderEntrevistas() }[v];
   if (f) f();
   if (typeof pintaRevDot === 'function') pintaRevDot();
+}
+// vaciar la planilla de un rango (semana o mes) desde la interfaz: todas las plazas,
+// también las puestas a mano. Las bajas, vacaciones y demás ausencias viven en las
+// fichas y se respetan; los eventos, cierres y aperturas se quedan. Ctrl+Z lo deshace.
+function vaciarRangoUI(desde, hasta, titulo, que) {
+  if (!confirmarSiCerrado(desde)) return;
+  const previo = (() => { let n = 0; for (const iso of rangoIso(desde, hasta)) for (const lista of Object.values(estadoDeIso(iso).asig[iso] || {})) n += lista.length; return n; })();
+  if (!previo) { toast(`No hay nada que vaciar en ${que}`, 'warn'); return; }
+  const ausentes = S.staff.filter(p => [...rangoIso(desde, hasta)].some(iso => ausenciaEn(p, iso))).length;
+  if (!confirm(`Se quitan las ${previo} plazas de ${titulo} (también las puestas a mano). ${ausentes ? `Las ${ausentes} persona(s) con baja, vacaciones u otra ausencia siguen igual en sus fichas. ` : 'Las ausencias siguen en las fichas. '}Los eventos, cierres y aperturas se quedan. ¿Vaciar ${que}? (Ctrl+Z lo deshace)`)) return;
+  pushUndo(`vaciar ${que}`, { otrosMeses: true });
+  let plazas = 0;
+  for (const iso of rangoIso(desde, hasta)) plazas += vaciarPlanilla(estadoDeIso(iso, true), iso, iso).plazas;
+  registrarCambio(`Vaciada ${titulo}: ${plazas} plaza(s) retiradas (ausencias respetadas)`, 'cambio');
+  if (mesCerrado(desde)) registrarCambio(`Cambio en un mes cerrado (${desde.slice(0, 7)})`, 'aviso');
+  saveState(); renderVistaActiva();
+  toast(`${plazas} plaza(s) retiradas de ${que} · Ctrl+Z para deshacer`, 'warn');
 }

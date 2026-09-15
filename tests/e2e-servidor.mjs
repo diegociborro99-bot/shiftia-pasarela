@@ -59,7 +59,7 @@ try {
   await entrar(A, 'diego', '12345678');
   const tA = await appCargada(A);
   ok(`diego / 12345678 entra por el formulario y llega la app (${tA} ms)`, tA >= 0, (await A.$('#loginErr')) ? await A.$eval('#loginErr', e => e.textContent) : '');
-  ok('las pestañas del encargado se ven', await A.$$eval('.tab', ts => ts.filter(t => t.offsetParent).length) === 7);
+  ok('las pestañas del encargado se ven (las ocho, con Cobertura)', await A.$$eval('.tab', ts => ts.filter(t => t.offsetParent).length) === 8);
   ok('la sesión es de programador (esAdmin) sin cambio obligatorio', await A.evaluate(() => SRV.rol === 'programador' && SRV.esAdmin === true && SRV.usuario === 'diego') && !(await A.$('#cambioPassOvl')));
   ok('entrar no deja errores de página', errores.length === 0, errores.join(' | '));
 

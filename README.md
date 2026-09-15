@@ -44,6 +44,14 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   cambiado, quién libra cada día y las condiciones comprobadas; vista previa,
   aplicar con deshacer e impresión de la planilla propuesta. Modo «Periodo libre»
   para el mes, con motor local o **núcleo Shiftia (CP-SAT)** vía el servidor.
+- **Gestor de cobertura**: quién va a faltar (baja, vacaciones, día libre, permiso,
+  otro motivo o cambio de turno), qué días y qué franja, y la app propone el
+  **plan A** y el **plan B** para cubrir cada turno afectado con las fichas y las
+  reglas del grupo (o explica por qué nadie puede); aplicar registra la ausencia,
+  retira a la persona y pone a quien cubre con «por X», con deshacer. En un cambio
+  de turno propone también el intercambio.
+- **Vaciar la semana o el mes** (en Semana y Mes) respetando bajas, vacaciones y
+  demás ausencias; el aviso de un partido se quita desde su chip.
 - **Entrevistas**: sección del administrador reservada para la base de datos de
   entrevistas y sus funciones (por importar); de momento visible y «en construcción».
 - **Revisar el mes**, historial de cambios, deshacer (Ctrl+Z), tema claro y

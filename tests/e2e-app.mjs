@@ -3,7 +3,8 @@
 // genera con la semana tipo). Se recorren las siete vistas en escritorio (1280×900)
 // y la barra inferior en el móvil (400×820): selector de Hoy, cuadrante de la
 // Semana, botones de fútbol del Mes con deshacer, generador con historial,
-// revisión, ficha, horas, entrevistas, tema oscuro, impresión y persistencia.
+// revisión, ficha, horas, entrevistas, gestor de cobertura (plan A / plan B, aplicar,
+// deshacer), vaciar la semana, quitar el aviso del partido, tema oscuro, impresión y persistencia.
 // Cuenta como fallo un `pageerror` o un assert; los errores de red de la consola, no.
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync } from 'node:fs';
@@ -55,7 +56,7 @@ try {
   ok(`?demo=1 genera el mes en pantalla (${demo.mes}: ${demo.asig} días con ${demo.plazas} plazas)`, demo.asig > 0 && demo.mes === CLAVE, JSON.stringify(demo));
 
   // 1) las siete vistas cargan sin errores de página
-  for (const v of ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'entrevistas']) {
+  for (const v of ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'cobertura', 'entrevistas']) {
     const antes = errores.length;
     const t = await vista(pg, v);
     ok(`vista «${v}» carga y se muestra sin errores de página`, t >= 0 && errores.length === antes, errores.slice(antes).join(' | '));
@@ -106,6 +107,45 @@ try {
   ok('Ctrl+Z quita el evento (chip fuera)', await llega(pg, n => document.querySelectorAll('#mesRoot .mesev .evchip').length === n, evAntes.chips, 3000) >= 0, await pg.$$eval('#mesRoot .mesev .evchip', x => x.length));
   ok(`y el KPI vuelve a ${evAntes.n}`, await llega(pg, n => { const k = [...document.querySelectorAll('#kpis .kpi')].find(x => /eventos/i.test(x.textContent)); return !!k && k.querySelector('.knum').textContent.trim() === String(n); }, evAntes.n, 3000) >= 0, await kpiEventos());
   ok('el historial registra el evento y el deshecho', await pg.evaluate(() => (S.historial || []).some(h => /Evento: Juega el Barcelona/.test(h.txt)) && (S.historial || []).some(h => h.tipo === 'undo' && /evento/.test(h.txt))));
+
+  // 4b) El aviso del partido se quita desde el chip (Hoy) o el ⚽ de la cabecera (Mes), con deshacer
+  const evDemo = await pg.evaluate(() => (S.eventos || []).map(e => ({ id: e.id, iso: e.iso, nombre: e.nombre }))[0] || null);
+  ok('hay un partido de muestra en el mes (sembrado con ?demo=1)', !!evDemo, JSON.stringify(await pg.evaluate(() => S.eventos)));
+  if (evDemo) {
+    await pg.click(`#mesRoot th.day .evd[data-evpop="${evDemo.iso}"]`);
+    ok('el ⚽ de la cabecera del mes abre el detalle del evento (#evDiaPop) sin ir al día', await llega(pg, () => !!document.querySelector('#evDiaPop') && !document.getElementById('view-mes').classList.contains('hidden'), null, 3000) >= 0);
+    ok('el detalle ofrece «Quitar el evento»', await pg.$$eval('#evDiaPop [data-rmev]', x => x.length >= 1));
+    await pg.click('#evDiaPop .popb[data-rmev]');   // el confirm() se acepta solo
+    ok('el evento desaparece y el detalle se cierra', await llega(pg, id => !(S.eventos || []).some(e => e.id === id) && !document.querySelector('#evDiaPop'), evDemo.id, 3000) >= 0);
+    ok('el historial registra el evento retirado', await pg.evaluate(n => (S.historial || []).some(h => /Evento retirado/.test(h.txt) && h.txt.includes(n)), evDemo.nombre));
+    await pg.keyboard.press('Control+z');
+    ok('Ctrl+Z devuelve el partido', await llega(pg, id => (S.eventos || []).some(e => e.id === id), evDemo.id, 3000) >= 0);
+    await pg.evaluate(iso => irAIso(iso), evDemo.iso);
+    await pg.waitForSelector('#view-hoy .evchip[data-evpop]', { timeout: 4000 });
+    await pg.click('#view-hoy .evchip[data-evpop]');
+    ok('en Hoy, pulsar el chip del partido abre el mismo detalle', await llega(pg, () => !!document.querySelector('#evDiaPop'), null, 3000) >= 0);
+    await pg.keyboard.press('Escape');
+    await pg.evaluate(() => cerrarPops());
+    if (asig) await pg.evaluate(iso => irAIso(iso), asig.iso);   // de vuelta al día de la asignación de Hoy (la persistencia lo comprueba al final)
+  }
+
+  // 4c) Vaciar la semana y el mes: todas las plazas fuera, las ausencias se quedan, Ctrl+Z lo deshace
+  await vista(pg, 'semana');
+  const plazasSemana = () => pg.evaluate(() => { let n = 0; for (let k = 0; k < 7; k++) { const iso = addDias(S.semLunes, k); for (const l of Object.values(estadoDeIso(iso).asig[iso] || {})) n += l.length; } return n; });
+  const vac = { plazas: await plazasSemana(), ausentes: await pg.evaluate(() => S.staff.filter(p => (p.ausencias || []).length).length) };
+  await pg.click('#wVaciar');   // el confirm() se acepta solo
+  ok(`«Vaciar la semana…» retira las ${vac.plazas} plazas de la semana en pantalla`, vac.plazas > 0 && await llega(pg, () => { for (let k = 0; k < 7; k++) { const iso = addDias(S.semLunes, k); if (Object.values(estadoDeIso(iso).asig[iso] || {}).some(l => l.length)) return false; } return true; }, null, 4000) >= 0, await plazasSemana());
+  ok('las bajas y ausencias siguen en las fichas', await pg.evaluate(n => S.staff.filter(p => (p.ausencias || []).length).length === n, vac.ausentes));
+  ok('la semana vacía se pinta y el historial lo registra', await pg.evaluate(() => !!document.querySelector('table.semt') && /Vaciada la semana/.test((S.historial[0] || {}).txt)));
+  await pg.keyboard.press('Control+z');
+  ok(`Ctrl+Z devuelve las ${vac.plazas} plazas`, await llega(pg, n => { let p = 0; for (let k = 0; k < 7; k++) { const iso = addDias(S.semLunes, k); for (const l of Object.values(estadoDeIso(iso).asig[iso] || {})) p += l.length; } return p === n; }, vac.plazas, 4000) >= 0, await plazasSemana());
+  await vista(pg, 'mes');
+  const plazasMes = () => pg.evaluate(() => Object.values(est.asig).reduce((a, d) => a + Object.values(d).reduce((b, l) => b + l.length, 0), 0));
+  const pm0 = await plazasMes();
+  await pg.click('#mVaciar');
+  ok(`«Vaciar el mes…» deja el mes sin plazas (había ${pm0})`, pm0 > 0 && await llega(pg, () => Object.values(est.asig).every(d => !Object.values(d).some(l => l.length)), null, 4000) >= 0, await plazasMes());
+  await pg.keyboard.press('Control+z');
+  ok('Ctrl+Z devuelve el mes', await llega(pg, n => Object.values(est.asig).reduce((a, d) => a + Object.values(d).reduce((b, l) => b + l.length, 0), 0) === n, pm0, 4000) >= 0, await plazasMes());
 
   // 5) Generador semanal (modo por defecto): la planilla de la semana como el prototipo del cliente
   await vista(pg, 'generador');
@@ -176,6 +216,37 @@ try {
   await vista(pg, 'entrevistas');
   ok('Entrevistas: aparece «EN CONSTRUCCIÓN»', await pg.$eval('#view-entrevistas', x => /EN CONSTRUCCIÓN/.test(x.textContent)));
 
+  // 6b) Gestor de cobertura: día libre de alguien con turnos → plan A y plan B, aplicar y deshacer
+  await vista(pg, 'cobertura');
+  ok('Cobertura: panel con persona, seis tipos de incidencia y fechas', await pg.evaluate(() => !!document.querySelector('#cobPid') && document.querySelectorAll('#cobRoot [data-tipo]').length === 6 && !!document.querySelector('#cobD1') && !!document.querySelector('#cobProponer')));
+  const cob = await pg.evaluate(ex => {   // quien más turnos tiene esta semana (distinto de la persona puesta en Hoy)
+    const lunes = mondayOf(isoDia()); let mejor = null;
+    for (const p of activos()) { if (p.id === ex) continue; let n = 0, primero = null; for (let k = 0; k < 7; k++) { const iso = addDias(lunes, k); const e = estadoDeIso(iso); for (const t of turnosDe(S)) if (pidsEn(e, iso, t.id).includes(p.id)) { n++; if (!primero) primero = iso; } } if (!mejor || n > mejor.n) mejor = { pid: p.id, n, iso: primero }; }
+    return mejor;
+  }, asig ? asig.pid : '');
+  ok(`hay alguien con turnos esta semana para la prueba (${cob && cob.pid}, ${cob && cob.n} turnos)`, !!cob && cob.n > 0, JSON.stringify(cob));
+  await pg.selectOption('#cobPid', cob.pid);
+  await pg.click('#cobRoot [data-tipo="LD"]');
+  await pg.fill('#cobD1', cob.iso); await pg.dispatchEvent('#cobD1', 'change');
+  await pg.fill('#cobD2', cob.iso); await pg.dispatchEvent('#cobD2', 'change');
+  ok('el panel recuerda persona, tipo y día', await pg.evaluate(c => COB.pid === c.pid && COB.tipo === 'LD' && COB.desde === c.iso && COB.hasta === c.iso, cob));
+  await pg.click('#cobProponer');
+  ok('«Proponer plan A y plan B» pinta los turnos afectados y al menos un plan', await llega(pg, () => !!(COB.res && COB.res.afectados.length) && document.querySelectorAll('#cobRes .cobplan').length >= 1, null, 5000) >= 0, await pg.evaluate(() => COB.res && JSON.stringify({ af: COB.res.afectados.length, planes: COB.res.planes.length })));
+  const planes = await pg.evaluate(() => COB.res.planes.map(p => ({ id: p.id, n: p.asignaciones.length, huecos: p.huecos.length, avisos: p.avisos, pids: p.asignaciones.map(a => a.pid) })));
+  ok(`el plan A va primero y es el recomendado (${JSON.stringify(planes)})`, planes[0].id === 'A' && await pg.$eval('#cobRes .cobplan.reco .micro', x => /PLAN A/.test(x.textContent)));
+  ok('ninguna propuesta es la persona que falta', planes.every(p => !p.pids.includes(cob.pid)));
+  ok('cada turno afectado acaba con alguien, un hueco explicado o «no hace falta nadie»', await pg.evaluate(() => COB.res.afectados.every(a => ['asignaciones', 'huecos', 'sinCubrir'].some(k => COB.res.planes[0][k].some(x => x.iso === a.iso && x.tid === a.tid)))));
+  ok('cada persona propuesta explica por qué', await pg.evaluate(() => COB.res.planes.every(p => p.asignaciones.every(a => a.razones.length))));
+  const histCob = await pg.evaluate(() => (S.historial || []).length);
+  await pg.click('#cobRes [data-aplicar="A"]');   // el confirm() se acepta solo
+  ok('aplicar el plan A registra el día libre en la ficha', await llega(pg, c => { const p = S.staff.find(x => x.id === c.pid); return !!p && (p.ausencias || []).some(a => a.tipo === 'LD' && a.desde === c.iso); }, cob, 4000) >= 0);
+  ok('la persona sale de sus turnos de ese día', await pg.evaluate(c => turnosDe(S).every(t => !pidsEn(estadoDeIso(c.iso), c.iso, t.id).includes(c.pid)), cob));
+  ok('quien cubre entra con origen cobertura y «por»', planes[0].n === 0 || await pg.evaluate(c => turnosDe(S).some(t => asignados(estadoDeIso(c.iso), c.iso, t.id).some(x => x.origen === 'cobertura' && x.por === c.pid)), cob));
+  ok('la pantalla enseña el resumen de lo aplicado', await pg.$eval('#cobRes', x => /APLICADO/.test(x.textContent)));
+  ok('el historial registra la cobertura con su tipo', await pg.evaluate(n => (S.historial || []).length > n && S.historial[0].tipo === 'cobertura', histCob));
+  await pg.click('#cobDeshacer');
+  ok('«Deshacer» devuelve a la persona a sus turnos y quita el día libre', await llega(pg, c => turnosDe(S).some(t => pidsEn(estadoDeIso(c.iso), c.iso, t.id).includes(c.pid)) && !(S.staff.find(x => x.id === c.pid).ausencias || []).some(a => a.desde === c.iso), cob, 4000) >= 0);
+
   // 7) Tema oscuro
   const errTema = errores.length;
   const temas = [];
@@ -220,11 +291,11 @@ try {
   }
   await pm.click('#bnavMas');
   ok('móvil: «Más» abre #masOvl', await llega(pm, () => !!document.querySelector('#masOvl'), null, 3000) >= 0);
-  ok('móvil: «Más» ofrece Equipo, Horas, Generador y Entrevistas', await pm.evaluate(() => ['equipo', 'horas', 'generador', 'entrevistas'].every(a => !!document.querySelector(`#masOvl [data-mas="${a}"]`))));
+  ok('móvil: «Más» ofrece Equipo, Horas, Generador, Cobertura y Entrevistas', await pm.evaluate(() => ['equipo', 'horas', 'generador', 'cobertura', 'entrevistas'].every(a => !!document.querySelector(`#masOvl [data-mas="${a}"]`))));
   await pm.click('#masOvl [data-mas="horas"]');
   ok('móvil: desde «Más» se llega a Horas', await llega(pm, () => !document.querySelector('#masOvl') && !document.getElementById('view-horas').classList.contains('hidden') && !!document.querySelector('#horasRoot table.htab'), null, 5000) >= 0);
   ok('móvil: la barra marca «Más» como activo en Horas', await pm.$eval('#bnavMas', b => b.classList.contains('on')));
-  for (const v of ['equipo', 'generador', 'entrevistas']) {
+  for (const v of ['equipo', 'generador', 'cobertura', 'entrevistas']) {
     const antes = errores.length;
     await pm.click('#bnavMas'); await pm.waitForSelector('#masOvl', { timeout: 3000 }); await pm.click(`#masOvl [data-mas="${v}"]`);
     ok(`móvil: «${v}» desde «Más», sin errores`, await llega(pm, v => !document.querySelector('#masOvl') && !document.getElementById('view-' + v).classList.contains('hidden'), v, 4000) >= 0 && errores.length === antes, errores.slice(antes).join(' | '));

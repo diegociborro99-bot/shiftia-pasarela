@@ -38,7 +38,7 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 |---|---|
 | `00-pre.js` | `'use strict'`; delante va el modelo embebido. |
 | `01-core-utils.js` | `$`, formatos de fecha, `esc`, toasts, tooltip, overlays y popovers, color por persona y por local. |
-| `02-estado-y-modelo-datos.js` | Estado `S` (locales, staff, patrón, meses, eventos, extras, cierres, equipos), carga y guardado (localStorage o servidor), sincronía entre pestañas, historial, deshacer, `asignarUI` / `desasignarUI`, `renderVistaActiva`. |
+| `02-estado-y-modelo-datos.js` | Estado `S` (locales, staff, patrón, meses, eventos, extras, cierres, equipos), carga y guardado (localStorage o servidor), sincronía entre pestañas, historial, deshacer, `asignarUI` / `desasignarUI`, `vaciarRangoUI`, `renderVistaActiva`. |
 | `10-vista-hoy.js` | Vista Hoy: tarjetas por local con las casillas ordenadas. |
 | `11-selector.js` | Selector de persona (puede / con aviso / no puede + forzar) y menú de una persona en una casilla. |
 | `13-vista-semana.js` | Cuadrante semanal (8 filas × 7 días) con pie de descansos; «guardar como semana tipo». |
@@ -46,11 +46,12 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 | `15-export-xlsx.js` · `15-export-pdf.js` | Excel de la semana y de las horas; PDF. |
 | `16-compartir.js` | Compartir la semana (general o por local) como imagen PNG: hoja de compartir del móvil o descarga. |
 | `17-vista-mes.js` | Mes personas × días, KPIs, leyenda, fila de control, ausencias, botones de fútbol. |
-| `18-eventos.js` | Evento con refuerzo (partidos y otros): refuerzo por local, equipos editables. |
+| `18-eventos.js` | Evento con refuerzo (partidos y otros): refuerzo por local, equipos editables, detalle del evento de un día (quitar el aviso). |
 | `19-vista-equipo.js` · `20-ficha-persona.js` | Equipo: personas, altas y bajas, ficha con todas las condiciones editables, ajustes de los locales. |
 | `21-vista-horas.js` | Contador de horas: tabla del mes, horas extra, cierre y reapertura del mes. |
 | `22-generador.js` | Generador: periodo, opciones, motor local o núcleo, vista previa, aplicar, vaciar lo generado. |
 | `23-revision.js` | Revisión del mes y punto rojo de avisos. |
+| `26-cobertura.js` | Gestor de cobertura: quién falta y cuándo → plan A y plan B (turnos afectados, quién cubre y por qué, huecos, intercambio en un cambio de turno), aplicar con deshacer. |
 | `24-entrevistas.js` | Sección Entrevistas (en construcción): vista previa de la base de datos que llegará de Notion. |
 | `25-cuenta.js` | Contraseña, usuarios (servidor), copia de seguridad y versiones. |
 | `29-avisos-e-historial.js` | Historial de cambios. |
@@ -73,6 +74,8 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 `puedeEstar` devuelve `{ok, motivo, avisos}`: **duras** (cierre del local ese día, ausencia, ya está en esa casilla, no trabaja esa franja, veto local+franja, libra ese día, «nunca con» alguien ya en la casilla, mínimo de cocina obligatoria…) y **blandas** (no es su local, partido no declarado, día que evita…) que se pueden **forzar** desde la interfaz con motivo, y quedan marcadas. `revisarTurno` / `revisionMes` resumen faltas, sin cocina, sin nadie que abra, incompatibles y forzados.
 
 `puedePrimero` / `primeroDe` / `posicionesDe` deciden quién ocupa la 1.ª posición (abre y turno completo) y pintan la casilla con sus marcas; si nadie puede abrir, la 1.ª es un hueco. `condicionesDe` deriva el catálogo de condiciones de locales y fichas (respetando `cfg.reglas` y `p.inactivas`), `verificarSemana` lo comprueba sobre una semana y `generarSemana` devuelve la planilla semanal completa (locales × franjas × días con posiciones, huecos, cambios, quién libra, condiciones).
+
+`turnosAfectados` / `candidatosCobertura` / `planesCobertura` / `aplicarCobertura` son el gestor de cobertura: para una incidencia (`{pid, tipo, desde, hasta, franjas?, sinFin?}`) calculan los turnos de la persona, cómo queda cada casilla sin ella (faltan, sin cocina, nadie que abra), y dos planes (estricto, alternativo con otras personas, y relajado con partidos no declarados avisados; se quedan los dos mejores como A y B) con sus asignaciones razonadas, huecos con «por qué nadie» e intercambio en un cambio de turno. `vaciarPlanilla` quita las plazas y marcas de un rango sin tocar las ausencias.
 
 `generarPlanilla` es aditivo y determinista: instancia la semana tipo (saltando ausentes, con «cubre a» como primera alternativa), y rellena los mínimos con `candidatosPara` (puntuación con razones). Devuelve aplicados, huecos con `porQueNadie`, coberturas y rechazados. `toProblem` / `desdeSolucion` traducen al formato del núcleo Shiftia (CP-SAT) y de vuelta.
 
