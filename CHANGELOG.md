@@ -2,6 +2,21 @@
 
 ## v0.5.0 · 15/09/2026 — Lo que pidió el cliente en la reunión del 15/09
 
+- **Pasada de interfaz**: el menú superior encoge la letra por tramos para que las nueve
+  pestañas entren sin arrastrar y sin comerse el logo (los `@media` estaban escritos
+  antes de la regla base y nunca se aplicaban); los botones de la barra de Semana y Mes
+  van todos juntos a la derecha en vez de partirse en dos filas a lados distintos; al
+  desplazar de lado se quedan a la vista la persona, el nombre del local y la franja (y
+  su fondo ya es opaco: el tinte de la fila dejaba ver por debajo las casillas del otro
+  lado); y la cocina se marca con una **sartén** en vez del rombo, en la app y en las
+  hojas impresas.
+- **Vista previa del cambio** al confirmar una cobertura, como en el piloto de urología:
+  una rejilla de persona × día con quién sale (tachado, en rojo), quién entra (en verde)
+  y qué queda sin cubrir, con «Cancelar» y «Confirmar y aplicar». Nada se toca hasta
+  confirmar.
+- Arreglado: al cerrarse dos capas a la vez la app retrocedía dos veces en el historial y
+  cambiaba de pestaña sola.
+
 - **Arreglado: la app abría en una fecha vieja.** Guardaba el día que estabas mirando y
   lo restauraba para siempre, así que quien un día retrocedió a agosto abría la app en
   «1 de agosto» todas las mañanas, con la planilla vacía y ocho avisos. Ahora abre

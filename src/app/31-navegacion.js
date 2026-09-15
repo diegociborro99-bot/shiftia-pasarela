@@ -103,6 +103,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
+let soltarAtras = () => {};   // lo rellena el vigilante de capas de abajo; se declara antes de usarlo
 // ---------- diálogos: foco y Escape ----------
 {
   const FOC = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
@@ -122,7 +123,20 @@ document.addEventListener('keydown', e => {
   const cierra = ov => { const x = ov.querySelector('[data-ovx],.ovx'); if (x) x.click(); else ov.remove(); };
   const esCapa = n => n instanceof Element && (n.classList.contains('ovl') || (n.classList.contains('pop') && n.classList.contains('sheet')));
   const anota = () => { try { if (!(history.state && history.state.capa)) history.pushState(Object.assign({}, history.state || { v: 'hoy' }, { capa: 1 }), '', location.pathname + location.search); } catch (e) {} };
-  const retira = () => { if (CERRANDO_POR_HISTORIAL) return; if (!document.querySelector('.ovl, .pop.sheet') && history.state && history.state.capa) { try { history.back(); } catch (e) {} } };
+  // Solo se anota UNA entrada de historial por pila de capas, así que al cerrarse solo se
+  // retrocede UNA vez. Cerrando dos capas a la vez (la vista previa y la hoja que la abrió)
+  // se llamaba dos veces en el mismo repintado: se retrocedía de más y la app cambiaba de
+  // pestaña sola. El pestillo se suelta en cuanto llega el popstate.
+  let atrasPendiente = false;
+  soltarAtras = () => { atrasPendiente = false; };
+  const retira = () => {
+    if (CERRANDO_POR_HISTORIAL || atrasPendiente) return;
+    if (!document.querySelector('.ovl, .pop.sheet') && history.state && history.state.capa) {
+      atrasPendiente = true;
+      setTimeout(() => { atrasPendiente = false; }, 400);
+      try { history.back(); } catch (e) {}
+    }
+  };
   new MutationObserver(ms => {
     for (const m of ms) {
       for (const n of m.addedNodes) if (esCapa(n)) { if (n.classList.contains('ovl')) prepara(n); anota(); }
@@ -161,6 +175,7 @@ function anotarHistorial(v) {
   } catch (e) {}
 }
 window.addEventListener('popstate', e => {
+  soltarAtras();
   const abiertos = document.querySelectorAll('.ovl, .pop');
   if (abiertos.length) {
     CERRANDO_POR_HISTORIAL = true;

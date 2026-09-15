@@ -43,7 +43,7 @@ function renderMes() {
   // los que tienen varios locales van con su local principal (el primero); se listan ahí
   for (const [nombre, gente, color] of grupos) {
     if (!gente.length) continue;
-    h += `<tr class="ghdr"><td colspan="${est.days.length + 1}"><span class="lp" style="background:${esc(color)};display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px"></span>${esc(nombre)}</td></tr>`;
+    h += `<tr class="ghdr"><td colspan="${est.days.length + 1}"><span class="ghl"><span class="lp" style="background:${esc(color)};display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px"></span>${esc(nombre)}</span></td></tr>`;
     for (const p of gente) {
       const n = turnosMes(est, p.id);
       h += `<tr class="prow"><td class="pname"><span class="pn" data-ficha="${p.id}" style="cursor:pointer"><b><span class="dot2" style="background:${avColor(p.id)}"></span>${esc(p.nombre)}</b><small>${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${n} turnos</small></span><button class="pnaus" data-mesaus="${p.id}" title="Ausencia (vacaciones, baja, día libre)" aria-label="Ausencia de ${esc(p.nombre)}">＋</button></td>`;

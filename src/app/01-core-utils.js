@@ -7,6 +7,10 @@ const MES3 = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oc
 const DIAS_L = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const DOW_C = ['', 'L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
+// Marca de cocina: una sartén de trazo, más reconocible de un vistazo que el rombo del
+// prototipo. Hereda el color del texto, así que vale en cualquier chip, en la leyenda y
+// en las hojas impresas. Se dibuja con el tamaño de la letra que la rodea.
+const SVG_COCINA = '<svg class="icoc" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.9 10.3h12.3v2.4a5 5 0 0 1-5 5H7.9a5 5 0 0 1-5-5Z"/><path d="m15.4 11.2 5.7-2.8"/></svg>';
 function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"'`]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c])); }
 function initials(n) { const p = String(n || '').trim().split(/\s+/); return ((p[0] && p[0][0] || '') + (p[1] ? p[1][0] : '')).toUpperCase(); }
 function pl(n, sing, plur) { return `${n} ${n === 1 ? sing : plur}`; }

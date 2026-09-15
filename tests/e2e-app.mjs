@@ -263,8 +263,11 @@ try {
   ok('ninguna propuesta es la persona que falta', planes.every(p => !p.pids.includes(cob.pid)));
   ok('cada persona propuesta explica por qué', await pg.evaluate(() => COB.res.planes.every(p => p.asignaciones.every(a => a.razones.length))));
   const histCob = await pg.evaluate(() => (S.historial || []).length);
-  await pg.click('#cobOvl [data-aplicar="A"]');   // el confirm() se acepta solo
-  ok('confirmar el plan A cierra la hoja y vuelve a la semana', await llega(pg, () => !document.querySelector('#cobOvl') && !document.getElementById('view-semana').classList.contains('hidden'), null, 4000) >= 0);
+  await pg.click('#cobOvl [data-aplicar="A"]');
+  ok('«Confirmar plan A» abre la vista previa del cambio con la rejilla de quién sale y quién entra', await llega(pg, () => { const o = document.querySelector('#previaCobOvl'); return !!o && !!o.querySelector('table.pvt td.pvsale') && !!o.querySelector('#pvOk'); }, null, 4000) >= 0, await pg.evaluate(() => !!document.querySelector('#previaCobOvl')));
+  ok('la vista previa nombra a quien falta y aún no ha tocado la planilla', await pg.evaluate(c => { const o = document.querySelector('#previaCobOvl'); const p = S.staff.find(x => x.id === c.pid); return o.textContent.includes(p.nombre) && !(p.ausencias || []).some(a => a.desde === c.iso); }, cob));
+  await pg.click('#previaCobOvl #pvOk');
+  ok('confirmar el plan A cierra la hoja y vuelve a la semana', await llega(pg, () => !document.querySelector('#cobOvl') && !document.getElementById('view-semana').classList.contains('hidden'), null, 4000) >= 0, await pg.evaluate(() => ({ hoja: !!document.querySelector('#cobOvl'), previa: !!document.querySelector('#previaCobOvl'), vista: (document.querySelector('.tab[aria-selected="true"]') || {}).dataset && document.querySelector('.tab[aria-selected="true"]').dataset.v, aplicado: !!COB.aplicado })).then(JSON.stringify));
   ok('el día libre queda en la ficha', await pg.evaluate(c => { const p = S.staff.find(x => x.id === c.pid); return !!p && (p.ausencias || []).some(a => a.tipo === 'LD' && a.desde === c.iso); }, cob));
   ok('la persona sale de sus turnos de ese día (también en el cuadrante)', await pg.evaluate(c => turnosDe(S).every(t => !pidsEn(estadoDeIso(c.iso), c.iso, t.id).includes(c.pid)) && !document.querySelector(`table.semt [data-wpers="${c.iso}|${c.tid}|${c.pid}"]`), cob));
   ok('quien cubre entra con origen cobertura y «por»', planes[0].n === 0 || await pg.evaluate(c => turnosDe(S).some(t => asignados(estadoDeIso(c.iso), c.iso, t.id).some(x => x.origen === 'cobertura' && x.por === c.pid)), cob));

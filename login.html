@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Shiftia · Grupo Pasarela · Acceso</title>
 <meta name="robots" content="noindex,nofollow">
-<meta name="shiftia-build" content="0.5.0+60cc8e43bb">
+<meta name="shiftia-build" content="0.5.0+5543e32210">
 <meta name="theme-color" content="#f8f6f3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%2232%22%20y2%3D%2232%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234ecdc4%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%232980b9%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22url%28%23g%29%22/%3E%3Cpath%20d%3D%22M16%2026c-6-1.5-10-6-9-12s7-9%2013-7.5c-4.5-0.7-9%202.2-9.7%206.7s3%209%207.5%2010.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M14.5%208c6%201.5%2010%206%209%2012s-7%209-13%207.5c4.5%200.7%209-2.2%209.7-6.7s-3-9-7.5-10.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
@@ -132,7 +132,7 @@ select,input{font-family:inherit}
 .topbar{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:18px;padding:calc(15px + env(safe-area-inset-top)) calc(26px + env(safe-area-inset-right)) 15px calc(26px + env(safe-area-inset-left));
   background:color-mix(in srgb, var(--surface) 86%, transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
   border-bottom:1px solid var(--border)}
-.brand{display:flex;align-items:center;gap:10px;min-width:0;flex:0 1 auto}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;flex:none}   /* nunca se encoge: el logo no se recorta */
 .brand>svg,.brand .coop{flex:none}
 .bname{font-family:var(--font-d);font-size:24px;font-weight:700;letter-spacing:-.3px;color:var(--ink);white-space:nowrap}
 .bname em{font-style:normal;color:var(--accent)}
@@ -142,14 +142,18 @@ select,input{font-family:inherit}
    en TODAS las pantallas, por un píxel. Ahora es un punto más pequeño (subtítulo,
    no segundo título), cabe entero y solo aparece cuando el menú tiene sitio. */
 .svc{font-family:var(--font-d);font-size:14px;font-weight:600;color:var(--ink2);border-left:1px solid var(--border);padding-left:13px;margin-left:1px;white-space:nowrap;flex:none;letter-spacing:-.1px}
-@media (max-width:1560px){.svc{display:none}}
-@media (max-width:1400px){.tab{padding:10px 11px;font-size:13.5px}.tab svg{display:none}}
-@media (max-width:1200px){.tab{padding:10px 8px;font-size:13px}.tright{gap:6px}}
 .tabs{display:flex;gap:2px;margin-left:auto;margin-right:auto;overflow-x:auto}
-.tab{position:relative;background:none;border:0;padding:10px 18px;font-size:14.5px;font-weight:600;color:var(--ink3);border-radius:8px;white-space:nowrap;transition:color .15s}
+.tab{position:relative;background:none;border:0;padding:9px 13px;font-size:13.5px;font-weight:600;color:var(--ink3);border-radius:8px;white-space:nowrap;transition:color .15s}
 .tab:hover{color:var(--ink2)}
 .tab[aria-selected="true"]{color:var(--accent)}
-.tab[aria-selected="true"]::after{content:"";position:absolute;left:13px;right:13px;bottom:2px;height:2.5px;background:var(--accent);border-radius:2px}
+.tab[aria-selected="true"]::after{content:"";position:absolute;left:8px;right:8px;bottom:2px;height:2.5px;background:var(--accent);border-radius:2px}
+@media (max-width:1560px){.svc{display:none}}
+/* Nueve pestañas: con 14.5px se desbordaban y había que arrastrar el menú (y la marca
+   se encogía hasta recortar el logo). La letra baja por tramos hasta que entran solas. */
+@media (max-width:1700px){.tab{padding:9px 11px;font-size:13px}}
+@media (max-width:1460px){.tab{padding:9px 9px;font-size:12.5px}.tab svg{display:none}}
+@media (max-width:1280px){.tab{padding:9px 7px;font-size:12px}.tright{gap:6px}.topbar{gap:12px}}
+@media (max-width:1120px){.tab{padding:9px 5px;font-size:11.5px}.tab[aria-selected="true"]::after{left:4px;right:4px}.topbar{gap:10px;padding-left:16px;padding-right:16px}.bname{font-size:21px}}
 .tright{display:flex;align-items:center;gap:10px}
 .iconbtn{width:34px;height:34px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .iconbtn:hover{background:var(--accent-solid);border-color:var(--accent);color:#fff}
@@ -162,7 +166,7 @@ main{max-width:1520px;margin:0 auto;padding:24px 26px 70px}
 
 /* 03-nav.css */
 /* ============ NAV ============ */
-.tab svg{width:19px;height:19px;vertical-align:-3px;margin-right:6px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab svg{width:17px;height:17px;vertical-align:-3px;margin-right:5px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .dnav{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
 .dkick{display:block;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--ink3);text-transform:uppercase;margin-bottom:2px}
 .dbig{font-family:var(--font-d);font-size:42px;font-weight:300;letter-spacing:-.5px;color:var(--accent);line-height:1.1}
@@ -327,7 +331,10 @@ th.pname{top:0;z-index:8}
 .plan th{box-shadow:0 1px 0 var(--border)}
 .pn b{font-size:13.5px;font-weight:600;display:block;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pn small{font-size:9.5px;color:var(--ink3)}
-tr.ghdr td{background:var(--surface2) !important;font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.14em;color:var(--ink2);text-align:left;padding:6px 12px;position:sticky;left:0}
+tr.ghdr td{background:var(--surface2) !important;font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.14em;color:var(--ink2);text-align:left;padding:6px 12px}
+/* la fila del local ocupa todo el ancho: lo que se queda anclado al desplazar de lado
+   es el nombre de dentro, no la celda (que empieza en 0 y no tiene a dónde moverse) */
+tr.ghdr .ghl{display:inline-flex;align-items:center;position:sticky;left:12px}
 tr.frow td{background:var(--surface3);border-top:1px solid var(--border);padding:4px 2px}
 tr.frow td.pname{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);background:var(--surface3)}
 .cwarn{display:inline-block;min-width:20px;border-radius:5px;background:var(--warn-bg);color:var(--warn);font-family:var(--mono);font-size:9.5px;font-weight:700;padding:1px 4px}
@@ -1385,8 +1392,10 @@ footer .sep{flex:1}
    Ahora: una fila con las flechas y el título, una fila de acciones que se
    desliza de lado (como las pestañas del profesional), los cuatro KPI en cuatro
    líneas dentro de una tarjeta y la leyenda en una sola línea deslizable. En el
-   portátil `.dacts` es display:contents: la misma pantalla de siempre. */
-.dacts{display:contents}
+   portátil, las acciones van juntas a la derecha: con `display:contents` cada botón
+   era hijo de `.dnav` y, al no caber, la segunda fila empezaba por la izquierda —
+   unos botones a un lado y otros al otro. */
+.dacts{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;margin-left:auto;min-width:0}
 @media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
   .dnav{gap:8px 10px;margin-bottom:10px;align-items:center}
   .dnav .spacer{display:none}
@@ -1398,7 +1407,7 @@ footer .sep{flex:1}
   .mbtn{width:44px;height:44px}
   .dstats{flex:1 1 100%;order:3;gap:6px}
   .dstat{font-size:11px;padding:6px 9px}
-  .dacts{display:flex;order:4;flex:1 1 100%;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -12px;padding:2px 12px 4px}
+  .dacts{display:flex;order:4;flex:1 1 100%;flex-wrap:nowrap;justify-content:flex-start;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -12px;padding:2px 12px 4px}
   .dacts::-webkit-scrollbar{display:none}
   .dacts .btn{flex:none;white-space:nowrap;padding:10px 13px;font-size:13px;min-height:44px}
   /* KPI: cuatro líneas, no cuatro tarjetas */
@@ -2017,6 +2026,68 @@ body:not(.rol-programador) .tab[data-v="actividad"]{display:none!important}
 /* lo que hay en pantalla no es hoy: se dice a las claras y el botón «Hoy» resalta */
 .dchip.dc-otro{background:var(--warn-bg);color:var(--warn);border:1px solid color-mix(in srgb, var(--warn) 45%, transparent);text-transform:none;letter-spacing:.02em}
 .mbtn.lejos{border-color:var(--warn);color:var(--warn);font-weight:800}
+
+/* la sartén de la cocina: toma el tamaño y el color de lo que la rodea */
+.icoc{width:1.25em;height:1.25em;display:inline-block;vertical-align:-.28em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.gcoc .icoc,.pxg-mk.coc .icoc{vertical-align:-.22em}
+
+/* Primera columna fija al desplazar de lado: en Semana el local y la franja, en el
+   contador de horas la persona (antes se perdía de vista de quién era cada fila).
+   Su fondo tiene que ser OPACO: el tinte de la fila señalada es translúcido
+   (rgba .08) y por debajo se veían las casillas del otro lado del desplazamiento,
+   que se comían el nombre. El tinte va como capa encima, no como color de fondo. */
+.act td.lbl,.act th.lbl{position:sticky;left:0;z-index:4;background-color:var(--surface)}
+.act th.lbl{z-index:7}
+.act tr.locsec td{background-color:var(--surface)}
+.htab td.per,.htab th:first-child{position:sticky;left:0;z-index:2;background-color:var(--surface)}
+.htab th:first-child{z-index:4;background-color:var(--surface2)}
+.htab tfoot td:first-child{position:sticky;left:0;z-index:2;background-color:var(--surface2)}
+.plan td.pname,.plan th.pname{background-color:var(--surface)}
+.plan th.pname{background-color:var(--surface2)}
+.plan tr.frow td.pname{background-color:var(--surface3)}
+/* el tinte de la fila lo pinta una regla anterior con el atajo `background`, que
+   reponía el color translúcido: aquí se fija el fondo opaco y el tinte como capa */
+.plan tr.prow:hover td.pname,.plan tr.prowp:hover td.pname,.htab tr:hover td.per{background-color:var(--surface);background-image:linear-gradient(var(--accent-l),var(--accent-l))}
+.plan tr.frow:hover td.pname{background-color:var(--surface3)}
+
+/* ---------- vista previa del cambio de cobertura (quién sale y quién entra) ---------- */
+.pvhead{display:flex;align-items:flex-start;gap:12px}
+.pvico{width:38px;height:38px;border-radius:12px;background:color-mix(in srgb, var(--teal) 14%, var(--surface));color:var(--teal-tx);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.pvres{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--ink2);margin:12px 0 10px;line-height:1.5}
+.pvres b{color:var(--ink)}
+.pvmal{color:var(--bad);font-weight:700}
+.pvleg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11.5px;color:var(--ink3);margin-bottom:8px}
+.pvleg span{display:inline-flex;align-items:center;gap:6px}
+.pvk{width:13px;height:13px;border-radius:4px;display:inline-block;border:1.5px solid var(--border);background:var(--surface2)}
+.pvk.entra{border-color:color-mix(in srgb, var(--ok) 60%, transparent);background:color-mix(in srgb, var(--ok) 12%, var(--surface))}
+.pvk.sale{border-color:color-mix(in srgb, var(--bad) 55%, transparent);background:var(--bad-bg,rgba(204,68,68,.1))}
+.pvk.hueco{border-style:dashed;border-color:var(--bad);background:none}
+.pvwrap{overflow:auto;max-height:52vh;border:1px solid var(--border);border-radius:12px}
+table.pvt{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.pvt th,.pvt td{border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);padding:6px 7px;text-align:center;vertical-align:middle}
+.pvt tbody tr:last-child th,.pvt tbody tr:last-child td{border-bottom:0}
+.pvt thead th{position:sticky;top:0;z-index:3;background:var(--surface2);font-family:var(--mono);font-size:12px;font-weight:800;color:var(--ink2);padding:6px 4px;min-width:52px}
+.pvt thead th small{display:block;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.pvt thead th i{display:block;font-style:normal;font-size:8.5px;color:var(--ink3);font-weight:600}
+.pvt thead th.wk{background:color-mix(in srgb, var(--warn) 9%, var(--surface2))}
+.pvt th.pvp{position:sticky;left:0;z-index:4;background-color:var(--surface);border-left:0;text-align:left;display:table-cell;white-space:nowrap;min-width:172px}
+.pvt thead th.pvp{z-index:6;background-color:var(--surface2)}
+.pvt tbody th.pvp{display:flex;align-items:center;gap:8px}
+.pvt th.pvp .av{width:26px;height:26px;border-radius:9px;font-size:9.5px;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:none;background:var(--ink3)}
+.pvt th.pvp b{display:block;font-size:12.5px;color:var(--ink);font-weight:700}
+.pvrol{display:block;font-style:normal;font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.08em}
+.pvrol.ok{color:var(--ok)} .pvrol.bad{color:var(--bad)}
+.pvt s,.pvt b{display:block;font-family:var(--mono);font-size:10.5px;font-weight:800;line-height:1.5}
+.pvt s{color:var(--ink3);font-weight:600}
+.pvt td.pventra{background:color-mix(in srgb, var(--ok) 11%, var(--surface));box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--ok) 45%, transparent)}
+.pvt td.pventra b{color:var(--ok)}
+.pvt td.pvsale{background:var(--bad-bg,rgba(204,68,68,.08));box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--bad) 35%, transparent)}
+.pvt td.pvsale b{color:var(--bad)}
+.pvt td.pvhueco{border:1.5px dashed var(--bad);background:none}
+.pvt td.pvhueco b{color:var(--bad)}
+.pvt td.pvnada{color:var(--ink3)}
+.pvbar{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+@media (max-width:640px){.pvt th.pvp{min-width:132px}.pvwrap{max-height:44vh}.pvbar .btn{flex:1;justify-content:center}}
 
 /* 22-pasarela-equipo.css */
 /* ============ PASARELA · EQUIPO, FICHA Y AJUSTES DE LOS LOCALES ============

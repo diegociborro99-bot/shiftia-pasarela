@@ -72,7 +72,7 @@ function pxPie(centro) {
 function pxNombre(pid, marcas) {
   const mk = marcas || {};
   const tipo = mk.tipo ? (AUS_LBL[mk.tipo] ? AUS_LBL[mk.tipo].label : mk.tipo) : '';
-  return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${mk.abre ? '<b class="pxg-mk abre">▸</b>' : ''}${mk.cocina ? '<b class="pxg-mk coc">◆</b>' : ''}${esc(nombrePid(pid))}${tipo ? `<em>${esc(tipo)}</em>` : ''}</span>`;
+  return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${mk.abre ? '<b class="pxg-mk abre">▸</b>' : ''}${mk.cocina ? `<b class="pxg-mk coc">${SVG_COCINA}</b>` : ''}${esc(nombrePid(pid))}${tipo ? `<em>${esc(tipo)}</em>` : ''}</span>`;
 }
 // la posición 1 de la casilla es quien abre / sale primero (vocabulario del grupo): si
 // nadie lleva la marca puesta, en el Excel se señala al primero para que no salga sin abre
@@ -137,7 +137,7 @@ function pxFilasDescansos(cols, personas, colspan) {
 // El hueco de la 1.ª posición va en rojo: «Hueco disponible · abre la tarde · turno completo».
 function pxSlot(s, franja) {
   if (s.hueco) return `<div class="pxg-s hueco" title="${esc(s.motivo || '')}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-hb">Hueco disponible</span><small class="pxg-sub bad">abre la ${franja === 'M' ? 'mañana' : 'tarde'} · turno completo</small></div></div>`;
-  const mk = (s.abreFijo ? '<b class="pxg-mk abre" title="Sale el primero (fijo)">▸</b>' : '') + (s.cocina ? '<b class="pxg-mk coc" title="Lleva la cocina">◆</b>' : '') + (s.comodin ? '<b class="pxg-mk com" title="Comodín colocado por Shiftia">□</b>' : '');
+  const mk = (s.abreFijo ? '<b class="pxg-mk abre" title="Sale el primero (fijo)">▸</b>' : '') + (s.cocina ? `<b class="pxg-mk coc" title="Lleva la cocina">${SVG_COCINA}</b>` : '') + (s.comodin ? '<b class="pxg-mk com" title="Comodín colocado por Shiftia">□</b>' : '');
   const tags = (s.continuo ? '<em class="pxg-tag c" title="Turno continuo: sale el primero de mañana y de tarde">C</em>' : s.partido ? '<em class="pxg-tag p" title="Turno partido: mañana y tarde">P</em>' : '') + (s.cocina ? '<span class="pxg-coc">cocina</span>' : '');
   const subs = (s.por ? `<small class="pxg-sub">por ${esc(nombrePid(s.por))}</small>` : '') + (s.nota ? `<small class="pxg-sub">${esc(s.nota)}</small>` : '') + (s.forzado ? '<small class="pxg-sub warn">forzado a mano</small>' : '');
   return `<div class="pxg-s${s.abre ? ' abre' : ''}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-nm">${mk}${esc(s.nombre)}</span>${tags}${subs}</div></div>`;
@@ -163,7 +163,7 @@ function pxThDia(c) {
 }
 // leyenda de las casillas (la misma en las tres hojas semanales); extra = chips propios de la hoja
 function pxLeyendaCasilla(extra) {
-  return `<div class="pxg-ley"><span><i class="pxg-n">1</i>orden en la casilla: el primero abre y hace turno completo; la cocina va en su posición</span><span><b class="pxg-mk abre">▸</b>sale el primero (fijo)</span><span><b class="pxg-mk coc">◆</b>cocina</span><span><em class="pxg-tag p">P</em>turno partido</span><span><em class="pxg-tag c">C</em>turno continuo</span><span><b class="pxg-mk com">□</b>comodín colocado por Shiftia</span><span><b class="ast">*</b>mínimo no fijado por el cliente</span>${extra || ''}<span class="hue"><b>rojo</b>· hueco disponible: nadie de la plantilla puede ocupar esa posición</span><span class="fal"><b>ámbar</b>· turno corto: faltan personas para el mínimo</span><span><b>—</b>cerrado</span></div>`;
+  return `<div class="pxg-ley"><span><i class="pxg-n">1</i>orden en la casilla: el primero abre y hace turno completo; la cocina va en su posición</span><span><b class="pxg-mk abre">▸</b>sale el primero (fijo)</span><span><b class="pxg-mk coc">${SVG_COCINA}</b>cocina</span><span><em class="pxg-tag p">P</em>turno partido</span><span><em class="pxg-tag c">C</em>turno continuo</span><span><b class="pxg-mk com">□</b>comodín colocado por Shiftia</span><span><b class="ast">*</b>mínimo no fijado por el cliente</span>${extra || ''}<span class="hue"><b>rojo</b>· hueco disponible: nadie de la plantilla puede ocupar esa posición</span><span class="fal"><b>ámbar</b>· turno corto: faltan personas para el mínimo</span><span><b>—</b>cerrado</span></div>`;
 }
 const PX_LEYENDA_SEMANA = () => pxLeyendaCasilla('');
 

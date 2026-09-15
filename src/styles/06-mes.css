@@ -27,7 +27,10 @@ th.pname{top:0;z-index:8}
 .plan th{box-shadow:0 1px 0 var(--border)}
 .pn b{font-size:13.5px;font-weight:600;display:block;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pn small{font-size:9.5px;color:var(--ink3)}
-tr.ghdr td{background:var(--surface2) !important;font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.14em;color:var(--ink2);text-align:left;padding:6px 12px;position:sticky;left:0}
+tr.ghdr td{background:var(--surface2) !important;font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.14em;color:var(--ink2);text-align:left;padding:6px 12px}
+/* la fila del local ocupa todo el ancho: lo que se queda anclado al desplazar de lado
+   es el nombre de dentro, no la celda (que empieza en 0 y no tiene a dónde moverse) */
+tr.ghdr .ghl{display:inline-flex;align-items:center;position:sticky;left:12px}
 tr.frow td{background:var(--surface3);border-top:1px solid var(--border);padding:4px 2px}
 tr.frow td.pname{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);background:var(--surface3)}
 .cwarn{display:inline-block;min-width:20px;border-radius:5px;background:var(--warn-bg);color:var(--warn);font-family:var(--mono);font-size:9.5px;font-weight:700;padding:1px 4px}
