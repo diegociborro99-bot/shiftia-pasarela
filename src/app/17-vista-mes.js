@@ -24,6 +24,7 @@ function renderLegend() {
 }
 function renderMes() {
   $('#mTitle').innerHTML = `<b>${MESES[S.m - 1]}</b> <small>${S.y}</small>`;
+  $('#mVisible').innerHTML = htmlBotonVisible('mVisibleBtn', [mesKey(S.y, S.m)]);
   renderKPIs(); renderLegend();
   $('#futbolBtns').innerHTML = (S.equipos || []).map(q => `<button class="btn btn-sec" data-futbol="${esc(q.id)}" style="--ec:${esc(q.color)}">⚽ Juega el ${esc(q.corto || q.nombre)}</button>`).join('') + '<button class="btn btn-ghost" data-futbol="" title="Otro evento con refuerzo">＋ Evento</button>';
   const hoy = isoHoy();
@@ -90,6 +91,7 @@ function shiftMonth(dir, dayPolicy) {
 }
 $('#mPrev').addEventListener('click', () => { if (shiftMonth(-1)) renderMes(); });
 $('#mNext').addEventListener('click', () => { if (shiftMonth(1)) renderMes(); });
+$('#mVisible').addEventListener('click', e => { if (e.target.closest('#mVisibleBtn')) alternarPublicado([mesKey(S.y, S.m)]); });
 $('#mVaciar').addEventListener('click', () => vaciarRangoUI(est.days[0].iso, est.days[est.days.length - 1].iso, `${MESES[S.m - 1]} ${S.y}`, 'el mes'));
 $('#mGenerar').addEventListener('click', () => irAGenerador({ desde: est.days[0].iso, hasta: est.days[est.days.length - 1].iso, titulo: `Generar ${MESES[S.m - 1].toLowerCase()}` }));
 $('#futbolBtns').addEventListener('click', e => { const b = e.target.closest('[data-futbol]'); if (!b) return; openEvento({ equipo: b.dataset.futbol || undefined, iso: isoDia() }); });
@@ -141,7 +143,7 @@ function openDiaPersona(pid, iso, anchor) {
     pop.remove();
     if (b.dataset.dp === 'dia') irAIso(iso);
     else if (b.dataset.dp === 'aus') openAusenciaMes(pid, anchor, iso);
-    else if (b.dataset.dp === 'cobertura') irACobertura({ pid, tipo: 'LD', desde: iso, hasta: iso });
+    else if (b.dataset.dp === 'cobertura') openCobertura({ pid, tipo: 'LD', dias: [iso] });
     else if (b.dataset.dp === 'quitaraus') { pushUndo('quitar ausencia', { staff: true }); p.ausencias = quitarDiaDeAusencia(p.ausencias, iso); registrarCambio(`Ausencia retirada: ${p.nombre} el ${fmtDM(iso)}`, 'aus'); saveState(); renderVistaActiva(); }
   });
 }

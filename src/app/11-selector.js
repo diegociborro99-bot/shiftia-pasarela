@@ -63,6 +63,7 @@ function openMenuTurno(iso, tid, pid, anchor) {
   pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div>
     <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${i + 1} de ${lista.length}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${entry.avisos && entry.avisos.length ? `<br><small style="color:var(--warn)">${esc(entry.avisos.join(' · '))}</small>` : ''}</div>
     <button class="popb full" data-mt="ficha">Ver y editar su ficha</button>
+    <button class="popb full rec" data-mt="cobertura">Falta estos días… buscar quién cubre</button>
     ${i > 0 ? '<button class="popb full" data-mt="subir">▲ Subir en la casilla</button>' : ''}
     ${i < lista.length - 1 ? '<button class="popb full" data-mt="bajar">▼ Bajar en la casilla</button>' : ''}
     ${entry.abre ? '' : '<button class="popb full" data-mt="abre">Sale primero (abre el local)</button>'}
@@ -77,6 +78,7 @@ function openMenuTurno(iso, tid, pid, anchor) {
     const a = b.dataset.mt;
     pop.remove();
     if (a === 'ficha') { openFicha(pid); return; }
+    if (a === 'cobertura') { openCobertura({ pid, dias: [iso], tipo: 'LD' }); return; }
     if (!confirmarSiCerrado(iso)) return;
     const ew = estadoDeIso(iso, true);
     if (a === 'subir' || a === 'bajar') { pushUndo('reordenar casilla'); moverEnCasilla(ew, iso, tid, pid, i + (a === 'subir' ? -1 : 1)); registrarCambio(`${p.nombre} ${a === 'subir' ? 'sube' : 'baja'} en la casilla de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); }

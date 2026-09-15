@@ -85,6 +85,7 @@ function migrarEstado(estado) {
   if (!estado) return;
   const base = semillaPasarela();
   estado.locales = Array.isArray(estado.locales) && estado.locales.length ? estado.locales : base.locales;
+  for (const l of estado.locales) if (l.partidoAbre === undefined) { const b = base.locales.find(x => x.id === l.id); l.partidoAbre = b && b.partidoAbre ? Object.assign({}, b.partidoAbre) : { M: false, T: false }; }
   estado.patron = estado.patron && Object.keys(estado.patron).length ? estado.patron : base.patron;
   estado.equipos = Array.isArray(estado.equipos) && estado.equipos.length ? estado.equipos : base.equipos;
   for (const k of ['eventos', 'extras', 'festivos', 'peticiones', 'avisos', 'historial', 'mesesPublicados']) if (!Array.isArray(estado[k])) estado[k] = [];
@@ -234,4 +235,32 @@ function vaciarRangoUI(desde, hasta, titulo, que) {
   if (mesCerrado(desde)) registrarCambio(`Cambio en un mes cerrado (${desde.slice(0, 7)})`, 'aviso');
   saveState(); renderVistaActiva();
   toast(`${plazas} plaza(s) retiradas de ${que} · Ctrl+Z para deshacer`, 'warn');
+}
+
+// ---------- visible para el equipo (publicar meses) ----------
+// El mes en curso y los pasados siempre se ven; uno futuro solo cuando el encargado lo
+// hace visible (reunión del 15/09: «cuando te gusta la semana le das a visible y les
+// llega a los trabajadores»). Los empleados reciben solo los meses visibles.
+function mesPublicado(k) { return mesVisibleParaPersonal(S.mesesPublicados || [], k, isoHoy().slice(0, 7)); }
+function mesSiemprePublico(k) { return k <= isoHoy().slice(0, 7); }
+function alternarPublicado(claves) {
+  const ks = [...new Set(claves)].filter(k => !mesSiemprePublico(k));
+  if (!ks.length) { toast('Ese mes ya lo ve el equipo: el mes en curso y los pasados son siempre visibles', 'warn'); return; }
+  S.mesesPublicados = Array.isArray(S.mesesPublicados) ? S.mesesPublicados : [];
+  const hacerVisible = ks.some(k => !S.mesesPublicados.includes(k));
+  for (const k of ks) { const i = S.mesesPublicados.indexOf(k); if (hacerVisible && i < 0) S.mesesPublicados.push(k); if (!hacerVisible && i >= 0) S.mesesPublicados.splice(i, 1); }
+  S.mesesPublicados.sort();
+  const nombre = ks.map(k => `${MESES[+k.slice(5, 7) - 1].toLowerCase()} ${k.slice(0, 4)}`).join(' y ');
+  registrarCambio(hacerVisible ? `Planilla de ${nombre} visible para el equipo` : `Planilla de ${nombre} oculta al equipo`, 'pub');
+  saveState(); renderVistaActiva();
+  toast(hacerVisible ? `${nombre}: visible para el equipo` : `${nombre}: oculto al equipo`, hacerVisible ? 'ok' : 'warn');
+}
+function htmlBotonVisible(id, claves) {
+  const ks = [...new Set(claves)];
+  const fijo = ks.every(mesSiemprePublico);
+  const visible = ks.every(mesPublicado);
+  const cls = fijo ? 'vis fijo' : visible ? 'vis on' : 'vis off';
+  const txt = fijo ? 'Visible para el equipo' : visible ? 'Visible para el equipo' : 'Oculto al equipo';
+  const tit = fijo ? 'El mes en curso y los pasados siempre los ve el equipo' : visible ? 'El equipo ve esta planilla. Pulsa para ocultarla mientras la cambias' : 'El equipo aún no ve esta planilla. Pulsa cuando esté lista para que les llegue';
+  return `<button class="btn btn-sec ${cls}" id="${id}" title="${esc(tit)}" aria-pressed="${visible ? 'true' : 'false'}"><i></i>${txt}${fijo ? '' : visible ? ' · ocultar' : ' · hacer visible'}</button>`;
 }

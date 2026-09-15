@@ -38,7 +38,7 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 |---|---|
 | `00-pre.js` | `'use strict'`; delante va el modelo embebido. |
 | `01-core-utils.js` | `$`, formatos de fecha, `esc`, toasts, tooltip, overlays y popovers, color por persona y por local. |
-| `02-estado-y-modelo-datos.js` | Estado `S` (locales, staff, patrón, meses, eventos, extras, cierres, equipos), carga y guardado (localStorage o servidor), sincronía entre pestañas, historial, deshacer, `asignarUI` / `desasignarUI`, `vaciarRangoUI`, `renderVistaActiva`. |
+| `02-estado-y-modelo-datos.js` | Estado `S` (locales, staff, patrón, meses, eventos, extras, cierres, equipos), carga y guardado (localStorage o servidor), sincronía entre pestañas, historial, deshacer, `asignarUI` / `desasignarUI`, `vaciarRangoUI`, visible para el equipo (`alternarPublicado`), `renderVistaActiva`. |
 | `10-vista-hoy.js` | Vista Hoy: tarjetas por local con las casillas ordenadas. |
 | `11-selector.js` | Selector de persona (puede / con aviso / no puede + forzar) y menú de una persona en una casilla. |
 | `13-vista-semana.js` | Cuadrante semanal (8 filas × 7 días) con pie de descansos; «guardar como semana tipo». |
@@ -51,7 +51,7 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 | `21-vista-horas.js` | Contador de horas: tabla del mes, horas extra, cierre y reapertura del mes. |
 | `22-generador.js` | Generador: periodo, opciones, motor local o núcleo, vista previa, aplicar, vaciar lo generado. |
 | `23-revision.js` | Revisión del mes y punto rojo de avisos. |
-| `26-cobertura.js` | Gestor de cobertura: quién falta y cuándo → plan A y plan B (turnos afectados, quién cubre y por qué, huecos, intercambio en un cambio de turno), aplicar con deshacer. |
+| `26-cobertura.js` | Gestor de cobertura: la hoja «quién sale → quién entra» (persona, qué le pasa, tira de días con sus turnos, plan A y plan B por día, confirmar con deshacer); en la pestaña Cobertura y como capa desde Hoy, Semana y Mes. |
 | `24-entrevistas.js` | Sección Entrevistas (en construcción): vista previa de la base de datos que llegará de Notion. |
 | `25-cuenta.js` | Contraseña, usuarios (servidor), copia de seguridad y versiones. |
 | `29-avisos-e-historial.js` | Historial de cambios. |
@@ -62,7 +62,7 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 
 ## Modelo de datos (resumen)
 
-- **Local**: `{id, nombre, corto, color, abre:{M:[dows],T:[dows]}, minimos:{M:{dow:n},T:{…}}, supuestos, cocina:{obligatoria, titulares, reservas, posicion}, primero:{M,T}, horario:{M,T,porDow}, horarioSupuesto, descansoMin}`.
+- **Local**: `{id, nombre, corto, color, abre:{M:[dows],T:[dows]}, minimos:{M:{dow:n},T:{…}}, supuestos, cocina:{obligatoria, titulares, reservas, posicion}, primero:{M,T}, partidoAbre:{M,T}, horario:{M,T,porDow}, horarioSupuesto, descansoMin}`.
 - **Persona**: `{id, nombre, puesto, locales, franjas, libra, partido:{dias}, cocina:{titular, reserva, soloDias}, abre:{localId:[franjas]}, noAbre, nuncaCon, cubreA, vetos, contrato:{horasSemana}, ausencias:[{tipo,desde,hasta?}], prefs, nota, supuestos, color}`.
 - **Casilla**: `est.asig[iso][turnoId] = [{pid, cocina, abre, origen, razon, supuesto, forzado?, avisos?, ini?, fin?}]`, con `turnoId = localId_franja`. Es una lista ordenada: la posición 1 abre. `est.manual[iso][turnoId]` recuerda lo que se tocó a mano.
 - **Semana tipo**: `S.patron[dow] = [{t: turnoId, p: pid, c?: cocina, a?: abre, s?: supuesto}]`.

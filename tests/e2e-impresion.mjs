@@ -2,11 +2,12 @@
 // genera con la semana tipo), semana del 14 al 20 de septiembre de 2026, la del
 // prototipo del cliente del 11/09. Se comprueba:
 //   (1) #printBtn en Semana pinta las casillas con posicionesDe: El 33 martes tarde
-//       con «Hueco disponible» y Noe ◆ en 2.ª, Pasarela lunes tarde con hueco, Lola
-//       con ▸, marcas P y C (Noe miércoles) y «Quién libra» del viernes = nadie;
+//       con «Hueco disponible» y Noe ◆ en 2.ª, Pasarela lunes tarde con Mari Luz abriendo
+//       en partido (acordado el 15/09: sin hueco), Lola con ▸, marcas P y C (Noe miércoles)
+//       y «Quién libra» del viernes = nadie;
 //   (2) abrirImpresionSemanaGenerada(generarSemana(…)) monta las dos páginas del
 //       prototipo: título, 4 tablas de locales, «Qué ha cambiado», ≥ 30 condiciones
-//       con tres NUEVA, y «Descargar PDF» (#pPdf) sigue ahí;
+//       con cuatro NUEVA (30, 31, 32 y el partido que abre en Pasarela), y «Descargar PDF» (#pPdf) sigue ahí;
 //   (3) con dos casillas vaciadas, la página 2 enseña el cambio (antes tachado /
 //       ahora en negrita, «nueva» si la casilla estaba vacía);
 //   (4) sin pageerror en toda la batería.
@@ -75,7 +76,7 @@ try {
   ok('El 33 martes tarde: Noe con ◆ (cocina) en 2.ª y «por Jenny» debajo', !!el33mt && el33mt.slots[1] && /Noe/.test(el33mt.slots[1].nombre) && el33mt.slots[1].coc && el33mt.slots[1].n === '2' && el33mt.slots[1].sub.some(x => /por Jenny/.test(x)), JSON.stringify(el33mt && el33mt.slots[1]));
   ok('El 33 martes tarde: la cuenta dice 2/2* y «+1 hueco», y la casilla va en rojo', !!el33mt && /2\/2\*/.test(el33mt.cuenta) && /\+1 hueco/.test(el33mt.cuenta) && /hueco/.test(el33mt.cls), el33mt && el33mt.cuenta + ' · ' + el33mt.cls);
   const pasLt = await cas('2026-09-14', 'PASARELA_T');
-  ok('Pasarela lunes tarde: hueco en la 1.ª posición («abre la tarde · turno completo»)', !!pasLt && pasLt.slots[0] && pasLt.slots[0].hueco && /abre la tarde · turno completo/.test(pasLt.txt), JSON.stringify(pasLt));
+  ok('Pasarela lunes tarde: Mari Luz abre en partido (P) en la 1.ª, sin hueco (acordado con el cliente el 15/09)', !!pasLt && pasLt.slots[0] && !pasLt.slots[0].hueco && /Mari Luz/.test(pasLt.slots[0].nombre) && pasLt.slots[0].P && !pasLt.slots.some(s => s.hueco), JSON.stringify(pasLt));
   const pasLm = await cas('2026-09-14', 'PASARELA_M');
   ok('Pasarela lunes mañana: Lola lleva ▸ (sale la primera, fijo) en la 1.ª', !!pasLm && pasLm.slots[0] && /Lola/.test(pasLm.slots[0].nombre) && pasLm.slots[0].abre, JSON.stringify(pasLm && pasLm.slots[0]));
   ok('Pasarela lunes mañana: Mari Luz con P (partido)', !!pasLm && pasLm.slots.some(s => /Mari Luz/.test(s.nombre) && s.P), JSON.stringify(pasLm && pasLm.slots));
@@ -98,7 +99,7 @@ try {
     abrirImpresionSemanaGenerada(res, {});
     return { huecos: res.huecos.length, primeros: res.huecos.filter(h => h.tipo === 'primero').length, cambios: res.cambios.length, condiciones: res.condiciones.length, nuevas: res.condiciones.filter(c => c.nueva).length, resumen: res.resumen };
   }, LUNES);
-  ok(`generarSemana simula la semana (${gen.condiciones} condiciones, ${gen.nuevas} nuevas, ${gen.huecos} huecos, ${gen.cambios} cambios)`, gen.condiciones >= 30 && gen.nuevas === 3);
+  ok(`generarSemana simula la semana (${gen.condiciones} condiciones, ${gen.nuevas} nuevas, ${gen.huecos} huecos, ${gen.cambios} cambios)`, gen.condiciones >= 30 && gen.nuevas === 4);
   ok('abrirImpresionSemanaGenerada monta una hoja apaisada con dos páginas .pxg-pag', await llega(pg, () => { const r = document.getElementById('printRoot'); return !!r && !r.classList.contains('hidden') && r.querySelectorAll('.pxpage.apaisado .pxg-pag').length === 2; }, null, 4000) >= 0);
   const p1 = await pg.evaluate(() => {
     const pag = document.querySelectorAll('#printRoot .pxg-pag')[0];
@@ -116,9 +117,9 @@ try {
   });
   ok(`página 2: título «${p2.h1}»`, /^Qué ha cambiado · y /.test(p2.h1), p2.h1);
   ok(`página 2: la lista numerada tiene ≥ 30 condiciones (${p2.conds}) con ✓/✗`, p2.conds >= 30 && p2.conds === gen.condiciones && p2.ok + p2.ko === p2.conds, JSON.stringify({ conds: p2.conds, ok: p2.ok, ko: p2.ko }));
-  ok(`página 2: tres NUEVA en la lista y tres en la columna de condiciones nuevas`, p2.nuevas === 3 && p2.nuevasCol === 3, JSON.stringify({ lista: p2.nuevas, col: p2.nuevasCol }));
+  ok(`página 2: cuatro NUEVA en la lista y cuatro en la columna de condiciones nuevas`, p2.nuevas === 4 && p2.nuevasCol === 4, JSON.stringify({ lista: p2.nuevas, col: p2.nuevasCol }));
   ok(`página 2: ${p2.huecos} cajas de hueco, todas con «Queda:» y «Se destraparía / No se destrapa»`, p2.huecos === gen.huecos && p2.queda === p2.huecos && p2.destrapa.length === p2.huecos && p2.destrapa.every(t => /destrapa/.test(t)), JSON.stringify(p2.destrapa));
-  ok('página 2: el hueco de Pasarela del lunes cita a Mari Luz (viene de la mañana) como condición única', p2.destrapa.some(t => /Mari Luz/.test(t)), JSON.stringify(p2.destrapa));
+  ok('página 2: el hueco de El 33 del martes cita a Noe (viene de la mañana) como condición única', p2.destrapa.some(t => /Noe/.test(t)), JSON.stringify(p2.destrapa));
   ok(`página 2: preguntas para el cliente (${p2.preguntas}: quién sale el primero, supuestos, mínimos con *, horarios)`, p2.preguntas >= 3 && p2.pregTxt.some(t => /Quién sale el primero/.test(t)) && p2.pregTxt.some(t => /Horarios reales/.test(t)) && p2.pregTxt.some(t => /mínimos marcados/.test(t)), JSON.stringify(p2.pregTxt));
   ok('página 2: «Un turno sin solución no se rellena» y el pie de conclusión con turnos, condiciones y descansos', p2.sinSol && /La semana sale/.test(p2.fin || '') && new RegExp(`${gen.resumen.turnos} turnos`).test(p2.fin) && /descansos/.test(p2.fin) && /condiciones/.test(p2.fin), p2.fin);
   ok('«Descargar PDF» (#pPdf) e «Imprimir» (#pGo) siguen en la barra', await pg.evaluate(() => !!document.querySelector('#printRoot #pPdf') && !!document.querySelector('#printRoot #pGo')));
@@ -156,7 +157,7 @@ try {
   await pg.evaluate(() => abrirImpresionLocal('PASARELA'));
   ok('abrirImpresionLocal(PASARELA) monta la hoja vertical con las casillas nuevas', await llega(pg, () => !!document.querySelector('#printRoot .pxpage:not(.apaisado) table.pxlocal') && document.querySelectorAll('#printRoot table.pxlocal .pxg-s').length > 10, null, 4000) >= 0);
   const pl = await cas('2026-09-14', 'PASARELA_T');
-  ok('hoja del local: Pasarela lunes tarde con el hueco en rojo', !!pl && pl.slots[0] && pl.slots[0].hueco && /hueco/.test(pl.cls), JSON.stringify(pl));
+  ok('hoja del local: Pasarela lunes tarde con Mari Luz abriendo en partido, sin hueco', !!pl && pl.slots[0] && !pl.slots[0].hueco && /Mari Luz/.test(pl.slots[0].nombre) && !/hueco/.test(pl.cls), JSON.stringify(pl));
   if (CAPTURAS) { const alto = await pg.evaluate(() => document.querySelector('#printRoot .pxpage').scrollHeight); await pg.setViewportSize({ width: 1400, height: alto + 80 }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-local.png'), fullPage: true }); }
   await pg.click('#pClose');
 

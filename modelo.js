@@ -231,7 +231,7 @@ const REGLAS = [
   { k: 'nuncaCon', lbl: '«Nunca con»: no coinciden en la misma casilla' }, { k: 'libra', lbl: 'Días que libra cada persona' },
   { k: 'vetos', lbl: 'Vetos por local y franja' }, { k: 'partido', lbl: 'Partidos solo los días declarados' },
   { k: 'noPrimero', lbl: 'Quien no sale nunca el primero (Leo; Cristian por la tarde)', nueva: true },
-  { k: 'primeroCompleto', lbl: 'El primero de cada franja hace turno completo: quien viene de la mañana no abre la tarde (salvo turno continuo)', nueva: true },
+  { k: 'primeroCompleto', lbl: 'El primero de cada franja hace turno completo: quien viene de la mañana no abre la tarde (salvo turno continuo, o partido donde el local lo permita)', nueva: true },
   { k: 'cubreA', lbl: '«Cubre a»: quién ocupa el sitio de quien falta' }, { k: 'abre', lbl: 'Quién sale el primero (fijo por local)' },
 ];
 function regla(cfg, k) { return !(cfg && cfg.reglas && cfg.reglas[k] === false); }
@@ -331,10 +331,21 @@ function puedePrimero(cfg, staff, est, iso, tid, pid) {
     for (const t of turnosDe(cfg)) {
       if (t.franja !== 'M' || !pidsEn(est, iso, t.id).includes(pid)) continue;
       if (t.local.id === localId && primeroDe(cfg, staff, est, iso, t.id) === pid) return { ok: true, continuo: true };
+      if (partidoAbre(cfg, l, p, iso, franja)) return { ok: true, partido: true };
       return { ok: false, motivo: `${p.nombre} viene de hacer la mañana: el primero de la tarde hace turno completo` };
     }
   }
   return { ok: true };
+}
+// 15/09, reunión con el cliente: en Pasarela, si Iván libra, la tarde la hace Mari Luz en
+// partido y no hace falta cobertura entera. Donde el local lo permite (l.partidoAbre[franja]),
+// quien hace partido DECLARADO ese día puede abrir la tarde. El 33 no lo permite (José da
+// el martes por insalvable).
+function partidoAbre(cfg, l, p, iso, franja) {
+  if (!(l && l.partidoAbre && l.partidoAbre[franja])) return false;
+  if (!(regla(cfg, 'partido') && caracteristicaActiva(p, 'partido'))) return true;
+  const pd = p.partido || {};
+  return !!(pd.siempre || (pd.dias || []).includes(isoDow(iso)));
 }
 // quién sale el primero en una casilla: lo marcado a mano; si no, el fijo del local, quien
 // tiene «sale el primero» en su ficha, o el primero de la lista que pueda. null = nadie puede.
@@ -730,6 +741,7 @@ function condicionesDe(cfg, staff) {
     if (regla(cfg, 'noPrimero') && caracteristicaActiva(p, 'noPrimero') && (p.noPrimero || []).length) add(`p:${p.id}:noPrimero`, `${p.nombre} no sale nunca ${p.noPrimero.length === 2 ? 'el primero, ni de mañana ni de tarde' : p.noPrimero[0] === 'T' ? 'el primero de la tarde (no hace la tarde completa)' : 'el primero de la mañana'}`, { tipo: 'persona', pid: p.id, k: 'noPrimero', nueva: true });
   }
   if (regla(cfg, 'primeroCompleto')) add('reg:primeroCompleto', 'El primero de cada franja hace turno completo: quien ha trabajado la mañana no abre la tarde y los partidos entran a partir del segundo puesto (si sale primero en mañana y tarde del mismo local es turno continuo)', { tipo: 'regla', k: 'primeroCompleto', nueva: true });
+  for (const l of cfg.locales) for (const f of FRANJAS) if (l.partidoAbre && l.partidoAbre[f]) add(`loc:${l.id}:partidoAbre:${f}`, `En ${l.nombre}, quien hace partido puede abrir la ${FRANJA_LBL[f].toLowerCase()}: no hace falta una cobertura entera (acordado con el grupo el 15/09)`, { tipo: 'regla', k: 'partidoAbre', localId: l.id, franja: f, nueva: true });
   return out;
 }
 function verificarSemana(cfg, staff, est, lunes) {
@@ -771,7 +783,7 @@ function verificarSemana(cfg, staff, est, lunes) {
       if (t.franja !== 'T' || !turnoAbierto(cfg, est, iso, t.id)) continue;
       const s = slots(iso, t.id)[0]; if (!s || s.hueco) continue;
       const enM = turnosDe(cfg).some(x => x.franja === 'M' && pidsEn(est, iso, x.id).includes(s.pid));
-      if (enM && !s.continuo) v.push(`${dl(iso)}: ${s.nombre} abre ${t.local.nombre} viniendo de la mañana`);
+      if (enM && !s.continuo && !puedePrimero(cfg, staff, est, iso, t.id, s.pid).ok) v.push(`${dl(iso)}: ${s.nombre} abre ${t.local.nombre} viniendo de la mañana`);
     }
     c.ok = !v.length; c.detalle = v.join(' · ');
   }
@@ -834,6 +846,7 @@ function turnosAfectados(cfg, staff, est, pid, desde, hasta, opts) {
   let n = 0;
   for (const iso of rangoIso(desde, hasta || desde)) {
     if (++n > MAX_DIAS_COBERTURA) break;
+    if (o.dias && o.dias.length && !o.dias.includes(iso)) continue;
     for (const t of turnosDe(cfg)) {
       if (o.franjas && o.franjas.length && !o.franjas.includes(t.franja)) continue;
       if (o.turnos && o.turnos.length && !o.turnos.includes(iso + '|' + t.id)) continue;
@@ -973,12 +986,19 @@ function intercambioPara(cfg, staff, e, pid, as, afectados, usados) {
 }
 // planes para una incidencia: inc = {pid, tipo, desde, hasta, sinFin?, franjas?, turnos?, detalle?};
 // opts = {siempre (reemplazar aunque la casilla siga completa), intercambio}
+// inc.dias = días sueltos (la ausencia se registra por tramos contiguos); si no, desde..hasta
+function rangoDeIncidencia(inc) {
+  const dias = Array.isArray(inc.dias) && inc.dias.length ? inc.dias.slice().sort() : null;
+  const desde = dias ? dias[0] : inc.desde, hasta = dias ? dias[dias.length - 1] : (inc.hasta || inc.desde);
+  return { desde, hasta: hasta < desde ? desde : hasta, dias };
+}
 function planesCobertura(cfg, staff, est, inc, opts) {
   const o = opts || {};
   const p = personaDe(staff, inc.pid);
-  const hasta = inc.hasta || inc.desde;
-  const afectados = p ? turnosAfectados(cfg, staff, est, inc.pid, inc.desde, hasta, { franjas: inc.franjas, turnos: inc.turnos }) : [];
-  const out = { pid: inc.pid, nombre: p ? p.nombre : inc.pid, tipo: inc.tipo, desde: inc.desde, hasta, afectados: [], planes: [], posible: true, necesarios: 0 };
+  const { desde, hasta, dias } = rangoDeIncidencia(inc);
+  inc = Object.assign({}, inc, { desde, hasta });
+  const afectados = p ? turnosAfectados(cfg, staff, est, inc.pid, desde, hasta, { franjas: inc.franjas, turnos: inc.turnos, dias }) : [];
+  const out = { pid: inc.pid, nombre: p ? p.nombre : inc.pid, tipo: inc.tipo, desde, hasta, dias, afectados: [], planes: [], posible: true, necesarios: 0 };
   if (!p) return Object.assign(out, { posible: false, error: 'no existe' });
   // qué le pasa a cada casilla sin la persona
   const sin = clonarEstado(est);
@@ -1009,14 +1029,19 @@ function aplicarCobertura(cfg, staff, est, inc, plan) {
   const p = personaDe(staff, inc.pid);
   const res = { ausencia: null, quitados: 0, asignados: [], rechazados: [], intercambios: [] };
   if (!p) return res;
+  const { desde, hasta, dias } = rangoDeIncidencia(inc);
   if (inc.tipo !== 'CAMBIO') {
-    const a = { tipo: inc.tipo, desde: inc.desde };
-    if (!inc.sinFin) a.hasta = inc.hasta || inc.desde;
-    if (inc.detalle) a.detalle = inc.detalle;
-    res.ausencia = anadirAusencia(p, a).ausencia;
+    // tramos contiguos: con días sueltos, una ausencia por tramo; con baja sin fin, abierta desde el primero
+    const tramos = [];
+    for (const iso of dias || [...rangoIso(desde, hasta)]) { const u = tramos[tramos.length - 1]; if (u && addDias(u.hasta, 1) === iso) u.hasta = iso; else tramos.push({ desde: iso, hasta: iso }); }
+    for (const tr of tramos) {
+      const a = { tipo: inc.tipo, desde: tr.desde };
+      if (!(inc.sinFin && tr === tramos[tramos.length - 1])) a.hasta = tr.hasta;
+      if (inc.detalle) a.detalle = inc.detalle;
+      res.ausencia = anadirAusencia(p, a).ausencia;
+    }
   }
-  const hasta = inc.hasta || inc.desde;
-  for (const a of turnosAfectados(cfg, staff, est, inc.pid, inc.desde, hasta, { franjas: inc.franjas, turnos: inc.turnos })) if (desasignar(est, a.iso, a.tid, inc.pid)) res.quitados++;
+  for (const a of turnosAfectados(cfg, staff, est, inc.pid, desde, hasta, { franjas: inc.franjas, turnos: inc.turnos, dias })) if (desasignar(est, a.iso, a.tid, inc.pid)) res.quitados++;
   for (const as of (plan && plan.asignaciones) || []) {
     const r = asignar(est, cfg, staff, as.iso, as.tid, as.pid, { origen: 'cobertura', razon: `cubre a ${p.nombre}`, por: inc.pid, cocina: as.cocina ? true : undefined, permitirPartido: true });
     if (r.ok) res.asignados.push({ iso: as.iso, tid: as.tid, pid: as.pid, avisos: r.avisos }); else { res.rechazados.push({ iso: as.iso, tid: as.tid, pid: as.pid, motivo: r.motivo }); continue; }
@@ -1304,7 +1329,7 @@ function semillaPasarela() {
       minimos: { M: min([3, 3, 3, 3, 3, 2, 2]), T: min([2, 2, 2, 2, 3, 3, 2]) },
       supuestos: { M: sup([0, 0, 0, 0, 0, 0, 0]), T: sup([0, 0, 0, 0, 0, 0, 0]) },
       cocina: { obligatoria: { M: false, T: false }, titulares: { M: [], T: [] }, reservas: [], posicion: { M: 2, T: 2 }, posicionSiDesde: {} },
-      primero: { M: 'lola', T: 'ivan' }, horario: horario(), horarioSupuesto: true, descansoMin: 0 },
+      primero: { M: 'lola', T: 'ivan' }, partidoAbre: { M: false, T: true }, horario: horario(), horarioSupuesto: true, descansoMin: 0 },
   ];
   const P = (id, nombre, puesto, locales, franjas, libra, extra) => Object.assign({ id, nombre, puesto, locales, franjas, libra, partido: { dias: [] }, cocina: { titular: [], reserva: [], soloDias: [] }, abre: {}, noAbre: [], nuncaCon: [], cubreA: [], vetos: [], contrato: { horasSemana: null }, ausencias: [], prefs: {}, nota: '', supuestos: [] }, extra || {});
   const staff = [
@@ -1421,7 +1446,7 @@ if (typeof module !== 'undefined') {
     minutosTurno, minutosNocturnos, horarioDe, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo,
-    CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
+    CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
     resumenMinimos, descripcionCocina, condicionesDe, verificarSemana, generarSemana, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
     TIPOS_INCIDENCIA, turnosAfectados, turnosSemanaDe, candidatosCobertura, planesCobertura, aplicarCobertura, vaciarPlanilla,
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,

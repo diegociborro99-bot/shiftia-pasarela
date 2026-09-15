@@ -18,10 +18,13 @@ function cerrarImpresion() {
   document.body.classList.remove('printing');
   const ps = document.getElementById('pageStyle'); if (ps) ps.remove();
 }
-function montarImpresion(h, apaisado, nombre) {
+function montarImpresion(h, apaisado, nombre, opts) {
   PRINT_CTX = { apaisado: !!apaisado, nombre: nombre || 'Planilla' };
+  const o = opts || {};
   const pr = $('#printRoot');
-  pr.innerHTML = `<div class="pbar2"><button class="btn btn-cta" id="pGo"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 8.5V3.5h11v5"/><path d="M6.5 17H5a2 2 0 0 1-2-2v-4.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2h-1.5"/><rect x="6.5" y="14" width="11" height="6.5" rx="1"/></svg> Imprimir (o Ctrl+P)</button><button class="btn btn-sec" id="pPdf" title="Descargar la hoja como PDF (también en el móvil, sin diálogo de imprimir)"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar PDF</button><button class="btn btn-sec" id="pClose">Cerrar</button><span class="pbnota">Sale en color: en el diálogo de impresión no hace falta marcar «gráficos de fondo».</span></div><div class="pxpage${apaisado ? ' apaisado' : ''}">` + h + '</div>';
+  // desde el generador: la hoja también deja volcar la propuesta a la planilla (reunión del 15/09: «me falta el botón que lo vuelque»)
+  const volcar = o.volcar && o.volcar.n ? `<button class="btn btn-cta" id="pVolcar" title="Pasa la planilla propuesta a la semana">Volcar a la planilla (${pl(o.volcar.n, 'plaza nueva', 'plazas nuevas')})</button>` : '';
+  pr.innerHTML = `<div class="pbar2">${volcar}<button class="btn ${volcar ? 'btn-sec' : 'btn-cta'}" id="pGo"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 8.5V3.5h11v5"/><path d="M6.5 17H5a2 2 0 0 1-2-2v-4.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2h-1.5"/><rect x="6.5" y="14" width="11" height="6.5" rx="1"/></svg> Imprimir (o Ctrl+P)</button><button class="btn btn-sec" id="pPdf" title="Descargar la hoja como PDF (también en el móvil, sin diálogo de imprimir)"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar PDF</button><button class="btn btn-sec" id="pClose">Cerrar</button><span class="pbnota">Sale en color: en el diálogo de impresión no hace falta marcar «gráficos de fondo».</span></div><div class="pxpage${apaisado ? ' apaisado' : ''}">` + h + '</div>';
   pr.classList.remove('hidden');
   pr.scrollTop = 0;
   document.body.classList.add('printing');
@@ -42,6 +45,7 @@ function montarImpresion(h, apaisado, nombre) {
     for (const cls of ['compacto', 'compacto2']) { if (alto() <= altoHoja) break; bloque.classList.add(cls); }
   }
   $('#pClose').addEventListener('click', cerrarImpresion);
+  const pv = $('#pVolcar'); if (pv) pv.addEventListener('click', () => o.volcar.fn());
   $('#pGo').addEventListener('click', () => { try { window.print(); } catch (e) { toast('Usa Ctrl+P para imprimir', 'warn'); } });
   $('#pPdf').addEventListener('click', () => exportarPdfHoja());
 }
@@ -437,7 +441,7 @@ function abrirImpresionSemanaGenerada(res, opts) {
   h2 += `<h3 class="pxg-h2 pxg-h2c">Las ${res.condiciones.length} condiciones que comprueba el simulador sobre cada semana que genera</h3>${pxgCondicionesTodas(res)}`;
   h2 += pxgConclusion(res);
   h2 += `<div class="pxg-foot">Propuesta generada por Shiftia con las condiciones facilitadas por el cliente · Highkey Labs · ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>`;
-  montarImpresion(`<div class="pxg-pag">${h1}</div><div class="pxg-pag pxg-p2">${h2}</div>`, true, `Planilla_semana_generada_${lunes}`);
+  montarImpresion(`<div class="pxg-pag">${h1}</div><div class="pxg-pag pxg-p2">${h2}</div>`, true, `Planilla_semana_generada_${lunes}`, { volcar: o.volcar });
 }
 
 // ---------- tablón del mes: personas × días ----------

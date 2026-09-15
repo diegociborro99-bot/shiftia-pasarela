@@ -33,6 +33,7 @@ const BASE = `http://127.0.0.1:${srv.address().port}`;
 const HOY = new Date(); const pad = n => String(n).padStart(2, '0');
 const ISO_HOY = `${HOY.getFullYear()}-${pad(HOY.getMonth() + 1)}-${pad(HOY.getDate())}`, CLAVE = ISO_HOY.slice(0, 7);
 const errores = [];
+const masDias = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const abrirContexto = async (br, viewport, movil) => {
   const ctx = await br.newContext(Object.assign({ viewport }, movil ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}));
   // la app pide contraseña en modo local salvo que la sesión ya esté abierta en la pestaña
@@ -147,6 +148,24 @@ try {
   await pg.keyboard.press('Control+z');
   ok('Ctrl+Z devuelve el mes', await llega(pg, n => Object.values(est.asig).reduce((a, d) => a + Object.values(d).reduce((b, l) => b + l.length, 0), 0) === n, pm0, 4000) >= 0, await plazasMes());
 
+  // 4d) Visible para el equipo: el mes en curso siempre; el siguiente se publica y se oculta desde Mes (y desde Semana)
+  await vista(pg, 'mes');
+  ok('el mes en curso sale como visible fijo (siempre lo ve el equipo)', await pg.$eval('#mVisibleBtn', b => b.classList.contains('fijo') && /Visible para el equipo/.test(b.textContent)));
+  await pg.click('#mNext');
+  await pg.waitForSelector('#mesRoot table.plan', { timeout: 5000 });
+  const kSig = await pg.evaluate(() => mesKey(S.y, S.m));
+  ok(`el mes siguiente (${kSig}) sale oculto al equipo`, await pg.$eval('#mVisibleBtn', b => b.classList.contains('off') && /Oculto al equipo/.test(b.textContent)));
+  await pg.click('#mVisibleBtn');
+  ok('pulsar lo hace visible: queda en S.mesesPublicados y el botón cambia', await llega(pg, k => (S.mesesPublicados || []).includes(k) && document.querySelector('#mVisibleBtn').classList.contains('on'), kSig, 3000) >= 0);
+  ok('el historial lo registra como publicación', await pg.evaluate(() => S.historial[0].tipo === 'pub' && /visible para el equipo/.test(S.historial[0].txt)));
+  await pg.click('#mVisibleBtn');
+  ok('volver a pulsar lo oculta', await llega(pg, k => !(S.mesesPublicados || []).includes(k) && document.querySelector('#mVisibleBtn').classList.contains('off'), kSig, 3000) >= 0);
+  await pg.click('#mPrev');
+  await pg.waitForSelector('#mesRoot table.plan', { timeout: 5000 });
+  await vista(pg, 'semana');
+  ok('Semana también lleva el botón de visibilidad', !!(await pg.$('#wVisibleBtn')));
+  if (asig) await pg.evaluate(iso => irAIso(iso), asig.iso);   // de vuelta al día de la asignación de Hoy
+
   // 5) Generador semanal (modo por defecto): la planilla de la semana como el prototipo del cliente
   await vista(pg, 'generador');
   await pg.waitForSelector('#genPrevia', { timeout: 5000 });
@@ -155,7 +174,7 @@ try {
   await pg.click('#genPrevia');
   await pg.waitForSelector('.gsemwrap table.gsem', { timeout: 8000 });
   ok('semana: una tabla por local y la de «quién libra», 7 columnas de días', await pg.evaluate(() => document.querySelectorAll('.gsemwrap table.gsem').length === 5 && document.querySelector('table.gsem thead tr').children.length === 8));
-  ok('semana: KPIs (turnos, plazas, huecos, condiciones, máximo de días, descansos) y botón Aplicar', await pg.evaluate(() => document.querySelectorAll('.genk').length === 6 && !!document.querySelector('#genAplicar')));
+  ok('semana: KPIs (turnos, plazas, huecos, condiciones, máximo de días, descansos) y botón «Volcar a la planilla»', await pg.evaluate(() => document.querySelectorAll('.genk').length === 6 && !!document.querySelector('#genAplicar')));
   ok('semana: las casillas llevan posiciones numeradas y la cocina marcada', await pg.evaluate(() => document.querySelectorAll('.gslot > b').length > 100 && document.querySelectorAll('.gslot .gcoc').length >= 20));
   ok('semana: la lista de condiciones comprobadas está y las nuevas van marcadas', await pg.evaluate(() => document.querySelectorAll('.gcond').length >= 30 && document.querySelectorAll('.gcond .gnueva').length >= 3));
   ok('semana: «Qué ha cambiado» y «Huecos» tienen su columna', await pg.evaluate(() => [...document.querySelectorAll('.gscol h3')].map(h => h.textContent).join('|').includes('Qué ha cambiado') && [...document.querySelectorAll('.gscol h3')].map(h => h.textContent).join('|').includes('Huecos')));
@@ -174,13 +193,13 @@ try {
   ok('«Vaciar lo generado en el periodo…» deja huecos (acepta el confirm)', await llega(pg, () => /retiradas/.test((document.querySelector('#toasts') || {}).textContent || ''), null, 3000) >= 0 && await plazasEn() < antesVaciar, `${antesVaciar} → ${await plazasEn()}`);
   ok('lo puesto a mano en Hoy sobrevive al vaciado', !!asig && await pg.evaluate(a => (estadoDeIso(a.iso).asig[a.iso] && estadoDeIso(a.iso).asig[a.iso][a.tid] || []).some(x => x.pid === a.pid), asig));
   await pg.click('#genPrevia');
-  ok('«Generar vista previa» produce una propuesta con el botón Aplicar', await llega(pg, () => { const b = document.querySelector('#genAplicar'); return !!b && !b.disabled; }, null, 15000) >= 0, (await pg.$('#genRes') ? await pg.$eval('#genRes', x => x.textContent.slice(0, 200)) : ''));
+  ok('«Generar vista previa» produce una propuesta con el botón «Volcar a la planilla»', await llega(pg, () => { const b = document.querySelector('#genAplicar'); return !!b && !b.disabled; }, null, 15000) >= 0, (await pg.$('#genRes') ? await pg.$eval('#genRes', x => x.textContent.slice(0, 200)) : ''));
   const previa = await pg.evaluate(() => GEN.previa ? { aplicados: GEN.previa.aplicados.length, huecos: GEN.previa.huecos.length, patron: GEN.previa.aplicados.filter(a => a.origen === 'patron').length } : null);
   ok(`la vista previa propone plazas (${previa ? previa.aplicados : '?'}, ${previa ? previa.patron : '?'} de la semana tipo, ${previa ? previa.huecos : '?'} casillas cortas)`, !!previa && previa.aplicados > 0, JSON.stringify(previa));
   ok('la vista previa lista los días con sus plazas y razones', await pg.$$eval('#genRes .gendia', x => x.length) >= 1 && await pg.$$eval('#genRes .genrow', x => x.length) >= 1);
   const histAntes = await pg.evaluate(() => (S.historial || []).length);
   await pg.click('#genAplicar');
-  ok('«Aplicar» vuelca la propuesta en la planilla', await llega(pg, n => !document.querySelector('#genAplicar') && (S.historial || []).length > n, histAntes, 5000) >= 0);
+  ok('«Volcar a la planilla» vuelca la propuesta', await llega(pg, n => !document.querySelector('#genAplicar') && (S.historial || []).length > n, histAntes, 5000) >= 0);
   ok('las plazas aplicadas están en el periodo', await plazasEn() >= antesVaciar - 2, `${await plazasEn()} frente a ${antesVaciar} antes de vaciar`);
   await pg.click('#topHist');
   await pg.waitForSelector('#histOvl', { timeout: 4000 });
@@ -216,36 +235,49 @@ try {
   await vista(pg, 'entrevistas');
   ok('Entrevistas: aparece «EN CONSTRUCCIÓN»', await pg.$eval('#view-entrevistas', x => /EN CONSTRUCCIÓN/.test(x.textContent)));
 
-  // 6b) Gestor de cobertura: día libre de alguien con turnos → plan A y plan B, aplicar y deshacer
-  await vista(pg, 'cobertura');
-  ok('Cobertura: panel con persona, seis tipos de incidencia y fechas', await pg.evaluate(() => !!document.querySelector('#cobPid') && document.querySelectorAll('#cobRoot [data-tipo]').length === 6 && !!document.querySelector('#cobD1') && !!document.querySelector('#cobProponer')));
-  const cob = await pg.evaluate(ex => {   // quien más turnos tiene esta semana (distinto de la persona puesta en Hoy)
-    const lunes = mondayOf(isoDia()); let mejor = null;
-    for (const p of activos()) { if (p.id === ex) continue; let n = 0, primero = null; for (let k = 0; k < 7; k++) { const iso = addDias(lunes, k); const e = estadoDeIso(iso); for (const t of turnosDe(S)) if (pidsEn(e, iso, t.id).includes(p.id)) { n++; if (!primero) primero = iso; } } if (!mejor || n > mejor.n) mejor = { pid: p.id, n, iso: primero }; }
-    return mejor;
+  // 6b) Gestor de cobertura desde la planilla: en Semana, «Falta estos días…» sobre una persona abre la hoja
+  //     con ese día marcado; plan A / plan B como «quién sale → quién entra»; confirmar aplica y vuelve a la semana
+  await vista(pg, 'semana');
+  const cob = await pg.evaluate(ex => {   // una persona con turno esta semana (distinta de la puesta en Hoy) y su primer día
+    for (let k = 0; k < 7; k++) { const iso = addDias(S.semLunes, k); const e = estadoDeIso(iso); for (const t of turnosDe(S)) for (const pid of pidsEn(e, iso, t.id)) if (pid !== ex) return { pid, iso, tid: t.id }; }
+    return null;
   }, asig ? asig.pid : '');
-  ok(`hay alguien con turnos esta semana para la prueba (${cob && cob.pid}, ${cob && cob.n} turnos)`, !!cob && cob.n > 0, JSON.stringify(cob));
-  await pg.selectOption('#cobPid', cob.pid);
-  await pg.click('#cobRoot [data-tipo="LD"]');
-  await pg.fill('#cobD1', cob.iso); await pg.dispatchEvent('#cobD1', 'change');
-  await pg.fill('#cobD2', cob.iso); await pg.dispatchEvent('#cobD2', 'change');
-  ok('el panel recuerda persona, tipo y día', await pg.evaluate(c => COB.pid === c.pid && COB.tipo === 'LD' && COB.desde === c.iso && COB.hasta === c.iso, cob));
-  await pg.click('#cobProponer');
-  ok('«Proponer plan A y plan B» pinta los turnos afectados y al menos un plan', await llega(pg, () => !!(COB.res && COB.res.afectados.length) && document.querySelectorAll('#cobRes .cobplan').length >= 1, null, 5000) >= 0, await pg.evaluate(() => COB.res && JSON.stringify({ af: COB.res.afectados.length, planes: COB.res.planes.length })));
+  ok(`hay alguien con turno esta semana para la prueba (${cob && cob.pid} el ${cob && cob.iso})`, !!cob, JSON.stringify(cob));
+  await pg.click(`table.semt [data-wpers="${cob.iso}|${cob.tid}|${cob.pid}"]`);
+  ok('el bloque de la persona abre su menú con «Falta estos días…»', await llega(pg, () => !!document.querySelector('#menuTurnoPop [data-mt="cobertura"]'), null, 3000) >= 0);
+  await pg.click('#menuTurnoPop [data-mt="cobertura"]');
+  ok('se abre la hoja de cobertura (#cobOvl) con la persona y el día ya marcado', await llega(pg, c => { const ov = document.querySelector('#cobOvl'); return !!ov && COB.pid === c.pid && COB.dias.length === 1 && COB.dias[0] === c.iso && !!ov.querySelector(`.cobday.on[data-dia="${c.iso}"]`); }, cob, 4000) >= 0, JSON.stringify(await pg.evaluate(() => ({ pid: COB.pid, dias: COB.dias }))));
+  ok('la tira enseña 14 días con los turnos de la persona y los seis tipos de incidencia', await pg.evaluate(() => document.querySelectorAll('#cobOvl .cobday').length === 14 && document.querySelectorAll('#cobOvl [data-tipo]').length === 6 && document.querySelectorAll('#cobOvl .cobday .cobdots i').length >= 1));
+  await pg.click(`#cobOvl .cobday[data-dia="${masDias(cob.iso, 1)}"]`);   // marcar otro día y desmarcarlo
+  ok('pulsar otro día lo marca', await pg.evaluate(() => COB.dias.length === 2 && document.querySelectorAll('#cobOvl .cobday.on').length === 2));
+  await pg.click(`#cobOvl .cobday[data-dia="${masDias(cob.iso, 1)}"]`);
+  ok('volver a pulsarlo lo desmarca', await pg.evaluate(c => COB.dias.length === 1 && COB.dias[0] === c.iso, cob));
+  await pg.click('#cobOvl [data-tipo="LD"]');
+  await pg.click('#cobOvl #cobProponer');
+  ok('«Buscar quién cubre» pinta los turnos afectados y al menos un plan', await llega(pg, () => !!(COB.res && COB.res.afectados.length) && document.querySelectorAll('#cobOvl #cobRes .cobplan').length >= 1, null, 5000) >= 0, await pg.evaluate(() => COB.res && JSON.stringify({ af: COB.res.afectados.length, planes: COB.res.planes.length })));
   const planes = await pg.evaluate(() => COB.res.planes.map(p => ({ id: p.id, n: p.asignaciones.length, huecos: p.huecos.length, avisos: p.avisos, pids: p.asignaciones.map(a => a.pid) })));
-  ok(`el plan A va primero y es el recomendado (${JSON.stringify(planes)})`, planes[0].id === 'A' && await pg.$eval('#cobRes .cobplan.reco .micro', x => /PLAN A/.test(x.textContent)));
+  ok(`el plan A va primero y es el recomendado (${JSON.stringify(planes)})`, planes[0].id === 'A' && await pg.$eval('#cobOvl #cobRes .cobplan.reco .micro', x => /PLAN A/.test(x.textContent)));
+  ok('cada turno afectado se enseña como «quién sale → quién entra» (o hueco, o nadie hace falta)', await pg.evaluate(() => { const n = COB.res.afectados.length; const A = document.querySelector('#cobOvl .cobplan.reco'); return A.querySelectorAll('.cobmv').length === n && A.querySelectorAll('.cobsale s').length === n && [...A.querySelectorAll('.cobentra')].every(x => x.querySelector('.cobrow')); }));
   ok('ninguna propuesta es la persona que falta', planes.every(p => !p.pids.includes(cob.pid)));
-  ok('cada turno afectado acaba con alguien, un hueco explicado o «no hace falta nadie»', await pg.evaluate(() => COB.res.afectados.every(a => ['asignaciones', 'huecos', 'sinCubrir'].some(k => COB.res.planes[0][k].some(x => x.iso === a.iso && x.tid === a.tid)))));
   ok('cada persona propuesta explica por qué', await pg.evaluate(() => COB.res.planes.every(p => p.asignaciones.every(a => a.razones.length))));
   const histCob = await pg.evaluate(() => (S.historial || []).length);
-  await pg.click('#cobRes [data-aplicar="A"]');   // el confirm() se acepta solo
-  ok('aplicar el plan A registra el día libre en la ficha', await llega(pg, c => { const p = S.staff.find(x => x.id === c.pid); return !!p && (p.ausencias || []).some(a => a.tipo === 'LD' && a.desde === c.iso); }, cob, 4000) >= 0);
-  ok('la persona sale de sus turnos de ese día', await pg.evaluate(c => turnosDe(S).every(t => !pidsEn(estadoDeIso(c.iso), c.iso, t.id).includes(c.pid)), cob));
+  await pg.click('#cobOvl [data-aplicar="A"]');   // el confirm() se acepta solo
+  ok('confirmar el plan A cierra la hoja y vuelve a la semana', await llega(pg, () => !document.querySelector('#cobOvl') && !document.getElementById('view-semana').classList.contains('hidden'), null, 4000) >= 0);
+  ok('el día libre queda en la ficha', await pg.evaluate(c => { const p = S.staff.find(x => x.id === c.pid); return !!p && (p.ausencias || []).some(a => a.tipo === 'LD' && a.desde === c.iso); }, cob));
+  ok('la persona sale de sus turnos de ese día (también en el cuadrante)', await pg.evaluate(c => turnosDe(S).every(t => !pidsEn(estadoDeIso(c.iso), c.iso, t.id).includes(c.pid)) && !document.querySelector(`table.semt [data-wpers="${c.iso}|${c.tid}|${c.pid}"]`), cob));
   ok('quien cubre entra con origen cobertura y «por»', planes[0].n === 0 || await pg.evaluate(c => turnosDe(S).some(t => asignados(estadoDeIso(c.iso), c.iso, t.id).some(x => x.origen === 'cobertura' && x.por === c.pid)), cob));
-  ok('la pantalla enseña el resumen de lo aplicado', await pg.$eval('#cobRes', x => /APLICADO/.test(x.textContent)));
   ok('el historial registra la cobertura con su tipo', await pg.evaluate(n => (S.historial || []).length > n && S.historial[0].tipo === 'cobertura', histCob));
-  await pg.click('#cobDeshacer');
-  ok('«Deshacer» devuelve a la persona a sus turnos y quita el día libre', await llega(pg, c => turnosDe(S).some(t => pidsEn(estadoDeIso(c.iso), c.iso, t.id).includes(c.pid)) && !(S.staff.find(x => x.id === c.pid).ausencias || []).some(a => a.desde === c.iso), cob, 4000) >= 0);
+  await pg.keyboard.press('Control+z');
+  ok('Ctrl+Z devuelve a la persona a sus turnos y quita el día libre', await llega(pg, c => turnosDe(S).some(t => pidsEn(estadoDeIso(c.iso), c.iso, t.id).includes(c.pid)) && !(S.staff.find(x => x.id === c.pid).ausencias || []).some(a => a.desde === c.iso), cob, 4000) >= 0);
+  // la pestaña Cobertura: la misma hoja con selector de persona por avatares
+  await vista(pg, 'cobertura');
+  ok('la pestaña Cobertura enseña el selector de personas y la tira de días', await pg.evaluate(() => document.querySelectorAll('#cobRoot .cobpk').length >= 20 && document.querySelectorAll('#cobRoot .cobday').length === 14 && !!document.querySelector('#cobRoot #cobProponer')));
+  await pg.click(`#cobRoot .cobpk[data-pk="${cob.pid}"]`);
+  ok('elegir a alguien lo marca y pinta sus turnos en la tira', await pg.evaluate(c => COB.pid === c.pid && !!document.querySelector(`#cobRoot .cobpk.on[data-pk="${c.pid}"]`), cob));
+  await pg.click('#cobRoot [data-cobsel="ninguno"]');
+  ok('«Quitar la selección» deja la tira sin días y apaga el botón', await pg.evaluate(() => COB.dias.length === 0 && !document.querySelector('#cobRoot .cobday.on') && document.querySelector('#cobRoot #cobProponer').disabled));
+  await pg.click('#cobRoot [data-cobsel="semana"]');
+  ok('«Toda la semana» marca los siete días de la primera semana', await pg.evaluate(() => COB.dias.length === 7 && document.querySelectorAll('#cobRoot .cobday.on').length === 7));
 
   // 7) Tema oscuro
   const errTema = errores.length;

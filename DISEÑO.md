@@ -35,10 +35,15 @@ cada día y la lista de las 32 condiciones comprobadas. Tres condiciones nuevas:
   segundo puesto; si sale primero en mañana y tarde del mismo local es turno
   continuo (C).
 - **32** Leo no va nunca de primero, ni de mañana ni de tarde.
+- **Excepción acordada el 15/09** (reunión con la encargada): en Pasarela, quien hace
+  partido puede abrir la tarde. Con Iván libre el lunes, la tarde la hace Mari Luz en
+  partido y no hace falta pedir una cobertura entera. Es un interruptor por local
+  (Ajustes de los locales → «Quién abre»); en El 33 sigue apagado porque José da el
+  martes por insalvable si no entra otra persona o vuelve alguna de las bajas.
 
 La semana tipo de la app es esa planilla corregida, y un test del modelo la
-reproduce casilla a casilla, con los dos huecos (Pasarela lunes tarde y El 33
-martes tarde). Las decisiones del prototipo que el cliente aún no ha confirmado
+reproduce casilla a casilla, con el hueco de El 33 del martes por la tarde (el de
+Pasarela del lunes desapareció con la excepción del 15/09). Las decisiones del prototipo que el cliente aún no ha confirmado
 (Cristian a seis días, quién abre El 33, Zapatillera y el Mónaco por la mañana,
 horarios reales) siguen marcadas como supuestos.
 

@@ -1,5 +1,29 @@
 # Changelog — Shiftia · Grupo Pasarela
 
+## v0.5.0 · 15/09/2026 — Lo que pidió el cliente en la reunión del 15/09
+
+- **Cobertura como en el papel**: desde Semana, Hoy o Mes, sobre la persona que va
+  a faltar, «Falta estos días…» abre la hoja de cobertura con ella y el día ya
+  marcados; una tira de dos semanas enseña sus turnos (M / T◆, en el color del
+  local; libra / sin turno) y se marcan los días con un toque; «Buscar quién cubre»
+  propone el plan A y el plan B **día a día: quién sale → quién entra** (con ABRE,
+  ◆ cocina, avisos) o el hueco que queda y por qué; «Confirmar plan A» lo aplica y
+  vuelve a la planilla con los cambios a la vista. La pestaña Cobertura es la
+  misma hoja con la plantilla en avatares. Días sueltos se registran como
+  ausencias por tramos.
+- **Pasarela: quien hace partido puede abrir la tarde** (audio de la reunión: con
+  Iván libre, la tarde del lunes la hace Mari Luz en partido y no hace falta un
+  hueco de cobertura entera). Interruptor por local en Ajustes de los locales →
+  «Quién abre»; condición nueva en el catálogo; El 33 sigue sin permitirlo (José
+  da el martes por insalvable). La semana del prototipo pasa de dos huecos a uno.
+- **«Volcar a la planilla»**: el botón del generador semanal dice lo que hace y,
+  cuando no hay nada nuevo, «Ya está volcada en la planilla»; la hoja impresa de la
+  planilla propuesta también lleva el botón de volcar.
+- **Visible para el equipo**: en Semana y Mes, un botón por mes con el estado (el
+  mes en curso y los pasados siempre visibles; los siguientes se hacen visibles
+  cuando la planilla está lista y entonces les llega a los trabajadores; se puede
+  volver a ocultar). Queda en el historial como publicación.
+
 ## v0.4.0 · 15/09/2026 — Gestor de cobertura, vaciar semana o mes, quitar el aviso del partido
 
 - **Gestor de cobertura** (pestaña Cobertura, y en «Más» del móvil): el encargado

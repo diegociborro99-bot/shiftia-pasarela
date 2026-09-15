@@ -39,6 +39,7 @@ function renderSemana() {
   }).join('')}</tr>`;
   h += '</tbody></table>';
   $('#semRoot').innerHTML = h;
+  $('#wVisible').innerHTML = htmlBotonVisible('wVisibleBtn', [lunes.slice(0, 7), fin.slice(0, 7)]);
   $('#wStats').innerHTML = `<span class="dstat"><b>${turnos}</b> turnos</span><span class="dstat ${cortos ? 'warn' : 'ok'}"><b>${cortos}</b> casillas cortas</span><span class="dstat ${sinCocina ? 'warn' : 'ok'}"><b>${sinCocina}</b> sin cocina</span>${forzados ? `<span class="dstat sal"><b>${forzados}</b> forzadas</span>` : ''}`;
   pintaRevDot();
 }
@@ -50,6 +51,7 @@ $('#semRoot').addEventListener('click', e => {
   const w = e.target.closest('[data-wpers]');
   if (w) { const [iso, tid, pid] = w.dataset.wpers.split('|'); openMenuTurno(iso, tid, pid, w); }
 });
+$('#wVisible').addEventListener('click', e => { if (e.target.closest('#wVisibleBtn')) alternarPublicado([S.semLunes.slice(0, 7), addDias(S.semLunes, 6).slice(0, 7)]); });
 $('#wVaciar').addEventListener('click', () => vaciarRangoUI(S.semLunes, addDias(S.semLunes, 6), `la semana del ${fmtDM(S.semLunes)} al ${fmtDM(addDias(S.semLunes, 6))}`, 'la semana'));
 $('#wGenerar').addEventListener('click', () => irAGenerador({ desde: S.semLunes, hasta: addDias(S.semLunes, 6), titulo: 'Generar esta semana' }));
 $('#wPatron').addEventListener('click', () => {

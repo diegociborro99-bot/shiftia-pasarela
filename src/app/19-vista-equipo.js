@@ -388,6 +388,7 @@ function openAjustesLocales(localId) {
       <div class="locgrid2">
         ${FRANJAS.map(f => `<label class="pinlbl">${FRANJA_LBL[f]}<select class="logininp" data-libre data-primero="${f}">${personasSel(l.primero[f], '— quien tenga «abre» en su ficha —')}</select></label>`).join('')}
       </div>
+      <label class="singchk chkrow" style="margin-top:8px"><input type="checkbox" data-libre data-lf="partidoAbreT"${l.partidoAbre && l.partidoAbre.T ? ' checked' : ''}> Quien hace partido puede abrir la tarde <small>(no hace falta una cobertura entera: si quien abre libra, la tarde la hace quien viene de la mañana en partido)</small></label>
     </div>`;
   };
   const pinta = () => { pintaTabs(); pintaLocal(); };
@@ -445,6 +446,7 @@ function openAjustesLocales(localId) {
       else if (k === 'color') { l.color = t.value; anota(l, 'color'); pinta(); }
       else if (k === 'descansoMin') { l.descansoMin = Math.max(0, +t.value || 0); anota(l, 'descanso'); }
       else if (k === 'horarioConfirmado') { l.horarioSupuesto = !t.checked; anota(l, t.checked ? 'horario confirmado' : 'horario marcado como supuesto'); }
+      else if (k === 'partidoAbreT') { l.partidoAbre = Object.assign({ M: false, T: false }, l.partidoAbre || {}); l.partidoAbre.T = t.checked; anota(l, t.checked ? 'quien hace partido puede abrir la tarde' : 'el partido ya no abre la tarde'); }
       return;
     }
     if (t.dataset.min) {

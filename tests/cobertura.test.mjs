@@ -14,12 +14,17 @@ test('hay una pestaña Cobertura con su sección y su raíz', () => {
   assert.match(html, /<section class="view hidden" id="view-cobertura">/);
   assert.match(html, /id="cobRoot"/);
 });
-test('la sección propone plan A y plan B y aplica con deshacer', () => {
-  const fn = html.slice(html.indexOf('function renderCobertura()'), html.indexOf('function aplicarPlanCobertura('));
-  assert.match(fn, /Proponer plan A y plan B/);
+test('la hoja se abre desde la planilla (Semana, Hoy y Mes), marca días en una tira y propone plan A y plan B', () => {
+  const fn = html.slice(html.indexOf('function pintaCob(root, modo)'), html.indexOf('function aplicarPlanCobertura('));
+  assert.match(fn, /Buscar quién cubre/);
   assert.match(fn, /TIPOS_INCIDENCIA/);
+  assert.match(fn, /data-dia=/);
   assert.match(fn, /planesCobertura\(/);
-  assert.match(html, /function aplicarPlanCobertura\(id\)[\s\S]*aplicarCobertura\(S, S\.staff, real, inc, plan\)/);
+  assert.match(fn, /Confirmar plan \$\{P\.id\}/);
+  assert.match(html, /data-mt="cobertura">Falta estos días…/);
+  assert.match(html, /openCobertura\(\{ pid, dias: \[iso\], tipo: 'LD' \}\)/);
+  assert.match(html, /openCobertura\(\{ pid, tipo: 'LD', dias: \[iso\] \}\)/);
+  assert.match(html, /function aplicarPlanCobertura\(id, root, modo\)[\s\S]*aplicarCobertura\(S, S\.staff, real, inc, plan\)/);
   assert.match(html, /pushUndo\(`cobertura de \$\{nombre\}`, \{ staff: true, otrosMeses: true \}\)/);
 });
 test('la navegación conoce la vista, el móvil la lista en «Más» y el historial tiene su tipo', () => {
