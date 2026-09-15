@@ -214,7 +214,7 @@ function desasignarUI(iso, tid, pid) {
 function renderVistaActiva() {
   const activa = document.querySelector('.tab[aria-selected="true"]');
   const v = activa ? activa.dataset.v : 'hoy';
-  const f = { hoy: () => renderDia(), semana: () => renderSemana(), mes: () => renderMes(), equipo: () => renderEquipo(), horas: () => renderHoras(), generador: () => renderGenerador(), cobertura: () => renderCobertura(), entrevistas: () => renderEntrevistas() }[v];
+  const f = { hoy: () => renderDia(), semana: () => renderSemana(), mes: () => renderMes(), equipo: () => renderEquipo(), horas: () => renderHoras(), generador: () => renderGenerador(), cobertura: () => renderCobertura(), actividad: () => renderActividad(), entrevistas: () => renderEntrevistas() }[v];
   if (f) f();
   if (typeof pintaRevDot === 'function') pintaRevDot();
 }

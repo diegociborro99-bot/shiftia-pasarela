@@ -59,7 +59,7 @@ try {
   await entrar(A, 'diego', '12345678');
   const tA = await appCargada(A);
   ok(`diego / 12345678 entra por el formulario y llega la app (${tA} ms)`, tA >= 0, (await A.$('#loginErr')) ? await A.$eval('#loginErr', e => e.textContent) : '');
-  ok('las pestañas del encargado se ven (las ocho, con Cobertura)', await A.$$eval('.tab', ts => ts.filter(t => t.offsetParent).length) === 8);
+  ok('las pestañas del programador se ven (las nueve: las ocho del encargado más Actividad)', await A.$$eval('.tab', ts => ts.filter(t => t.offsetParent).length) === 9, await A.$$eval('.tab', ts => ts.filter(t => t.offsetParent).map(t => t.dataset.v).join(',')));
   ok('la sesión es de programador (esAdmin) sin cambio obligatorio', await A.evaluate(() => SRV.rol === 'programador' && SRV.esAdmin === true && SRV.usuario === 'diego') && !(await A.$('#cambioPassOvl')));
   ok('entrar no deja errores de página', errores.length === 0, errores.join(' | '));
 
@@ -88,6 +88,30 @@ try {
   ok(`la asignación está en estado.meses[${a1.iso.slice(0, 7)}].asig`, !!sube.v && enServidor(sube.v.estado, a1));
   ok('y queda en el historial con el usuario que la hizo', !!sube.v && (sube.v.estado.historial || []).some(h => h.usuario === 'diego' && h.tipo === 'asig'));
 
+  // ── 3b) Actividad: el visor del programador fusiona el historial de la planilla con la auditoría del servidor
+  ok('diego ve la pestaña Actividad y el body lleva rol-programador', await A.evaluate(() => !!document.querySelector('.tab[data-v="actividad"]').offsetParent && document.body.classList.contains('rol-programador')));
+  await A.click('.tab[data-v="actividad"]');
+  const tAct = await llega(A, () => !document.getElementById('view-actividad').classList.contains('hidden') && !!document.querySelector('#actRoot .actrow[data-accion="login"]'), null, 8000);
+  ok(`Actividad se abre y pinta filas con la auditoría del servidor (${tAct} ms)`, tAct >= 0, await A.evaluate(() => (document.getElementById('actRoot') || { textContent: '' }).textContent.slice(0, 200)));
+  const filas = await A.$$eval('#actRoot .actrow', rs => rs.map(r => ({ accion: r.dataset.accion, usuario: r.dataset.usuario, grupo: r.dataset.grupo, txt: r.textContent.replace(/\s+/g, ' ').trim() })));
+  ok('lista el inicio de sesión de diego («Inicio de sesión»)', filas.some(f => f.accion === 'login' && f.usuario === 'diego' && f.grupo === 'accesos' && /Inicio de sesión/.test(f.txt)), JSON.stringify(filas.slice(0, 5)));
+  ok('lista el guardado de la planilla de diego («Guardó la planilla (vN · …)»)', filas.some(f => f.accion === 'estado' && f.usuario === 'diego' && f.grupo === 'planilla' && /Guardó la planilla \(v\d+ · /.test(f.txt)), JSON.stringify(filas.filter(f => f.accion === 'estado').slice(0, 3)));
+  ok('y la asignación del historial de la planilla, fusionada en la misma línea de tiempo', filas.some(f => f.accion === 'hist-asig' && f.usuario === 'diego' && /historial de la planilla/.test(f.txt)), JSON.stringify(filas.filter(f => /^hist-/.test(f.accion)).slice(0, 3)));
+  ok('las filas del servidor llevan la IP', filas.some(f => f.accion === 'login' && /127\.0\.0\.1/.test(f.txt)));
+  ok('las filas van de lo más reciente a lo más antiguo, agrupadas por día («Hoy»)', await A.evaluate(() => { const ts = [...document.querySelectorAll('#actRoot .actrow')].map(r => +r.dataset.ts); return ts.length > 1 && ts.every((t, i) => !i || t <= ts[i - 1]) && /^Hoy/.test((document.querySelector('#actRoot .cobday') || {}).textContent || ''); }));
+  ok('las cinco tarjetas resumen están', await A.$$eval('#actKpis .kpi', k => k.length) === 5, await A.$$eval('#actKpis .kpi', k => k.map(x => x.dataset.kpi).join(',')));
+  ok('«último guardado» enseña la versión y quién', await A.$eval('#actKpis [data-kpi="guardado"]', k => /^v\d+$/.test(k.querySelector('.knum').textContent.trim()) && /diego/.test(k.textContent)), await A.$eval('#actKpis', k => k.textContent));
+  ok('«cambios de hoy» cuenta la asignación del historial', await A.$eval('#actKpis [data-kpi="hoy"] .knum', k => +k.textContent >= 1), await A.$eval('#actKpis [data-kpi="hoy"]', k => k.textContent));
+  ok('avisa de que el encargado aún no ha entrado', await A.$eval('#actAviso', a => /aún no ha entrado/.test(a.textContent)) && await A.$eval('#actKpis [data-kpi="acceso"] .knum', k => k.textContent.trim() === '—'));
+  ok('hay chips de usuario (diego) y de tipo (Accesos, Planilla, Usuarios, Peticiones, Otros)', await A.evaluate(() => !!document.querySelector('#actChipsU [data-actu="diego"]') && ['accesos', 'planilla', 'usuarios', 'peticiones', 'otros'].every(g => !!document.querySelector(`#actChipsT [data-actg="${g}"]`))));
+  await A.click('#actChipsT [data-actg="accesos"]');
+  ok('el chip «Accesos» deja solo accesos', await A.$$eval('#actRoot .actrow', rs => rs.length > 0 && rs.every(r => r.dataset.grupo === 'accesos')), await A.$$eval('#actRoot .actrow', rs => rs.map(r => r.dataset.grupo).join(',')));
+  await A.click('#actChipsT [data-actg=""]');
+  await A.fill('#actQ', 'guardó');
+  ok('el buscador filtra por texto (sin distinguir acentos)', await llega(A, () => { const rs = [...document.querySelectorAll('#actRoot .actrow')]; return rs.length > 0 && rs.every(r => /Guardó/.test(r.textContent)); }, null, 3000) >= 0);
+  await A.fill('#actQ', '');
+  ok('abrir Actividad no deja errores de página', errores.length === 0, errores.join(' | '));
+
   // ── 4) recargar: sigue; otro navegador (admin) la ve; y una edición nueva le llega sin recargar
   await A.reload();
   ok('tras recargar, la app vuelve con sesión', await appCargada(A) >= 0);
@@ -112,6 +136,26 @@ try {
   ok(`la asignación nueva (origen «a mano») aparece en B sin recargar en ≤ 8 s (${tB} ms)`, tB >= 0 && tB <= 8000);
   const vA = await A.evaluate(() => SRV.version), vB = await B.evaluate(() => SRV.version);
   ok(`B va por la misma versión que A y por encima de la que tenía (${vB1} → ${vB})`, vA === vB && vB > vB1, `${vB} vs ${vA}`);
+
+  // ── 4b) el admin no ve Actividad; el programador, tras «Actualizar», ve el acceso del admin
+  ok('el admin ve las ocho pestañas del encargado: Actividad no (offsetParent null) y sin rol-programador', await B.$$eval('.tab', ts => ts.filter(t => t.offsetParent).length) === 8 && await B.$eval('.tab[data-v="actividad"]', t => t.offsetParent === null) && await B.evaluate(() => !document.body.classList.contains('rol-programador')), await B.$$eval('.tab', ts => ts.filter(t => t.offsetParent).map(t => t.dataset.v).join(',')));
+  // abre «Más», mira si lista Actividad y lo cierra; espera a que el «atrás» que deja el overlay se asiente
+  const enMas = pg => pg.evaluate(() => new Promise(res => { openMas(); const hay = !!document.querySelector('#masOvl [data-mas="actividad"]'); document.querySelector('#masOvl [data-ovx]').click(); setTimeout(() => res(hay), 350); }));
+  ok('«Más» del admin no lista Actividad; el de diego sí', !(await enMas(B)) && await enMas(A));
+  ok('el servidor no le da la auditoría al admin (403)', await B.evaluate(async () => (await fetch('/api/auditoria?n=5', { credentials: 'same-origin' })).status) === 403);
+  ok('switchTab(«actividad») en el admin cae en Hoy', await B.evaluate(() => { switchTab('actividad'); return !document.getElementById('view-hoy').classList.contains('hidden') && document.getElementById('view-actividad').classList.contains('hidden'); }));
+  await llega(A, () => !document.querySelector('#masOvl'), null, 2000);
+  await A.click('.tab[data-v="actividad"]');
+  await llega(A, () => !document.getElementById('view-actividad').classList.contains('hidden') && !!document.querySelector('#actRefresh'), null, 5000);
+  await A.click('#actRefresh');
+  const tAdm = await llega(A, () => !!document.querySelector('#actRoot .actrow[data-accion="login"][data-usuario="admin"]'), null, 8000);
+  ok(`tras «Actualizar», Actividad lista el inicio de sesión del admin (${tAdm} ms)`, tAdm >= 0, await A.$$eval('#actRoot .actrow', rs => rs.slice(0, 6).map(r => r.dataset.accion + ':' + r.dataset.usuario).join(',')));
+  ok('la tarjeta «último acceso del encargado» dice admin y el aviso desaparece', await A.$eval('#actKpis [data-kpi="acceso"] .knum', k => k.textContent.trim() === 'admin') && await A.$eval('#actAviso', a => !/aún no ha entrado/.test(a.textContent)), await A.$eval('#actKpis [data-kpi="acceso"]', k => k.textContent));
+  ok('el chip de usuario «admin» va marcado como encargado', await A.$eval('#actChipsU [data-actu="admin"]', c => /encargado/.test(c.textContent)));
+  await A.click('#actChipsU [data-actu="admin"]');
+  ok('el chip de usuario «admin» deja solo sus filas', await A.$$eval('#actRoot .actrow', rs => rs.length > 0 && rs.every(r => r.dataset.usuario === 'admin')), await A.$$eval('#actRoot .actrow', rs => rs.map(r => r.dataset.usuario).join(',')));
+  await A.click('#actChipsU [data-actu=""]');
+  await A.click('.tab[data-v="hoy"]');
 
   // ── 5) empleado: alta con contraseña genérica, cambio obligatorio y vista de empleado
   const jAdm = jar();

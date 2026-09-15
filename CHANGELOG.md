@@ -1,5 +1,21 @@
 # Changelog — Shiftia · Grupo Pasarela
 
+## v0.5.0 · 15/09/2026 — Actividad: visor del programador
+
+- **Actividad** (pestaña nueva, solo para el programador; en «Más» del móvil):
+  qué está haciendo el encargado con la app, como un historial. Una sola línea de
+  tiempo agrupada por días (Hoy / Ayer / fecha) que fusiona el historial de la
+  planilla (quién hizo cada cambio) con la auditoría del servidor traducida al
+  español: inicios de sesión, accesos fallidos y bloqueos, guardados de la planilla
+  con su versión, copias, altas, bajas y reset de usuarios, contraseñas, peticiones,
+  núcleo… con la IP en cada fila. Tarjetas resumen (último acceso del encargado,
+  último guardado y quién, cambios de hoy, últimos 7 días, accesos fallidos),
+  filtros por usuario y por tipo (Accesos, Planilla, Usuarios, Peticiones, Otros),
+  buscador, «Actualizar», aviso si el encargado aún no ha entrado y «Mostrar más»
+  a partir de 300 filas. Sin servidor enseña solo el historial de esta planilla.
+  El encargado y los empleados no ven la pestaña (`body.rol-programador`).
+  `tests/actividad.test.mjs`; baterías e2e del servidor y de la app ampliadas.
+
 ## v0.4.0 · 15/09/2026 — Gestor de cobertura, vaciar semana o mes, quitar el aviso del partido
 
 - **Gestor de cobertura** (pestaña Cobertura, y en «Más» del móvil): el encargado
