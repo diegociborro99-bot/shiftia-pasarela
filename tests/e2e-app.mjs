@@ -248,11 +248,11 @@ try {
   await pg.click(`table.semt [data-wpers="${cob.iso}|${cob.tid}|${cob.pid}"]`);
   ok('el bloque de la persona abre su menú con «Falta estos días…»', await llega(pg, () => !!document.querySelector('#menuTurnoPop [data-mt="cobertura"]'), null, 3000) >= 0);
   await pg.click('#menuTurnoPop [data-mt="cobertura"]');
-  ok('se abre la hoja de cobertura (#cobOvl) con la persona y el día ya marcado', await llega(pg, c => { const ov = document.querySelector('#cobOvl'); return !!ov && COB.pid === c.pid && COB.dias.length === 1 && COB.dias[0] === c.iso && !!ov.querySelector(`.cobday.on[data-dia="${c.iso}"]`); }, cob, 4000) >= 0, JSON.stringify(await pg.evaluate(() => ({ pid: COB.pid, dias: COB.dias }))));
-  ok('la tira enseña 14 días con los turnos de la persona y los seis tipos de incidencia', await pg.evaluate(() => document.querySelectorAll('#cobOvl .cobday').length === 14 && document.querySelectorAll('#cobOvl [data-tipo]').length === 6 && document.querySelectorAll('#cobOvl .cobday .cobdots i').length >= 1));
-  await pg.click(`#cobOvl .cobday[data-dia="${masDias(cob.iso, 1)}"]`);   // marcar otro día y desmarcarlo
-  ok('pulsar otro día lo marca', await pg.evaluate(() => COB.dias.length === 2 && document.querySelectorAll('#cobOvl .cobday.on').length === 2));
-  await pg.click(`#cobOvl .cobday[data-dia="${masDias(cob.iso, 1)}"]`);
+  ok('se abre la hoja de cobertura (#cobOvl) con la persona y el día ya marcado', await llega(pg, c => { const ov = document.querySelector('#cobOvl'); return !!ov && COB.pid === c.pid && COB.dias.length === 1 && COB.dias[0] === c.iso && !!ov.querySelector(`.cobdia.on[data-dia="${c.iso}"]`); }, cob, 4000) >= 0, JSON.stringify(await pg.evaluate(() => ({ pid: COB.pid, dias: COB.dias }))));
+  ok('la tira enseña 14 días con los turnos de la persona y los seis tipos de incidencia', await pg.evaluate(() => document.querySelectorAll('#cobOvl .cobdia').length === 14 && document.querySelectorAll('#cobOvl [data-tipo]').length === 6 && document.querySelectorAll('#cobOvl .cobdia .cobdots i').length >= 1));
+  await pg.click(`#cobOvl .cobdia[data-dia="${masDias(cob.iso, 1)}"]`);   // marcar otro día y desmarcarlo
+  ok('pulsar otro día lo marca', await pg.evaluate(() => COB.dias.length === 2 && document.querySelectorAll('#cobOvl .cobdia.on').length === 2));
+  await pg.click(`#cobOvl .cobdia[data-dia="${masDias(cob.iso, 1)}"]`);
   ok('volver a pulsarlo lo desmarca', await pg.evaluate(c => COB.dias.length === 1 && COB.dias[0] === c.iso, cob));
   await pg.click('#cobOvl [data-tipo="LD"]');
   await pg.click('#cobOvl #cobProponer');
@@ -273,13 +273,13 @@ try {
   ok('Ctrl+Z devuelve a la persona a sus turnos y quita el día libre', await llega(pg, c => turnosDe(S).some(t => pidsEn(estadoDeIso(c.iso), c.iso, t.id).includes(c.pid)) && !(S.staff.find(x => x.id === c.pid).ausencias || []).some(a => a.desde === c.iso), cob, 4000) >= 0);
   // la pestaña Cobertura: la misma hoja con selector de persona por avatares
   await vista(pg, 'cobertura');
-  ok('la pestaña Cobertura enseña el selector de personas y la tira de días', await pg.evaluate(() => document.querySelectorAll('#cobRoot .cobpk').length >= 20 && document.querySelectorAll('#cobRoot .cobday').length === 14 && !!document.querySelector('#cobRoot #cobProponer')));
+  ok('la pestaña Cobertura enseña el selector de personas y la tira de días', await pg.evaluate(() => document.querySelectorAll('#cobRoot .cobpk').length >= 20 && document.querySelectorAll('#cobRoot .cobdia').length === 14 && !!document.querySelector('#cobRoot #cobProponer')));
   await pg.click(`#cobRoot .cobpk[data-pk="${cob.pid}"]`);
   ok('elegir a alguien lo marca y pinta sus turnos en la tira', await pg.evaluate(c => COB.pid === c.pid && !!document.querySelector(`#cobRoot .cobpk.on[data-pk="${c.pid}"]`), cob));
   await pg.click('#cobRoot [data-cobsel="ninguno"]');
-  ok('«Quitar la selección» deja la tira sin días y apaga el botón', await pg.evaluate(() => COB.dias.length === 0 && !document.querySelector('#cobRoot .cobday.on') && document.querySelector('#cobRoot #cobProponer').disabled));
+  ok('«Quitar la selección» deja la tira sin días y apaga el botón', await pg.evaluate(() => COB.dias.length === 0 && !document.querySelector('#cobRoot .cobdia.on') && document.querySelector('#cobRoot #cobProponer').disabled));
   await pg.click('#cobRoot [data-cobsel="semana"]');
-  ok('«Toda la semana» marca los siete días de la primera semana', await pg.evaluate(() => COB.dias.length === 7 && document.querySelectorAll('#cobRoot .cobday.on').length === 7));
+  ok('«Toda la semana» marca los siete días de la primera semana', await pg.evaluate(() => COB.dias.length === 7 && document.querySelectorAll('#cobRoot .cobdia.on').length === 7));
 
   // 7) Tema oscuro
   const errTema = errores.length;

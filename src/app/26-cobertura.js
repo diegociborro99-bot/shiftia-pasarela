@@ -75,7 +75,7 @@ function pintaCob(root, modo) {
     const on = COB.dias.includes(iso);
     const dots = ts.map(t => `<i style="--lc:${colorLocal(t.localId)}" title="${esc(nombreLocal(t.localId) + ' · ' + FRANJA_LBL[t.franja].toLowerCase() + (t.abre ? ' · abre' : '') + (t.cocina ? ' · cocina' : ''))}">${t.franja}${t.cocina ? '◆' : ''}</i>`).join('');
     const pie = aus ? `<em class="a-${esc(aus.tipo)}">${esc((AUS_LBL[aus.tipo] || {}).label || aus.tipo)}</em>` : ts.length ? dots : `<em>${libra ? 'libra' : 'sin turno'}</em>`;
-    return `<button type="button" class="cobday${on ? ' on' : ''}${iso === hoy ? ' hoy' : ''}${iso < hoy ? ' pasado' : ''}${ts.length ? '' : ' vacio'}${isoDow(iso) >= 6 ? ' finde' : ''}" data-dia="${iso}" aria-pressed="${on ? 'true' : 'false'}" title="${esc(fmtLargo(iso))}"><small>${DIAS_L[isoDow(iso)].slice(0, 3)}</small><b>${+iso.slice(8, 10)}</b><span class="cobdots">${pie}</span></button>`;
+    return `<button type="button" class="cobdia${on ? ' on' : ''}${iso === hoy ? ' hoy' : ''}${iso < hoy ? ' pasado' : ''}${ts.length ? '' : ' vacio'}${isoDow(iso) >= 6 ? ' finde' : ''}" data-dia="${iso}" aria-pressed="${on ? 'true' : 'false'}" title="${esc(fmtLargo(iso))}"><small>${DIAS_L[isoDow(iso)].slice(0, 3)}</small><b>${+iso.slice(8, 10)}</b><span class="cobdots">${pie}</span></button>`;
   };
   const nTurnos = p ? COB.dias.reduce((a, iso) => a + turnosDia(p.id, iso).filter(t => !COB.franjas.length || COB.franjas.includes(t.franja)).length, 0) : 0;
   root.innerHTML = `<div class="cobsheet">
