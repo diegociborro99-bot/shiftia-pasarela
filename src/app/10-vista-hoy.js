@@ -61,7 +61,8 @@ function renderDia() {
   const iso = d.iso;
   const hoy = isoHoy();
   $('#dKick').textContent = `${DIAS_L[d.dow]} · semana del ${fmtDM(mondayOf(iso))}${d.festivo ? ' · festivo' : ''}`;
-  $('#dTitle').innerHTML = `<b>${d.d}</b> de ${MESES[S.m - 1].toLowerCase()} <small>${S.y}</small>${iso === hoy ? ' <span class="dchip dc-hoy">HOY</span>' : ''}${d.dow >= 6 ? ' <span class="dchip dc-finde">FIN DE SEMANA</span>' : ''}`;
+  $('#dTitle').innerHTML = `<b>${d.d}</b> de ${MESES[S.m - 1].toLowerCase()} <small>${S.y}</small>${iso === hoy ? ' <span class="dchip dc-hoy">HOY</span>' : ` <span class="dchip dc-otro" title="Hoy es ${esc(fmtLargo(hoy))}">${esc(distanciaHoy(iso))}</span>`}${d.dow >= 6 ? ' <span class="dchip dc-finde">FIN DE SEMANA</span>' : ''}`;
+  $('#dHoy').classList.toggle('lejos', iso !== hoy);
   $('#stKick').textContent = DIAS_L[d.dow]; $('#stTitle').textContent = `${d.d} de ${MESES[S.m - 1].toLowerCase()}`;
   // estadísticas del día
   let abiertos = 0, cortos = 0, sinCocina = 0, personas = new Set(), forzados = 0;

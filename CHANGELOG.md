@@ -2,6 +2,13 @@
 
 ## v0.5.0 · 15/09/2026 — Lo que pidió el cliente en la reunión del 15/09
 
+- **Arreglado: la app abría en una fecha vieja.** Guardaba el día que estabas mirando y
+  lo restauraba para siempre, así que quien un día retrocedió a agosto abría la app en
+  «1 de agosto» todas las mañanas, con la planilla vacía y ocho avisos. Ahora abre
+  siempre en hoy y solo vuelve a donde estabas si lo dejaste ese mismo día. Además, Hoy,
+  Semana y Mes avisan en ámbar cuando lo que hay en pantalla no es hoy («hace 2 meses»,
+  «dentro de 12 días») y el botón «Hoy» resalta.
+
 - **Horarios reales del grupo** (WhatsApp de la encargada): mañana de 07:00 a 16:00, los
   fines de semana desde las 08:00, y tarde de 16:00 hasta el cierre, «sobre las 00:00,
   aunque depende» (queda marcado como aproximado). Ya no son horarios supuestos.

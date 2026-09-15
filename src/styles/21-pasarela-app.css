@@ -445,3 +445,7 @@ body:not(.rol-programador) .tab[data-v="actividad"]{display:none!important}
 .actip{flex:none;font-family:var(--mono);font-size:9.5px;color:var(--ink3);padding-top:7px}
 .actpie{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:11px;color:var(--ink3)}
 @media (max-width:640px){.actip{display:none}.acth{width:32px}.actbusca{flex-wrap:wrap}.actbusca input{flex-basis:100%}}
+
+/* lo que hay en pantalla no es hoy: se dice a las claras y el botón «Hoy» resalta */
+.dchip.dc-otro{background:var(--warn-bg);color:var(--warn);border:1px solid color-mix(in srgb, var(--warn) 45%, transparent);text-transform:none;letter-spacing:.02em}
+.mbtn.lejos{border-color:var(--warn);color:var(--warn);font-weight:800}

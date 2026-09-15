@@ -9,7 +9,9 @@ function renderSemana() {
   const cols = [];
   for (let k = 0; k < 7; k++) { const iso = addDias(lunes, k); cols.push({ iso, dow: isoDow(iso), d: +iso.slice(8, 10), e: estadoDeIso(iso), evs: eventosDe(S, iso) }); }
   const m1 = +lunes.slice(5, 7), m2 = +fin.slice(5, 7);
-  $('#wTitle').innerHTML = `<b>${+lunes.slice(8, 10)}${m1 !== m2 ? ' ' + MES3[m1 - 1] : ''} – ${+fin.slice(8, 10)} de ${MESES[m2 - 1].toLowerCase()}</b> <small>${fin.slice(0, 4)}</small>`;
+  const lunesHoy = mondayOf(hoy);
+  $('#wTitle').innerHTML = `<b>${+lunes.slice(8, 10)}${m1 !== m2 ? ' ' + MES3[m1 - 1] : ''} – ${+fin.slice(8, 10)} de ${MESES[m2 - 1].toLowerCase()}</b> <small>${fin.slice(0, 4)}</small>${lunes === lunesHoy ? ' <span class="dchip dc-hoy">ESTA SEMANA</span>' : ` <span class="dchip dc-otro" title="Hoy es ${esc(fmtLargo(hoy))}">${esc(distanciaHoy(lunes))}</span>`}`;
+  $('#wHoy').classList.toggle('lejos', lunes !== lunesHoy);
   let cortos = 0, sinCocina = 0, forzados = 0, turnos = 0;
   const celda = (c, tid) => {
     if (!turnoAbierto(S, c.e, c.iso, tid)) return `<td class="${c.dow >= 6 ? 'wk' : ''}${c.iso === hoy ? ' hoyc' : ''}"><span class="wcerr">cerrado</span></td>`;

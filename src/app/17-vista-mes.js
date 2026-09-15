@@ -23,7 +23,8 @@ function renderLegend() {
     `<span class="lg"><span class="lgd pill pM" style="--lc:var(--ink3)">M</span>mañana</span><span class="lg"><span class="lgd pill pT" style="--lc:var(--ink3)">T</span>tarde</span><span class="lg"><span class="lgd pill pP" style="--lc:var(--ink3)">P</span>partido</span><span class="lg"><span class="lgd striped a-VAC">VAC</span>ausencia</span><span class="lg"><span class="lgd" style="background:var(--warn-bg);color:var(--warn)">n</span>faltan</span>`;
 }
 function renderMes() {
-  $('#mTitle').innerHTML = `<b>${MESES[S.m - 1]}</b> <small>${S.y}</small>`;
+  const kHoy = isoHoy().slice(0, 7), kMes = mesKey(S.y, S.m);
+  $('#mTitle').innerHTML = `<b>${MESES[S.m - 1]}</b> <small>${S.y}</small>${kMes === kHoy ? ' <span class="dchip dc-hoy">ESTE MES</span>' : ` <span class="dchip dc-otro" title="Hoy es ${esc(fmtLargo(isoHoy()))}">${esc(distanciaHoy(isoDe(S.y, S.m, 1)))}</span>`}`;
   $('#mVisible').innerHTML = htmlBotonVisible('mVisibleBtn', [mesKey(S.y, S.m)]);
   renderKPIs(); renderLegend();
   $('#futbolBtns').innerHTML = (S.equipos || []).map(q => `<button class="btn btn-sec" data-futbol="${esc(q.id)}" style="--ec:${esc(q.color)}">⚽ Juega el ${esc(q.corto || q.nombre)}</button>`).join('') + '<button class="btn btn-ghost" data-futbol="" title="Otro evento con refuerzo">＋ Evento</button>';

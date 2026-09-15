@@ -45,14 +45,21 @@ function cargarMes() {
 function isoDia() { return est.days[S.day - 1].iso; }
 // la navegación se recuerda aparte de la planilla
 function guardarNav() {
-  try { localStorage.setItem(NAV_KEY, JSON.stringify({ y: S.y, m: S.m, day: S.day, semLunes: S.semLunes, guiaOff: S.guiaOff, hY: S.hY, hM: S.hM })); } catch (e) {}
+  try { localStorage.setItem(NAV_KEY, JSON.stringify({ y: S.y, m: S.m, day: S.day, semLunes: S.semLunes, guiaOff: S.guiaOff, hY: S.hY, hM: S.hM, hoy: isoHoy() })); } catch (e) {}
 }
+// La app abre en hoy. Solo se vuelve al día que estabas mirando si lo dejaste hoy mismo
+// (recargar no pierde el sitio); mañana, la pantalla vuelve a abrir en la fecha de hoy.
 function restaurarNav() {
   let nav = null;
   try { nav = JSON.parse(localStorage.getItem(NAV_KEY) || 'null'); } catch (e) {}
-  if (nav && nav.y && nav.m && mesKey(nav.y, nav.m) >= MIN_MONTH && mesKey(nav.y, nav.m) <= MAX_MONTH) { for (const k of Object.keys(nav)) if (nav[k] !== undefined && nav[k] !== null) S[k] = nav[k]; return true; }
+  if (nav && nav.guiaOff !== undefined) S.guiaOff = nav.guiaOff;   // es una preferencia, no navegación
   const hoy = isoHoy();
+  if (navVigente(nav, hoy, MIN_MONTH, MAX_MONTH)) {
+    for (const k of ['y', 'm', 'day', 'semLunes', 'hY', 'hM']) if (nav[k] !== undefined && nav[k] !== null) S[k] = nav[k];
+    return true;
+  }
   S.y = +hoy.slice(0, 4); S.m = +hoy.slice(5, 7); S.day = +hoy.slice(8, 10); S.semLunes = mondayOf(hoy);
+  S.hY = S.y; S.hM = S.m;
   return false;
 }
 let ultimoAvisoCuota = 0;

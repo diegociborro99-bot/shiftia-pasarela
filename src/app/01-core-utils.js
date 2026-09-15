@@ -14,6 +14,17 @@ function isoHoy() { return fechaMadrid(); }
 function fmtDM(iso) { return `${+iso.slice(8, 10)}/${+iso.slice(5, 7)}`; }
 function fmtLargo(iso) { return `${DIAS_L[isoDow(iso)]} ${+iso.slice(8, 10)} de ${MESES[+iso.slice(5, 7) - 1].toLowerCase()}`; }
 function fmtCorto(iso) { return `${DOW_C[isoDow(iso)]} ${+iso.slice(8, 10)}`; }
+// «ayer», «hace 12 días», «dentro de 2 meses»: para que se vea cuándo lo que hay en
+// pantalla no es hoy y nadie lea una fecha vieja como si fuera la de hoy
+function distanciaHoy(iso) {
+  const d = Math.round((fechaLocal(iso) - fechaLocal(isoHoy())) / 864e5);
+  if (!d) return '';
+  const n = Math.abs(d);
+  if (n === 1) return d < 0 ? 'ayer' : 'mañana';
+  if (n < 31) return d < 0 ? `hace ${n} días` : `dentro de ${n} días`;
+  const ms = Math.round(n / 30);
+  return d < 0 ? `hace ${pl(ms, 'mes', 'meses')}` : `dentro de ${pl(ms, 'mes', 'meses')}`;
+}
 function fmtHoras(h) { return (Math.round(h * 10) / 10).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' h'; }
 function nombreCorto(nombre) {
   const partes = String(nombre || '').trim().split(/\s+/).filter(Boolean);

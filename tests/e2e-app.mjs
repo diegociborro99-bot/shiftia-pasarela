@@ -308,6 +308,24 @@ try {
   ok('la navegación (día en pantalla) también se recuerda', asig && await pg.evaluate(() => isoDia()) === asig.iso);
   await ctx.close();
 
+  // 11) La app abre siempre en HOY: una navegación vieja guardada (alguien miró agosto una
+  //     vez) no puede dejar la pantalla anclada en una fecha que no es la de hoy
+  const ctxN = await abrirContexto(br, { width: 1280, height: 900 });
+  await ctxN.addInitScript(() => { try { if (!localStorage.getItem('nav_sembrada')) { localStorage.setItem('shiftia_pas_nav', JSON.stringify({ y: 2026, m: 8, day: 1, semLunes: '2026-07-27', hoy: '2026-08-01' })); localStorage.setItem('nav_sembrada', '1'); } } catch (e) {} });   // solo en la primera carga: la recarga usa lo que guarde la app
+  const pn = await ctxN.newPage();
+  await prepararPagina(pn, errores, 'navegación');
+  await pn.goto(BASE + '/index.html');
+  await pn.waitForSelector('#view-hoy .loccard', { timeout: 15000 });
+  const nav1 = await pn.evaluate(() => ({ iso: isoDia(), hoy: isoHoy(), chip: (document.querySelector('#dTitle .dchip') || {}).textContent, lejos: document.querySelector('#dHoy').classList.contains('lejos') }));
+  ok(`con una navegación vieja guardada (1 de agosto) la app abre en hoy (${nav1.iso}) con la marca HOY`, nav1.iso === nav1.hoy && nav1.chip === 'HOY' && !nav1.lejos, JSON.stringify(nav1));
+  await pn.evaluate(() => { S.y = 2026; S.m = 12; S.day = 4; cargarMes(); saveState(); renderDia(); });
+  const nav2 = await pn.evaluate(() => ({ chip: (document.querySelector('#dTitle .dchip') || {}).textContent, lejos: document.querySelector('#dHoy').classList.contains('lejos') }));
+  ok(`al irse a otra fecha se avisa de que no es hoy («${nav2.chip}») y el botón «Hoy» resalta`, /dentro de/.test(nav2.chip || '') && nav2.lejos, JSON.stringify(nav2));
+  await pn.reload();
+  await pn.waitForSelector('#view-hoy .loccard', { timeout: 15000 });
+  ok('al recargar el mismo día se vuelve donde estabas (no se pierde el sitio)', await pn.evaluate(() => isoDia()) === '2026-12-04', await pn.evaluate(() => isoDia()));
+  await ctxN.close();
+
   // ══════════════ MÓVIL 400×820 ══════════════
   console.log('── móvil 400×820');
   const ctxM = await abrirContexto(br, { width: 400, height: 820 }, true);

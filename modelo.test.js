@@ -831,4 +831,20 @@ ok('migrarHorarios: los locales guardados con el horario supuesto de fábrica pa
   assert.equal(M.migrarHorarios(estado).cambiados, 0, 'idempotente');
 });
 
+
+// ---------- navegación: la app abre siempre en hoy (15/09) ----------
+// Se guardaba el día que estabas mirando y se restauraba para siempre: quien un día
+// retrocedió a agosto abría la app en agosto todas las mañanas, con la planilla vacía
+// y el título diciendo «1 de agosto». Ahora el sitio solo se recuerda dentro del día.
+ok('navVigente: la navegación guardada solo se recupera si se guardó hoy y cae en el rango de planificación', () => {
+  const hoy = '2026-09-15';
+  assert.equal(M.navVigente({ y: 2026, m: 10, day: 3, hoy }, hoy, '2026-01', '2030-12'), true, 'guardada hoy: se vuelve donde estaba');
+  assert.equal(M.navVigente({ y: 2026, m: 8, day: 1, hoy: '2026-08-01' }, hoy, '2026-01', '2030-12'), false, 'guardada otro día: se abre en hoy');
+  assert.equal(M.navVigente({ y: 2026, m: 8, day: 1 }, hoy, '2026-01', '2030-12'), false, 'guardada por una versión anterior, sin fecha: se abre en hoy');
+  assert.equal(M.navVigente(null, hoy, '2026-01', '2030-12'), false);
+  assert.equal(M.navVigente({}, hoy, '2026-01', '2030-12'), false);
+  assert.equal(M.navVigente({ y: 2025, m: 12, day: 1, hoy }, hoy, '2026-01', '2030-12'), false, 'antes del rango de planificación');
+  assert.equal(M.navVigente({ y: 2031, m: 1, day: 1, hoy }, hoy, '2026-01', '2030-12'), false, 'después del rango');
+});
+
 console.log(`\n${n} tests OK`);

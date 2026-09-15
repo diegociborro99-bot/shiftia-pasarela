@@ -1417,6 +1417,17 @@ function semillaPasarela() {
   return { locales, staff, patron, equipos, eventos: [], extras: [], festivos: [], cierres: {}, reglas: {} };
 }
 
+// ---------- navegación ----------
+// La app abre siempre en el día de hoy. El mes, el día y la semana que estabas mirando
+// solo se recuperan si los dejaste ese mismo día: así al recargar no pierdes el sitio,
+// pero al día siguiente la pantalla no se queda anclada en una fecha vieja (hasta el
+// 15/09 se restauraba para siempre y la app podía abrir en agosto con todo vacío).
+function navVigente(nav, hoyIso, minMes, maxMes) {
+  if (!nav || !nav.y || !nav.m || nav.hoy !== hoyIso) return false;
+  const k = claveMes(nav.y, nav.m);
+  return !(minMes && k < minMes) && !(maxMes && k > maxMes);
+}
+
 // ---------- migración de los horarios (15/09) ----------
 // Una planilla guardada antes de que la encargada confirmara los horarios sigue con los
 // supuestos de fábrica (09:00–16:00 / 16:00–23:00). Solo se sustituyen esos: un horario
@@ -1487,7 +1498,7 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, horarioDe, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
-    fusionarEstado, sembrarDemo, migrarHorarios,
+    fusionarEstado, sembrarDemo, migrarHorarios, navVigente,
     CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
     resumenMinimos, descripcionCocina, condicionesDe, verificarSemana, generarSemana, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
     TIPOS_INCIDENCIA, turnosAfectados, turnosSemanaDe, candidatosCobertura, planesCobertura, aplicarCobertura, vaciarPlanilla,
