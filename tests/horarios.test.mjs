@@ -20,9 +20,18 @@ test('una planilla ya guardada se migra al cargarla, sin pisar lo editado a mano
   assert.match(html, /function migrarHorarios\(estado\)[\s\S]*?deFabrica[\s\S]*?l\.horarioSupuesto = false; l\.cierreAprox = true;/);
 });
 test('el contador de horas explica con qué horarios cuenta y qué sigue sin confirmar', () => {
-  assert.match(html, /Horas del mes con los horarios del grupo/);
+  assert.match(html, /Se cuentan \$\{dur \? esc\(fmtHoras\(dur\)\) : 'las horas de apertura'\} por turno/);
   assert.match(html, /La hora de cierre es aproximada/);
-  assert.match(html, /no dos jornadas enteras; quien abre la franja la hace entera/);
+  assert.match(html, /quien abre la franja la hace entera/);
+  assert.match(html, /Un <b>continuo<\/b> es un turno seguido y se cuenta una vez/);
+});
+test('ocho horas por turno: el local abre nueve por la mañana y cada persona hace ocho', () => {
+  assert.match(html, /const duracion = \(\) => \(\{ M: 480, T: 480 \}\)/);
+  assert.match(html, /duracion: duracion\(\), duracionSupuesta: true/);
+  assert.match(html, /if \(!partido\) \{ const d = l && l\.duracion && \+l\.duracion\[franja\]; if \(d > 0\) return d; \}/);
+  assert.match(html, /const continuo = partido && abren\.length === 2 && abren\[0\]\.localId === abren\[1\]\.localId/);
+  assert.match(html, /data-dur="\$\{f\}"/);
+  assert.match(html, /Horas por turno confirmadas/);
 });
 test('los ajustes del local permiten cambiar los tramos del partido y el cierre aproximado', () => {
   assert.match(html, /data-horp="\$\{f\}\|ini"/);

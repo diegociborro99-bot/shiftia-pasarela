@@ -57,16 +57,23 @@ horarios reales) siguen marcadas como supuestos.
 - **Partido** = la misma persona mañana y tarde el mismo día; **dobla** = en dos locales distintos (Jenny el domingo).
 - **Ausencias**: al marcar una, sus turnos de esos días salen de la planilla y quedan como huecos; el generador los propone («cubre a» primero, luego cualquier candidato con reglas, y si nadie, hueco explicado).
 - **Cobertura** (pestaña Cobertura): antes de que la ausencia exista, el encargado pide plan A y plan B para cubrirla. Solo se cubre lo que hace falta (si la casilla sigue completa sin la persona, «no hace falta nadie», salvo «reemplazar siempre»); el orden de preferencia es «cubre a», comodines y apoyos, quien libra ese día antes que quien haría partido, el local habitual, la cocina si la persona la llevaba, quien puede abrir si abría, y menos turnos esa semana. El plan relajado solo relaja los partidos no declarados (con aviso); nunca locales, franjas, días que libra, vetos ni «nunca con». Una baja sin fecha de fin se cubre hasta la fecha que se indique. Vaciar la semana o el mes nunca borra ausencias.
-- **Horas**: un partido suma las dos franjas, cada una con el horario del local; descanso dentro del turno por local (a cero por defecto); nocturnas informativas (22:00–06:00); domingos y festivos aparte; saldo frente a contrato prorrateado por ausencias; **Cerrar mes** guarda instantánea y avisa antes de editar un mes cerrado.
+- **Horas**: cada turno cuenta lo que dura un turno (8 h de fábrica, por local y franja), no lo que abre el local; el partido suma sus dos tramos y el continuo se cuenta una vez; descanso dentro del turno por local (a cero por defecto); nocturnas informativas (22:00–06:00); domingos y festivos aparte; saldo frente a contrato prorrateado por ausencias; **Cerrar mes** guarda instantánea y avisa antes de editar un mes cerrado.
 
 ## Horas: cómo se cuentan (15/09)
 
-Los horarios del grupo los confirmó la encargada por WhatsApp: **mañana 07:00–16:00** (sábado y domingo desde las 08:00) y **tarde 16:00 hasta el cierre**, sobre las 00:00. Con eso, un turno de mañana son 9 h entre semana y 8 h el fin de semana, y la tarde 8 h con 2 h nocturnas.
+Los horarios del grupo los confirmó la encargada por WhatsApp: **mañana 07:00–16:00** (sábado y domingo desde las 08:00) y **tarde 16:00 hasta el cierre**, sobre las 00:00. Pero eso es lo que **abre el local**, no lo que hace cada persona: el cliente refiere **ocho horas por turno, «más o menos»**. Por eso la app separa la **apertura** (quién abre, qué franja cubre el turno, qué se imprime) de la **duración** (lo que se cuenta para nómina). De fábrica un turno cuenta **8 h** en las dos franjas, editable por local y franja en Equipo → Ajustes de los locales y marcado supuesto hasta que lo confirmen.
 
-El **turno partido no son dos jornadas enteras**: quien lo hace entra a mediodía y vuelve por la noche (Adrián «solo viene como al mediodía»). La app cuenta los dos tramos del local (12:00–16:00 y 20:00–00:00 de fábrica, marcados supuestos) en vez de 17 h. Dos excepciones: **quien abre** esa franja la hace entera, y un **horario puesto a mano** en la casilla manda sobre todo.
+Manda, por este orden: **horario puesto a mano en la casilla** → **tramo del partido** → **duración del turno** (8 h) → lo que abre el local menos el descanso. Las **nocturnas** (22:00–06:00) se siguen calculando sobre el horario real, no sobre la duración.
+
+El **turno partido no son dos jornadas enteras**: quien lo hace entra a mediodía y vuelve por la noche (Adrián «solo viene como al mediodía»). La app cuenta los dos tramos del local (12:00–16:00 y 20:00–00:00 de fábrica, marcados supuestos) en vez de 17 h. Excepción: **quien abre** esa franja la hace entera, o sea sus 8 h.
+
+Un **turno continuo** —la misma persona abre la mañana y la tarde del mismo local— es **un turno seguido y se cuenta una vez**: la mañana suma 0 y la tarde lleva las horas y las nocturnas del tirón. El contador de horas lo dice por persona («N días de turno continuo»).
+
+Con esto, en septiembre casi todo el equipo sale a **8 h por día trabajado**. Solo pasan de ahí quienes abren una franja (y por tanto la hacen entera) y además hacen el otro tramo del partido: Victoria 9,3 h y Mari Luz 8,6 h de media por día. La media del equipo queda en 8,1 h.
 
 ## Supuestos (marcados «supuesto» en la app hasta confirmación)
 
+- Un turno cuenta **8 h** («más o menos», dice el cliente: C2, pendiente), independientemente de las nueve horas que abre el local por la mañana. Editable por local y franja en Equipo → Ajustes de los locales.
 - Tramos del turno partido: 12:00–16:00 y 20:00–00:00 (C2, pendiente). Sin descanso que no cuente dentro del turno. Editables en Equipo → Ajustes de los locales.
 - El 33 sábado mañana pide 3 y con el PDF solo pueden Victoria y Jenny: la semana tipo pone a **Hojan** como tercero, marcado supuesto.
 - Roberto hace partido viernes y sábado; Yilian partido el lunes cubriendo a Susana Capón; Lavinia por defecto en Pasarela domingo tarde.
@@ -75,7 +82,7 @@ El **turno partido no son dos jornadas enteras**: quien lo hace entra a mediodí
 
 ## Preguntas abiertas para el grupo (C1–C29)
 
-Horas y nómina: **C1 respondida** (WhatsApp de la encargada, 15/09): mañana desde la apertura, 07:00 (fines de semana 08:00), hasta las 16:00; tarde de 16:00 hasta el cierre, «a lo mejor sobre las 00:00, aunque depende» — falta la hora real de cierre por local y día, que en la app va marcada como aproximada. C2 a qué hora entra y sale quien hace partido (la app cuenta 12:00–16:00 y 20:00–00:00, supuesto) y si hay descanso que no cuente; C3 el «estira el turno» de Noe el domingo; C4 horas de contrato (Lavinia, Leo, Tere, Cristian, Hojan); C5 cómo se paga y quién apunta las horas fuera de planilla; C6 festivos: apertura, municipio y si se pagan distinto.
+Horas y nómina: **C1 respondida** (WhatsApp de la encargada, 15/09): mañana desde la apertura, 07:00 (fines de semana 08:00), hasta las 16:00; tarde de 16:00 hasta el cierre, «a lo mejor sobre las 00:00, aunque depende» — falta la hora real de cierre por local y día, que en la app va marcada como aproximada. C2 cuántas horas cuenta exactamente un turno (el cliente dice «ocho más o menos»: la app cuenta 8 h, supuesto) y a qué hora entra y sale quien hace partido (la app cuenta 12:00–16:00 y 20:00–00:00, supuesto), y si hay descanso que no cuente; C3 el «estira el turno» de Noe el domingo; C4 horas de contrato (Lavinia, Leo, Tere, Cristian, Hojan); C5 cómo se paga y quién apunta las horas fuera de planilla; C6 festivos: apertura, municipio y si se pagan distinto.
 
 Mínimos y aperturas: C7 confirmar los mínimos con asterisco; C8 Zapatillera mañana ¿3 o 2?; C9 Pasarela domingo ¿2 y 2?; C10 quién abre El 33, Zapatillera y Mónaco por la mañana; C11 quién sale primero cuando el titular libra.
 

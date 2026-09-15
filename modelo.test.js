@@ -361,7 +361,7 @@ ok('horas de un turno: el horario por defecto es editable por local y franja y c
   const cfg = cfgBase();
   const mon = cfg.locales.find(l => l.id === 'MONACO');
   mon.horario = { M: { ini: '10:00', fin: '16:00' }, T: { ini: '18:00', fin: '01:00' }, porDow: { 5: { T: { ini: '18:00', fin: '02:30' } } } };
-  mon.descansoMin = 30;
+  mon.descansoMin = 30; mon.duracion = null;   // sin duración fijada se cuenta lo que el local abre, menos el descanso
   assert.strictEqual(M.minutosTurno(mon, 1, 'M'), 360 - 30);
   assert.strictEqual(M.minutosTurno(mon, 1, 'T'), 420 - 30);
   assert.strictEqual(M.minutosTurno(mon, 5, 'T'), 510 - 30, 'viernes con excepción');
@@ -370,7 +370,7 @@ ok('horas de un turno: el horario por defecto es editable por local y franja y c
 
 ok('horasPersonaMes suma mañanas, tardes, partidos, horas por local, festivos, domingos, extras y saldo frente a contrato', () => {
   const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
-  for (const l of cfg.locales) { l.horario = { M: { ini: '09:00', fin: '16:00' }, T: { ini: '16:00', fin: '23:00' } }; l.horarioPartido = null; l.descansoMin = 0; }   // sin tramos de partido: dos turnos enteros
+  for (const l of cfg.locales) { l.horario = { M: { ini: '09:00', fin: '16:00' }, T: { ini: '16:00', fin: '23:00' } }; l.horarioPartido = null; l.duracion = null; l.descansoMin = 0; }   // sin tramos de partido ni duración fijada: se cuenta lo que el local abre
   M.instanciarPatron(cfg, st, e, '2026-10-05', '2026-10-11');
   const meses = { '2026-10': { asig: e.asig } };
   const adr = st.find(p => p.id === 'adrian');
@@ -775,9 +775,8 @@ ok('horarios reales: mañana 07:00–16:00 (fines de semana desde las 08:00) y t
     assert.equal(l.cierreAprox, true, `${l.nombre}: la hora de cierre es aproximada («a lo mejor sobre las 00, aunque depende»)`);
   }
   const l = M.localDe(cfg, 'ZAPA');
-  assert.equal(M.minutosTurno(l, 1, 'M'), 9 * 60, 'la mañana de un día de diario son 9 h');
-  assert.equal(M.minutosTurno(l, 6, 'M'), 8 * 60, 'la del sábado, 8 h');
-  assert.equal(M.minutosTurno(l, 1, 'T'), 8 * 60, 'la tarde, 8 h');
+  assert.equal(M.minutosEntre(M.horarioDe(l, 1, 'M').ini, M.horarioDe(l, 1, 'M').fin), 9 * 60, 'el local abre 9 h por la mañana entre semana');
+  assert.equal(M.minutosEntre(M.horarioDe(l, 1, 'T').ini, M.horarioDe(l, 1, 'T').fin), 8 * 60, 'y 8 h por la tarde');
   assert.equal(M.minutosNocturnos(l, 1, 'T'), 120, 'de las 22:00 a las 00:00, 2 h nocturnas');
   assert.equal(M.minutosNocturnos(l, 1, 'M'), 0, 'la mañana no tiene nocturnas');
 });
@@ -798,7 +797,7 @@ ok('turno partido: se cuentan los tramos del partido (mediodía y noche), no dos
   // el mismo día sin partido: el turno es el completo del local
   const e2 = M.nuevoEstado(2026, 10, { festivos: [] });
   assert.ok(M.asignar(e2, cfg, st, '2026-10-09', 'ZAPA_M', 'adrian', { cocina: true }).ok);
-  assert.equal(M.horasPersonaMes(cfg, st, { '2026-10': { asig: e2.asig } }, 'adrian', 2026, 10).minutos, 9 * 60);
+  assert.equal(M.horasPersonaMes(cfg, st, { '2026-10': { asig: e2.asig } }, 'adrian', 2026, 10).minutos, 8 * 60, 'un turno suelto son ocho horas, las que dura el turno');
 });
 ok('turno partido: quien abre una franja la hace entera, y el horario puesto a mano en la casilla manda sobre todo', () => {
   const cfg = cfgBase(), st = staffDe(cfg);
@@ -845,6 +844,61 @@ ok('navVigente: la navegación guardada solo se recupera si se guardó hoy y cae
   assert.equal(M.navVigente({}, hoy, '2026-01', '2030-12'), false);
   assert.equal(M.navVigente({ y: 2025, m: 12, day: 1, hoy }, hoy, '2026-01', '2030-12'), false, 'antes del rango de planificación');
   assert.equal(M.navVigente({ y: 2031, m: 1, day: 1, hoy }, hoy, '2026-01', '2030-12'), false, 'después del rango');
+});
+
+
+// ---------- 8 horas por turno (el cliente, 15/09) ----------
+// El local abre de 07:00 a 16:00 (nueve horas), pero «8 horas por turno más o menos»:
+// cada persona hace ocho, no las nueve que el local está abierto. La duración del turno
+// es lo que se cuenta; el horario de apertura sigue mandando en quién abre y en lo que
+// se imprime. Un horario puesto a mano en la casilla manda sobre las dos cosas.
+ok('duración del turno: se cuentan 8 h por turno aunque el local abra nueve', () => {
+  const cfg = cfgBase();
+  for (const l of cfg.locales) {
+    assert.deepEqual(l.duracion, { M: 480, T: 480 }, `${l.nombre}: ocho horas por turno`);
+    assert.equal(l.duracionSupuesta, true, `${l.nombre}: «más o menos», pendiente de confirmar`);
+    assert.equal(M.minutosTurno(l, 1, 'M'), 8 * 60, `${l.nombre}, mañana de diario`);
+    assert.equal(M.minutosTurno(l, 6, 'M'), 8 * 60, `${l.nombre}, mañana del sábado`);
+    assert.equal(M.minutosTurno(l, 3, 'T'), 8 * 60, `${l.nombre}, tarde`);
+  }
+  const l = M.localDe(cfg, 'ZAPA');
+  assert.equal(M.minutosTurno(l, 1, 'M', { ini: '10:00', fin: '15:00' }), 5 * 60, 'el horario de la casilla manda');
+  assert.equal(M.minutosTurno(l, 1, 'M', null, true), 4 * 60, 'un tramo de partido cuenta lo que dura el tramo');
+  assert.equal(M.minutosTurno(l, 1, 'T', null, true), 4 * 60);
+  l.duracion = null;
+  assert.equal(M.minutosTurno(l, 1, 'M'), 9 * 60, 'sin duración fijada se cuenta lo que el local está abierto');
+});
+ok('turno continuo: quien abre la mañana y la tarde del mismo local hace UN turno seguido, y se cuenta una vez', () => {
+  const cfg = cfgBase(), st = staffDe(cfg);
+  const e = M.nuevoEstado(2026, 10, { festivos: [] });   // miércoles 7: Noe abre El 33 mañana y tarde
+  for (const [tid, pid] of [['EL33_M', 'noe'], ['EL33_M', 'jenny'], ['EL33_T', 'noe'], ['EL33_T', 'jenny']])
+    assert.ok(M.asignar(e, cfg, st, '2026-10-07', tid, pid, { permitirPartido: true }).ok, `${pid} en ${tid}`);
+  assert.ok(M.esContinuo(cfg, st, e, '2026-10-07', 'EL33', 'noe'), 'Noe hace turno continuo');
+  const h = M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'noe', 2026, 10);
+  assert.equal(h.minutos, 8 * 60, `un turno seguido son ocho horas, no dos turnos de ocho: salieron ${h.minutos / 60} h`);
+  assert.equal(h.continuos, 1, 'se cuenta cuántos días hace turno continuo');
+  assert.equal(h.nocturnosMin, 120, 'acaba al cierre: las dos últimas horas son nocturnas');
+  // Jenny, que hace partido normal ese día, sigue con sus dos tramos
+  assert.equal(M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'jenny', 2026, 10).minutos, 8 * 60);
+});
+ok('con ocho horas por turno, un mes normal ronda las 200 h; solo alarga quien abre una franja y además hace el otro tramo', () => {
+  const cfg = cfgBase(), st = staffDe(cfg);
+  const e = M.nuevoEstado(2026, 10, { festivos: [] });
+  M.generarPlanilla(cfg, st, e, '2026-10-01', '2026-10-31', {});
+  const meses = { '2026-10': { asig: e.asig } };
+  const t = M.horasEquipoMes(cfg, st, meses, 2026, 10).filter(x => x.turnos);
+  for (const f of t) {
+    assert.ok(f.horas <= f.dias * 12 + 0.1, `${f.nombre}: ${f.horas} h en ${f.dias} días`);
+    assert.ok(f.horas >= f.dias * 4, `${f.nombre}: ${f.horas} h en ${f.dias} días, muy poco`);
+  }
+  const media = t.reduce((a, f) => a + f.horas, 0) / t.reduce((a, f) => a + f.dias, 0);
+  assert.ok(media >= 7.5 && media <= 8.6, `la media del equipo se va de las ocho horas por día: ${Math.round(media * 100) / 100}`);
+  const adr = t.find(x => x.pid === 'adrian');
+  assert.ok(adr.partidos >= 20 && adr.horas === adr.dias * 8, `Adrián hace partido casi a diario y suma ocho horas por día: ${adr.horas} h en ${adr.dias} días`);
+  // Mari Luz abre la tarde de Pasarela y además hace el tramo de mañana: ese día son doce
+  // horas y la app lo enseña tal cual, que es justo lo que el encargado necesita ver
+  const ml = t.find(x => x.pid === 'mariluz');
+  assert.ok(ml.horas > ml.dias * 8, `Mari Luz: ${ml.horas} h en ${ml.dias} días`);
 });
 
 console.log(`\n${n} tests OK`);

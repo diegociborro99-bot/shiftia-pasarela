@@ -1081,8 +1081,13 @@ function horarioDe(l, dow, franja, partido) {
   return ex || h[franja] || null;
 }
 function minutosEntre(ini, fin) { let d = hm(fin) - hm(ini); if (d <= 0) d += 1440; return d; }
+// Lo que cuenta un turno para las horas: el horario puesto a mano en la casilla manda;
+// después, el tramo del partido; después, la duración fijada del turno (ocho horas);
+// y si no hay ninguna, lo que el local esté abierto menos el descanso.
 function minutosTurno(l, dow, franja, override, partido) {
-  const h = override && override.ini && override.fin ? override : horarioDe(l, dow, franja, partido);
+  if (override && override.ini && override.fin) return Math.max(0, minutosEntre(override.ini, override.fin) - (+(l && l.descansoMin) || 0));
+  if (!partido) { const d = l && l.duracion && +l.duracion[franja]; if (d > 0) return d; }
+  const h = horarioDe(l, dow, franja, partido);
   if (!h) return 0;
   return Math.max(0, minutosEntre(h.ini, h.fin) - (+(l && l.descansoMin) || 0));
 }
@@ -1099,7 +1104,7 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
   const p = personaDe(staff, pid);
   const k = claveMes(y, m);
   const asig = (meses && meses[k] && meses[k].asig) || {};
-  const out = { pid, nombre: p ? p.nombre : pid, mananas: 0, tardes: 0, partidos: 0, dias: 0, turnos: 0, minutos: 0, nocturnosMin: 0, festivas: 0, domingos: 0, festivasMin: 0, domingosMin: 0, extrasMin: 0, ausencias: 0, porLocal: {}, contratoHoras: null, saldo: null, refuerzos: 0, forzados: 0 };
+  const out = { pid, nombre: p ? p.nombre : pid, mananas: 0, tardes: 0, partidos: 0, continuos: 0, dias: 0, turnos: 0, minutos: 0, nocturnosMin: 0, festivas: 0, domingos: 0, festivasMin: 0, domingosMin: 0, extrasMin: 0, ausencias: 0, porLocal: {}, contratoHoras: null, saldo: null, refuerzos: 0, forzados: 0 };
   const n = diasDelMes(y, m);
   for (let d = 1; d <= n; d++) {
     const iso = isoDe(y, m, d), dow = isoDow(iso);
@@ -1113,13 +1118,19 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
     }
     const man = mias.some(x => x.franja === 'M'), tar = mias.some(x => x.franja === 'T');
     const partido = man && tar;
+    // turno continuo: abre la mañana Y la tarde del mismo local. Es UN turno seguido, no
+    // dos: se cuenta una sola vez (con la tarde, que es la que acaba al cierre).
+    const abren = mias.filter(x => x.e.abre);
+    const continuo = partido && abren.length === 2 && abren[0].localId === abren[1].localId ? abren[0].localId : null;
+    if (continuo) out.continuos++;
     let minDia = 0;
     for (const { e, localId, franja } of mias) {
       const l = localDe(cfg, localId);
       const tramoPartido = partido && !e.abre;
-      const min = minutosTurno(l, dow, franja, e, tramoPartido);
+      const seguido = continuo === localId && franja === 'M';   // la mañana del continuo ya va en la tarde
+      const min = seguido ? 0 : minutosTurno(l, dow, franja, e, tramoPartido);
       out.turnos++; out.minutos += min; minDia += min;
-      out.nocturnosMin += minutosNocturnos(l, dow, franja, e, tramoPartido);
+      if (!seguido) out.nocturnosMin += minutosNocturnos(l, dow, franja, e, tramoPartido);
       if (franja === 'M') out.mananas++; else out.tardes++;
       const pl = out.porLocal[localId] = out.porLocal[localId] || { turnos: 0, minutos: 0, horas: 0 };
       pl.turnos++; pl.minutos += min; pl.horas = Math.round(pl.minutos / 6) / 10;
@@ -1323,31 +1334,35 @@ function semillaPasarela() {
   // el partido no son dos turnos enteros: quien lo hace entra a mediodía y vuelve por la
   // noche (Adrián «solo viene como al mediodía»). Los tramos siguen siendo un supuesto.
   const horarioPartido = () => ({ M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } });
+  // «8 horas por turno más o menos» (el cliente, 15/09): el local abre nueve por la
+  // mañana, pero cada persona hace ocho. La apertura manda en quién abre y en lo que se
+  // imprime; la duración es lo que se cuenta para la nómina.
+  const duracion = () => ({ M: 480, T: 480 });
   const locales = [
     { id: 'EL33', nombre: 'El 33', corto: '33', color: '#b8741a',
       abre: { M: dows.slice(), T: [2, 3, 4, 5, 6] },
       minimos: { M: min([2, 2, 2, 2, 2, 3, 3]), T: min([0, 2, 2, 2, 2, 2, 0]) },
       supuestos: { M: sup([1, 1, 1, 1, 1, 0, 0]), T: sup([0, 1, 1, 1, 1, 1, 0]) },
       cocina: { obligatoria: { M: false, T: false }, titulares: { M: ['jenny', 'noe', 'hojan'], T: ['jenny', 'noe', 'hojan'] }, reservas: ['hojan'], posicion: { M: 2, T: 2 }, posicionSiDesde: {} },
-      primero: { M: null, T: null }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, descansoMin: 0 },
+      primero: { M: null, T: null }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, duracion: duracion(), duracionSupuesta: true, descansoMin: 0 },
     { id: 'ZAPA', nombre: 'Zapatillera', corto: 'ZAP', color: '#c2378f',
       abre: { M: dows.slice(), T: dows.slice() },
       minimos: { M: min([2, 2, 2, 2, 2, 2, 2]), T: min([2, 2, 2, 2, 4, 4, 2]) },
       supuestos: { M: sup([1, 1, 1, 1, 1, 1, 1]), T: sup([0, 0, 0, 0, 0, 0, 1]) },
       cocina: { obligatoria: { M: false, T: false }, titulares: { M: ['adrian', 'roberto', 'hojan'], T: ['adrian', 'roberto', 'hojan'] }, reservas: ['roberto', 'hojan'], posicion: { M: 3, T: 2 }, posicionSiDesde: { M: 3 } },
-      primero: { M: null, T: null }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, descansoMin: 0 },
+      primero: { M: null, T: null }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, duracion: duracion(), duracionSupuesta: true, descansoMin: 0 },
     { id: 'MONACO', nombre: 'Bar Mónaco', corto: 'MON', color: '#2f6db5',
       abre: { M: dows.slice(), T: dows.slice() },
       minimos: { M: min([3, 3, 3, 3, 3, 3, 3]), T: min([2, 2, 2, 2, 3, 3, 2]) },
       supuestos: { M: sup([0, 0, 0, 0, 0, 0, 0]), T: sup([0, 0, 0, 0, 0, 0, 1]) },
       cocina: { obligatoria: { M: true, T: true }, titulares: { M: ['esmeralda', 'jenny', 'hojan'], T: ['hojan', 'jenny', 'scapon'] }, reservas: ['hojan'], posicion: { M: 2, T: 2 }, posicionSiDesde: {} },
-      primero: { M: null, T: 'scapon' }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, descansoMin: 0 },
+      primero: { M: null, T: 'scapon' }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, duracion: duracion(), duracionSupuesta: true, descansoMin: 0 },
     { id: 'PASARELA', nombre: 'Pasarela', corto: 'PAS', color: '#1f9a6e',
       abre: { M: dows.slice(), T: dows.slice() },
       minimos: { M: min([3, 3, 3, 3, 3, 2, 2]), T: min([2, 2, 2, 2, 3, 3, 2]) },
       supuestos: { M: sup([0, 0, 0, 0, 0, 0, 0]), T: sup([0, 0, 0, 0, 0, 0, 0]) },
       cocina: { obligatoria: { M: false, T: false }, titulares: { M: [], T: [] }, reservas: [], posicion: { M: 2, T: 2 }, posicionSiDesde: {} },
-      primero: { M: 'lola', T: 'ivan' }, partidoAbre: { M: false, T: true }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, descansoMin: 0 },
+      primero: { M: 'lola', T: 'ivan' }, partidoAbre: { M: false, T: true }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, duracion: duracion(), duracionSupuesta: true, descansoMin: 0 },
   ];
   const P = (id, nombre, puesto, locales, franjas, libra, extra) => Object.assign({ id, nombre, puesto, locales, franjas, libra, partido: { dias: [] }, cocina: { titular: [], reserva: [], soloDias: [] }, abre: {}, noAbre: [], nuncaCon: [], cubreA: [], vetos: [], contrato: { horasSemana: null }, ausencias: [], prefs: {}, nota: '', supuestos: [] }, extra || {});
   const staff = [
@@ -1448,6 +1463,7 @@ function migrarHorarios(estado) {
       r.cambiados++;
     }
     if (!l.horarioPartido) { l.horarioPartido = JSON.parse(JSON.stringify(base.horarioPartido)); l.horarioPartidoSupuesto = true; r.partido++; }
+    if (!l.duracion) { l.duracion = JSON.parse(JSON.stringify(base.duracion)); l.duracionSupuesta = true; r.duracion = (r.duracion || 0) + 1; }
   }
   return r;
 }
@@ -1496,7 +1512,7 @@ if (typeof module !== 'undefined') {
     revisarTurno, revisionMes,
     plazasDe, instanciarPatron, patronDesdeSemana,
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
-    minutosTurno, minutosNocturnos, horarioDe, horasPersonaMes, horasEquipoMes, horasLocalMes,
+    minutosTurno, minutosNocturnos, minutosEntre, horarioDe, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,
     CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,

@@ -372,9 +372,14 @@ function openAjustesLocales(localId) {
       </tbody></table></div>
       <p class="filltxt" style="margin:4px 0 6px">En un turno partido se cuentan estos dos tramos y no dos jornadas enteras. Quien <b>abre</b> la franja la hace entera. En blanco, el horario normal del local.</p>
       <div class="locgrid2">
+        ${FRANJAS.map(f => `<label class="pinlbl">Horas que cuenta un turno de ${FRANJA_LBL[f].toLowerCase()}<input type="number" class="logininp" min="0" max="12" step="0.5" inputmode="decimal" data-libre data-dur="${f}" value="${(l.duracion && +l.duracion[f]) ? Math.round(+l.duracion[f] / 6) / 10 : ''}" placeholder="lo que el local abre"></label>`).join('')}
+      </div>
+      <p class="filltxt" style="margin:4px 0 6px">El local abre nueve horas por la mañana, pero el cliente dice <b>ocho horas por turno más o menos</b>: esto es lo que se cuenta para la nómina. En blanco se cuenta todo lo que el local está abierto. Un turno continuo (abre la mañana y la tarde del mismo local) es un solo turno seguido y se cuenta una vez.</p>
+      <div class="locgrid2">
         <label class="singchk chkrow"><input type="checkbox" data-libre data-lf="horarioConfirmado"${l.horarioSupuesto ? '' : ' checked'}> Horario confirmado por el grupo</label>
         <label class="singchk chkrow"><input type="checkbox" data-libre data-lf="partidoConfirmado"${l.horarioPartidoSupuesto ? '' : ' checked'}> Tramos del partido confirmados</label>
         <label class="singchk chkrow"><input type="checkbox" data-libre data-lf="cierreAprox"${l.cierreAprox ? ' checked' : ''}> La hora de cierre de la tarde es aproximada</label>
+        <label class="singchk chkrow"><input type="checkbox" data-libre data-lf="duracionConfirmada"${l.duracionSupuesta ? '' : ' checked'}> Horas por turno confirmadas</label>
         <label class="pinlbl">Descanso por turno (minutos)<input type="number" class="logininp" min="0" max="180" step="5" inputmode="numeric" data-libre data-lf="descansoMin" value="${+l.descansoMin || 0}"></label>
       </div>
       <div class="revgrp"><span class="dot" style="background:${esc(l.color)}"></span>COCINA</div>
@@ -457,6 +462,7 @@ function openAjustesLocales(localId) {
       else if (k === 'horarioConfirmado') { l.horarioSupuesto = !t.checked; anota(l, t.checked ? 'horario confirmado' : 'horario marcado como supuesto'); }
       else if (k === 'partidoConfirmado') { l.horarioPartidoSupuesto = !t.checked; anota(l, t.checked ? 'tramos del partido confirmados' : 'tramos del partido marcados como supuestos'); }
       else if (k === 'cierreAprox') { l.cierreAprox = t.checked; anota(l, t.checked ? 'cierre de la tarde aproximado' : 'cierre de la tarde fijo'); }
+      else if (k === 'duracionConfirmada') { l.duracionSupuesta = !t.checked; anota(l, t.checked ? 'horas por turno confirmadas' : 'horas por turno marcadas como supuestas'); }
       else if (k === 'partidoAbreT') { l.partidoAbre = Object.assign({ M: false, T: false }, l.partidoAbre || {}); l.partidoAbre.T = t.checked; anota(l, t.checked ? 'quien hace partido puede abrir la tarde' : 'el partido ya no abre la tarde'); }
       return;
     }
@@ -464,6 +470,12 @@ function openAjustesLocales(localId) {
       const [f, d] = t.dataset.min.split('|');
       l.minimos[f] = l.minimos[f] || {}; l.minimos[f][d] = Math.max(0, Math.min(20, +t.value || 0)); t.value = l.minimos[f][d];
       anota(l, `mínimos de ${FRANJA_LBL[f].toLowerCase()}`); return;
+    }
+    if (t.dataset.dur) {
+      const f = t.dataset.dur, h = +t.value;
+      l.duracion = l.duracion || {};
+      l.duracion[f] = h > 0 ? Math.round(h * 60) : 0;
+      anota(l, `horas por turno de ${FRANJA_LBL[f].toLowerCase()}`); return;
     }
     if (t.dataset.horp) {
       const [f, k] = t.dataset.horp.split('|');

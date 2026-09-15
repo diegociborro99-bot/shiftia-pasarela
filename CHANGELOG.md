@@ -32,6 +32,14 @@
   salvo en la franja que la persona **abre**, que hace entera, y salvo horario puesto a
   mano en la casilla. Adrián pasa de 358 h a 200 h en septiembre: cifras de un mes, no de
   un año. El contador de horas explica arriba con qué horarios cuenta.
+- **Ocho horas por turno**, como dice el cliente: el local abre nueve horas por la mañana
+  (07:00–16:00), pero cada persona hace su turno de 8 h, así que la app separa lo que
+  **abre el local** de lo que **cuenta el turno**. Un **turno continuo** —la misma persona
+  abre la mañana y la tarde del mismo local— es un turno seguido y se cuenta una vez, no
+  dos. Con eso el equipo sale a 8 h por día trabajado, salvo quien abre una franja (la hace
+  entera) y además hace el otro tramo del partido: Victoria 9,3 h y Mari Luz 8,6 h de media
+  al día. Las horas que cuenta un turno se cambian por local y franja en Equipo → Ajustes de
+  los locales, y van marcadas como supuestas hasta que el cliente confirme el «más o menos».
 - Las planillas ya guardadas se migran al cargarlas: solo se sustituyen los horarios que
   seguían siendo los supuestos de fábrica; lo que el encargado tocó a mano no se pisa.
 

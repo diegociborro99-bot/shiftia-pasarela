@@ -41,6 +41,7 @@ function renderHoras() {
   const supuestos = S.locales.filter(l => l.horarioSupuesto);
   const cierreAp = S.locales.filter(l => l.cierreAprox);
   const partidoSup = S.locales.filter(l => l.horarioPartidoSupuesto && l.horarioPartido && l.horarioPartido.M && l.horarioPartido.T);
+  const durSup = S.locales.filter(l => l.duracionSupuesta && l.duracion && +l.duracion.M > 0);
   const extrasMes = (S.extras || []).filter(x => x.iso && x.iso.startsWith(k));
   const totHoras = filas.reduce((a, f) => a + f.horas, 0);
   const totExtras = filas.reduce((a, f) => a + f.extrasMin, 0) / 60;
@@ -63,10 +64,11 @@ function renderHoras() {
   if (supuestos.length) {
     h += `<div class="haviso warn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.8 21.4 20H2.6Z"/><path d="M12 9.8v4.4"/><circle fill="currentColor" stroke="none" cx="12" cy="17" r="1.05"/></svg><span><b>Los horarios aún no están confirmados por el grupo: las horas son estimadas.</b> Falta confirmar ${supuestos.map(l => esc(l.nombre)).join(', ')}. Se ajustan en Equipo → Ajustes de los locales.</span></div>`;
   }
-  if (!supuestos.length && (cierreAp.length || partidoSup.length)) {
+  if (!supuestos.length && (cierreAp.length || partidoSup.length || durSup.length)) {
     const l0 = partidoSup[0] || S.locales[0];
     const tp = l0 && l0.horarioPartido;
-    h += `<div class="haviso info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11.3v5"/><circle fill="currentColor" stroke="none" cx="12" cy="8" r="1.05"/></svg><span><b>Horas del mes con los horarios del grupo:</b> mañana ${esc(horarioTxt(l0, 'M'))} y tarde ${esc(horarioTxt(l0, 'T'))}.${cierreAp.length ? ' La hora de cierre es aproximada: la tarde termina «sobre las 00:00, aunque depende».' : ''}${tp ? ` Quien hace <b>partido</b> cuenta dos tramos (${esc(tp.M.ini)}–${esc(tp.M.fin)} y ${esc(tp.T.ini)}–${esc(tp.T.fin)}), no dos jornadas enteras; quien abre la franja la hace entera.` : ''} Se ajusta en Equipo → Ajustes de los locales, o casilla a casilla desde Hoy.</span></div>`;
+    const dur = l0 && l0.duracion && +l0.duracion.M > 0 ? Math.round(+l0.duracion.M / 6) / 10 : null;
+    h += `<div class="haviso info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11.3v5"/><circle fill="currentColor" stroke="none" cx="12" cy="8" r="1.05"/></svg><span><b>Se cuentan ${dur ? esc(fmtHoras(dur)) : 'las horas de apertura'} por turno.</b> El local abre ${esc(horarioTxt(l0, 'M'))} por la mañana y ${esc(horarioTxt(l0, 'T'))} por la tarde, pero cada persona hace su turno${dur ? ' de ' + esc(fmtHoras(dur)) : ''}.${tp ? ` Un <b>partido</b> son dos tramos (${esc(tp.M.ini)}–${esc(tp.M.fin)} y ${esc(tp.T.ini)}–${esc(tp.T.fin)}); quien abre la franja la hace entera. Un <b>continuo</b> es un turno seguido y se cuenta una vez.` : ''}${cierreAp.length ? ' La hora de cierre es aproximada.' : ''} Se ajusta en Equipo → Ajustes de los locales, o casilla a casilla desde Hoy.</span></div>`;
   }
   if (cierre) {
     const cambiado = huellaHoras(cierre.tabla) !== huellaHoras(filas);
@@ -121,6 +123,7 @@ function detalleHoras(p, f, extrasMes) {
     : '<span class="hnota">Sin turnos este mes</span>'}</div>`;
   const notas = [];
   if (f.ausencias) notas.push(`${pl(f.ausencias, 'día', 'días')} de ausencia (no cuentan para el contrato)`);
+  if (f.continuos) notas.push(`${pl(f.continuos, 'día de turno continuo', 'días de turno continuo')} (un turno seguido, se cuenta una vez)`);
   if (f.forzados) notas.push(`${pl(f.forzados, 'asignación forzada', 'asignaciones forzadas')} a mano`);
   if (notas.length) h += `<p class="hnota">${notas.join(' · ')}</p>`;
   h += `</div><div><span class="micro">Horas extra</span><div class="hxtras">${mias.length
