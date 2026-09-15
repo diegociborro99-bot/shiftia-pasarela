@@ -1,7 +1,8 @@
 // ================= NAVEGACIÓN =================
-const VISTAS = ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'cobertura', 'entrevistas'];
+const VISTAS = ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'cobertura', 'actividad', 'entrevistas'];
 function switchTab(v) {
   if (!VISTAS.includes(v)) v = 'hoy';
+  if (v === 'actividad' && SRV.on && SRV.rol && SRV.rol !== 'programador') v = 'hoy';   // el visor de Actividad es solo del programador
   cerrarPops();
   if (typeof closePicker === 'function') closePicker();
   document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x.dataset.v === v ? 'true' : 'false'));
@@ -20,6 +21,7 @@ function switchTab(v) {
   if (v === 'horas') renderHoras();
   if (v === 'generador') renderGenerador();
   if (v === 'cobertura') renderCobertura();
+  if (v === 'actividad') renderActividad();
   if (v === 'entrevistas') renderEntrevistas();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.v)));
@@ -176,7 +178,7 @@ window.addEventListener('popstate', e => {
 });
 
 // ---------- navegación inferior móvil ----------
-const BNAV_EN_MAS = ['equipo', 'horas', 'generador', 'cobertura', 'entrevistas'];
+const BNAV_EN_MAS = ['equipo', 'horas', 'generador', 'cobertura', 'actividad', 'entrevistas'];
 function pintaBnav(v) {
   const activo = BNAV_EN_MAS.includes(v) ? 'mas' : v;
   document.querySelectorAll('.bnav [data-bnav]').forEach(b => {
@@ -207,6 +209,7 @@ function openMas() {
       ${fila('horas', I('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/>'), 'Contador de horas', 'horas del mes para la nómina')}
       ${fila('generador', I('<path d="M12 3.5l1.8 4.6 4.7.4-3.6 3.1 1.1 4.6-4-2.5-4 2.5 1.1-4.6-3.6-3.1 4.7-.4Z"/>'), 'Generador de planillas', 'semana tipo + relleno inteligente')}
       ${fila('cobertura', I('<path d="M12 3.5 5 6v5.5c0 4.2 3 7.6 7 9 4-1.4 7-4.8 7-9V6Z"/><path d="m9.3 12.2 1.9 1.9 3.6-3.8"/>'), 'Gestor de cobertura', 'baja, día libre o cambio: plan A y plan B')}
+      ${!SRV.on || SRV.rol === 'programador' ? fila('actividad', I('<path d="M4 6h9M4 10.5h6M4 15h5"/><circle cx="15.5" cy="13.5" r="4"/><path d="m18.5 16.5 2.5 2.5"/>'), 'Actividad', 'qué hace el encargado en la app') : ''}
       ${fila('entrevistas', I('<path d="M4 5.5h16v10H9l-4 3.5v-3.5H4Z"/><path d="M8 9h8M8 12h5"/>'), 'Entrevistas', 'en construcción')}
       ${fila('evento', I('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17M3.5 12h17"/>'), 'Partido u evento', 'refuerzo por local')}
       ${fila('revisar', I('<circle cx="10.7" cy="10.7" r="6.7"/><path d="m15.7 15.7 4.8 4.8"/>'), 'Revisar el mes', 'casillas cortas, sin cocina, forzados')}
@@ -224,7 +227,7 @@ function openMas() {
     if (!m) return;
     ov.remove();
     const a = m.dataset.mas;
-    if (a === 'equipo' || a === 'horas' || a === 'generador' || a === 'cobertura' || a === 'entrevistas') switchTab(a);
+    if (a === 'equipo' || a === 'horas' || a === 'generador' || a === 'cobertura' || a === 'actividad' || a === 'entrevistas') switchTab(a);
     else if (a === 'evento') openEvento({ iso: isoDia() });
     else if (a === 'revisar') { switchTab('mes'); openRevision(); }
     else if (a === 'deshacer') deshacer();

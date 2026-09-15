@@ -52,6 +52,7 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 | `22-generador.js` | Generador: periodo, opciones, motor local o núcleo, vista previa, aplicar, vaciar lo generado. |
 | `23-revision.js` | Revisión del mes y punto rojo de avisos. |
 | `26-cobertura.js` | Gestor de cobertura: la hoja «quién sale → quién entra» (persona, qué le pasa, tira de días con sus turnos, plan A y plan B por día, confirmar con deshacer); en la pestaña Cobertura y como capa desde Hoy, Semana y Mes. |
+| `27-actividad.js` | Actividad (visor del programador): qué hace el encargado con la app. Fusiona el historial de la planilla con la auditoría del servidor (`GET /api/auditoria`) traducida al español; tarjetas resumen, filtros por usuario y tipo, buscador. Solo con `body.rol-programador` (sin servidor también, para probar). |
 | `24-entrevistas.js` | Sección Entrevistas (en construcción): vista previa de la base de datos que llegará de Notion. |
 | `25-cuenta.js` | Contraseña, usuarios (servidor), copia de seguridad y versiones. |
 | `29-avisos-e-historial.js` | Historial de cambios. |

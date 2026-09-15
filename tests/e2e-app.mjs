@@ -56,12 +56,14 @@ try {
   const demo = await pg.evaluate(() => ({ asig: Object.keys(est.asig).length, mes: mesKey(S.y, S.m), plazas: Object.values(est.asig).reduce((a, d) => a + Object.values(d).reduce((b, l) => b + l.length, 0), 0) }));
   ok(`?demo=1 genera el mes en pantalla (${demo.mes}: ${demo.asig} días con ${demo.plazas} plazas)`, demo.asig > 0 && demo.mes === CLAVE, JSON.stringify(demo));
 
-  // 1) las siete vistas cargan sin errores de página
-  for (const v of ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'cobertura', 'entrevistas']) {
+  // 1) las nueve vistas cargan sin errores de página (Actividad se ve en modo local: es Diego probando)
+  ok('modo local: la pestaña Actividad se ve (body.rol-programador)', await llega(pg, () => document.body.classList.contains('rol-programador') && !!document.querySelector('.tab[data-v="actividad"]').offsetParent, null, 4000) >= 0);
+  for (const v of ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'cobertura', 'actividad', 'entrevistas']) {
     const antes = errores.length;
     const t = await vista(pg, v);
     ok(`vista «${v}» carga y se muestra sin errores de página`, t >= 0 && errores.length === antes, errores.slice(antes).join(' | '));
   }
+  ok('Actividad sin servidor: solo el historial de la planilla (la siembra del demo) y la nota', await pg.evaluate(() => document.querySelectorAll('#actRoot .actrow[data-accion="hist-ia"]').length >= 1 && /Sin servidor/.test(document.getElementById('actMeta').textContent) && document.querySelectorAll('#actKpis .kpi').length === 5), await pg.evaluate(() => (document.getElementById('actRoot') || { textContent: '' }).textContent.slice(0, 160)));
 
   // 2) Hoy: cuatro locales y el selector asigna a alguien de «pueden»
   await vista(pg, 'hoy');
@@ -323,11 +325,11 @@ try {
   }
   await pm.click('#bnavMas');
   ok('móvil: «Más» abre #masOvl', await llega(pm, () => !!document.querySelector('#masOvl'), null, 3000) >= 0);
-  ok('móvil: «Más» ofrece Equipo, Horas, Generador, Cobertura y Entrevistas', await pm.evaluate(() => ['equipo', 'horas', 'generador', 'cobertura', 'entrevistas'].every(a => !!document.querySelector(`#masOvl [data-mas="${a}"]`))));
+  ok('móvil: «Más» ofrece Equipo, Horas, Generador, Cobertura, Actividad (modo local) y Entrevistas', await pm.evaluate(() => ['equipo', 'horas', 'generador', 'cobertura', 'actividad', 'entrevistas'].every(a => !!document.querySelector(`#masOvl [data-mas="${a}"]`))));
   await pm.click('#masOvl [data-mas="horas"]');
   ok('móvil: desde «Más» se llega a Horas', await llega(pm, () => !document.querySelector('#masOvl') && !document.getElementById('view-horas').classList.contains('hidden') && !!document.querySelector('#horasRoot table.htab'), null, 5000) >= 0);
   ok('móvil: la barra marca «Más» como activo en Horas', await pm.$eval('#bnavMas', b => b.classList.contains('on')));
-  for (const v of ['equipo', 'generador', 'cobertura', 'entrevistas']) {
+  for (const v of ['equipo', 'generador', 'cobertura', 'actividad', 'entrevistas']) {
     const antes = errores.length;
     await pm.click('#bnavMas'); await pm.waitForSelector('#masOvl', { timeout: 3000 }); await pm.click(`#masOvl [data-mas="${v}"]`);
     ok(`móvil: «${v}» desde «Más», sin errores`, await llega(pm, v => !document.querySelector('#masOvl') && !document.getElementById('view-' + v).classList.contains('hidden'), v, 4000) >= 0 && errores.length === antes, errores.slice(antes).join(' | '));

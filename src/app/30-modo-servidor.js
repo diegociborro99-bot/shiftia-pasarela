@@ -10,6 +10,9 @@ const PID_KEY = 'shiftia_pas_pid';
 const SRV_KEY = 'shiftia_pas_srv';          // «este origen tiene servidor»
 const PEND_KEY = 'shiftia_pas_pendiente';   // bandeja de salida: último estado del admin aún no confirmado por el servidor
 let sesionCaducada = false, saliendo = false;
+// el visor de Actividad (27-actividad.js) es solo del programador: la pestaña y su
+// fila de «Más» se enseñan con esta clase en <body>. Sin servidor es Diego probando.
+function marcarRolProgramador() { document.body.classList.toggle('rol-programador', !SRV.on || SRV.rol === 'programador'); }
 const NAV_NULL = { y: null, m: null, day: null, semLunes: null, guiaOff: null, hY: null, hM: null };
 const sinNav = e => JSON.stringify(Object.assign({}, e, NAV_NULL));   // huella del estado sin la navegación local
 function sesionPerdida() {
@@ -397,6 +400,9 @@ function pedirCambioPass(actual) {
 }
 async function entrarServidor(datos, passUsada) {
   SRV.on = true; SRV.rol = datos.rol; SRV.esAdmin = ['admin', 'programador'].includes(datos.rol); SRV.pid = datos.pid; SRV.usuario = datos.usuario;
+  marcarRolProgramador();
+  // si este navegador se quedó en Actividad (un programador antes) y ahora entra otro rol, a Hoy
+  if (SRV.rol !== 'programador' && document.querySelector('.tab[data-v="actividad"][aria-selected="true"]')) switchTab('hoy');
   // con servidor nada de la planilla vive en localStorage (lo que dejó el arranque local se retira)
   try { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_KEY + '_corrupto'); } catch (e) {}
   if (datos.cambiar) await pedirCambioPass(passUsada || null);   // el servidor no deja cargar nada antes
@@ -493,6 +499,7 @@ function mostrarLogin() {
     mostrarLogin();
     return;
   }
+  marcarRolProgramador();   // modo local: sin servidor es Diego probando, Actividad se ve
   if (haySesion()) { if (rolActual() === 'empleado') setTimeout(activarModoEmpleado, 0); return; }
   mostrarLogin();
 })();

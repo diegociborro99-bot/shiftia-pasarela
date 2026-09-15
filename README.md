@@ -57,6 +57,14 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   demás ausencias; el aviso de un partido se quita desde su chip.
 - **Entrevistas**: sección del administrador reservada para la base de datos de
   entrevistas y sus funciones (por importar); de momento visible y «en construcción».
+- **Actividad** (solo el programador): qué está haciendo el encargado con la app,
+  como un historial. Una sola línea de tiempo por días con los cambios de la
+  planilla (quién y qué) y la auditoría del servidor traducida (inicios de sesión,
+  accesos fallidos, guardados con su versión, altas y bajas de usuarios,
+  peticiones…), con la IP; tarjetas resumen (último acceso del encargado, último
+  guardado, cambios de hoy y de la semana, accesos fallidos), filtros por usuario
+  y por tipo, buscador y aviso si el encargado aún no ha entrado. El encargado y
+  los empleados no la ven.
 - **Revisar el mes**, historial de cambios, deshacer (Ctrl+Z), tema claro y
   oscuro, PWA instalable, móvil con barra inferior.
 
