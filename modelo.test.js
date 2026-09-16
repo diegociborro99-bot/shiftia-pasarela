@@ -780,11 +780,41 @@ ok('horarios reales: mañana 07:00–16:00 (fines de semana desde las 08:00) y t
   assert.equal(M.minutosNocturnos(l, 1, 'T'), 120, 'de las 22:00 a las 00:00, 2 h nocturnas');
   assert.equal(M.minutosNocturnos(l, 1, 'M'), 0, 'la mañana no tiene nocturnas');
 });
+ok('un partido son ocho horas repartidas: 5 y 3 entre semana, 4 y 4 el fin de semana', () => {
+  // Cliente, 16/09: «se dividen las horas según 4 y 4 o 5 y 3 horas […] entre semana es
+  // 5 y 3 y el finde 4 y 4, aunque depende a veces según la necesidad».
+  const cfg = cfgBase();
+  for (const l of cfg.locales) {
+    for (const d of [1, 2, 3, 4, 5]) {
+      assert.deepEqual(M.horarioDe(l, d, 'M', true), { ini: '11:00', fin: '16:00' }, `${l.nombre}, día ${d}: tramo de mediodía de 5 h`);
+      assert.deepEqual(M.horarioDe(l, d, 'T', true), { ini: '21:00', fin: '00:00' }, `${l.nombre}, día ${d}: tramo de noche de 3 h`);
+    }
+    for (const d of [6, 7]) {
+      assert.deepEqual(M.horarioDe(l, d, 'M', true), { ini: '12:00', fin: '16:00' }, `${l.nombre}, día ${d}: el finde, 4 h a mediodía`);
+      assert.deepEqual(M.horarioDe(l, d, 'T', true), { ini: '20:00', fin: '00:00' }, `${l.nombre}, día ${d}: el finde, 4 h de noche`);
+    }
+    for (const d of M.TODOS)
+      assert.equal(M.minutosTurno(l, d, 'M', null, true) + M.minutosTurno(l, d, 'T', null, true), 8 * 60, `${l.nombre}, día ${d}: el partido suma ocho horas`);
+  }
+});
+ok('partido de quien abre: entra a la hora de apertura y hace el tramo largo, y el día sigue siendo de ocho horas', () => {
+  const cfg = cfgBase();
+  const l = M.localDe(cfg, 'PASARELA');
+  assert.deepEqual(M.horarioDe(l, 1, 'T', true, 'T'), { ini: '16:00', fin: '21:00' }, 'abre la tarde: entra a las 16:00 y hace las 5 h');
+  assert.deepEqual(M.horarioDe(l, 1, 'M', true, 'T'), { ini: '13:00', fin: '16:00' }, 'y a mediodía le quedan las 3 h');
+  assert.deepEqual(M.horarioDe(l, 1, 'M', true, 'M'), { ini: '07:00', fin: '12:00' }, 'abre la mañana: entra a abrir y hace las 5 h');
+  assert.deepEqual(M.horarioDe(l, 1, 'T', true, 'M'), { ini: '21:00', fin: '00:00' }, 'y por la noche, las 3 h');
+  assert.deepEqual(M.horarioDe(l, 6, 'M', true, 'M'), { ini: '08:00', fin: '12:00' }, 'el sábado abre a las 08:00 y son 4 y 4');
+  assert.deepEqual(M.horarioDe(l, 6, 'T', true, 'M'), { ini: '20:00', fin: '00:00' });
+  for (const d of M.TODOS) for (const f of ['M', 'T'])
+    assert.equal(M.minutosTurno(l, d, 'M', null, true, f) + M.minutosTurno(l, d, 'T', null, true, f), 8 * 60, `día ${d} abriendo la franja ${f}: ocho horas`);
+});
 ok('turno partido: se cuentan los tramos del partido (mediodía y noche), no dos turnos enteros', () => {
   const cfg = cfgBase(), st = staffDe(cfg);
   const l = M.localDe(cfg, 'ZAPA');
-  assert.deepEqual(l.horarioPartido, { M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } });
-  assert.equal(l.horarioPartidoSupuesto, true, 'los tramos del partido siguen pendientes de confirmar con el grupo');
+  assert.deepEqual(l.horarioPartido.M, { ini: '11:00', fin: '16:00' }, 'entre semana, 5 h a mediodía');
+  assert.deepEqual(l.horarioPartido.porDow[6], { M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } }, 'el sábado, 4 y 4');
+  assert.equal(l.horarioPartidoSupuesto, true, 'el reparto lo confirmó el cliente, pero la hora exacta de cada tramo sigue pendiente');
   const e = M.nuevoEstado(2026, 10, { festivos: [] });   // viernes 9: Adrián, cocina de Zapatillera, partido
   assert.ok(M.asignar(e, cfg, st, '2026-10-09', 'ZAPA_M', 'jacquelin', {}).ok);
   assert.ok(M.asignar(e, cfg, st, '2026-10-09', 'ZAPA_M', 'adrian', { cocina: true }).ok);
@@ -792,24 +822,30 @@ ok('turno partido: se cuentan los tramos del partido (mediodía y noche), no dos
   assert.ok(M.asignar(e, cfg, st, '2026-10-09', 'ZAPA_T', 'adrian', { cocina: true }).ok);
   const h = M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'adrian', 2026, 10);
   assert.equal(h.partidos, 1);
-  assert.equal(h.minutos, 8 * 60, `4 h a mediodía y 4 h por la noche, no 17 h (salieron ${h.minutos / 60} h)`);
+  assert.equal(h.minutos, 8 * 60, `5 h a mediodía y 3 h por la noche, no 17 h (salieron ${h.minutos / 60} h)`);
   assert.equal(h.nocturnosMin, 120, 'las dos últimas horas de la noche');
   // el mismo día sin partido: el turno es el completo del local
   const e2 = M.nuevoEstado(2026, 10, { festivos: [] });
   assert.ok(M.asignar(e2, cfg, st, '2026-10-09', 'ZAPA_M', 'adrian', { cocina: true }).ok);
   assert.equal(M.horasPersonaMes(cfg, st, { '2026-10': { asig: e2.asig } }, 'adrian', 2026, 10).minutos, 8 * 60, 'un turno suelto son ocho horas, las que dura el turno');
 });
-ok('turno partido: quien abre una franja la hace entera, y el horario puesto a mano en la casilla manda sobre todo', () => {
+ok('turno partido: quien abre una franja entra a abrir, y el horario puesto a mano en la casilla manda sobre todo', () => {
   const cfg = cfgBase(), st = staffDe(cfg);
   const e = M.nuevoEstado(2026, 10, { festivos: [] });   // lunes 5: Mari Luz hace partido en Pasarela y abre la tarde
   for (const [tid, pid] of [['PASARELA_M', 'lola'], ['PASARELA_M', 'mariluz'], ['PASARELA_M', 'tere'], ['PASARELA_T', 'mariluz'], ['PASARELA_T', 'leo']])
     assert.ok(M.asignar(e, cfg, st, '2026-10-05', tid, pid, {}).ok, `${pid} en ${tid}`);
   assert.equal(M.primeroDe(cfg, st, e, '2026-10-05', 'PASARELA_T'), 'mariluz', 'abre la tarde en partido (acuerdo del 15/09)');
+  // lo que usan las vistas para enseñar el tramo de cada turno
+  assert.deepEqual(M.turnoDelDia(cfg, e, '2026-10-05', 'mariluz'), { partido: true, continuo: null, abre: 'T' });
+  assert.deepEqual(M.turnoDelDia(cfg, e, '2026-10-05', 'leo'), { partido: false, continuo: null, abre: null }, 'Leo solo hace la tarde');
+  assert.deepEqual(M.horarioDe(M.localDe(cfg, 'PASARELA'), 1, 'T', true, 'T'), { ini: '16:00', fin: '21:00' }, 'entra a abrir a las 16:00');
+  assert.deepEqual(M.horarioDe(M.localDe(cfg, 'PASARELA'), 1, 'M', true, 'T'), { ini: '13:00', fin: '16:00' }, 'y a mediodía hace las 3 h');
   const h = M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'mariluz', 2026, 10);
-  assert.equal(h.minutos, 4 * 60 + 8 * 60, `mañana de partido (4 h) + tarde entera porque la abre (8 h); salieron ${h.minutos / 60} h`);
+  assert.equal(h.minutos, 8 * 60, `un partido son ocho horas aunque abra la tarde; salieron ${h.minutos / 60} h`);
+  assert.equal(h.nocturnosMin, 0, 'abre la tarde a las 16:00 y sale a las 21:00: no llega a las nocturnas');
   const mm = M.asignados(e, '2026-10-05', 'PASARELA_M').find(x => x.pid === 'mariluz');
   mm.ini = '10:00'; mm.fin = '15:00';
-  assert.equal(M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'mariluz', 2026, 10).minutos, 5 * 60 + 8 * 60, 'el horario a mano de la casilla manda');
+  assert.equal(M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'mariluz', 2026, 10).minutos, 5 * 60 + 5 * 60, 'el horario a mano de la casilla manda');
 });
 ok('migrarHorarios: los locales guardados con el horario supuesto de fábrica pasan al real; lo editado a mano se respeta', () => {
   const estado = M.semillaPasarela();
@@ -826,8 +862,19 @@ ok('migrarHorarios: los locales guardados con el horario supuesto de fábrica pa
   assert.equal(l0.horarioSupuesto, false); assert.equal(l0.cierreAprox, true);
   assert.deepEqual(propio.horario.M, { ini: '10:00', fin: '15:00' }, 'el horario editado a mano no se toca');
   assert.equal(propio.horarioSupuesto, true, 'y sigue marcado como suyo, sin confirmar');
-  for (const l of estado.locales) assert.ok(l.horarioPartido && l.horarioPartido.M.ini === '12:00', `${l.nombre} gana los tramos del partido, que no existían`);
+  for (const l of estado.locales) assert.ok(l.horarioPartido && l.horarioPartido.M.ini === '11:00', `${l.nombre} gana los tramos del partido, que no existían`);
   assert.equal(M.migrarHorarios(estado).cambiados, 0, 'idempotente');
+  // el reparto viejo del partido (4 y 4 todos los días) pasa al que dijo el cliente el 16/09
+  const otro = M.semillaPasarela();
+  otro.locales[0].horarioPartido = { M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } };
+  otro.locales[1].horarioPartido = { M: { ini: '13:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } };   // este lo tocó el encargado
+  otro.locales[2].horarioPartido = { M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } };
+  otro.locales[2].horarioPartidoSupuesto = false;                                                              // y este lo dio por bueno
+  M.migrarHorarios(otro);
+  assert.deepEqual(otro.locales[0].horarioPartido.M, { ini: '11:00', fin: '16:00' }, 'el reparto de fábrica se actualiza');
+  assert.ok(otro.locales[0].horarioPartido.porDow[6], 'y gana el reparto del fin de semana');
+  assert.deepEqual(otro.locales[1].horarioPartido.M, { ini: '13:00', fin: '16:00' }, 'lo editado a mano no se toca');
+  assert.deepEqual(otro.locales[2].horarioPartido.M, { ini: '12:00', fin: '16:00' }, 'ni lo que ya estaba confirmado');
 });
 
 
@@ -863,8 +910,8 @@ ok('duración del turno: se cuentan 8 h por turno aunque el local abra nueve', (
   }
   const l = M.localDe(cfg, 'ZAPA');
   assert.equal(M.minutosTurno(l, 1, 'M', { ini: '10:00', fin: '15:00' }), 5 * 60, 'el horario de la casilla manda');
-  assert.equal(M.minutosTurno(l, 1, 'M', null, true), 4 * 60, 'un tramo de partido cuenta lo que dura el tramo');
-  assert.equal(M.minutosTurno(l, 1, 'T', null, true), 4 * 60);
+  assert.equal(M.minutosTurno(l, 1, 'M', null, true), 5 * 60, 'un tramo de partido cuenta lo que dura el tramo');
+  assert.equal(M.minutosTurno(l, 1, 'T', null, true), 3 * 60);
   l.duracion = null;
   assert.equal(M.minutosTurno(l, 1, 'M'), 9 * 60, 'sin duración fijada se cuenta lo que el local está abierto');
 });
@@ -874,6 +921,7 @@ ok('turno continuo: quien abre la mañana y la tarde del mismo local hace UN tur
   for (const [tid, pid] of [['EL33_M', 'noe'], ['EL33_M', 'jenny'], ['EL33_T', 'noe'], ['EL33_T', 'jenny']])
     assert.ok(M.asignar(e, cfg, st, '2026-10-07', tid, pid, { permitirPartido: true }).ok, `${pid} en ${tid}`);
   assert.ok(M.esContinuo(cfg, st, e, '2026-10-07', 'EL33', 'noe'), 'Noe hace turno continuo');
+  assert.deepEqual(M.turnoDelDia(cfg, e, '2026-10-07', 'noe'), { partido: true, continuo: 'EL33', abre: null }, 'un continuo no tiene tramos de partido');
   const h = M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'noe', 2026, 10);
   assert.equal(h.minutos, 8 * 60, `un turno seguido son ocho horas, no dos turnos de ocho: salieron ${h.minutos / 60} h`);
   assert.equal(h.continuos, 1, 'se cuenta cuántos días hace turno continuo');
@@ -881,24 +929,17 @@ ok('turno continuo: quien abre la mañana y la tarde del mismo local hace UN tur
   // Jenny, que hace partido normal ese día, sigue con sus dos tramos
   assert.equal(M.horasPersonaMes(cfg, st, { '2026-10': { asig: e.asig } }, 'jenny', 2026, 10).minutos, 8 * 60);
 });
-ok('con ocho horas por turno, un mes normal ronda las 200 h; solo alarga quien abre una franja y además hace el otro tramo', () => {
+ok('con ocho horas por turno, un día trabajado son ocho horas para todo el equipo, haga partido, continuo o turno suelto', () => {
   const cfg = cfgBase(), st = staffDe(cfg);
   const e = M.nuevoEstado(2026, 10, { festivos: [] });
   M.generarPlanilla(cfg, st, e, '2026-10-01', '2026-10-31', {});
   const meses = { '2026-10': { asig: e.asig } };
   const t = M.horasEquipoMes(cfg, st, meses, 2026, 10).filter(x => x.turnos);
-  for (const f of t) {
-    assert.ok(f.horas <= f.dias * 12 + 0.1, `${f.nombre}: ${f.horas} h en ${f.dias} días`);
-    assert.ok(f.horas >= f.dias * 4, `${f.nombre}: ${f.horas} h en ${f.dias} días, muy poco`);
-  }
-  const media = t.reduce((a, f) => a + f.horas, 0) / t.reduce((a, f) => a + f.dias, 0);
-  assert.ok(media >= 7.5 && media <= 8.6, `la media del equipo se va de las ocho horas por día: ${Math.round(media * 100) / 100}`);
+  for (const f of t) assert.equal(f.horas, f.dias * 8, `${f.nombre}: ${f.horas} h en ${f.dias} días (partidos ${f.partidos}, continuos ${f.continuos})`);
   const adr = t.find(x => x.pid === 'adrian');
-  assert.ok(adr.partidos >= 20 && adr.horas === adr.dias * 8, `Adrián hace partido casi a diario y suma ocho horas por día: ${adr.horas} h en ${adr.dias} días`);
-  // Mari Luz abre la tarde de Pasarela y además hace el tramo de mañana: ese día son doce
-  // horas y la app lo enseña tal cual, que es justo lo que el encargado necesita ver
+  assert.ok(adr.partidos >= 20, `Adrián hace partido casi a diario: ${adr.partidos} partidos`);
   const ml = t.find(x => x.pid === 'mariluz');
-  assert.ok(ml.horas > ml.dias * 8, `Mari Luz: ${ml.horas} h en ${ml.dias} días`);
+  assert.ok(ml.partidos > 0 && ml.horas === ml.dias * 8, `Mari Luz abre la tarde de Pasarela en partido y aun así son ocho horas: ${ml.horas} h en ${ml.dias} días`);
 });
 
 console.log(`\n${n} tests OK`);

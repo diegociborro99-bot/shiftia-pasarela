@@ -338,6 +338,14 @@ function openAjustesLocales(localId) {
     l.cocina.titulares = l.cocina.titulares || { M: [], T: [] }; l.cocina.reservas = l.cocina.reservas || []; l.cocina.obligatoria = l.cocina.obligatoria || {}; l.cocina.posicion = l.cocina.posicion || {}; l.cocina.posicionSiDesde = l.cocina.posicionSiDesde || {};
     l.primero = l.primero || { M: null, T: null }; l.horario = l.horario || { M: { ini: '09:00', fin: '16:00' }, T: { ini: '16:00', fin: '23:00' }, porDow: {} }; l.horario.porDow = l.horario.porDow || {};
     const hx = (dow, f, k) => (((l.horario.porDow[dow] || {})[f] || {})[k]) || '';
+    const hpx = (dow, f, k) => ((((l.horarioPartido || {}).porDow || {})[dow] || {})[f] || {})[k] || '';
+    // lo que suman ahora mismo los dos tramos, que es lo que el encargado quiere ver
+    const repartoTxt = lo => {
+      const tr = (dow, f) => (((lo.horarioPartido || {}).porDow || {})[dow] || {})[f] || (lo.horarioPartido || {})[f];
+      const suma = dow => ['M', 'T'].map(f => { const t = tr(dow, f); return t && t.ini && t.fin ? minutosEntre(t.ini, t.fin) : 0; });
+      const txt = dow => { const [a, b] = suma(dow); return a + b ? `${Math.round(a / 6) / 10} h + ${Math.round(b / 6) / 10} h = <b>${Math.round((a + b) / 6) / 10} h</b>` : 'sin tramos'; };
+      return `Ahora mismo: entre semana ${txt(1)}; el fin de semana ${txt(6)}.`;
+    };
     const filaAbre = f => `<tr><th>${FRANJA_LBL[f]}</th>${TODOS.map(d => `<td><button type="button" class="dowk${(l.abre[f] || []).includes(d) ? ' on' : ''}" data-abre="${f}|${d}" data-libre title="${esc(FRANJA_LBL[f])} ${esc(DOW_PL[d])}">${DOW_C[d]}</button></td>`).join('')}</tr>`;
     const filaMin = f => `<tr><th>${FRANJA_LBL[f]}</th>${TODOS.map(d => {
       const abierto = (l.abre[f] || []).includes(d);
@@ -357,20 +365,20 @@ function openAjustesLocales(localId) {
       <p class="filltxt" style="margin:0 0 6px">Cuántas personas hacen falta como mínimo cada día y franja (los eventos añaden refuerzo aparte). El <b class="supstar">*</b> ámbar marca un mínimo supuesto.</p>
       <div class="tscrollx"><table class="loctab mintab"><thead><tr><th></th>${TODOS.map(d => `<th>${DIAS_L[d].slice(0, 3)}</th>`).join('')}</tr></thead><tbody>${FRANJAS.map(filaMin).join('')}</tbody></table></div>
       <div class="revgrp"><span class="dot" style="background:${esc(l.color)}"></span>HORARIO</div>
-      <div class="tscrollx"><table class="loctab hortab"><thead><tr><th></th><th>Entrada</th><th>Salida</th><th>Viernes</th><th>Sábado</th></tr></thead><tbody>
+      <div class="tscrollx"><table class="loctab hortab"><thead><tr><th></th><th>Entrada</th><th>Salida</th><th>Sábado</th><th>Domingo</th></tr></thead><tbody>
         ${FRANJAS.map(f => `<tr><th>${FRANJA_LBL[f]}</th>
           <td><input type="time" data-libre data-hor="${f}|ini" value="${esc((l.horario[f] || {}).ini || '')}" aria-label="Entrada ${esc(FRANJA_LBL[f])}"></td>
           <td><input type="time" data-libre data-hor="${f}|fin" value="${esc((l.horario[f] || {}).fin || '')}" aria-label="Salida ${esc(FRANJA_LBL[f])}"></td>
           ${[6, 7].map(d => `<td><span class="horx"><input type="time" data-libre data-horx="${d}|${f}|ini" value="${esc(hx(d, f, 'ini'))}" aria-label="Entrada ${esc(FRANJA_LBL[f])} ${esc(DOW_PL[d])}"><input type="time" data-libre data-horx="${d}|${f}|fin" value="${esc(hx(d, f, 'fin'))}" aria-label="Salida ${esc(FRANJA_LBL[f])} ${esc(DOW_PL[d])}"></span></td>`).join('')}</tr>`).join('')}
       </tbody></table></div>
       <p class="filltxt" style="margin:4px 0 6px">Sábado y domingo: solo si cambia (la mañana abre a las 08:00); en blanco, el horario normal.</p>
-      <div class="tscrollx"><table class="loctab hortab"><thead><tr><th>Turno partido</th><th>Entrada</th><th>Salida</th><th colspan="2">Quien hace mañana y tarde el mismo día</th></tr></thead><tbody>
+      <div class="tscrollx"><table class="loctab hortab"><thead><tr><th>Turno partido</th><th>Entrada</th><th>Salida</th><th>Sábado</th><th>Domingo</th></tr></thead><tbody>
         ${FRANJAS.map(f => `<tr><th>${FRANJA_LBL[f]}</th>
           <td><input type="time" data-libre data-horp="${f}|ini" value="${esc(((l.horarioPartido || {})[f] || {}).ini || '')}" aria-label="Entrada del partido, ${esc(FRANJA_LBL[f])}"></td>
           <td><input type="time" data-libre data-horp="${f}|fin" value="${esc(((l.horarioPartido || {})[f] || {}).fin || '')}" aria-label="Salida del partido, ${esc(FRANJA_LBL[f])}"></td>
-          <td colspan="2" class="filltxt">${f === 'M' ? 'entra a mediodía, no a la apertura' : 'vuelve por la noche, no a las 16:00'}</td></tr>`).join('')}
+          ${[6, 7].map(d => `<td><span class="horx"><input type="time" data-libre data-horpx="${d}|${f}|ini" value="${esc(hpx(d, f, 'ini'))}" aria-label="Entrada del partido, ${esc(FRANJA_LBL[f])} ${esc(DOW_PL[d])}"><input type="time" data-libre data-horpx="${d}|${f}|fin" value="${esc(hpx(d, f, 'fin'))}" aria-label="Salida del partido, ${esc(FRANJA_LBL[f])} ${esc(DOW_PL[d])}"></span></td>`).join('')}</tr>`).join('')}
       </tbody></table></div>
-      <p class="filltxt" style="margin:4px 0 6px">En un turno partido se cuentan estos dos tramos y no dos jornadas enteras. Quien <b>abre</b> la franja la hace entera. En blanco, el horario normal del local.</p>
+      <p class="filltxt" style="margin:4px 0 6px">Un partido son <b>ocho horas repartidas entre las dos franjas</b>: entre semana 5 y 3, el fin de semana 4 y 4 (lo dijo el cliente el 16/09, «aunque depende a veces según la necesidad»). Quien <b>abre</b> una franja entra a la hora de apertura y hace el tramo largo. ${repartoTxt(l)} En blanco, el horario normal del local.</p>
       <div class="locgrid2">
         ${FRANJAS.map(f => `<label class="pinlbl">Horas que cuenta un turno de ${FRANJA_LBL[f].toLowerCase()}<input type="number" class="logininp" min="0" max="12" step="0.5" inputmode="decimal" data-libre data-dur="${f}" value="${(l.duracion && +l.duracion[f]) ? Math.round(+l.duracion[f] / 6) / 10 : ''}" placeholder="lo que el local abre"></label>`).join('')}
       </div>
@@ -483,6 +491,17 @@ function openAjustesLocales(localId) {
       l.horarioPartido[f] = Object.assign({ ini: '', fin: '' }, l.horarioPartido[f] || {}, { [k]: t.value });
       anota(l, `tramo del partido de ${FRANJA_LBL[f].toLowerCase()}`); return;
     }
+    if (t.dataset.horpx) {
+      // la excepción solo existe con entrada Y salida; si falta una, se borra
+      const [d, f] = t.dataset.horpx.split('|');
+      const ini = ov.querySelector(`[data-horpx="${d}|${f}|ini"]`).value, fin = ov.querySelector(`[data-horpx="${d}|${f}|fin"]`).value;
+      l.horarioPartido = l.horarioPartido || {};
+      l.horarioPartido.porDow = l.horarioPartido.porDow || {};
+      l.horarioPartido.porDow[d] = l.horarioPartido.porDow[d] || {};
+      if (ini && fin) l.horarioPartido.porDow[d][f] = { ini, fin }; else delete l.horarioPartido.porDow[d][f];
+      if (!Object.keys(l.horarioPartido.porDow[d]).length) delete l.horarioPartido.porDow[d];
+      anota(l, `tramo del partido ${DOW_PL[d] || 'del fin de semana'}`); return;
+    }
     if (t.dataset.hor) {
       const [f, k] = t.dataset.hor.split('|');
       l.horario[f] = l.horario[f] || { ini: '', fin: '' }; l.horario[f][k] = t.value;
@@ -495,7 +514,7 @@ function openAjustesLocales(localId) {
       l.horario.porDow[d] = l.horario.porDow[d] || {};
       if (ini && fin) l.horario.porDow[d][f] = { ini, fin }; else delete l.horario.porDow[d][f];
       if (!Object.keys(l.horario.porDow[d]).length) delete l.horario.porDow[d];
-      anota(l, `horario ${d === '5' ? 'del viernes' : 'del sábado'}`); return;
+      anota(l, `horario ${DOW_PL[d] || 'del fin de semana'}`); return;
     }
     if (t.dataset.cocobl) { l.cocina.obligatoria[t.dataset.cocobl] = t.checked; anota(l, `cocina obligatoria de ${FRANJA_LBL[t.dataset.cocobl].toLowerCase()}`); return; }
     if (t.dataset.cocpos) { l.cocina.posicion[t.dataset.cocpos] = +t.value === 3 ? 3 : 2; anota(l, 'posición de la cocina'); return; }

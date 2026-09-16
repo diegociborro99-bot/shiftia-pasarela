@@ -6,9 +6,11 @@ const ORIGEN_LBL = { patron: 'semana tipo', generador: 'generador', manual: 'a m
 
 function chipPersona(iso, tid, s, opts) {
   const p = personaDeId(s.pid); if (!p) return '';
-  const e = asignados(estadoDeIso(iso), iso, tid).find(x => x.pid === s.pid) || {};
+  const est = estadoDeIso(iso);
+  const e = asignados(est, iso, tid).find(x => x.pid === s.pid) || {};
   const { localId: lid, franja: fr } = partirTurno(tid);
-  const hTramo = (s.partido || s.continuo) && !s.abre ? horarioDe(localDe(S, lid), isoDow(iso), fr, true) : null;
+  // el tramo del partido de esa persona ese día: quien abre una franja entra a abrir
+  const hTramo = s.partido && !s.continuo ? horarioDe(localDe(S, lid), isoDow(iso), fr, true, turnoDelDia(S, est, iso, s.pid).abre) : null;
   const razon = [e.razon, e.avisos && e.avisos.length ? 'aviso: ' + e.avisos.join(', ') : '', s.supuesto ? 'plaza supuesta (pendiente de confirmar con el grupo)' : '', s.continuo ? 'turno continuo: abre la mañana y la tarde del mismo local' : s.partido ? `partido: mañana y tarde${hTramo ? ` · este tramo, ${hTramo.ini}–${hTramo.fin}` : ''}` : '', s.comodin ? 'comodín (sin local fijo)' : '', `origen: ${ORIGEN_LBL[s.origen] || s.origen || 'a mano'}`].filter(Boolean).join('\n');
   return `<span class="pchip${s.forzado ? ' forzado' : ''}${s.abre ? ' primero' : ''}" data-pid="${s.pid}" data-turno="${iso}|${tid}" style="--pc:${avColor(s.pid)}" data-tipstr="${esc(razon)}" role="button" tabindex="0">
     <span class="pos">${s.pos}</span><span class="avq">${esc(initials(p.nombre))}</span><span class="pnom">${s.abreFijo ? '<i class="mk fijo" title="sale el primero (fijo)">▸</i>' : ''}${esc(p.nombre)}${s.por ? `<small class="por">por ${esc(nombreCorto(nombrePid(s.por)))}</small>` : s.nota ? `<small class="por">${esc(s.nota)}</small>` : ''}</span>

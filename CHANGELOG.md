@@ -40,6 +40,13 @@
   entera) y además hace el otro tramo del partido: Victoria 9,3 h y Mari Luz 8,6 h de media
   al día. Las horas que cuenta un turno se cambian por local y franja en Equipo → Ajustes de
   los locales, y van marcadas como supuestas hasta que el cliente confirme el «más o menos».
+- **El turno partido reparte esas ocho horas** (cliente, 16/09: «4 y 4 o 5 y 3 […] entre
+  semana es 5 y 3 y el finde 4 y 4»). De fábrica: 11:00–16:00 y 21:00–00:00 de lunes a
+  viernes, 12:00–16:00 y 20:00–00:00 el fin de semana, con su propia fila por día en
+  Ajustes de los locales. **Quien abre una franja** entra a la hora de apertura y hace el
+  tramo largo de los dos, así que también le salen ocho horas: Mari Luz, que abre la tarde
+  de Pasarela en partido, hace 16:00–21:00 y 13:00–16:00 en vez de doce horas. Ahora un día
+  trabajado son ocho horas para todo el equipo, haga turno suelto, partido o continuo.
 - Las planillas ya guardadas se migran al cargarlas: solo se sustituyen los horarios que
   seguían siendo los supuestos de fábrica; lo que el encargado tocó a mano no se pisa.
 

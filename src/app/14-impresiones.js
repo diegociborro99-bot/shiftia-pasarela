@@ -77,6 +77,11 @@ function pxNombre(pid, marcas) {
 // la posición 1 de la casilla es quien abre / sale primero (vocabulario del grupo): si
 // nadie lleva la marca puesta, en el Excel se señala al primero para que no salga sin abre
 function abreEn(lista, i) { return !!(lista[i] && (lista[i].abre || (i === 0 && !lista.some(e => e.abre)))); }
+// «11:00–16:00 y 21:00–00:00»: los dos tramos en los que se reparte un turno partido
+function tramoTxt(tr) {
+  const p = f => tr && tr[f] && tr[f].ini && tr[f].fin ? `${tr[f].ini}–${tr[f].fin}` : '';
+  return p('M') && p('T') ? `${p('M')} y ${p('T')}` : p('M') || p('T');
+}
 // «09:00–16:00», o «16:00–23:00 · V S 16:00–00:00» cuando algún día de la semana cambia
 function horarioTxt(l, franja) {
   const base = l && l.horario && l.horario[franja];
@@ -396,7 +401,7 @@ function pxgPreguntas(res) {
   if (S.locales.some(l => l.horarioSupuesto)) out.push('<b>Horarios reales de entrada y salida.</b> Sin ellos, «turno completo», «partido» y «continuo» son etiquetas en un papel y no horas que se puedan contar para nóminas.');
   else {
     const ca = S.locales.some(l => l.cierreAprox), ps = S.locales.some(l => l.horarioPartidoSupuesto);
-    if (ca || ps) out.push(`<b>${ca && ps ? 'La hora de cierre y los tramos del turno partido' : ca ? 'La hora de cierre de la tarde' : 'Los tramos del turno partido'}.</b> ${ca ? 'La mañana (07:00–16:00, los fines de semana desde las 08:00) y la entrada de la tarde ya están confirmadas; el cierre es «sobre las 00:00, aunque depende», y para la nómina hace falta la hora real por local y día. ' : ''}${ps ? 'Quien hace partido se cuenta con dos tramos, mediodía y noche, en vez de dos jornadas enteras: falta confirmar a qué hora entra y sale en cada uno.' : ''}${S.locales.some(l => l.duracionSupuesta) ? ' Las horas que cuenta cada turno (ocho «más o menos», según el cliente) también están por confirmar.' : ''}`);
+    if (ca || ps) out.push(`<b>${ca && ps ? 'La hora de cierre y los tramos del turno partido' : ca ? 'La hora de cierre de la tarde' : 'Los tramos del turno partido'}.</b> ${ca ? 'La mañana (07:00–16:00, los fines de semana desde las 08:00) y la entrada de la tarde ya están confirmadas; el cierre es «sobre las 00:00, aunque depende», y para la nómina hace falta la hora real por local y día. ' : ''}${ps ? 'Del turno partido ya sabemos el reparto (ocho horas: 5 y 3 entre semana, 4 y 4 el fin de semana): falta la hora exacta a la que entra y sale en cada tramo, y si cambia de un local a otro.' : ''}${S.locales.some(l => l.duracionSupuesta) ? ' Las horas que cuenta cada turno (ocho «más o menos», según el cliente) también están por confirmar.' : ''}`);
   }
   return out.length ? out.map(t => `<div class="pxg-preg"><i></i><p>${t}</p></div>`).join('') : '<p class="pxg-p mut">Sin preguntas pendientes.</p>';
 }

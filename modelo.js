@@ -1070,13 +1070,37 @@ function vaciarPlanilla(est, desde, hasta) {
 
 // ---------- horas ----------
 function hm(s) { const [h, m] = String(s || '0:0').split(':').map(Number); return h * 60 + (m || 0); }
+function hhmm(min) { const t = ((min % 1440) + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; }
+// El tramo del turno partido de esa franja. Un partido son ocho horas repartidas entre
+// las dos franjas: entre semana 5 y 3, el fin de semana 4 y 4 (cliente, 16/09), editable
+// por local y por día. Quien hace partido entra a mediodía y se va a la hora de cerrar la
+// noche, así que cada tramo va pegado al final de su franja. Con una excepción: quien
+// ABRE una franja entra a la hora de apertura, y ese es su tramo largo de los dos.
+function tramoPartidoDe(l, dow, franja, abre) {
+  const hp = l && l.horarioPartido;
+  if (!hp) return null;
+  const base = (hp.porDow && hp.porDow[dow]) || hp;
+  const mio = base[franja], otro = base[franja === 'M' ? 'T' : 'M'];
+  if (!mio || !mio.ini || !mio.fin) return null;
+  let dur = minutosEntre(mio.ini, mio.fin);
+  if (abre === 'M' || abre === 'T') {
+    const otroDur = otro && otro.ini && otro.fin ? minutosEntre(otro.ini, otro.fin) : dur;
+    dur = abre === franja ? Math.max(dur, otroDur) : Math.min(dur, otroDur);
+  }
+  if (abre === franja) {
+    const ap = horarioDe(l, dow, franja);
+    if (!ap) return null;
+    return { ini: ap.ini, fin: hhmm(hm(ap.ini) + dur) };
+  }
+  return { ini: hhmm(hm(mio.fin) - dur), fin: mio.fin };
+}
 // partido=true devuelve el tramo del turno partido de ese local (mediodía / noche), que
-// es lo que hace de verdad quien trabaja las dos franjas del mismo día.
-function horarioDe(l, dow, franja, partido) {
+// es lo que hace de verdad quien trabaja las dos franjas del mismo día; abre es la franja
+// que esa persona abre ese día, si abre alguna.
+function horarioDe(l, dow, franja, partido, abre) {
   const h = l && l.horario;
   if (!h) return null;
-  const hp = partido && l.horarioPartido && l.horarioPartido[franja];
-  if (hp && hp.ini && hp.fin) return hp;
+  if (partido) { const hp = tramoPartidoDe(l, dow, franja, abre); if (hp) return hp; }
   const ex = h.porDow && h.porDow[dow] && h.porDow[dow][franja];
   return ex || h[franja] || null;
 }
@@ -1084,21 +1108,37 @@ function minutosEntre(ini, fin) { let d = hm(fin) - hm(ini); if (d <= 0) d += 14
 // Lo que cuenta un turno para las horas: el horario puesto a mano en la casilla manda;
 // después, el tramo del partido; después, la duración fijada del turno (ocho horas);
 // y si no hay ninguna, lo que el local esté abierto menos el descanso.
-function minutosTurno(l, dow, franja, override, partido) {
+function minutosTurno(l, dow, franja, override, partido, abre) {
   if (override && override.ini && override.fin) return Math.max(0, minutosEntre(override.ini, override.fin) - (+(l && l.descansoMin) || 0));
   if (!partido) { const d = l && l.duracion && +l.duracion[franja]; if (d > 0) return d; }
-  const h = horarioDe(l, dow, franja, partido);
+  const h = horarioDe(l, dow, franja, partido, abre);
   if (!h) return 0;
   return Math.max(0, minutosEntre(h.ini, h.fin) - (+(l && l.descansoMin) || 0));
 }
 // minutos entre las 22:00 y las 06:00 del tramo (tarde que cruza la medianoche)
-function minutosNocturnos(l, dow, franja, override, partido) {
-  const h = override && override.ini && override.fin ? override : horarioDe(l, dow, franja, partido);
+function minutosNocturnos(l, dow, franja, override, partido, abre) {
+  const h = override && override.ini && override.fin ? override : horarioDe(l, dow, franja, partido, abre);
   if (!h) return 0;
   const a = hm(h.ini); let b = hm(h.fin); if (b <= a) b += 1440;
   let n = 0;
   for (const [x, y] of [[22 * 60, 30 * 60], [0, 6 * 60], [46 * 60, 54 * 60]]) n += Math.max(0, Math.min(b, y) - Math.max(a, x));
   return n;
+}
+// Cómo cuenta el día de una persona: partido si trabaja las dos franjas; continuo si
+// además abre las dos del mismo local (un turno seguido, no dos); y la franja que abre,
+// que es la que fija su tramo del partido (entra a abrir y hace el tramo largo).
+function repartoDelDia(mias) {
+  const partido = mias.some(x => x.franja === 'M') && mias.some(x => x.franja === 'T');
+  const abren = mias.filter(x => x.e.abre);
+  const continuo = partido && abren.length === 2 && abren[0].localId === abren[1].localId ? abren[0].localId : null;
+  const fr = [...new Set(abren.map(x => x.franja))];
+  return { partido, continuo, abre: partido && !continuo && fr.length === 1 ? fr[0] : null };
+}
+// lo mismo para las vistas, que parten de la persona y el día en vez de la planilla del mes
+function turnoDelDia(cfg, est, iso, pid) {
+  const mias = [];
+  for (const t of turnosDe(cfg)) { const e = asignados(est, iso, t.id).find(x => x.pid === pid); if (e) mias.push({ e, localId: t.local.id, franja: t.franja }); }
+  return repartoDelDia(mias);
 }
 function horasPersonaMes(cfg, staff, meses, pid, y, m) {
   const p = personaDe(staff, pid);
@@ -1110,34 +1150,31 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
     const iso = isoDe(y, m, d), dow = isoDow(iso);
     const festivo = (cfg.festivos || []).includes(iso);
     // primero se mira todo el día: si trabaja en las dos franjas es partido, y entonces
-    // cuentan los tramos del partido salvo en la franja que abre, que hace entera
+    // cuentan los tramos del partido (ocho horas repartidas entre las dos franjas)
     const mias = [];
     for (const [tid, lista] of Object.entries(asig[iso] || {})) {
       const e = lista.find(x => x.pid === pid); if (!e) continue;
       mias.push(Object.assign({ e }, partirTurno(tid)));
     }
-    const man = mias.some(x => x.franja === 'M'), tar = mias.some(x => x.franja === 'T');
-    const partido = man && tar;
     // turno continuo: abre la mañana Y la tarde del mismo local. Es UN turno seguido, no
     // dos: se cuenta una sola vez (con la tarde, que es la que acaba al cierre).
-    const abren = mias.filter(x => x.e.abre);
-    const continuo = partido && abren.length === 2 && abren[0].localId === abren[1].localId ? abren[0].localId : null;
+    const { partido, continuo, abre: abreF } = repartoDelDia(mias);
     if (continuo) out.continuos++;
+    const enPartido = partido && !continuo;
     let minDia = 0;
     for (const { e, localId, franja } of mias) {
       const l = localDe(cfg, localId);
-      const tramoPartido = partido && !e.abre;
       const seguido = continuo === localId && franja === 'M';   // la mañana del continuo ya va en la tarde
-      const min = seguido ? 0 : minutosTurno(l, dow, franja, e, tramoPartido);
+      const min = seguido ? 0 : minutosTurno(l, dow, franja, e, enPartido, abreF);
       out.turnos++; out.minutos += min; minDia += min;
-      if (!seguido) out.nocturnosMin += minutosNocturnos(l, dow, franja, e, tramoPartido);
+      if (!seguido) out.nocturnosMin += minutosNocturnos(l, dow, franja, e, enPartido, abreF);
       if (franja === 'M') out.mananas++; else out.tardes++;
       const pl = out.porLocal[localId] = out.porLocal[localId] || { turnos: 0, minutos: 0, horas: 0 };
       pl.turnos++; pl.minutos += min; pl.horas = Math.round(pl.minutos / 6) / 10;
       if (e.origen === 'refuerzo') out.refuerzos++;
       if (e.forzado) out.forzados++;
     }
-    if (man || tar) { out.dias++; if (man && tar) out.partidos++; if (festivo) { out.festivas++; out.festivasMin += minDia; } if (dow === 7) { out.domingos++; out.domingosMin += minDia; } }
+    if (mias.length) { out.dias++; if (partido) out.partidos++; if (festivo) { out.festivas++; out.festivasMin += minDia; } if (dow === 7) { out.domingos++; out.domingosMin += minDia; } }
     else if (p && ausenciaEn(p, iso)) out.ausencias++;
   }
   for (const x of cfg.extras || []) if (x.pid === pid && x.iso && x.iso.startsWith(k)) out.extrasMin += +x.min || 0;
@@ -1333,7 +1370,8 @@ function semillaPasarela() {
   const horario = () => ({ M: { ini: '07:00', fin: '16:00' }, T: { ini: '16:00', fin: '00:00' }, porDow: { 6: { M: { ini: '08:00', fin: '16:00' } }, 7: { M: { ini: '08:00', fin: '16:00' } } } });
   // el partido no son dos turnos enteros: quien lo hace entra a mediodía y vuelve por la
   // noche (Adrián «solo viene como al mediodía»). Los tramos siguen siendo un supuesto.
-  const horarioPartido = () => ({ M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } });
+  // un partido son ocho horas repartidas: entre semana 5 y 3, el fin de semana 4 y 4
+  const horarioPartido = () => ({ M: { ini: '11:00', fin: '16:00' }, T: { ini: '21:00', fin: '00:00' }, porDow: { 6: { M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } }, 7: { M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } } } });
   // «8 horas por turno más o menos» (el cliente, 15/09): el local abre nueve por la
   // mañana, pero cada persona hace ocho. La apertura manda en quién abre y en lo que se
   // imprime; la duración es lo que se cuenta para la nómina.
@@ -1449,6 +1487,8 @@ function navVigente(nav, hoyIso, minMes, maxMes) {
 // que el encargado haya tocado a mano no se pisa nunca. Los tramos del partido, que no
 // existían, se añaden a todos los locales que no los tengan.
 const HORARIO_VIEJO = { M: { ini: '09:00', fin: '16:00' }, T: { ini: '16:00', fin: '23:00' } };
+// los tramos de partido de fábrica de antes del 16/09: 4 y 4 todos los días, sin reparto por día
+const PARTIDO_VIEJO = { M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } };
 function migrarHorarios(estado) {
   const r = { cambiados: 0, partido: 0 };
   const base = semillaPasarela().locales[0];
@@ -1462,7 +1502,11 @@ function migrarHorarios(estado) {
       l.horarioSupuesto = false; l.cierreAprox = true;
       r.cambiados++;
     }
-    if (!l.horarioPartido) { l.horarioPartido = JSON.parse(JSON.stringify(base.horarioPartido)); l.horarioPartidoSupuesto = true; r.partido++; }
+    const hp = l.horarioPartido || null;
+    const partidoDeFabrica = hp && !hp.porDow && l.horarioPartidoSupuesto && hp.M && hp.T
+      && hp.M.ini === PARTIDO_VIEJO.M.ini && hp.M.fin === PARTIDO_VIEJO.M.fin
+      && hp.T.ini === PARTIDO_VIEJO.T.ini && hp.T.fin === PARTIDO_VIEJO.T.fin;
+    if (!hp || partidoDeFabrica) { l.horarioPartido = JSON.parse(JSON.stringify(base.horarioPartido)); l.horarioPartidoSupuesto = true; r.partido++; }
     if (!l.duracion) { l.duracion = JSON.parse(JSON.stringify(base.duracion)); l.duracionSupuesta = true; r.duracion = (r.duracion || 0) + 1; }
   }
   return r;
@@ -1512,7 +1556,7 @@ if (typeof module !== 'undefined') {
     revisarTurno, revisionMes,
     plazasDe, instanciarPatron, patronDesdeSemana,
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
-    minutosTurno, minutosNocturnos, minutosEntre, horarioDe, horasPersonaMes, horasEquipoMes, horasLocalMes,
+    minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,
     CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
