@@ -65,6 +65,40 @@ try {
   }
   ok('Actividad sin servidor: solo el historial de la planilla (la siembra del demo) y la nota', await pg.evaluate(() => document.querySelectorAll('#actRoot .actrow[data-accion="hist-ia"]').length >= 1 && /Sin servidor/.test(document.getElementById('actMeta').textContent) && document.querySelectorAll('#actKpis .kpi').length === 5), await pg.evaluate(() => (document.getElementById('actRoot') || { textContent: '' }).textContent.slice(0, 160)));
 
+  // 1b) las barras de Semana y Mes: los botones no se pisan ni se salen, a cualquier ancho
+  // (Diego, 17/09: «el calendario ocupa mucho y descoloca los botones, unos se pisan a otros»)
+  const barra = (v) => pg.evaluate(vista => {
+    const bs = [...document.querySelectorAll(`#view-${vista} .dacts > *`)].filter(b => b.offsetParent && b.getBoundingClientRect().width > 0);
+    const r = bs.map(b => ({ n: (b.textContent || b.id || '').replace(/\s+/g, ' ').trim().slice(0, 18), c: b.getBoundingClientRect() }));
+    const pisan = [], fuera = [];
+    for (let i = 0; i < r.length; i++) {
+      if (r[i].c.left < -0.5 || r[i].c.right > innerWidth + 0.5) fuera.push(r[i].n);
+      for (let j = i + 1; j < r.length; j++) {
+        const a = r[i].c, b = r[j].c;
+        if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) pisan.push(r[i].n + ' × ' + r[j].n);
+      }
+    }
+    // las filas se agrupan por solape vertical (cada botón tiene su alto) y todas tienen que
+    // arrancar del mismo borde izquierdo: nada de filas sueltas a la derecha
+    const filas = [];
+    for (const x of r.slice().sort((a, b) => a.c.top - b.c.top)) {
+      const f = filas.find(f => x.c.top < f.bot - 4 && f.top < x.c.bottom - 4);
+      if (f) { f.bot = Math.max(f.bot, x.c.bottom); f.izq = Math.min(f.izq, x.c.left); f.n.push(x.n); }
+      else filas.push({ top: x.c.top, bot: x.c.bottom, izq: x.c.left, n: [x.n] });
+    }
+    return { n: r.length, pisan, fuera, filas: filas.length, primerosDeFila: filas.map(f => Math.round(f.izq)), reparto: filas.map(f => f.n.join(' + ')) };
+  }, v);
+  for (const ancho of [1280, 1024]) {
+    await pg.setViewportSize({ width: ancho, height: 900 });
+    for (const v of ['semana', 'mes']) {
+      await vista(pg, v); await pg.waitForTimeout(250);
+      const b = await barra(v);
+      ok(`barra de ${v} a ${ancho}px: ${b.n} botones, ninguno se pisa ni se sale`, !b.pisan.length && !b.fuera.length, JSON.stringify(b));
+      ok(`barra de ${v} a ${ancho}px: todas las filas arrancan del mismo borde`, new Set(b.primerosDeFila).size === 1, JSON.stringify(b.primerosDeFila));
+    }
+  }
+  await pg.setViewportSize({ width: 1280, height: 900 });
+
   // 2) Hoy: cuatro locales y el selector asigna a alguien de «pueden»
   await vista(pg, 'hoy');
   ok('Hoy enseña las tarjetas de los 4 locales', await pg.$$eval('#view-hoy .loccard', x => x.length) === 4, await pg.$$eval('#view-hoy .loccard', x => x.length));

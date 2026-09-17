@@ -1715,6 +1715,25 @@ const HORARIO_VIEJO = { M: { ini: '09:00', fin: '16:00' }, T: { ini: '16:00', fi
 // los tramos de partido de fábrica de antes del 16/09: 4 y 4 todos los días, sin reparto por día
 const PARTIDO_VIEJO = { M: { ini: '12:00', fin: '16:00' }, T: { ini: '20:00', fin: '00:00' } };
 // Fichas guardadas con el puesto «comodín»: pasan a «apoyo» sin perder el sin-local-fijo.
+// Altas que llegaron después del primer arranque: la semilla solo se usa cuando el servidor
+// está vacío, así que sin esto el cliente —que ya tenía su planilla dentro— no las vería
+// nunca. Se aplican UNA vez (marca en estado.migraciones) para no resucitar a quien el
+// encargado haya borrado a propósito.
+const ALTAS_1709 = ['dulce', 'susi'];
+function migrarAltas(estado) {
+  const r = { altas: [] };
+  if (!estado || !Array.isArray(estado.staff)) return r;
+  estado.migraciones = estado.migraciones || {};
+  if (estado.migraciones.altas1709) return r;
+  const semilla = semillaPasarela().staff;
+  for (const id of ALTAS_1709) {
+    if (estado.staff.some(p => p.id === id)) continue;
+    const p = semilla.find(x => x.id === id);
+    if (p) { estado.staff.push(JSON.parse(JSON.stringify(p))); r.altas.push(id); }
+  }
+  estado.migraciones.altas1709 = 1;
+  return r;
+}
 function migrarPuestos(estado) {
   const r = { puestos: 0 };
   for (const p of estado.staff || []) if (p.puesto === 'comodin') { p.puesto = 'apoyo'; p.comodin = p.comodin === undefined ? true : p.comodin; r.puestos++; }
@@ -1788,7 +1807,7 @@ if (typeof module !== 'undefined') {
     plazasDe, instanciarPatron, patronDesdeSemana,
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
-    migrarPuestos, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
+    migrarPuestos, migrarAltas, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
     LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos, textoCampo,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,

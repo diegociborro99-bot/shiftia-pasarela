@@ -65,6 +65,14 @@
   Camarero Cocinero»). El puesto deja de ser uno solo: en la ficha se pulsan los dos, en la
   lista salen las dos etiquetas y los filtros de Cocina y Sala encuentran a esa persona por
   las dos. Las fichas que ya había se convierten solas al abrir la app.
+- **Las barras de Semana y Mes, ordenadas**: el titular pierde cuerpo en pantallas medianas
+  —era lo que empujaba a los botones contra el borde— y las acciones bajan siempre a su
+  propia fila alineadas a la izquierda. Al envolverse, todas las filas arrancan del mismo
+  sitio en vez de quedar sueltas contra el margen derecho. Un test mide la barra a 1280 y a
+  1024 y falla si algún botón se pisa con otro, se sale o empieza una fila donde no toca.
+- **Las altas llegan a las planillas que ya existían**: la semilla solo se usa en un servidor
+  vacío, así que Dulce y Susi no habrían aparecido nunca en el del cliente. Ahora entran al
+  arrancar, una sola vez, y sin resucitar a quien se haya borrado a propósito.
 - **Susi entra en el equipo, de baja**: cocinera, sin fecha de vuelta, y la cubre Adrián. El
   local (Zapatillera, por quien la cubre) y la fecha en que empezó la baja quedan marcados
   como supuestos, a la espera de confirmarlos.

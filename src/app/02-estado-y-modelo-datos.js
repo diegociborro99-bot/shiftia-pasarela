@@ -105,6 +105,7 @@ function migrarEstado(estado) {
   }
   migrarHorarios(estado);   // 15/09: los horarios que confirmó la encargada por WhatsApp
   migrarPuestos(estado);    // 17/09: el puesto «comodín» pasa a ser «apoyo»
+  migrarAltas(estado);      // 17/09: Dulce y Susi, que entraron después del primer arranque
   // 17/09: la base de entrevistas de Notion (entrevistas + alerta interna)
   if (!Array.isArray(estado.entrevistas) || !estado.entrevistas.length) estado.entrevistas = JSON.parse(JSON.stringify(ENTREVISTAS_SEMILLA));
   migrarCandidatos(estado);   // 17/09: el puesto del candidato pasa de uno suelto a una lista

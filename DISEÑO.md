@@ -127,7 +127,7 @@ Las **153 fotos y CV** adjuntos (16 MB) no caben en la aplicación de un solo fi
 - El 33 sábado mañana pide 3 y con el PDF solo pueden Victoria y Jenny: la semana tipo pone a **Hojan** como tercero, marcado supuesto.
 - Roberto hace partido viernes y sábado; Yilian partido el lunes cubriendo a Susana Capón; Lavinia por defecto en Pasarela domingo tarde.
 - Los festivos solo marcan el día: ni cierran locales ni recargan horas.
-- Laura, Maydeth y Susi (Aroa, 17/09) siguen en el equipo con baja sin fecha de fin. A Susi la cubre Adrián; su local (Zapatillera, porque la cubre él) y la fecha de inicio de la baja son supuestos.
+- Laura, Maydeth y Susi (Aroa, 17/09) siguen en el equipo con baja sin fecha de fin. Las altas posteriores al primer arranque (Dulce y Susi) las mete `migrarAltas` al cargar, una sola vez y con marca en `estado.migraciones`: la semilla solo se usa con el servidor vacío, así que sin eso no llegarían a la planilla del cliente. A Susi la cubre Adrián; su local (Zapatillera, porque la cubre él) y la fecha de inicio de la baja son supuestos.
 
 ## Preguntas abiertas para el grupo (C1–C29)
 

@@ -97,3 +97,23 @@
   .cperf .candpie .btn-sec,.cperf .candpie .btn-cta{flex:1;min-height:42px}
 }
 @media (max-width:380px){ .cperfkpis{grid-template-columns:1fr} }
+
+/* Las barras de Semana y Mes (Diego, 17/09): «el calendario ocupa mucho y descoloca los
+   botones, están dispuestos de forma anárquica, unos se pisan a otros». El título manda en
+   la primera fila y las acciones bajan SIEMPRE a la suya, alineadas a la izquierda: al
+   envolver, todas las filas arrancan del mismo borde en vez de quedar sueltas a la derecha.
+   En el móvil siguen siendo una tira que se desliza (20-movil.css), que ahí es mejor. */
+@media (min-width:641px){
+  .dnav{row-gap:12px}
+  /* los contadores solo se van a la derecha si caben al lado del titular; cuando bajan de
+     línea arrancan del mismo borde que todo lo demás, no sueltos contra el margen */
+  .dstats{margin-left:0}
+  .dacts{flex:1 0 100%;justify-content:flex-start;margin-left:0;gap:8px 10px}
+  .dnav .spacer{display:none}
+  /* el mes agrupa los partidos: se separan del resto con un respiro, no con una fila suelta */
+  .futbol{gap:6px;margin-right:4px}
+}
+/* entre el móvil y el escritorio grande, el titular pierde cuerpo: es lo que empujaba a los
+   botones contra el borde */
+@media (min-width:641px) and (max-width:1200px){ .dbig{font-size:32px} }
+@media (min-width:1201px){ .dstats{margin-left:auto} }

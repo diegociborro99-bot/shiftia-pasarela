@@ -50,6 +50,23 @@ ok('la semilla trae 24 personas: 21 en activo (con Dulce, alta del 17/09) y 3 de
   assert.strictEqual(new Set(st.map(p => p.id)).size, 24, 'ids únicos');
 });
 
+ok('altas del 17/09: Dulce y Susi llegan también a una planilla que ya estaba guardada, y una sola vez', () => {
+  // La semilla solo se usa en un servidor vacío: sin esto, quien ya tenía la planilla dentro
+  // (el del cliente) nunca vería a las que se dieron de alta después.
+  const estado = M.semillaPasarela();
+  estado.staff = estado.staff.filter(p => p.id !== 'dulce' && p.id !== 'susi');   // como estaba en septiembre
+  delete estado.migraciones;
+  const r = M.migrarAltas(estado);
+  assert.deepStrictEqual(r.altas.slice().sort(), ['dulce', 'susi']);
+  const susi = estado.staff.find(p => p.id === 'susi');
+  assert.ok(susi && susi.puesto === 'cocina' && (susi.ausencias || []).some(a => a.tipo === 'BAJ' && !a.hasta), 'Susi entra de baja');
+  assert.ok(estado.staff.find(p => p.id === 'dulce'), 'y Dulce también');
+  // y no se repite: si el encargado borra a alguien, no vuelve solo en el siguiente arranque
+  estado.staff = estado.staff.filter(p => p.id !== 'susi');
+  assert.deepStrictEqual(M.migrarAltas(estado).altas, []);
+  assert.ok(!estado.staff.some(p => p.id === 'susi'), 'no resucita a quien se borró a propósito');
+});
+
 ok('Susi: cocinera de baja, y la cubre Adrián (Aroa, 17/09)', () => {
   const cfg = cfgBase(), st = staffDe(cfg), e = M.nuevoEstado(2026, 10, { festivos: [] });
   const susi = st.find(p => p.id === 'susi');
