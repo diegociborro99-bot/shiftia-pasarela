@@ -87,24 +87,35 @@ Reglas: **dos apoyos no pueden quedarse solos** en un turno; **Johan siempre coc
 
 El 33 los martes es día flojo: mínimo 1, se queda Noe y abre él viniendo de la mañana (`partidoAbre.T`), igual que Pasarela. La **cocina no se imprime**.
 
-## Entrevistas: los iconos y el dato que falta (17/09)
+## Entrevistas: los iconos y las hojas escaneadas (17/09)
 
 El grupo marca cada ficha de su base con un emoticono, y ahí está toda la clasificación: **cocinero**, **camarero**, **pulgar arriba** (bien valorado), **pulgar abajo** (mal valorado) y **reloj de arena** (pendiente de valorar). La app tiene ese mismo esquema —puesto y valoración por separado— y lo enseña con iconos propios.
 
-Lo que **no** llegó son los datos: **Notion no exporta el icono de cada ficha**, ni en el CSV ni en el Markdown ni en los nombres de fichero (comprobado sobre el zip del 17/09: cero emoticonos en 273 fichas). El icono de página solo sale por la API (`GET /v1/pages/{id}` → `icon`).
+**Notion no exporta el icono de cada ficha**, ni en el CSV ni en el Markdown ni en los nombres de fichero (comprobado sobre el zip del 17/09: cero emoticonos en 273 fichas). Tampoco sale por consulta SQL de la base: solo por `GET /v1/pages/{id}` → `icon`, o por `POST /v1/databases/{id}/query`, que sí lo devuelve. Con el token de integración que pasó Diego se leyeron los 193 iconos de «Archivo de entrevistas» en dos llamadas: **⛔ 3 · 👍 13 · ⏳ 11 · 👎 13 · 👨‍🍳 1**, que son exactamente los 41 que ya se habían transcrito a mano de las capturas. No había ninguno más.
 
-**Los emoticonos son cinco**, no tres (capturas del 17/09): 👍 bien · ⏳ en espera · 👎 mal · ⛔ **vetado** (no volver a llamar; es más fuerte que el pulgar abajo) · 👨‍🍳 el puesto es cocinero. La ficha sin marcar lleva el icono de documento por defecto.
+**Los emoticonos son cinco**, no tres: 👍 bien · ⏳ en espera · 👎 mal · ⛔ **vetado** (no volver a llamar; es más fuerte que el pulgar abajo) · 👨‍🍳 el puesto es cocinero. La ficha sin marcar lleva el icono de documento por defecto.
 
-De las capturas se transcribieron **41 valoraciones y un puesto**; las otras 234 fichas siguen sin marcar porque solo se veían esas en pantalla.
+### El grueso de las entrevistas estaba en papel
 
-Dos maneras de recuperar el resto:
+Diego, el 17/09: *«el grueso de las entrevistas están adjuntadas digitalizando solo nombre y teléfono; luego la entrevista en sí está en un documento escaneado dentro de la base de datos. Necesitamos un lector OCR que nos permita extrapolar los datos de la ficha de cada empleado y pasarlos a nuestra base de datos, la de la web»*.
 
-1. **Que José añada dos columnas en Notion** (dos «Select»: puesto y valoración) y vuelva a exportar a CSV. Es lo más limpio y el volcado se rehace en minutos.
-2. **Por la API de Notion**: José crea una integración interna, la comparte con las dos bases y pasa el token. Así se leen los iconos tal cual están, sin que él toque nada.
+Eran **154 escaneos** (17 MB) repartidos por las fichas de Notion; 150 correspondían a entrevistas que la app no tenía. Se bajaron por la API (`GET /v1/blocks/{id}/children` da la URL firmada del bloque de imagen, **que caduca a los 5 minutos**) y se leyó cada hoja manuscrita, campo a campo.
 
-Mientras tanto las 275 fichas están «sin puesto» y «sin valorar», salvo las 26 en las que el puesto venía escrito en el propio nombre («Janira Cocinera»).
+Dos cosas que conviene tener presentes sobre ese volcado:
 
-**Lo que sí trajo la exportación y ya está dentro**: de cada ficha se saca todo lo que había escrito —edad, zona, fecha de la entrevista, la experiencia contada, tipología de cocina, incorporación, expectativas salariales, horarios, condiciones y observaciones— y las siete aptitudes que pregunta el grupo: **cafetera, cambiar barril, bandeja, cocina, jamón, TPV y PDA**, cada una como sí / con dudas / no. Son **275 fichas**, de las que **35 tienen la entrevista contestada** y 31 la experiencia escrita. Se puede filtrar por aptitud («quién sabe cafetera») y el buscador entra en todo el texto, no solo en el nombre.
+- **Se cruzó por el teléfono escrito en el papel**, no por el nombre de la página de Notion. Hay fichas con el escaneo de otra persona pegado: la de «Raquel perez ruiz» lleva el papel de Darlys Olaja, la de «Lavinia teodora stan» el de Raquel y la de «Darlys Olaja» el de Lavinia. Cruzando por nombre se habrían mezclado tres personas.
+- **Diez hojas no casaban con ningún teléfono de la base**, porque en Notion está tecleado con un dígito cambiado (Sergio Navarro 602→607, Nicole Hoffman 667→662, Albedan Hurtado 641→691…). Esas se cruzaron por nombre y llevan en observaciones «En la hoja escaneada el teléfono es el …», para que el grupo decida cuál es el bueno.
+- «Mar campello huedo» y «Mº angeles campello» comparten el 658852324: es la misma persona con dos hojas, de 6/9/2024 y 7/1/2025.
+
+La hoja pregunta dos cosas que la ficha de la web no pinta —**copas/vinos** y **rapidez**—, así que van contadas dentro de observaciones.
+
+### Cómo queda la base
+
+De **275 fichas**: **192 con zona, 191 con edad, 188 con la experiencia contada, 177 con observaciones, 176 con las aptitudes y 143 con la documentación en regla** (antes eran 35 con entrevista y 31 con experiencia). Se filtra por aptitud («quién sabe cafetera») y el buscador entra en todo el texto, no solo en el nombre.
+
+**117 fichas valoradas**: 44 bien, 25 en espera, 39 mal y 9 vetadas. Las nuevas salen de lo que el propio grupo escribió a mano al final de cada hoja —«ni de coña», «me gusta mucho y tiene mucha experiencia», «un impresentable que nos dejó tirados el día de entrar a trabajar»—, que es más rico que el emoticono. Las 158 restantes son hojas sin conclusión escrita.
+
+**Pendiente**: la segunda base, «Alerta interna» (81 fichas), sigue sin duplicar en el espacio de Diego, así que sus escaneos no se han podido leer.
 
 **Lo que pregunta la entrevista** (Aroa, 17/09): a las siete aptitudes de siempre se suma **«Aperturas o cierres»** —«para saber si ha hecho aperturas o cierres en otros locales, que ahí veo yo si tiene experiencia»—, con las mismas tres respuestas y su propio filtro. Y detrás del campo Horarios va **«El entrevistado busca»**: mañanas, tardes, turno partido, fin de semana y «no tiene problemas», varias a la vez; la última es excluyente porque quiere decir justo eso. Se guarda en `busca` (lista de ids) y entra en el buscador por su texto.
 

@@ -286,6 +286,7 @@ try {
   await pg.fill('#entQ', '625828119'); await pg.waitForTimeout(250);
   ok('Entrevistas: el buscador encuentra por teléfono', await pg.$$eval('#entrevistasRoot .entrow b', x => x.map(y => y.textContent).join('|')).then(t => /Janira/.test(t)));
   await pg.click('#entLimpiar').catch(() => {}); await pg.waitForTimeout(200);
+  const quienEdita = await pg.$eval('#entrevistasRoot .entrow b', e => e.textContent.trim());
   await pg.click('#entrevistasRoot .entrow'); await pg.waitForTimeout(300);
   ok('Entrevistas: pulsar en alguien abre su perfil (siete tarjetas de dato y las ocho aptitudes)',
     !!(await pg.$('#candOvl .cperf')) && await pg.$$eval('#candOvl .cperfk', x => x.length) === 7 && await pg.$$eval('#candOvl .habchip', x => x.length) === 8,
@@ -326,16 +327,22 @@ try {
   await pg.click('#candOvl [data-cset="val|bien"]'); await pg.click('#candOvl [data-cok]'); await pg.waitForTimeout(350);
   const busca = await pg.evaluate(() => (S.entrevistas || []).filter(c => (c.busca || []).length).map(c => c.busca.join(',')));
   ok('Entrevistas: lo que busca se guarda', busca.length === 1 && busca[0] === 'T,FDS', JSON.stringify(busca));
-  const dosPuestos = await pg.evaluate(() => (S.entrevistas || []).filter(c => (c.puestos || []).length === 2).map(c => c.nombre));
-  ok('Entrevistas: quien es camarero y cocinero se guarda con los dos', dosPuestos.length === 1, JSON.stringify(dosPuestos));
-  const valBien = await pg.evaluate(() => (S.entrevistas || []).filter(c => c.lista === 'alerta' && c.val === 'bien').length);
-  ok('Entrevistas: valorar a alguien se guarda, queda en el historial y vuelve al perfil ya valorado', valBien === 1
+  // hay más gente con los dos puestos y con valoración: sale de las entrevistas en papel que
+  // se volcaron (Diego, 17/09), así que la prueba mira a quien acaba de tocar, no el total.
+  const editado = await pg.evaluate(n => (S.entrevistas || []).find(c => c.nombre === n), quienEdita);
+  ok(`Entrevistas: quien es camarero y cocinero se guarda con los dos (${quienEdita})`,
+    (editado.puestos || []).slice().sort().join(',') === 'cocina,sala', JSON.stringify(editado.puestos));
+  ok('Entrevistas: valorar a alguien se guarda, queda en el historial y vuelve al perfil ya valorado', editado.val === 'bien'
     && !!(await pg.$('#candOvl .cperfetq .entv.v-bien'))
     && await pg.evaluate(() => (S.historial || []).some(x => /Candidato actualizado/.test(x.txt || ''))),
     await pg.evaluate(() => JSON.stringify((S.historial || []).slice(0, 2))));
   await pg.click('#candOvl [data-ovx]'); await pg.waitForTimeout(200);
   await pg.click('#entrevistasRoot [data-entf="val|bien"]'); await pg.waitForTimeout(250);
-  ok('Entrevistas: el filtro de valoración encuentra a quien acabamos de valorar', await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === 1);
+  const bienEnLista = await pg.evaluate(() => (S.entrevistas || []).filter(c => c.lista === 'alerta' && c.val === 'bien').length);
+  ok('Entrevistas: el filtro de valoración encuentra a quien acabamos de valorar',
+    await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === bienEnLista && bienEnLista > 0
+    && await pg.$$eval('#entrevistasRoot .entrow b', (x, n) => x.some(y => y.textContent.trim().startsWith(n)), quienEdita),
+    JSON.stringify({ filas: await pg.$$eval('#entrevistasRoot .entrow', x => x.length), bienEnLista, quienEdita }));
   await pg.click('#entLimpiar'); await pg.waitForTimeout(200);
 
   // 6b) Gestor de cobertura desde la planilla: en Semana, «Falta estos días…» sobre una persona abre la hoja

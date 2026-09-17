@@ -23,6 +23,18 @@
   *Los datos de esos iconos no vinieron en la exportación*: Notion no incluye el icono de
   cada ficha ni en el CSV ni en el Markdown, así que las etiquetas están por rellenar
   (ver DISEÑO.md).
+- **Las entrevistas que solo estaban en papel, leídas y volcadas.** El grueso de la base
+  de Notion tenía tecleados solo el nombre y el teléfono: la entrevista de verdad era una
+  hoja manuscrita escaneada dentro de la ficha. Se han leído las **150 hojas** y está todo
+  dentro. La base pasa de 35 a **192 fichas con la entrevista contestada**, y de 41 a
+  **117 valoradas** (44 bien, 25 en espera, 39 mal, 9 vetadas) con el motivo que el grupo
+  escribió a mano. Dos avisos: el cruce se hizo por el **teléfono escrito en el papel**
+  porque hay fichas de Notion con el escaneo de otra persona pegado, y **diez teléfonos
+  están tecleados en Notion con un dígito cambiado** —esas fichas lo dicen en
+  observaciones para poder corregirlo. Ver DISEÑO.md.
+- **Los emoticonos de Notion, comprobados uno a uno.** Leídos por la API los 193 iconos de
+  «Archivo de entrevistas»: son exactamente los 41 que ya estaban transcritos de las
+  capturas, no había más. Queda pendiente la base «Alerta interna».
 - **La entrevista entera de cada candidato**, que estaba en la exportación y no se había
   usado: edad, zona, fecha, la experiencia contada, incorporación, lo que pide de sueldo,
   horarios, condiciones y observaciones, más las siete aptitudes que pregunta el grupo
