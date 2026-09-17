@@ -220,7 +220,7 @@ function vaciarGenerado() {
 // ================= GENERADOR SEMANAL (el de la planilla del grupo) =================
 // Genera la semana con la semana tipo y las fichas y la enseña como el prototipo del
 // cliente (11/09): una tabla por local con las posiciones numeradas (1.º abre y hace
-// turno completo, ◆ cocina en su posición, P partido, C continuo, □ comodín, «por X»),
+// turno completo, ◆ cocina en su posición, P partido, C continuo, □ sin local fijo, «por X»),
 // la cuenta n/mín* de cada casilla, los huecos disponibles con su motivo, qué ha
 // cambiado respecto a lo que había, quién libra cada día y las condiciones comprobadas.
 // estado «virtual» de una semana: sus siete días apuntan a los objetos del mes al que

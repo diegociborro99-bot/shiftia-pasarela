@@ -20,8 +20,10 @@ test('las pestañas encogen por tramos y la marca no se recorta', () => {
 test('la cocina se marca con una sartén, no con un rombo', () => {
   assert.match(html, /const SVG_COCINA = '<svg class="icoc"/);
   assert.match(css, /\.icoc\{[^}]*stroke:currentColor/);
-  for (const sitio of [/<span class="bdg cocina">\$\{SVG_COCINA\} COCINA<\/span>/, /<u class="gcoc" title="cocina">\$\{SVG_COCINA\}<\/u>/, /<b class="pxg-mk coc" title="Lleva la cocina">\$\{SVG_COCINA\}<\/b>/])
+  for (const sitio of [/<span class="bdg cocina">\$\{SVG_COCINA\} COCINA<\/span>/, /<u class="gcoc" title="cocina">\$\{SVG_COCINA\}<\/u>/])
     assert.match(html, sitio);
+  // 17/09: en las hojas impresas la cocina no aparece (sigue siendo variable interna)
+  assert.ok(!/pxg-mk coc/.test(html), 'la cocina no se imprime');
   assert.ok(!/<span class="bdg cocina">◆/.test(html) && !/>◆<\/u>/.test(html), 'no queda ningún rombo de cocina');
 });
 test('los botones de la barra van todos al mismo lado', () => {

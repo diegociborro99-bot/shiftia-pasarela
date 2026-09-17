@@ -65,7 +65,7 @@ function chipsCondiciones(p) {
   const tc = (k, lbl, txt, cls, title) => tchip(lbl, txt, (cls || '') + off(k), caracteristicaActiva(p, k) ? title : `${lblCaracteristica(k)}: desactivada en la ficha, el generador no la tiene en cuenta`);
   const locs = p.locales || [];
   if (locs.length) for (const id of locs) h.push(tc('locales', 'Local', chipLocal(id), 'loc'));
-  else h.push(tchip('Local', 'cualquiera (comodín)', 'teal'));
+  else h.push(tchip('Local', 'cualquiera (sin local fijo)', 'teal'));
   h.push(tc('franjas', 'Franja', esc(lblFranjas(p.franjas))));
   const pd = p.partido || {};
   if (pd.siempre) h.push(tc('partido', 'Partido', 'siempre', 'fix'));
@@ -120,7 +120,7 @@ function htmlTarjetaPersona(p, baja) {
   const locs = (p.locales || []).map(id => (localDe(S, id) || { corto: id }).corto).join(' · ');
   return `<div class="pcard${baja ? ' baja' : ''}" data-pcard="${esc(p.id)}">
     <div class="pchead"><span class="av" data-ficha="${esc(p.id)}" style="cursor:pointer;background:${avColor(p.id)}">${esc(initials(p.nombre))}</span>
-      <span data-ficha="${esc(p.id)}" style="min-width:0;cursor:pointer"><b>${esc(p.nombre)}</b><small>${esc(lblPuesto(p.puesto))}${locs ? ' · ' + esc(locs) : ' · comodín'}${baja ? ' · de baja' : ''}</small></span>
+      <span data-ficha="${esc(p.id)}" style="min-width:0;cursor:pointer"><b>${esc(p.nombre)}</b><small>${esc(lblPuesto(p.puesto))}${locs ? ' · ' + esc(locs) : ' · sin local fijo'}${baja ? ' · de baja' : ''}</small></span>
       <button type="button" class="pmini" data-ficha="${esc(p.id)}" title="Editar ficha" aria-label="Editar ficha de ${esc(p.nombre)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m13.5 6.5 3 3"/></svg></button></div>
     <div class="traits">${chipsCondiciones(p)}</div>
     <div class="abschips">${chipsAusencias(p)}</div>
@@ -149,14 +149,14 @@ function renderEquipo() {
     h += seccion(l.nombre, gente, { color: l.color, localId: l.id, sub: `${FRANJA_LBL.M.toLowerCase()} ${lblDows(l.abre && l.abre.M) || '—'} · ${FRANJA_LBL.T.toLowerCase()} ${lblDows(l.abre && l.abre.T) || '—'}` });
   }
   const varios = enActivo.filter(p => (p.locales || []).length !== 1);
-  h += seccion('Comodines y varios locales', varios, { sub: 'sin local fijo o con más de uno', vacio: 'Nadie trabaja en varios locales.' });
+  h += seccion('Sin local fijo y varios locales', varios, { sub: 'sin local fijo o con más de uno', vacio: 'Nadie trabaja en varios locales.' });
   if (deBajaHoy.length) h += seccion('De baja', deBajaHoy, { baja: true, sub: 'no cuentan para el generador' });
   root.innerHTML = h;
   const stats = $('#eqStats');
   if (stats) {
-    const comodines = enActivo.filter(esComodin).length;
+    const sinLocal = enActivo.filter(esComodin).length;
     const cocineros = enActivo.filter(p => p.puesto === 'cocina' || ((p.cocina || {}).titular || []).length).length;
-    stats.innerHTML = `<span class="dstat"><b>${enActivo.length}</b> en activo</span>${deBajaHoy.length ? `<span class="dstat warn"><b>${deBajaHoy.length}</b> de baja</span>` : ''}<span class="dstat"><b>${comodines}</b> comodines</span><span class="dstat"><b>${cocineros}</b> cocina</span>`;
+    stats.innerHTML = `<span class="dstat"><b>${enActivo.length}</b> en activo</span>${deBajaHoy.length ? `<span class="dstat warn"><b>${deBajaHoy.length}</b> de baja</span>` : ''}<span class="dstat"><b>${sinLocal}</b> sin local fijo</span><span class="dstat"><b>${cocineros}</b> cocina</span>`;
     stats.querySelectorAll('b').forEach(countUp);
   }
 }
@@ -220,7 +220,7 @@ function openPersonas() {
     <form id="persForm" class="absform" style="display:grid">
       <div class="row2"><span><label>Nombre y apellidos</label><input type="text" id="persNombre" placeholder="Ana Morales" autocomplete="off" spellcheck="false" required></span>
       <span><label>Puesto</label><select id="persPuesto">${PUESTOS.map(x => `<option value="${x.id}">${esc(x.label)}</option>`).join('')}</select></span></div>
-      <span><label>Locales (ninguno = cualquiera, comodín)</label><div class="locset" id="persLocs">${locChips}</div></span>
+      <span><label>Locales (ninguno = cualquiera, sin local fijo)</label><div class="locset" id="persLocs">${locChips}</div></span>
       <span><label>Franjas</label><div class="segrow" id="persFranjas">${FRANJAS.map(f => `<button type="button" class="segk on" data-franja="${f}">${FRANJA_LBL[f]}</button>`).join('')}</div></span>
       <p class="filltxt" id="persPrev" style="margin:0">Escribe el nombre: el identificador (y su usuario, si entra en la app) se calcula solo.</p>
       <div class="bar"><button type="button" class="btn btn-ghost" data-ovx>Cancelar</button><button type="submit" class="btn btn-cta">Dar de alta</button></div>
@@ -244,11 +244,10 @@ function openPersonas() {
     let franjas = [...ov.querySelectorAll('#persFranjas .segk.on')].map(b => b.dataset.franja);
     if (!franjas.length) franjas = FRANJAS.slice();
     const np = personaNueva(nombre, { id: idParaPersona(nombre), puesto, locales, franjas });
-    if (puesto === 'comodin') np.comodin = true;
     pushUndo(`alta de ${nombre}`, { staff: true });
     S.staff.push(np);
     asignarColores(S.staff);
-    registrarCambio(`Alta en el equipo: ${nombre} (${lblPuesto(puesto).toLowerCase()}${locales.length ? ', ' + locales.map(nombreLocal).join(' y ') : ', comodín'})`, 'cambio');
+    registrarCambio(`Alta en el equipo: ${nombre} (${lblPuesto(puesto).toLowerCase()}${locales.length ? ', ' + locales.map(nombreLocal).join(' y ') : ', sin local fijo'})`, 'cambio');
     saveState();
     ov.remove();
     repintarTrasEquipo();

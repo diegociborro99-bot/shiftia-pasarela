@@ -14,7 +14,7 @@ const HORAS_ABIERTAS = new Set();   // filas desplegadas; sobreviven al repintad
 function numHoras(h) { return (Math.round((+h || 0) * 10) / 10).toLocaleString('es-ES', { maximumFractionDigits: 1 }); }
 function puestoLbl(p) {
   const base = (PUESTOS.find(x => x.id === p.puesto) || {}).label || '';
-  return p.comodin && p.puesto !== 'comodin' ? `${base} · comodín`.replace(/^ · /, '') : base;
+  return p.comodin ? `${base} · sin local fijo`.replace(/^ · /, '') : base;
 }
 // el mes de la vista; si aún no se ha elegido, el de la planilla en pantalla (y se recuerda)
 function mesHoras() {

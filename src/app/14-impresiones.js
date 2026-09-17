@@ -10,7 +10,7 @@
 // «gráficos de fondo». Comparte con 15-export-xlsx.js las piezas de la semana
 // (columnas, pie de descansos) para que el Excel y la hoja digan lo mismo.
 // Las casillas se pintan con posicionesDe (modelo.js): número de posición, ▸ si sale
-// el primero (fijo), ◆ cocina, □ comodín, P partido / C continuo, «por Fulana» y la
+// el primero (fijo), □ sin local fijo, P partido / C continuo, «por Fulana» y la
 // nota en gris, y la 1.ª posición como HUECO DISPONIBLE en rojo cuando nadie de la
 // casilla puede abrir.
 function cerrarImpresion() {
@@ -72,7 +72,7 @@ function pxPie(centro) {
 function pxNombre(pid, marcas) {
   const mk = marcas || {};
   const tipo = mk.tipo ? (AUS_LBL[mk.tipo] ? AUS_LBL[mk.tipo].label : mk.tipo) : '';
-  return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${mk.abre ? '<b class="pxg-mk abre">▸</b>' : ''}${mk.cocina ? `<b class="pxg-mk coc">${SVG_COCINA}</b>` : ''}${esc(nombrePid(pid))}${tipo ? `<em>${esc(tipo)}</em>` : ''}</span>`;
+  return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${mk.abre ? '<b class="pxg-mk abre">▸</b>' : ''}${esc(nombrePid(pid))}${tipo ? `<em>${esc(tipo)}</em>` : ''}</span>`;
 }
 // la posición 1 de la casilla es quien abre / sale primero (vocabulario del grupo): si
 // nadie lleva la marca puesta, en el Excel se señala al primero para que no salga sin abre
@@ -137,13 +137,14 @@ function pxFilasDescansos(cols, personas, colspan) {
 }
 
 // ---------- la casilla tal como la enseña el prototipo del 11/09 ----------
-// Una posición: número, ▸ si sale el primero (fijo), ◆ cocina, □ comodín, el nombre,
-// P partido / C continuo, la palabra «cocina» y, debajo en gris, «por Fulana» y la nota.
+// Una posición: número, ▸ si sale el primero (fijo), □ sin local fijo, el nombre,
+// P partido / C continuo y, debajo en gris, «por Fulana» y la nota. La cocina NO se
+// imprime (José, 17/09): es variable interna, en el papel sobra.
 // El hueco de la 1.ª posición va en rojo: «Hueco disponible · abre la tarde · turno completo».
 function pxSlot(s, franja) {
   if (s.hueco) return `<div class="pxg-s hueco" title="${esc(s.motivo || '')}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-hb">Hueco disponible</span><small class="pxg-sub bad">abre la ${franja === 'M' ? 'mañana' : 'tarde'} · turno completo</small></div></div>`;
-  const mk = (s.abreFijo ? '<b class="pxg-mk abre" title="Sale el primero (fijo)">▸</b>' : '') + (s.cocina ? `<b class="pxg-mk coc" title="Lleva la cocina">${SVG_COCINA}</b>` : '') + (s.comodin ? '<b class="pxg-mk com" title="Comodín colocado por Shiftia">□</b>' : '');
-  const tags = (s.continuo ? '<em class="pxg-tag c" title="Turno continuo: sale el primero de mañana y de tarde">C</em>' : s.partido ? '<em class="pxg-tag p" title="Turno partido: mañana y tarde">P</em>' : '') + (s.cocina ? '<span class="pxg-coc">cocina</span>' : '');
+  const mk = (s.abreFijo ? '<b class="pxg-mk abre" title="Sale el primero (fijo)">▸</b>' : '') + (s.comodin ? '<b class="pxg-mk com" title="Sin local fijo">□</b>' : '');
+  const tags = (s.continuo ? '<em class="pxg-tag c" title="Turno continuo: sale el primero de mañana y de tarde">C</em>' : s.partido ? '<em class="pxg-tag p" title="Turno partido: mañana y tarde">P</em>' : '');
   const subs = (s.por ? `<small class="pxg-sub">por ${esc(nombrePid(s.por))}</small>` : '') + (s.nota ? `<small class="pxg-sub">${esc(s.nota)}</small>` : '') + (s.forzado ? '<small class="pxg-sub warn">forzado a mano</small>' : '');
   return `<div class="pxg-s${s.abre ? ' abre' : ''}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-nm">${mk}${esc(s.nombre)}</span>${tags}${subs}</div></div>`;
 }
@@ -168,7 +169,7 @@ function pxThDia(c) {
 }
 // leyenda de las casillas (la misma en las tres hojas semanales); extra = chips propios de la hoja
 function pxLeyendaCasilla(extra) {
-  return `<div class="pxg-ley"><span><i class="pxg-n">1</i>orden en la casilla: el primero abre y hace turno completo; la cocina va en su posición</span><span><b class="pxg-mk abre">▸</b>sale el primero (fijo)</span><span><b class="pxg-mk coc">${SVG_COCINA}</b>cocina</span><span><em class="pxg-tag p">P</em>turno partido</span><span><em class="pxg-tag c">C</em>turno continuo</span><span><b class="pxg-mk com">□</b>comodín colocado por Shiftia</span><span><b class="ast">*</b>mínimo no fijado por el cliente</span>${extra || ''}<span class="hue"><b>rojo</b>· hueco disponible: nadie de la plantilla puede ocupar esa posición</span><span class="fal"><b>ámbar</b>· turno corto: faltan personas para el mínimo</span><span><b>—</b>cerrado</span></div>`;
+  return `<div class="pxg-ley"><span><i class="pxg-n">1</i>orden en la casilla: el primero abre y hace turno completo</span><span><b class="pxg-mk abre">▸</b>sale el primero (fijo)</span><span><em class="pxg-tag p">P</em>turno partido</span><span><em class="pxg-tag c">C</em>turno continuo</span><span><b class="pxg-mk com">□</b>sin local fijo</span><span><b class="ast">*</b>mínimo no fijado por el cliente</span>${extra || ''}<span class="hue"><b>rojo</b>· hueco disponible: nadie de la plantilla puede ocupar esa posición</span><span class="fal"><b>ámbar</b>· turno corto: faltan personas para el mínimo</span><span><b>—</b>cerrado</span></div>`;
 }
 const PX_LEYENDA_SEMANA = () => pxLeyendaCasilla('');
 
@@ -177,7 +178,7 @@ function abrirImpresion() {
   const lunes = S.semLunes || mondayOf(isoHoy());
   const cols = pxColsSemana(lunes);
   const supuesto = S.locales.some(l => l.horarioSupuesto);
-  let h = pxCabecera('Planilla semanal', 'Grupo Pasarela · los cuatro locales · mañana y tarde · posiciones de la casilla: el 1.º abre, la cocina en su sitio',
+  let h = pxCabecera('Planilla semanal', 'Grupo Pasarela · los cuatro locales · mañana y tarde · posiciones de la casilla: el 1.º abre y hace turno completo',
     `Semana ${rangoSemanaTxt(lunes)}`, supuesto ? 'Horarios de apertura aún sin confirmar por el grupo' : `${S.locales.length} locales`);
   h += `<table class="pxw pxsem"><thead><tr><th class="act">Local · franja</th>${cols.map(pxThDia).join('')}</tr></thead><tbody>`;
   for (const l of S.locales) {
@@ -189,7 +190,7 @@ function abrirImpresion() {
   h += pxFilasDescansos(cols, S.staff, 8);
   h += '</tbody></table>';
   h += PX_LEYENDA_SEMANA();
-  h += pxPie('El 1.º de cada casilla abre y hace turno completo; la cocina va en su posición. El pie de descansos dice quién libra cada día y quién está ausente.');
+  h += pxPie('El 1.º de cada casilla abre y hace turno completo. El pie de descansos dice quién libra cada día y quién está ausente.');
   montarImpresion(h, true, `Planilla_semana_${lunes}`);
 }
 
@@ -247,7 +248,7 @@ function pxgDiaDe(res, localId, franja, iso) {
 }
 // «1.ª posición vacante · 2.ª Noe de cocina · 3.º Leo»
 function pxgPosiciones(slots, nuevos) {
-  return slots.map(s => s.hueco ? `<b class="bad">${s.pos}.ª posición vacante</b>` : `${pxgOrd(s.pos, s.nombre)} ${nuevos && nuevos.includes(s.pid) ? `<b>${esc(s.nombre)}</b>` : esc(s.nombre)}${s.cocina ? ' de cocina' : ''}${s.continuo ? ', turno continuo' : s.partido ? (s.cocina ? ', partido' : ' de partido') : ''}`).join(' · ');
+  return slots.map(s => s.hueco ? `<b class="bad">${s.pos}.ª posición vacante</b>` : `${pxgOrd(s.pos, s.nombre)} ${nuevos && nuevos.includes(s.pid) ? `<b>${esc(s.nombre)}</b>` : esc(s.nombre)}${s.continuo ? ', turno continuo' : s.partido ? ' de partido' : ''}`).join(' · ');
 }
 function pxgCabecera(res, titulo, sub, resumen, pagina) {
   const kicker = `SHIFTIA · PLANILLA SEMANAL · ${res.locales.map(l => `<b style="color:${esc(l.color)}">${esc(l.nombre)}</b>`).join(' · ')}`;

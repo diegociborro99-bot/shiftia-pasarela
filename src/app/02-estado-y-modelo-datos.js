@@ -104,6 +104,8 @@ function migrarEstado(estado) {
     p.cubreA = p.cubreA || []; p.vetos = p.vetos || []; p.contrato = p.contrato || { horasSemana: null }; p.ausencias = p.ausencias || []; p.prefs = p.prefs || {}; p.supuestos = p.supuestos || [];
   }
   migrarHorarios(estado);   // 15/09: los horarios que confirmó la encargada por WhatsApp
+  migrarPuestos(estado);    // 17/09: el puesto «comodín» pasa a ser «apoyo»
+  limpiarLibrePuntual(estado.staff, isoHoy());   // los días libres puntuales caducan solos
   asignarColores(estado.staff);
   estado.esquema = 1;
 }

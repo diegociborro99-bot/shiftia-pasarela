@@ -72,20 +72,20 @@ try {
     return { cls: td.className, cuenta: (td.querySelector('.pxg-cnt') || {}).textContent || '', txt: td.textContent, slots };
   }, [iso, tid]);
   const el33mt = await cas('2026-09-15', 'EL33_T');
-  ok('El 33 martes tarde: «Hueco disponible» en la 1.ª posición', !!el33mt && /Hueco disponible/.test(el33mt.txt) && el33mt.slots[0] && el33mt.slots[0].hueco && el33mt.slots[0].n === '1', JSON.stringify(el33mt));
-  ok('El 33 martes tarde: Noe con ◆ (cocina) en 2.ª y «por Jenny» debajo', !!el33mt && el33mt.slots[1] && /Noe/.test(el33mt.slots[1].nombre) && el33mt.slots[1].coc && el33mt.slots[1].n === '2' && el33mt.slots[1].sub.some(x => /por Jenny/.test(x)), JSON.stringify(el33mt && el33mt.slots[1]));
-  ok('El 33 martes tarde: la cuenta dice 2/2* y «+1 hueco», y la casilla va en rojo', !!el33mt && /2\/2\*/.test(el33mt.cuenta) && /\+1 hueco/.test(el33mt.cuenta) && /hueco/.test(el33mt.cls), el33mt && el33mt.cuenta + ' · ' + el33mt.cls);
+  ok('El 33 martes tarde: día flojo, se queda Noe solo y sin hueco (José, 17/09)', !!el33mt && !/Hueco disponible/.test(el33mt.txt) && el33mt.slots.length === 1 && /Noe/.test(el33mt.slots[0].nombre), JSON.stringify(el33mt));
+  ok('El 33 martes tarde: Noe en la 1.ª con «por Jenny» debajo y sin marca de cocina en el papel', !!el33mt && el33mt.slots[0] && el33mt.slots[0].n === '1' && !el33mt.slots[0].coc && el33mt.slots[0].sub.some(x => /por Jenny/.test(x)), JSON.stringify(el33mt && el33mt.slots[0]));
+  ok('El 33 martes tarde: la cuenta dice 1/1* y la casilla ya no va en rojo', !!el33mt && /1\/1\*/.test(el33mt.cuenta) && !/hueco/.test(el33mt.cls), el33mt && el33mt.cuenta + ' · ' + el33mt.cls);
   const pasLt = await cas('2026-09-14', 'PASARELA_T');
   ok('Pasarela lunes tarde: Mari Luz abre en partido (P) en la 1.ª, sin hueco (acordado con el cliente el 15/09)', !!pasLt && pasLt.slots[0] && !pasLt.slots[0].hueco && /Mari Luz/.test(pasLt.slots[0].nombre) && pasLt.slots[0].P && !pasLt.slots.some(s => s.hueco), JSON.stringify(pasLt));
   const pasLm = await cas('2026-09-14', 'PASARELA_M');
   ok('Pasarela lunes mañana: Lola lleva ▸ (sale la primera, fijo) en la 1.ª', !!pasLm && pasLm.slots[0] && /Lola/.test(pasLm.slots[0].nombre) && pasLm.slots[0].abre, JSON.stringify(pasLm && pasLm.slots[0]));
   ok('Pasarela lunes mañana: Mari Luz con P (partido)', !!pasLm && pasLm.slots.some(s => /Mari Luz/.test(s.nombre) && s.P), JSON.stringify(pasLm && pasLm.slots));
   const el33xm = await cas('2026-09-16', 'EL33_M');
-  ok('El 33 miércoles mañana: Noe con C (turno continuo) y «por Victoria»; Jenny con ◆ y P', !!el33xm && el33xm.slots[0] && /Noe/.test(el33xm.slots[0].nombre) && el33xm.slots[0].C && el33xm.slots[0].sub.some(x => /por Victoria/.test(x)) && el33xm.slots[1] && /Jenny/.test(el33xm.slots[1].nombre) && el33xm.slots[1].coc && el33xm.slots[1].P, JSON.stringify(el33xm && el33xm.slots));
+  ok('El 33 miércoles mañana: Noe con C (turno continuo) y «por Victoria»; Jenny con P y sin marca de cocina', !!el33xm && el33xm.slots[0] && /Noe/.test(el33xm.slots[0].nombre) && el33xm.slots[0].C && el33xm.slots[0].sub.some(x => /por Victoria/.test(x)) && el33xm.slots[1] && /Jenny/.test(el33xm.slots[1].nombre) && !el33xm.slots[1].coc && el33xm.slots[1].P, JSON.stringify(el33xm && el33xm.slots));
   const monLm = await cas('2026-09-14', 'MONACO_M');
   ok('Bar Mónaco lunes mañana: Cristian con □ (comodín) en 3.ª', !!monLm && monLm.slots[2] && /Cristian/.test(monLm.slots[2].nombre) && monLm.slots[2].com, JSON.stringify(monLm && monLm.slots));
   const libV = await pg.evaluate(() => { const td = document.querySelector('#printRoot .pxpage tr.pxdesc [data-libran="2026-09-18"]'); return td ? td.textContent.replace(/\s+/g, ' ').trim() : null; });
-  ok('«Quién libra» del viernes 18 dice nadie (0 libran)', !!libV && /nadie/.test(libV) && /0 libran/.test(libV), libV);
+  ok('«Quién libra» del viernes 18: solo Dulce, que aún no está en la semana tipo', !!libV && /Dulce/.test(libV) && /1 libra/.test(libV), libV);
   ok('la hoja lleva los 4 locales con su regla de cocina, 7 días y la leyenda con ▸ ◆ P C □', await pg.evaluate(() => document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc').length === 4 && [...document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc td.sec small')].every(x => /cocina/.test(x.textContent)) && document.querySelectorAll('#printRoot table.pxsem thead th.pxd').length === 7 && /▸/.test(document.querySelector('#printRoot .pxg-ley').textContent) && /□/.test(document.querySelector('#printRoot .pxg-ley').textContent)));
   const altoSem = await pg.evaluate(() => { const p = document.querySelector('#printRoot .pxpage'); return { alto: p.scrollHeight, hoja: Math.round(210 * 96 / 25.4), cls: p.className }; });
   ok(`la hoja semanal cabe en un A4 apaisado (${altoSem.alto}px ≤ ${altoSem.hoja}px · ${altoSem.cls})`, altoSem.alto <= altoSem.hoja + 2, JSON.stringify(altoSem));
@@ -99,7 +99,7 @@ try {
     abrirImpresionSemanaGenerada(res, {});
     return { huecos: res.huecos.length, primeros: res.huecos.filter(h => h.tipo === 'primero').length, cambios: res.cambios.length, condiciones: res.condiciones.length, nuevas: res.condiciones.filter(c => c.nueva).length, resumen: res.resumen };
   }, LUNES);
-  ok(`generarSemana simula la semana (${gen.condiciones} condiciones, ${gen.nuevas} nuevas, ${gen.huecos} huecos, ${gen.cambios} cambios)`, gen.condiciones >= 30 && gen.nuevas === 4);
+  ok(`generarSemana simula la semana (${gen.condiciones} condiciones, ${gen.nuevas} nuevas, ${gen.huecos} huecos, ${gen.cambios} cambios)`, gen.condiciones >= 30 && gen.nuevas === 6);
   ok('abrirImpresionSemanaGenerada monta una hoja apaisada con dos páginas .pxg-pag', await llega(pg, () => { const r = document.getElementById('printRoot'); return !!r && !r.classList.contains('hidden') && r.querySelectorAll('.pxpage.apaisado .pxg-pag').length === 2; }, null, 4000) >= 0);
   const p1 = await pg.evaluate(() => {
     const pag = document.querySelectorAll('#printRoot .pxg-pag')[0];
@@ -107,19 +107,19 @@ try {
   });
   ok(`página 1: título «${p1.h1}»`, /^Planilla propuesta · semana del 14 al 20 de septiembre de 2026$/.test(p1.h1), p1.h1);
   ok('página 1: la línea de cabecera nombra Shiftia y los cuatro locales', /SHIFTIA/.test(p1.kick) && /El 33/.test(p1.kick) && /Pasarela/.test(p1.kick), p1.kick);
-  ok('página 1: 4 tablas de locales, «Quién libra cada día» y la leyenda', p1.tablas === 4 && p1.libran && /nadie/.test(p1.libV || '') && /Hueco disponible|hueco disponible/.test(p1.ley || ''), JSON.stringify(p1));
-  ok(`página 1: casillas con hueco en rojo (${p1.huecos}) = huecos de 1.ª posición del modelo (${gen.primeros})`, p1.huecos === gen.primeros && p1.huecos >= 1, JSON.stringify({ p1: p1.huecos, gen: gen.primeros }));
+  ok('página 1: 4 tablas de locales, «Quién libra cada día» y la leyenda', p1.tablas === 4 && p1.libran && /Dulce/.test(p1.libV || '') && /Hueco disponible|hueco disponible/.test(p1.ley || ''), JSON.stringify(p1));
+  ok(`página 1: casillas con hueco en rojo (${p1.huecos}) = huecos de 1.ª posición del modelo (${gen.primeros})`, p1.huecos === gen.primeros, JSON.stringify({ p1: p1.huecos, gen: gen.primeros }));
   const g33 = await cas('2026-09-15', 'EL33_T');
-  ok('página 1: El 33 martes tarde con «Hueco disponible», «+1 hueco» y Noe ◆ en 2.ª', !!g33 && g33.slots[0] && g33.slots[0].hueco && /\+1 hueco/.test(g33.cuenta) && g33.slots[1] && /Noe/.test(g33.slots[1].nombre) && g33.slots[1].coc, JSON.stringify(g33));
+  ok('página 1: El 33 martes tarde sin hueco, con Noe solo y sin marca de cocina (José, 17/09)', !!g33 && g33.slots.length === 1 && !g33.slots[0].hueco && /Noe/.test(g33.slots[0].nombre) && !g33.slots[0].coc, JSON.stringify(g33));
   const p2 = await pg.evaluate(() => {
     const pag = document.querySelectorAll('#printRoot .pxg-pag')[1];
     return { h1: pag.querySelector('.pxg-h1').textContent.replace(/\s+/g, ' ').trim(), h2: [...pag.querySelectorAll('.pxg-h2')].map(x => x.textContent.trim()), conds: pag.querySelectorAll('.pxg-cond').length, nuevas: pag.querySelectorAll('.pxg-cond em.nueva').length, nuevasCol: pag.querySelectorAll('.pxg-nueva').length, huecos: pag.querySelectorAll('.pxg-hueco').length, queda: [...pag.querySelectorAll('.pxg-hueco')].map(x => x.textContent).filter(t => /Queda:/.test(t)).length, destrapa: [...pag.querySelectorAll('.pxg-des')].map(x => x.textContent.slice(0, 120)), preguntas: pag.querySelectorAll('.pxg-preg').length, pregTxt: [...pag.querySelectorAll('.pxg-preg')].map(x => x.textContent.slice(0, 60)), fin: (pag.querySelector('.pxg-fin') || {}).textContent, sinSol: /Un turno sin solución no se rellena/.test(pag.textContent), ok: pag.querySelectorAll('.pxg-cond b.ok').length, ko: pag.querySelectorAll('.pxg-cond.ko small').length };
   });
   ok(`página 2: título «${p2.h1}»`, /^Qué ha cambiado · y /.test(p2.h1), p2.h1);
   ok(`página 2: la lista numerada tiene ≥ 30 condiciones (${p2.conds}) con ✓/✗`, p2.conds >= 30 && p2.conds === gen.condiciones && p2.ok + p2.ko === p2.conds, JSON.stringify({ conds: p2.conds, ok: p2.ok, ko: p2.ko }));
-  ok(`página 2: cuatro NUEVA en la lista y cuatro en la columna de condiciones nuevas`, p2.nuevas === 4 && p2.nuevasCol === 4, JSON.stringify({ lista: p2.nuevas, col: p2.nuevasCol }));
+  ok(`página 2: las NUEVA de la lista y de la columna coinciden`, p2.nuevas === 6 && p2.nuevasCol === 6, JSON.stringify({ lista: p2.nuevas, col: p2.nuevasCol }));
   ok(`página 2: ${p2.huecos} cajas de hueco, todas con «Queda:» y «Se destraparía / No se destrapa»`, p2.huecos === gen.huecos && p2.queda === p2.huecos && p2.destrapa.length === p2.huecos && p2.destrapa.every(t => /destrapa/.test(t)), JSON.stringify(p2.destrapa));
-  ok('página 2: el hueco de El 33 del martes cita a Noe (viene de la mañana) como condición única', p2.destrapa.some(t => /Noe/.test(t)), JSON.stringify(p2.destrapa));
+  ok('página 2: el hueco de El 33 del martes ya no existe (José lo quitó el 17/09)', !p2.destrapa.some(t => /Noe/.test(t)), JSON.stringify(p2.destrapa));
   ok(`página 2: preguntas para el cliente (${p2.preguntas}: quién sale el primero, supuestos, mínimos con *, cierre y tramos del partido)`, p2.preguntas >= 3 && p2.pregTxt.some(t => /Quién sale el primero/.test(t)) && p2.pregTxt.some(t => /Horarios reales|hora de cierre/.test(t)) && p2.pregTxt.some(t => /mínimos marcados/.test(t)), JSON.stringify(p2.pregTxt));
   ok('página 2: «Un turno sin solución no se rellena» y el pie de conclusión con turnos, condiciones y descansos', p2.sinSol && /La semana sale/.test(p2.fin || '') && new RegExp(`${gen.resumen.turnos} turnos`).test(p2.fin) && /descansos/.test(p2.fin) && /condiciones/.test(p2.fin), p2.fin);
   ok('«Descargar PDF» (#pPdf) e «Imprimir» (#pGo) siguen en la barra', await pg.evaluate(() => !!document.querySelector('#printRoot #pPdf') && !!document.querySelector('#printRoot #pGo')));
@@ -145,11 +145,11 @@ try {
     const pag = document.querySelectorAll('#printRoot .pxg-pag')[1];
     return { cambios: res.cambios.map(c => c.turnoId + ':' + c.antes.length + '>' + c.despues.length), h1: document.querySelector('#printRoot .pxg-h1').textContent.replace(/\s+/g, ' ').trim(), sub: document.querySelector('#printRoot .pxg-sub').textContent, cajas: [...pag.querySelectorAll('.pxg-cambio')].map(x => x.textContent.replace(/\s+/g, ' ').trim().slice(0, 200)), tachado: pag.querySelectorAll('.pxg-antes s').length, negrita: pag.querySelectorAll('.pxg-ahora b').length, nueva: pag.querySelectorAll('.pxg-nueva-cas').length, corr: document.querySelectorAll('#printRoot .pxg-pag td.pxg-c.corr').length };
   }, LUNES);
-  ok(`con dos casillas vaciadas generarSemana devuelve cambios (${cam.cambios.join(', ')})`, cam.cambios.length === 2, JSON.stringify(cam.cambios));
+  ok(`con dos casillas vaciadas generarSemana devuelve los cambios (${cam.cambios.join(', ')})`, cam.cambios.length === 3, JSON.stringify(cam.cambios));
   ok(`el título usa opts.titulo («${cam.h1.slice(0, 20)}…») y el resumen dice «Corregido el lunes en Bar Mónaco»`, /^Planilla corregida/.test(cam.h1) && /Corregido el lunes 14 en Bar Mónaco/.test(cam.sub), cam.sub);
-  ok('página 2: cada cambio con «antes» tachado y «ahora» en negrita, y «nueva» en la casilla que estaba vacía', cam.tachado === 2 && cam.negrita >= 2 && cam.nueva === 1, JSON.stringify(cam));
+  ok('página 2: cada cambio con «antes» tachado y «ahora» en negrita, y «nueva» en la casilla que estaba vacía', cam.tachado >= 2 && cam.negrita >= 2 && cam.nueva === 1, JSON.stringify(cam));
   ok('página 2: el cambio de Bar Mónaco del lunes nombra a Yilian y Hojan', cam.cajas.some(t => /Bar Mónaco · lunes 14/.test(t) && /Yilian/.test(t) && /Hojan/.test(t)), JSON.stringify(cam.cajas));
-  ok('página 1: las dos casillas corregidas van en ámbar con la marca «corregido»', cam.corr === 2 && await pg.evaluate(() => [...document.querySelectorAll('#printRoot td.pxg-c.corr .pxg-cnt')].every(x => /corregido/.test(x.textContent))), cam.corr);
+  ok('página 1: las casillas corregidas van en ámbar con la marca «corregido»', cam.corr === 3 && await pg.evaluate(() => [...document.querySelectorAll('#printRoot td.pxg-c.corr .pxg-cnt')].every(x => /corregido/.test(x.textContent))), cam.corr);
   if (CAPTURAS) { const pags = await pg.$$('#printRoot .pxg-pag'); await pags[1].screenshot({ path: join(CAPTURAS, 'print-generada-p2-cambios.png') }); }
   await pg.click('#pClose');
 

@@ -20,7 +20,7 @@ function openEvento(opts) {
       <label class="pinlbl">Franja que se refuerza<select id="evFranja" class="logininp"><option value="T">Tarde (y noche)</option><option value="M">Mañana</option><option value="MT">Mañana y tarde</option></select></label>
       <div class="pinlbl">Refuerzo por local</div>
       <div class="reflist" id="evRef">${S.locales.map(l => `<div class="refrow" style="--lc:${esc(l.color)}"><i></i><b>${esc(l.nombre)}</b><input type="number" min="0" max="9" data-ref="${l.id}" value="${eq0 && eq0.refuerzo ? (eq0.refuerzo[l.id] || 0) : 1}"></div>`).join('')}</div>
-      <label class="genopt"><input type="checkbox" id="evProponer" checked> <span><b>Proponer quién viene</b> · tras guardar, el generador propone a los comodines libres para cubrir el refuerzo</span></label>
+      <label class="genopt"><input type="checkbox" id="evProponer" checked> <span><b>Proponer quién viene</b> · tras guardar, el generador propone a quien esté libre para cubrir el refuerzo</span></label>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn btn-cta" type="submit">Guardar evento</button></div>
     </form>`;
   const ov = abrirOverlay('evOvl', html, { ancho: 520 });

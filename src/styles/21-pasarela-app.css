@@ -511,3 +511,14 @@ table.pvt{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 .pvt td.pvnada{color:var(--ink3)}
 .pvbar{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 @media (max-width:640px){.pvt th.pvp{min-width:132px}.pvwrap{max-height:44vh}.pvbar .btn{flex:1;justify-content:center}}
+
+/* día libre puntual de una semana (José, 17/09) */
+.lpunt{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.lpunt .pinlbl small{font-weight:400;color:var(--ink3)}
+.lpuntpie{margin-top:6px;font-size:12px;color:var(--ink3);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Semana con nombres en vez de iniciales (José, 17/09) */
+.wav{min-width:0;height:26px;font-size:10.5px;font-weight:700;letter-spacing:0;padding:0 7px;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex}
+.wgrid .wav{width:auto}
+@media (max-width:760px){ .wav{height:30px;font-size:10px;padding:0 6px} }

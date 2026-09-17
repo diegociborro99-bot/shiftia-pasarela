@@ -38,7 +38,7 @@ function renderMes() {
   h += '</tr></thead><tbody>';
   const grupos = [];
   for (const l of S.locales) grupos.push([l.nombre, S.staff.filter(p => !deBaja(p) && (p.locales || [])[0] === l.id), l.color]);
-  grupos.push(['Comodines y varios locales', S.staff.filter(p => !deBaja(p) && !(p.locales || []).length), 'var(--ink3)']);
+  grupos.push(['Sin local fijo y varios locales', S.staff.filter(p => !deBaja(p) && !(p.locales || []).length), 'var(--ink3)']);
   grupos.push(['De baja', S.staff.filter(p => deBaja(p)), 'var(--bad)']);
   // los que tienen varios locales van con su local principal (el primero); se listan ahí
   for (const [nombre, gente, color] of grupos) {

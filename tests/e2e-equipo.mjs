@@ -77,7 +77,7 @@ try {
   const nModelo = await pg.evaluate(() => condicionesDe(S, S.staff).length);
   ok(`el catálogo lista ≥ 30 condiciones activas (${n1}), las mismas que condicionesDe (${nModelo})`, n1 >= 30 && n1 === nModelo, `${n1} / ${nModelo}`);
   const nuevas = await pg.$$eval('#condOvl .condrow[data-cid]:not(.off) .condnew', x => x.length);
-  ok(`las cuatro condiciones NUEVA llevan su etiqueta (Leo, Cristian, el primero completo y el partido que abre en Pasarela): ${nuevas}`, nuevas === 4, nuevas);
+  ok(`las condiciones NUEVA llevan su etiqueta (Leo, Cristian, el primero completo y el partido que abre en Pasarela y El 33): ${nuevas}`, nuevas === 6, nuevas);
   ok('la lista está numerada como el modelo (1…N, sin saltos)', await pg.$$eval('#condOvl .condrow[data-cid]:not(.off) .condnum', xs => xs.every((x, i) => +x.textContent === i + 1)));
   ok('las condiciones van agrupadas por tipo: mínimos, cocina, personas y reglas', await pg.$$eval('#condOvl .condgrp', xs => xs.map(x => x.dataset.grp).join(',')) === 'minimos,cocina,persona,regla', await pg.$$eval('#condOvl .condgrp', xs => xs.map(x => x.dataset.grp).join(',')));
   const nReglas = await pg.evaluate(() => REGLAS.length);

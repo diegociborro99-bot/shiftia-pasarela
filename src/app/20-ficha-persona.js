@@ -7,6 +7,14 @@ function openFicha(pid) {
   const p = personaDeId(pid); if (!p) return;
   if (typeof closePicker === 'function') closePicker();
   // campos que la ficha da por existentes (estados guardados con esquemas viejos)
+  // día libre puntual: solo cuenta en la semana de la planilla que se está mirando
+  const lpSemana = () => lunesDe(S.semLunes || isoHoy());
+  const lpDias = q => (q.libraPuntual && q.libraPuntual.semana === lpSemana() ? q.libraPuntual.dias : []) || [];
+  const lpTxt = q => {
+    const d = lpDias(q);
+    const sem = `semana del ${fmtCorto(lpSemana())}`;
+    return d.length ? `Esta ${sem} libra ${d.map(x => lblDowPl(x)).join(' y ')} en vez de ${(q.libra || []).length ? q.libra.map(x => lblDowPl(x)).join(' y ') : 'nada'}.` : `Sin cambios en la ${sem}.`;
+  };
   p.locales = p.locales || []; p.franjas = p.franjas || ['M', 'T']; p.libra = p.libra || []; p.partido = p.partido || { dias: [] }; p.partido.dias = p.partido.dias || [];
   p.cocina = p.cocina || { titular: [], reserva: [], soloDias: [] }; p.cocina.titular = p.cocina.titular || []; p.cocina.reserva = p.cocina.reserva || []; p.cocina.soloDias = p.cocina.soloDias || [];
   p.abre = p.abre || {}; p.noAbre = p.noAbre || []; p.nuncaCon = p.nuncaCon || []; p.cubreA = p.cubreA || []; p.vetos = p.vetos || [];
@@ -65,10 +73,15 @@ function openFicha(pid) {
     const c = p.cocina, pd = p.partido;
     let h = '';
     h += sec('donde', 'Dónde y cuándo', 'locales, franjas, libra y partido',
-      car('locales', 'Locales', '(ninguno = cualquiera, comodín)', `<div class="locset">${locChips(p.locales, 'tloc')}</div>`) +
+      car('locales', 'Locales', '(ninguno = cualquiera, sin local fijo)', `<div class="locset">${locChips(p.locales, 'tloc')}</div>`) +
       car('franjas', 'Franjas', '', `<div class="segrow">${franjaChips(p.franjas, 'tfranja')}</div>`) +
       car('libra', 'Libra', '', `<div class="dowset">${dowSet(p.libra, 'tlibra')}</div>
-       ${chk('libreVariable', !!p.libreVariable, 'Día libre variable (se decide cada semana)')}`) +
+       ${chk('libreVariable', !!p.libreVariable, 'Día libre variable (se decide cada semana)')}
+       <div class="lpunt">
+         <div class="pinlbl">Esta semana libra otro día <small>(solo para la semana de la planilla; después vuelve a su día de siempre)</small></div>
+         <div class="dowset">${dowSet(lpDias(p), 'tlpunt')}</div>
+         <div class="lpuntpie">${lpTxt(p)}${lpDias(p).length ? ' <button type="button" class="btn-mini ghost" data-lpoff>Quitar</button>' : ''}</div>
+       </div>`) +
       car('partido', 'Hace partido', '(mañana y tarde el mismo día) los…', `<div class="dowset">${dowSet(pd.dias, 'tpartido')}</div>
        ${chk('partidoSiempre', !!pd.siempre, 'Siempre partido')}`));
     h += sec('cocina', 'Cocina', subOff('cocina', c.nunca ? 'nunca cocina' : `${c.titular.length + c.reserva.length ? 'titular o reserva' : p.puesto === 'cocina' ? 'por su puesto' : 'no cocina'}`),
@@ -113,7 +126,7 @@ function openFicha(pid) {
   const pintaCabecera = () => {
     ov.querySelector('#fichAv').style.background = avColor(p.id);
     ov.querySelector('#fichAv').textContent = initials(p.nombre);
-    const locs = p.locales.length ? p.locales.map(nombreLocal).join(' y ') : 'cualquier local (comodín)';
+    const locs = p.locales.length ? p.locales.map(nombreLocal).join(' y ') : 'cualquier local (sin local fijo)';
     ov.querySelector('#fichSub').textContent = `${lblPuesto(p.puesto)} · ${locs} · ${lblFranjas(p.franjas).toLowerCase()}${deBaja(p) ? ' · de baja' : ''}`;
     ov.querySelector('#fichColores').innerHTML = PALETA_PERSONAS.map((col, i) => {
       const otros = S.staff.filter(q => q.id !== p.id && q.color === i).map(q => q.nombre);
@@ -131,7 +144,7 @@ function openFicha(pid) {
     pintaCabecera();
   });
   ov.querySelector('#fichPuesto').addEventListener('change', e => {
-    guarda(`puesto ${lblPuesto(e.target.value).toLowerCase()}`, x => { x.puesto = e.target.value; if (x.puesto === 'comodin') x.comodin = true; });
+    guarda(`puesto ${lblPuesto(e.target.value).toLowerCase()}`, x => { x.puesto = e.target.value; });
     pinta();
   });
   ov.addEventListener('click', e => {
@@ -141,7 +154,7 @@ function openFicha(pid) {
     const cs = t.closest('[data-color]');
     if (cs) { guarda('color', x => { x.color = +cs.dataset.color; }); pintaCabecera(); return; }
     const d = t.dataset || {};
-    const el = t.closest('[data-tloc],[data-tfranja],[data-tlibra],[data-tpartido],[data-tcoct],[data-tcocr],[data-tcocd],[data-tabre],[data-tnoabre],[data-tnoprimero],[data-tevita],[data-rmnunca],[data-addnunca],[data-rmcubre],[data-addcubre],[data-rmveto],[data-addveto],[data-rmaus],[data-addaus],[data-rmsup],[data-addsup]');
+    const el = t.closest('[data-tloc],[data-tfranja],[data-tlibra],[data-tlpunt],[data-lpoff],[data-tpartido],[data-tcoct],[data-tcocr],[data-tcocd],[data-tabre],[data-tnoabre],[data-tnoprimero],[data-tevita],[data-rmnunca],[data-addnunca],[data-rmcubre],[data-addcubre],[data-rmveto],[data-addveto],[data-rmaus],[data-addaus],[data-rmsup],[data-addsup]');
     if (!el) return;
     const ds = el.dataset;
     if (ds.tnoprimero !== undefined) {
@@ -153,6 +166,17 @@ function openFicha(pid) {
       if (p.franjas.length === 1 && p.franjas[0] === ds.tfranja) { toast('Tiene que hacer al menos una franja', 'warn'); return; }
       guarda(`franjas → ${lblFranjas(p.franjas.includes(ds.tfranja) ? p.franjas.filter(f => f !== ds.tfranja) : p.franjas.concat(ds.tfranja)).toLowerCase()}`, x => { alterna(x.franjas, ds.tfranja); x.franjas.sort(); }); pinta(); return;
     }
+    if (ds.tlpunt !== undefined) {
+      const d = +ds.tlpunt;
+      guarda(`libra ${lblDowPl(d)} solo esta semana`, x => {
+        const sem = lpSemana();
+        if (!x.libraPuntual || x.libraPuntual.semana !== sem) x.libraPuntual = { semana: sem, dias: [] };
+        alterna(x.libraPuntual.dias, d);
+        if (!x.libraPuntual.dias.length) x.libraPuntual = null;
+      });
+      pinta(); return;
+    }
+    if (ds.lpoff !== undefined) { guarda('día libre puntual quitado', x => { x.libraPuntual = null; }); pinta(); return; }
     if (ds.tlibra !== undefined) { guarda(`libra ${lblDowPl(+ds.tlibra)} ${p.libra.includes(+ds.tlibra) ? 'quitado' : 'añadido'}`, x => alterna(x.libra, +ds.tlibra)); pinta(); return; }
     if (ds.tpartido !== undefined) { guarda(`partido ${lblDowPl(+ds.tpartido)} ${p.partido.dias.includes(+ds.tpartido) ? 'quitado' : 'añadido'}`, x => alterna(x.partido.dias, +ds.tpartido)); pinta(); return; }
     if (ds.tcoct !== undefined) { guarda(`cocina titular en ${nombreLocal(ds.tcoct)} ${p.cocina.titular.includes(ds.tcoct) ? 'quitada' : 'añadida'}`, x => { alterna(x.cocina.titular, ds.tcoct); if (x.cocina.titular.includes(ds.tcoct)) { const i = x.cocina.reserva.indexOf(ds.tcoct); if (i >= 0) x.cocina.reserva.splice(i, 1); } }); pinta(); return; }
