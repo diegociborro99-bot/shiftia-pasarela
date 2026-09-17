@@ -10,6 +10,15 @@ const DOW_C = ['', 'L', 'M', 'X', 'J', 'V', 'S', 'D'];
 // Marca de cocina: una sartén de trazo, más reconocible de un vistazo que el rombo del
 // prototipo. Hereda el color del texto, así que vale en cualquier chip, en la leyenda y
 // en las hojas impresas. Se dibuja con el tamaño de la letra que la rodea.
+// Los iconos de la base de entrevistas, los mismos que el grupo usa en Notion pero
+// dibujados a mano para que peguen con la sartén de la cocina: sartén (cocinero),
+// bandeja (camarero), pulgar arriba (bien), pulgar abajo (mal) y reloj de arena
+// (pendiente de valorar). Trazo, currentColor y 24×24, como el resto.
+const ICO = (d, cls) => `<svg class="ico ${cls || ''}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${d}</svg>`;
+const SVG_CAMARERO = ICO('<path d="M3.4 12.6h17.2a8.6 8.6 0 0 1-17.2 0Z"/><path d="M12 12.6V9.4"/><circle cx="12" cy="7.9" r="1.5"/><path d="M6.5 21.2h11"/>', 'icam');
+const SVG_BIEN = ICO('<path d="M7.6 20.4V10.2l4.2-7a2 2 0 0 1 2.9 2.4l-1.3 4h4.9a2 2 0 0 1 2 2.4l-1.3 6.4a2.6 2.6 0 0 1-2.6 2h-8.8Z"/><path d="M7.6 10.4H4.2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3.4"/>', 'ibien');
+const SVG_MAL = ICO('<path d="M7.6 3.6v10.2l4.2 7a2 2 0 0 0 2.9-2.4l-1.3-4h4.9a2 2 0 0 0 2-2.4L19 5.6a2.6 2.6 0 0 0-2.6-2H7.6Z"/><path d="M7.6 13.6H4.2a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h3.4"/>', 'imal');
+const SVG_ESPERA = ICO('<path d="M6.6 2.8h10.8M6.6 21.2h10.8"/><path d="M7.8 2.8v3.6c0 2.4 4.2 3.9 4.2 5.6s-4.2 3.2-4.2 5.6v3.6"/><path d="M16.2 2.8v3.6c0 2.4-4.2 3.9-4.2 5.6s4.2 3.2 4.2 5.6v3.6"/>', 'iesp');
 const SVG_COCINA = '<svg class="icoc" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.9 10.3h12.3v2.4a5 5 0 0 1-5 5H7.9a5 5 0 0 1-5-5Z"/><path d="m15.4 11.2 5.7-2.8"/></svg>';
 function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"'`]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c])); }
 function initials(n) { const p = String(n || '').trim().split(/\s+/); return ((p[0] && p[0][0] || '') + (p[1] ? p[1][0] : '')).toUpperCase(); }

@@ -35,3 +35,16 @@ test('la navegación conoce la vista y el móvil la lista en «Más»', () => {
 test('el empleado no la ve', () => {
   assert.match(html, /\.modo-empleado #view-entrevistas\{display:none!important\}/);
 });
+test('las etiquetas llevan los mismos iconos que el grupo usa en su base: sartén, bandeja, pulgares y reloj', () => {
+  for (const k of ['SVG_CAMARERO', 'SVG_BIEN', 'SVG_MAL', 'SVG_ESPERA'])
+    assert.match(html, new RegExp('const ' + k + ' = ICO\\('), k + ' definido');
+  assert.match(html, /const PUESTOS_CAND = \[\s*\{ id: 'cocina'[^}]*ico: 'cocina'[\s\S]*?\{ id: 'sala'[^}]*ico: 'camarero'/);
+  assert.match(html, /\{ id: 'bien'[^}]*ico: 'bien' \}/);
+  assert.match(html, /\{ id: 'regular'[^}]*ico: 'espera' \}/, 'el reloj de arena es «en espera»');
+  assert.match(html, /\{ id: 'mal'[^}]*ico: 'mal' \}/);
+  assert.match(html, /const ICO_CAND = \{ cocina: [\s\S]*?espera: \(\) => SVG_ESPERA \}/);
+  // y salen tanto en la lista como en los filtros y en la ficha
+  assert.match(html, /<em class="entp p-\$\{esc\(c\.puesto \|\| 'no'\)\}">\$\{icoPuesto\(c\.puesto\)\}/);
+  assert.match(html, /chip\('val', v\.id, v\.label, r\[v\.id\], icoCand\(v\.ico\)\)/);
+  assert.match(html, /\$\{o\.ico \? icoCand\(o\.ico\) : ''\}/, 'la ficha también');
+});

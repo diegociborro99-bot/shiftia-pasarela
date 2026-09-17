@@ -453,6 +453,7 @@ body:not(.rol-programador) .tab[data-v="actividad"]{display:none!important}
 /* la sartén de la cocina: toma el tamaño y el color de lo que la rodea */
 .icoc{width:1.25em;height:1.25em;display:inline-block;vertical-align:-.28em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .gcoc .icoc,.pxg-mk.coc .icoc{vertical-align:-.22em}
+.ico{width:1.15em;height:1.15em;display:inline-block;vertical-align:-.24em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
 /* Primera columna fija al desplazar de lado: en Semana el local y la franja, en el
    contador de horas la persona (antes se perdía de vista de quién era cada fila).
@@ -555,7 +556,10 @@ table.pvt{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 .enttxt b{display:block;font-size:13.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .enttxt small{display:block;font-size:11.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .entetq{display:flex;gap:5px;flex:none;flex-wrap:wrap;justify-content:flex-end}
-.entetq em{font-style:normal;font-size:10.5px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.entetq em{font-style:normal;font-size:10.5px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.entetq em .ico{width:13px;height:13px;vertical-align:0}
+.entchip .ico,.segk .ico{width:14px;height:14px;vertical-align:-.18em;margin-right:1px}
+.segk{display:inline-flex;align-items:center;gap:5px}
 .entp{background:var(--accent-l);color:var(--accent)}
 .entp.p-cocina{background:rgba(184,116,26,.14);color:#8a5410}
 .entp.p-no{background:var(--bg2);color:var(--ink3)}

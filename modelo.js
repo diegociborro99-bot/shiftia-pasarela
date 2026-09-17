@@ -65,10 +65,17 @@ const LISTAS_CAND = [
   { id: 'ent', label: 'Entrevistas', sub: 'la base del grupo' },
   { id: 'alerta', label: 'Alerta interna', sub: 'no acuden o dan problemas' },
 ];
+// Los tres estados que el grupo marca con un emoticono en su base: pulgar arriba,
+// reloj de arena (pendiente de valorar) y pulgar abajo.
 const VALORACIONES = [
-  { id: 'bien', label: 'Bien', corto: 'bien' },
-  { id: 'regular', label: 'En espera', corto: 'en espera' },
-  { id: 'mal', label: 'Mal', corto: 'mal' },
+  { id: 'bien', label: 'Bien', corto: 'bien', ico: 'bien' },
+  { id: 'regular', label: 'En espera', corto: 'en espera', ico: 'espera' },
+  { id: 'mal', label: 'Mal', corto: 'mal', ico: 'mal' },
+];
+// El puesto al que opta: cocinero (sartén) o camarero (bandeja)
+const PUESTOS_CAND = [
+  { id: 'cocina', label: 'Cocinero/a', corto: 'Cocina', ico: 'cocina' },
+  { id: 'sala', label: 'Camarero/a', corto: 'Sala', ico: 'camarero' },
 ];
 const MOTIVOS_ALERTA = [
   { id: 'NOACUDE', label: 'No acude a la cita' },
@@ -1681,7 +1688,7 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
-    LISTAS_CAND, VALORACIONES, MOTIVOS_ALERTA, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
+    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, MOTIVOS_ALERTA, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,

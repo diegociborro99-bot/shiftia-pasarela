@@ -6,6 +6,12 @@
 // teléfono y una ficha por cajetines para registrar y editar.
 const ENT = { lista: 'ent', q: '', puesto: '', val: '', motivo: '', abierta: null };
 
+// El icono de cada etiqueta, los mismos que el grupo usa en su base de Notion
+const ICO_CAND = { cocina: () => SVG_COCINA, camarero: () => SVG_CAMARERO, bien: () => SVG_BIEN, mal: () => SVG_MAL, espera: () => SVG_ESPERA };
+const icoCand = k => (ICO_CAND[k] ? ICO_CAND[k]() : '');
+const icoPuesto = p => { const x = PUESTOS_CAND.find(v => v.id === p); return x ? icoCand(x.ico) : ''; };
+const icoVal = v => { const x = VAL_LBL[v]; return x ? icoCand(x.ico) : ''; };
+
 function candidatos() { S.entrevistas = S.entrevistas || []; return S.entrevistas; }
 function candidatoDe(id) { return candidatos().find(c => c.id === id) || null; }
 function nuevoIdCand() {
@@ -27,11 +33,11 @@ function renderEntrevistas() {
   const r = res.find(x => x.l.id === ENT.lista).r;
   const alerta = ENT.lista === 'alerta';
 
-  const chip = (k, v, txt, n) => `<button class="entchip${ENT[k] === v ? ' on' : ''}" data-entf="${k}|${esc(v)}">${esc(txt)}${n !== undefined ? `<i>${n}</i>` : ''}</button>`;
+  const chip = (k, v, txt, n, ico) => `<button class="entchip${ENT[k] === v ? ' on' : ''}" data-entf="${k}|${esc(v)}">${ico || ''}${esc(txt)}${n !== undefined ? `<i>${n}</i>` : ''}</button>`;
   const puestoChips = `<div class="entchips" role="group" aria-label="Filtrar por puesto">
-    ${chip('puesto', '', 'Todos', r.total)}${chip('puesto', 'cocina', 'Cocina')}${chip('puesto', 'sala', 'Sala')}${chip('puesto', 'ninguno', 'Sin puesto', r.sinPuesto)}</div>`;
+    ${chip('puesto', '', 'Todos', r.total)}${PUESTOS_CAND.map(x => chip('puesto', x.id, x.corto, undefined, icoCand(x.ico))).join('')}${chip('puesto', 'ninguno', 'Sin puesto', r.sinPuesto)}</div>`;
   const valChips = `<div class="entchips" role="group" aria-label="Filtrar por valoración">
-    ${chip('val', '', 'Todas')}${VALORACIONES.map(v => chip('val', v.id, v.label, r[v.id])).join('')}${chip('val', 'ninguna', 'Sin valorar', r.sinValorar)}</div>`;
+    ${chip('val', '', 'Todas')}${VALORACIONES.map(v => chip('val', v.id, v.label, r[v.id], icoCand(v.ico))).join('')}${chip('val', 'ninguna', 'Sin valorar', r.sinValorar)}</div>`;
   const motChips = alerta ? `<div class="entchips" role="group" aria-label="Filtrar por motivo">
     ${chip('motivo', '', 'Todos los motivos')}${MOTIVOS_ALERTA.map(m => chip('motivo', m.id, m.label)).join('')}</div>` : '';
 
@@ -69,8 +75,8 @@ function filaCand(c) {
     <span class="entav" style="--pc:${avColor(c.id)}">${esc(initials(nombreCand(c)))}</span>
     <span class="enttxt"><b>${esc(nombreCand(c))}</b><small>${c.tel ? esc(telBonito(c.tel)) : 'sin teléfono'}${c.nota ? ' · ' + esc(c.nota.slice(0, 48)) : ''}</small></span>
     <span class="entetq">
-      <em class="entp p-${esc(c.puesto || 'no')}">${c.puesto === 'cocina' ? 'Cocina' : c.puesto === 'sala' ? 'Sala' : 'Sin puesto'}</em>
-      ${v ? `<em class="entv v-${esc(v.id)}">${esc(v.label)}</em>` : '<em class="entv v-no">Sin valorar</em>'}
+      <em class="entp p-${esc(c.puesto || 'no')}">${icoPuesto(c.puesto)}${c.puesto === 'cocina' ? 'Cocina' : c.puesto === 'sala' ? 'Sala' : 'Sin puesto'}</em>
+      ${v ? `<em class="entv v-${esc(v.id)}">${icoVal(v.id)}${esc(v.label)}</em>` : '<em class="entv v-no">Sin valorar</em>'}
       ${mot ? `<em class="entm">${esc(mot.label)}</em>` : ''}
     </span></button>`;
 }
@@ -80,7 +86,7 @@ function abrirFichaCand(id) {
   const nuevo = !id;
   const c = nuevo ? { id: nuevoIdCand(), nombre: '', tel: '', puesto: null, val: null, motivo: null, nota: '', fecha: null, lista: ENT.lista } : candidatoDe(id);
   if (!c) return;
-  const seg = (k, opts) => `<div class="segrow">${opts.map(o => `<button type="button" class="segk${(c[k] || '') === o.id ? ' on' : ''}" data-cset="${k}|${esc(o.id)}">${esc(o.label)}</button>`).join('')}</div>`;
+  const seg = (k, opts) => `<div class="segrow">${opts.map(o => `<button type="button" class="segk${(c[k] || '') === o.id ? ' on' : ''}" data-cset="${k}|${esc(o.id)}">${o.ico ? icoCand(o.ico) : ''}${esc(o.label)}</button>`).join('')}</div>`;
   const ov = abrirOverlay('candOvl', `
     <span class="micro">${nuevo ? 'ENTREVISTAS' : esc((LISTAS_CAND.find(l => l.id === c.lista) || {}).label || '')}</span>
     <h2 class="revh2">${nuevo ? 'Registrar candidato' : esc(nombreCand(c))}</h2>
@@ -88,7 +94,7 @@ function abrirFichaCand(id) {
       <label class="pinlbl">Nombre<input class="logininp" data-cin="nombre" value="${esc(c.nombre || '')}" placeholder="Nombre y apellidos" autocomplete="off"></label>
       <label class="pinlbl">Teléfono<input class="logininp" data-cin="tel" inputmode="tel" value="${esc(c.tel || '')}" placeholder="600 00 00 00" autocomplete="off"></label>
       <div class="pinlbl">Puesto al que opta</div>
-      ${seg('puesto', [{ id: 'sala', label: 'Camarero/a' }, { id: 'cocina', label: 'Cocinero/a' }, { id: '', label: 'Sin decidir' }])}
+      ${seg('puesto', PUESTOS_CAND.map(x => ({ id: x.id, label: x.label, ico: x.ico })).concat([{ id: '', label: 'Sin decidir' }]))}
       <div class="pinlbl">Valoración</div>
       ${seg('val', VALORACIONES.concat([{ id: '', label: 'Sin valorar' }]))}
       <div class="pinlbl">Lista</div>

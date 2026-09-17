@@ -81,6 +81,19 @@ Reglas: **dos apoyos no pueden quedarse solos** en un turno; **Johan siempre coc
 
 El 33 los martes es día flojo: mínimo 1, se queda Noe y abre él viniendo de la mañana (`partidoAbre.T`), igual que Pasarela. La **cocina no se imprime**.
 
+## Entrevistas: los iconos y el dato que falta (17/09)
+
+El grupo marca cada ficha de su base con un emoticono, y ahí está toda la clasificación: **cocinero**, **camarero**, **pulgar arriba** (bien valorado), **pulgar abajo** (mal valorado) y **reloj de arena** (pendiente de valorar). La app tiene ese mismo esquema —puesto y valoración por separado— y lo enseña con iconos propios.
+
+Lo que **no** llegó son los datos: **Notion no exporta el icono de cada ficha**, ni en el CSV ni en el Markdown ni en los nombres de fichero (comprobado sobre el zip del 17/09: cero emoticonos en 273 fichas). El icono de página solo sale por la API (`GET /v1/pages/{id}` → `icon`).
+
+Dos maneras de recuperarlo:
+
+1. **Que José añada dos columnas en Notion** (dos «Select»: puesto y valoración) y vuelva a exportar a CSV. Es lo más limpio y el volcado se rehace en minutos.
+2. **Por la API de Notion**: José crea una integración interna, la comparte con las dos bases y pasa el token. Así se leen los iconos tal cual están, sin que él toque nada.
+
+Mientras tanto las 273 fichas están «sin puesto» y «sin valorar», salvo las 26 en las que el puesto venía escrito en el propio nombre («Janira Cocinera»).
+
 ## Supuestos (marcados «supuesto» en la app hasta confirmación)
 
 - Un turno cuenta **8 h** («más o menos», dice el cliente: C2, pendiente), independientemente de las nueve horas que abre el local por la mañana. Editable por local y franja en Equipo → Ajustes de los locales.
