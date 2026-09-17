@@ -905,6 +905,24 @@ test('renombrado del 17/09: el encargado pasa a «oficina» y el jefe a «admin�
     assert.equal((await entrar(s, 'joseadmin', 'jefe12345')).status, 401, 'el nombre viejo ya no existe');
     await s.parar();
 
+    // si el nombre nuevo ya estuviera cogido, el renombrado no pisa nada y lo dice
+    const bd2 = new DatabaseSync(join(dir, 'shiftia.db'));
+    bd2.prepare("UPDATE users SET usuario='joseadmin' WHERE usuario='admin'").run();
+    bd2.prepare("UPDATE users SET usuario='admin' WHERE usuario='oficina'").run();
+    bd2.prepare("INSERT INTO users(usuario,hash,salt,rol,creado,cambiar) VALUES ('oficina','x','y','empleado',1,0)").run();
+    bd2.prepare("DELETE FROM meta WHERE k='usuarios_1709'").run();
+    bd2.close();
+    s = await arrancar(dir, { ADMIN_PASSWORD: 'oficina12345', JEFE_PASSWORD: 'jefe12345' });
+    assert.match(s.log(), /«admin» no se puede renombrar a «oficina»: ya hay alguien con ese nombre/);
+    assert.equal((await entrar(s, 'admin', 'oficina12345')).status, 200, 'la oficina se queda como estaba, sin perder el acceso');
+    await s.parar();
+    // lo dejamos otra vez en su sitio para la última comprobación
+    const bd3 = new DatabaseSync(join(dir, 'shiftia.db'));
+    bd3.prepare("DELETE FROM users WHERE usuario='oficina'").run();
+    bd3.prepare("UPDATE users SET usuario='oficina' WHERE usuario='admin'").run();
+    bd3.prepare("UPDATE users SET usuario='admin' WHERE usuario='joseadmin'").run();
+    bd3.close();
+
     // y no se repite: un arranque más lo deja todo igual
     s = await arrancar(dir, { ADMIN_PASSWORD: 'oficina12345', JEFE_PASSWORD: 'jefe12345' });
     assert.ok(!/pasa a llamarse/.test(s.log()), 'la segunda vez no toca nada');

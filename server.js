@@ -173,7 +173,13 @@ function renombrarCuentas() {
   const quien = u => db.prepare('SELECT id,usuario,rol FROM users WHERE usuario=?').get(u);
   const renombra = (de, a) => {
     const u = quien(de);
-    if (!u || quien(a)) return false;
+    if (!u) return false;
+    if (quien(a)) {
+      // no pisamos a nadie: si el nombre nuevo ya está cogido se queda todo como está, pero
+      // que se vea en el log, porque entonces no hay cuenta separada para el jefe
+      console.error(`[shiftia] «${de}» no se puede renombrar a «${a}»: ya hay alguien con ese nombre. Se queda como estaba; renómbralos a mano si hace falta.`);
+      return false;
+    }
     db.prepare('UPDATE users SET usuario=? WHERE id=?').run(a, u.id);
     auditar(null, null, 'usuario-renombrado', `${de} → ${a}`);
     console.log(`[shiftia] «${de}» pasa a llamarse «${a}»: misma contraseña y mismos permisos`);
