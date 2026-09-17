@@ -8,7 +8,7 @@ const ENT = { lista: 'ent', q: '', puesto: '', val: '', motivo: '', hab: '', abi
 
 // El icono de cada etiqueta, los mismos que el grupo usa en su base de Notion
 const ICO_CAND = { cocina: () => SVG_COCINA, camarero: () => SVG_CAMARERO, bien: () => SVG_BIEN, mal: () => SVG_MAL, espera: () => SVG_ESPERA, veto: () => SVG_VETO,
-  cafetera: () => SVG_CAFETERA, barril: () => SVG_BARRIL, jamon: () => SVG_JAMON, tpv: () => SVG_TPV, pda: () => SVG_PDA,
+  cafetera: () => SVG_CAFETERA, barril: () => SVG_BARRIL, jamon: () => SVG_JAMON, tpv: () => SVG_TPV, pda: () => SVG_PDA, llave: () => SVG_LLAVE, sol: () => SVG_SOL, luna: () => SVG_LUNA,
   edad: () => SVG_EDAD, zona: () => SVG_ZONA, fecha: () => SVG_FECHA, exp: () => SVG_EXP, tipoCocina: () => SVG_TIPOCOCINA,
   incorp: () => SVG_INCORP, sueldo: () => SVG_SUELDO, horarios: () => SVG_HORARIO, cond: () => SVG_COND, obs: () => SVG_OBS,
   adj: () => SVG_ADJ, tel: () => SVG_TEL, wa: () => SVG_WA, nota: () => SVG_NOTA, aptitud: () => SVG_APTITUD };
@@ -18,7 +18,7 @@ const icoPuesto = id => { const x = PUESTOS_CAND.find(v => v.id === id); return 
 function chipsPuesto(c) {
   const ps = PUESTOS_CAND.filter(x => puestosDe(c).includes(x.id));
   if (!ps.length) return '<em class="entp p-no">Sin puesto</em>';
-  return ps.map(x => `<em class="entp p-${esc(x.id)}">${icoCand(x.ico)}${esc(x.corto)}</em>`).join('');
+  return ps.map(x => `<em class="entp p-${esc(x.id)}">${icoCand(x.ico)}${esc(x.label)}</em>`).join('');
 }
 const icoVal = v => { const x = VAL_LBL[v]; return x ? icoCand(x.ico) : ''; };
 
@@ -45,7 +45,7 @@ function renderEntrevistas() {
 
   const chip = (k, v, txt, n, ico) => `<button class="entchip${ENT[k] === v ? ' on' : ''}" data-entf="${k}|${esc(v)}">${ico || ''}${esc(txt)}${n !== undefined ? `<i>${n}</i>` : ''}</button>`;
   const puestoChips = `<div class="entchips" role="group" aria-label="Filtrar por puesto">
-    ${chip('puesto', '', 'Todos', r.total)}${PUESTOS_CAND.map(x => chip('puesto', x.id, x.corto, r.puesto[x.id], icoCand(x.ico))).join('')}${chip('puesto', 'ninguno', 'Sin puesto', r.sinPuesto)}</div>`;
+    ${chip('puesto', '', 'Todos', r.total)}${PUESTOS_CAND.map(x => chip('puesto', x.id, x.plural, r.puesto[x.id], icoCand(x.ico))).join('')}${chip('puesto', 'ninguno', 'Sin puesto', r.sinPuesto)}</div>`;
   const valChips = `<div class="entchips" role="group" aria-label="Filtrar por valoración">
     ${chip('val', '', 'Todas')}${VALORACIONES.map(v => chip('val', v.id, v.label, r[v.id], icoCand(v.ico))).join('')}${chip('val', 'ninguna', 'Sin valorar', r.sinValorar)}</div>`;
   const habChips = `<div class="entchips" role="group" aria-label="Filtrar por aptitud">
@@ -132,6 +132,10 @@ function fichaCandHTML(c) {
       <div class="cperfacts">${acciones}</div>
     </header>
     <div class="cperfkpis">${cortos.map(dato).join('')}</div>
+    ${(c.busca || []).length ? `<section class="cperfsec">
+      <h4>${icoCand('horarios')}Busca</h4>
+      <div class="habgrid">${BUSCA.filter(x => c.busca.includes(x.id)).map(x => `<span class="habchip s-busca">${icoCand(x.ico)}${esc(x.label)}</span>`).join('')}</div>
+    </section>` : ''}
     <section class="cperfsec">
       <h4>${icoCand('aptitud')}Aptitudes</h4>
       <div class="habgrid">${HABILIDADES.map(h => { const e = (c.hab || {})[h.id];
@@ -161,6 +165,11 @@ function abrirFichaCand(id, editar) {
   if (!nuevo && !editar) { abrirPerfilCand(c); return; }
   const tmpHab = Object.assign({}, c.hab || {});
   const tmpPtos = puestosDe(c).slice();
+  const tmpBusca = (c.busca || []).slice();
+  // «el entrevistado busca» (Aroa, 17/09): varias a la vez; «No tiene problemas» va sola
+  const bloqueBusca = `
+      <div class="pinlbl ancho">${icoCand('horarios')}El entrevistado busca <small>puedes marcar varias</small></div>
+      <div class="segrow ancho">${BUSCA.map(x => `<button type="button" class="segk${tmpBusca.includes(x.id) ? ' on' : ''}" data-cbus="${esc(x.id)}">${icoCand(x.ico)}${esc(x.label)}</button>`).join('')}</div>`;
   const seg = (k, opts) => `<div class="segrow">${opts.map(o => `<button type="button" class="segk${(c[k] || '') === o.id ? ' on' : ''}" data-cset="${k}|${esc(o.id)}">${o.ico ? icoCand(o.ico) : ''}${esc(o.label)}</button>`).join('')}</div>`;
   const ov = abrirOverlay('candOvl', `
     <span class="micro">${nuevo ? 'ENTREVISTAS' : esc((LISTAS_CAND.find(l => l.id === c.lista) || {}).label || '')}</span>
@@ -185,7 +194,7 @@ function abrirFichaCand(id, editar) {
           <span class="segrow">${['si', 'dudas', 'no'].map(e => `<button type="button" class="segk mini${(tmpHab[h.id] || '') === e ? ' on e-' + e : ''}" data-chab="${h.id}|${e}">${esc(HAB_ESTADO[e])}</button>`).join('')}</span></span>`).join('')}</div>
         ${CAMPOS_ENTREVISTA.filter(x => x.k !== 'fecha').map(x => `<label class="pinlbl${x.largo ? ' ancho' : ''}">${icoCand(x.ico)}${esc(x.label)}${x.largo
           ? `<textarea class="logininp" data-cin="${x.k}" rows="${(c[x.k] || '').length > 160 ? 5 : 2}" placeholder="—">${esc(c[x.k] || '')}</textarea>`
-          : `<input class="logininp" data-cin="${x.k}" value="${esc(c[x.k] || '')}" placeholder="—">`}</label>`).join('')}
+          : `<input class="logininp" data-cin="${x.k}" value="${esc(c[x.k] || '')}" placeholder="—">`}</label>${x.k === 'horarios' ? bloqueBusca : ''}`).join('')}
       </div>
       <label class="pinlbl">Notas<textarea class="logininp" data-cin="nota" rows="3" placeholder="Lo que quieras recordar de esta persona">${esc(c.nota || '')}</textarea></label>
       <div class="candpie">
@@ -198,9 +207,19 @@ function abrirFichaCand(id, editar) {
 
   const tmp = Object.assign({}, c);
   ov.addEventListener('click', ev => {
-    const b = ev.target.closest('[data-cset],[data-cok],[data-cdel],[data-chab],[data-cperf],[data-cpto]');
+    const b = ev.target.closest('[data-cset],[data-cok],[data-cdel],[data-chab],[data-cperf],[data-cpto],[data-cbus]');
     if (!b) return;
     if (b.dataset.cperf !== undefined) { abrirPerfilCand(c); return; }
+    if (b.dataset.cbus !== undefined) {
+      const id = b.dataset.cbus;
+      if (id === 'TODO') { tmpBusca.length = 0; tmpBusca.push('TODO'); }
+      else {
+        const i = tmpBusca.indexOf('TODO'); if (i >= 0) tmpBusca.splice(i, 1);
+        if (tmpBusca.includes(id)) tmpBusca.splice(tmpBusca.indexOf(id), 1); else tmpBusca.push(id);
+      }
+      ov.querySelectorAll('[data-cbus]').forEach(x => x.classList.toggle('on', tmpBusca.includes(x.dataset.cbus)));
+      return;
+    }
     if (b.dataset.cpto !== undefined) {
       const id = b.dataset.cpto;
       if (!id) tmpPtos.length = 0;
@@ -234,6 +253,7 @@ function abrirFichaCand(id, editar) {
     ov.querySelectorAll('[data-cin]').forEach(i => { tmp[i.dataset.cin] = i.value.trim(); });
     tmp.hab = tmpHab;
     tmp.puestos = PUESTOS_CAND.filter(x => tmpPtos.includes(x.id)).map(x => x.id);   // en el orden de siempre
+    tmp.busca = BUSCA.filter(x => tmpBusca.includes(x.id)).map(x => x.id);
     delete tmp.puesto;
     tmp.tel = telLimpio(tmp.tel);
     if (!tmp.nombre && !tmp.tel) { alert('Pon al menos un nombre o un teléfono.'); return; }

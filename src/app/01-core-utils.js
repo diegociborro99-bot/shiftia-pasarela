@@ -25,6 +25,9 @@ const SVG_CAFETERA = ICO('<path d="M4.2 8.4h11.2v5.4a4.4 4.4 0 0 1-4.4 4.4H8.6a4
 const SVG_BARRIL = ICO('<rect x="5.4" y="3.2" width="13.2" height="17.6" rx="3.4"/><path d="M5.4 8.6h13.2M5.4 15.4h13.2"/>', 'ibar');
 const SVG_JAMON = ICO('<path d="M17.6 4.4c2.6 2.6 2 7.2-1.4 10.6s-8 4-10.6 1.4 1-6.2 2.6-7.8 6.8-6.8 9.4-4.2Z"/><path d="m5.6 16.4-2.2 2.2M4.5 17.5l2 2"/>', 'ijam');
 const SVG_TPV = ICO('<rect x="4.4" y="2.8" width="15.2" height="18.4" rx="2.6"/><path d="M7.6 6.6h8.8v4H7.6Z"/><path d="M8 14.4h.02M12 14.4h.02M16 14.4h.02M8 17.8h.02M12 17.8h.02M16 17.8h.02"/>', 'itpv');
+const SVG_SOL = ICO('<circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.4M12 19v2.4M4.4 12H2M22 12h-2.4M6.3 6.3 4.6 4.6M19.4 19.4l-1.7-1.7M17.7 6.3l1.7-1.7M4.6 19.4l1.7-1.7"/>', 'isol');
+const SVG_LUNA = ICO('<path d="M20.4 14.6A8.8 8.8 0 1 1 9.4 3.6a6.9 6.9 0 0 0 11 11Z"/>', 'ilun');
+const SVG_LLAVE = ICO('<circle cx="8.4" cy="15.6" r="4.4"/><path d="m11.5 12.5 8.1-8.1"/><path d="m17.4 6.6 2.2 2.2M15.2 8.8l2.2 2.2"/>', 'illa');
 const SVG_PDA = ICO('<rect x="6.6" y="2.6" width="10.8" height="18.8" rx="2.4"/><path d="M9.4 6h5.2v7.4H9.4Z"/><path d="M12 17.6h.02"/>', 'ipda');
 const SVG_COCINA = '<svg class="icoc" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.9 10.3h12.3v2.4a5 5 0 0 1-5 5H7.9a5 5 0 0 1-5-5Z"/><path d="m15.4 11.2 5.7-2.8"/></svg>';
 // 17/09: la ficha del candidato enseña la entrevista entera, y cada dato lleva el suyo

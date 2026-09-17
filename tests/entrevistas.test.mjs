@@ -51,7 +51,9 @@ test('las etiquetas llevan los mismos iconos que el grupo usa en su base: sarté
   assert.match(html, /\$\{o\.ico \? icoCand\(o\.ico\) : ''\}/, 'la ficha también');
 });
 test('la entrevista entera del grupo está dentro: aptitudes y campos', () => {
-  assert.match(html, /const HABILIDADES = \[[\s\S]*?cafetera[\s\S]*?barril[\s\S]*?bandeja[\s\S]*?cocina[\s\S]*?jamon[\s\S]*?tpv[\s\S]*?pda/);
+  assert.match(html, /const HABILIDADES = \[[\s\S]*?cafetera[\s\S]*?barril[\s\S]*?bandeja[\s\S]*?cocina[\s\S]*?jamon[\s\S]*?tpv[\s\S]*?pda[\s\S]*?apercierre/);
+  assert.match(html, /const SVG_LLAVE = ICO\(/, 'la llave de «aperturas o cierres»');
+  assert.match(html, /llave: \(\) => SVG_LLAVE/);
   assert.match(html, /const HAB_ESTADO = \{ si: 'Sí', dudas: 'Con dudas', no: 'No' \}/);
   assert.match(html, /const CAMPOS_ENTREVISTA = \[[\s\S]*?'edad'[\s\S]*?'zona'[\s\S]*?'exp'[\s\S]*?'sueldo'[\s\S]*?'obs'/);
   for (const k of ['SVG_CAFETERA', 'SVG_BARRIL', 'SVG_JAMON', 'SVG_TPV', 'SVG_PDA'])
@@ -97,4 +99,22 @@ test('el puesto se marca doble (camarero y cocinero) y la fecha se pone sola al 
   const campos = html.match(/const CAMPOS_ENTREVISTA = \[[\s\S]*?\n\];/)[0];
   assert.match(campos, /\[\s*\n\s*\/\/[^\n]*\n\s*\{ k: 'fecha'/, 'la fecha es el primer dato de todos');
   assert.ok(!/function icoPuesto|c\.puesto ===/.test(html.slice(html.indexOf('function filaCand'), html.indexOf('function abrirFichaCand'))), 'la fila ya no mira un puesto suelto');
+});
+
+test('«el entrevistado busca» va detrás de Horarios, con varias opciones a la vez', () => {
+  // 17/09 (Aroa): «a continuación de horarios pondría un botón que ponga: el entrevistado
+  // busca — mañanas, tardes, turno partido, fin de semana y otro que ponga no tiene
+  // problemas», y Diego: «que puedas elegir también varias opciones, no solo una».
+  assert.match(html, /El entrevistado busca/);
+  assert.match(html, /puedes marcar varias/);
+  assert.match(html, /data-cbus="/, 'cada opción se pulsa por su cuenta');
+  assert.match(html, /x\.k === 'horarios'/, 'el bloque se cuela justo detrás del campo Horarios');
+  assert.match(html, /const SVG_SOL = ICO\(/); assert.match(html, /const SVG_LUNA = ICO\(/);
+  assert.match(html, /sol: \(\) => SVG_SOL, luna: \(\) => SVG_LUNA/);
+});
+
+test('las mismas palabras en la ficha y en los filtros: cocinero/camarero, y plural al filtrar', () => {
+  assert.match(html, /chip\('puesto', x\.id, x\.plural/, 'los filtros agrupan gente: «Cocineros», «Camareros»');
+  assert.match(html, /<em class="entp p-\$\{esc\(x\.id\)\}">\$\{icoCand\(x\.ico\)\}\$\{esc\(x\.label\)\}/, 'y cada persona lleva el suyo en singular');
+  assert.ok(!/corto: 'Cocina'|corto: 'Sala'/.test(html), 'ya no quedan «Cocina»/«Sala» como etiqueta de puesto');
 });

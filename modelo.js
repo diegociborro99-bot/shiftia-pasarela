@@ -85,9 +85,20 @@ const VALORACIONES = [
   { id: 'veto', label: 'Vetado', corto: 'vetado', ico: 'veto' },
 ];
 // El puesto al que opta: cocinero (sartén) o camarero (bandeja)
+// 17/09 (Diego): las mismas palabras en la ficha y en los filtros. `label` es de una
+// persona («Cocinero/a»); `plural`, del filtro, que agrupa gente («Cocineros»).
 const PUESTOS_CAND = [
-  { id: 'cocina', label: 'Cocinero/a', corto: 'Cocina', ico: 'cocina' },
-  { id: 'sala', label: 'Camarero/a', corto: 'Sala', ico: 'camarero' },
+  { id: 'cocina', label: 'Cocinero/a', plural: 'Cocineros', ico: 'cocina' },
+  { id: 'sala', label: 'Camarero/a', plural: 'Camareros', ico: 'camarero' },
+];
+// 17/09 (Aroa): «a continuación de horarios, un botón que ponga: el entrevistado busca».
+// Se pueden marcar varias; «No tiene problemas» va sola, que es lo que significa.
+const BUSCA = [
+  { id: 'M', label: 'Mañanas', ico: 'sol' },
+  { id: 'T', label: 'Tardes', ico: 'luna' },
+  { id: 'P', label: 'Turno partido', ico: 'horarios' },
+  { id: 'FDS', label: 'Fin de semana', ico: 'fecha' },
+  { id: 'TODO', label: 'No tiene problemas', ico: 'bien' },
 ];
 // Lo que el grupo pregunta en la entrevista: si maneja cada cosa. Las respuestas del
 // candidato se guardan como sí / con dudas / no.
@@ -99,6 +110,9 @@ const HABILIDADES = [
   { id: 'jamon', label: 'Jamón', ico: 'jamon' },
   { id: 'tpv', label: 'TPV', ico: 'tpv' },
   { id: 'pda', label: 'PDA', ico: 'pda' },
+  // 17/09 (Aroa): «para saber si ha hecho aperturas o cierres en otros locales, que ahí veo
+  // yo si tiene experiencia». Es la que más le dice de alguien que viene de fuera.
+  { id: 'apercierre', label: 'Aperturas o cierres', ico: 'llave' },
 ];
 const HAB_ESTADO = { si: 'Sí', dudas: 'Con dudas', no: 'No' };
 // El resto de la entrevista, tal como la tiene el grupo en su plantilla
@@ -127,7 +141,7 @@ function puestosDe(c) {
 function textoPuestos(c) {
   const ps = PUESTOS_CAND.filter(x => puestosDe(c).includes(x.id));
   if (!ps.length) return 'Sin puesto';
-  return ps.map((x, i) => i ? x.corto.toLowerCase() : x.corto).join(' y ');
+  return ps.map((x, i) => i ? x.label.toLowerCase() : x.label).join(' y ');
 }
 function migrarCandidatos(estado) {
   const r = { candidatos: 0 };
@@ -147,7 +161,8 @@ function etiquetaCandidato(c) {
 }
 // el buscador mira todo lo que hay escrito de esa persona, no solo el nombre
 function textoCandidato(c) {
-  return [c.nombre, c.tel, c.nota].concat(CAMPOS_ENTREVISTA.map(x => c[x.k])).filter(Boolean).join(' ').toLowerCase();
+  const busca = BUSCA.filter(x => (c.busca || []).includes(x.id)).map(x => x.label);
+  return [c.nombre, c.tel, c.nota].concat(CAMPOS_ENTREVISTA.map(x => c[x.k])).concat(busca).filter(Boolean).join(' ').toLowerCase();
 }
 // filtro combinado: lista, texto libre (nombre o teléfono), puesto y valoración
 function filtrarCandidatos(cands, f) {
@@ -183,7 +198,7 @@ function resumenCandidatos(cands, lista) {
 }
 // ¿esta persona tiene la entrevista contestada? La fecha no cuenta: se pone sola al
 // registrarla (Aroa, 17/09), así que por sí sola no dice que se le haya preguntado nada.
-function tieneEntrevista(c) { return !!(c && (CAMPOS_ENTREVISTA.some(x => !x.meta && c[x.k]) || Object.keys(c.hab || {}).length)); }
+function tieneEntrevista(c) { return !!(c && (CAMPOS_ENTREVISTA.some(x => !x.meta && c[x.k]) || Object.keys(c.hab || {}).length || (c.busca || []).length)); }
 
 function turnoId(localId, franja) { return `${localId}_${franja}`; }
 function partirTurno(tid) { const i = tid.lastIndexOf('_'); return { localId: tid.slice(0, i), franja: tid.slice(i + 1) }; }
@@ -1757,7 +1772,7 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
-    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
+    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,

@@ -51,6 +51,16 @@
   permisos y sin acceso a **Actividad**, que sigue siendo solo del programador. En un
   servidor que ya estaba en marcha se renombran solas al arrancar, conservando contraseña,
   rol y ficha; y si la del jefe no existe, nace (`JEFE_USUARIO` / `JEFE_PASSWORD`).
+- **La entrevista pregunta por aperturas y cierres**: una aptitud más, «Aperturas o
+  cierres», con su llave y sus tres respuestas (sí / con dudas / no). Es la que más dice de
+  quien viene de otro local, y se puede filtrar como las demás: «quién ha hecho aperturas».
+- **«El entrevistado busca»**, justo debajo de Horarios: mañanas, tardes, turno partido, fin
+  de semana y «no tiene problemas». Se marcan **varias a la vez**; «no tiene problemas» va
+  sola, que es lo que significa. Sale también en el perfil y el buscador entra en ello
+  (buscar «fin de semana» encuentra a quien lo pidió).
+- **Las mismas palabras en todas partes**: en la ficha y en cada persona, **Cocinero/a** y
+  **Camarero/a**; en los filtros, que agrupan gente, **Cocineros** y **Camareros**. Antes la
+  ficha decía «Cocinero/a» y el filtro «Cocina».
 - **Un candidato puede ser camarero y cocinero a la vez** (Aroa: «hay algunos que son
   Camarero Cocinero»). El puesto deja de ser uno solo: en la ficha se pulsan los dos, en la
   lista salen las dos etiquetas y los filtros de Cocina y Sala encuentran a esa persona por

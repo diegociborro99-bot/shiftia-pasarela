@@ -1081,8 +1081,8 @@ ok('entrevistas: dos listas, dos etiquetas por candidato y filtro combinado', ()
     { id: 'c', nombre: 'Borja', tel: '674892888', puesto: null, val: null, lista: 'alerta', motivo: 'NOACUDE' },
     { id: 'd', nombre: 'Amanda Camarera', tel: '600377578', puesto: 'sala', val: 'regular', lista: 'ent' },
   ];
-  assert.equal(M.etiquetaCandidato(cands[0]), 'Cocina · bien');
-  assert.equal(M.etiquetaCandidato(cands[3]), 'Sala · en espera');
+  assert.equal(M.etiquetaCandidato(cands[0]), 'Cocinero/a · bien');
+  assert.equal(M.etiquetaCandidato(cands[3]), 'Camarero/a · en espera');
   assert.equal(M.etiquetaCandidato(cands[2]), 'Sin puesto');
   const f = o => M.filtrarCandidatos(cands, o).map(x => x.id);
   assert.deepEqual(f({ lista: 'ent' }), ['a', 'b', 'd']);
@@ -1109,8 +1109,8 @@ ok('puesto múltiple: hay quien opta a camarero y a cocinero a la vez (Aroa, 17/
   assert.ok(est.entrevistas.every(c => c.puesto === undefined), 'el campo viejo se retira');
   // y ahora uno puede llevar los dos
   est.entrevistas[2].puestos = ['cocina', 'sala'];
-  assert.equal(M.etiquetaCandidato(est.entrevistas[2]), 'Cocina y sala');
-  assert.equal(M.etiquetaCandidato(est.entrevistas[0]), 'Cocina');
+  assert.equal(M.etiquetaCandidato(est.entrevistas[2]), 'Cocinero/a y camarero/a');
+  assert.equal(M.etiquetaCandidato(est.entrevistas[0]), 'Cocinero/a');
   assert.equal(M.etiquetaCandidato({ puestos: [], val: 'bien' }), 'Sin puesto · bien');
   const ids = f => M.filtrarCandidatos(est.entrevistas, f).map(c => c.id);
   assert.deepStrictEqual(ids({ puesto: 'cocina' }), ['c1', 'c3'], 'el filtro de cocina lo encuentra');
@@ -1122,6 +1122,42 @@ ok('puesto múltiple: hay quien opta a camarero y a cocinero a la vez (Aroa, 17/
   // pasar la migración otra vez no toca lo ya migrado
   assert.equal(M.migrarCandidatos(est).candidatos, 0);
   assert.deepStrictEqual(est.entrevistas[2].puestos, ['cocina', 'sala']);
+});
+
+ok('las mismas palabras en los filtros y en la ficha: cocinero/camarero, y en plural al filtrar (Diego, 17/09)', () => {
+  assert.deepStrictEqual(M.PUESTOS_CAND.map(x => x.label), ['Cocinero/a', 'Camarero/a'], 'en la ficha y en cada persona');
+  assert.deepStrictEqual(M.PUESTOS_CAND.map(x => x.plural), ['Cocineros', 'Camareros'], 'en los filtros, que agrupan gente');
+  assert.equal(M.textoPuestos({ puestos: ['sala'] }), 'Camarero/a');
+  assert.equal(M.textoPuestos({ puestos: [] }), 'Sin puesto');
+});
+
+ok('«el entrevistado busca»: mañanas, tardes, partido, fin de semana o sin problemas (Aroa, 17/09)', () => {
+  assert.deepStrictEqual(M.BUSCA.map(x => x.id), ['M', 'T', 'P', 'FDS', 'TODO']);
+  assert.deepStrictEqual(M.BUSCA.map(x => x.label), ['Mañanas', 'Tardes', 'Turno partido', 'Fin de semana', 'No tiene problemas']);
+  assert.ok(M.BUSCA.every(x => x.ico), 'cada una con su icono');
+  assert.equal(M.tieneEntrevista({ busca: ['M', 'T'] }), true, 'contestar qué busca es contestar la entrevista');
+  assert.equal(M.tieneEntrevista({ busca: [] }), false);
+  const cands = [{ id: 'c1', lista: 'ent', busca: ['T', 'FDS'] }, { id: 'c2', lista: 'ent', busca: ['M'] }];
+  assert.deepStrictEqual(M.filtrarCandidatos(cands, { q: 'fin de semana' }).map(c => c.id), ['c1'], 'el buscador entra en lo que busca');
+  assert.deepStrictEqual(M.filtrarCandidatos(cands, { q: 'mañanas' }).map(c => c.id), ['c2']);
+});
+
+ok('la entrevista pregunta también por aperturas y cierres (Aroa, 17/09)', () => {
+  // «para saber si ha hecho aperturas o cierres en otros locales, que ahí veo yo si tiene
+  // experiencia». Va con las demás aptitudes: sí / con dudas / no, y se puede filtrar.
+  const h = M.HABILIDADES.find(x => x.id === 'apercierre');
+  assert.ok(h, 'está en la lista de aptitudes: ' + M.HABILIDADES.map(x => x.id).join(', '));
+  assert.equal(h.label, 'Aperturas o cierres');
+  assert.equal(h.ico, 'llave');
+  assert.equal(M.HABILIDADES.length, 8);
+  const cands = [
+    { id: 'c1', lista: 'ent', hab: { apercierre: 'si' } },
+    { id: 'c2', lista: 'ent', hab: { apercierre: 'no' } },
+    { id: 'c3', lista: 'ent', hab: {} },
+  ];
+  assert.deepStrictEqual(M.filtrarCandidatos(cands, { hab: 'apercierre' }).map(c => c.id), ['c1'], 'el filtro saca a quien sí las ha hecho');
+  assert.equal(M.resumenCandidatos(cands, 'ent').hab.apercierre, 1);
+  assert.equal(M.tieneEntrevista(cands[1]), true, 'contestar que no también es contestar');
 });
 
 ok('la fecha de la entrevista va la primera de todos los datos (Aroa, 17/09)', () => {
