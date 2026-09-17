@@ -1024,4 +1024,29 @@ ok('día libre puntual: libra otro día solo esa semana y luego vuelve a su día
   assert.equal(rob.libraPuntual, null);
 });
 
+ok('entrevistas: dos listas, dos etiquetas por candidato y filtro combinado', () => {
+  assert.deepEqual(M.LISTAS_CAND.map(x => x.id), ['ent', 'alerta']);
+  assert.deepEqual(M.VALORACIONES.map(x => x.id), ['bien', 'regular', 'mal']);
+  const cands = [
+    { id: 'a', nombre: 'Janira Cocinera', tel: '625828119', puesto: 'cocina', val: 'bien', lista: 'ent' },
+    { id: 'b', nombre: 'Maria Camarera', tel: '634719182', puesto: 'sala', val: 'mal', lista: 'ent' },
+    { id: 'c', nombre: 'Borja', tel: '674892888', puesto: null, val: null, lista: 'alerta', motivo: 'NOACUDE' },
+    { id: 'd', nombre: 'Amanda Camarera', tel: '600377578', puesto: 'sala', val: 'regular', lista: 'ent' },
+  ];
+  assert.equal(M.etiquetaCandidato(cands[0]), 'Cocina · bien');
+  assert.equal(M.etiquetaCandidato(cands[3]), 'Sala · en espera');
+  assert.equal(M.etiquetaCandidato(cands[2]), 'Sin puesto');
+  const f = o => M.filtrarCandidatos(cands, o).map(x => x.id);
+  assert.deepEqual(f({ lista: 'ent' }), ['a', 'b', 'd']);
+  assert.deepEqual(f({ lista: 'alerta' }), ['c']);
+  assert.deepEqual(f({ lista: 'ent', puesto: 'sala', val: 'mal' }), ['b'], 'camarera mal');
+  assert.deepEqual(f({ lista: 'ent', puesto: 'cocina', val: 'bien' }), ['a'], 'cocinera bien');
+  assert.deepEqual(f({ lista: 'ent', val: 'regular' }), ['d'], 'en espera');
+  assert.deepEqual(f({ puesto: 'ninguno' }), ['c'], 'sin puesto asignado');
+  assert.deepEqual(f({ q: 'camarera' }), ['b', 'd'], 'busca por nombre');
+  assert.deepEqual(f({ q: '674 892 888' }), ['c'], 'y por teléfono aunque lo escriba con espacios');
+  const r = M.resumenCandidatos(cands, 'ent');
+  assert.equal(r.total, 3); assert.equal(r.bien, 1); assert.equal(r.mal, 1); assert.equal(r.regular, 1); assert.equal(r.sinValorar, 0);
+});
+
 console.log(`\n${n} tests OK`);

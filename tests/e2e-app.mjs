@@ -235,7 +235,19 @@ try {
   ok(`Horas: la tabla tiene ≥ 20 filas de persona (${nHoras})`, nHoras >= 20, nHoras);
   ok('Horas: hay un total de horas del mes', await pg.$$eval('#horasRoot table.htab tfoot .hh', x => x.length >= 1));
   await vista(pg, 'entrevistas');
-  ok('Entrevistas: aparece «EN CONSTRUCCIÓN»', await pg.$eval('#view-entrevistas', x => /EN CONSTRUCCIÓN/.test(x.textContent)));
+  ok('Entrevistas: la base de José está dentro y se reparte en dos listas', await pg.evaluate(() => (S.entrevistas || []).length) === 273);
+  ok('Entrevistas: la lista arranca en «Entrevistas» con sus 192 personas', await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === 192);
+  await pg.click('#entrevistasRoot [data-entlista="alerta"]'); await pg.waitForTimeout(250);
+  ok('Entrevistas: «Alerta interna» enseña sus 81', await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === 81);
+  await pg.click('#entrevistasRoot [data-entf="puesto|cocina"]'); await pg.waitForTimeout(250);
+  const nCoc = await pg.$$eval('#entrevistasRoot .entrow', x => x.length);
+  ok(`Entrevistas: el filtro de cocina deja ${nCoc} de 81`, nCoc > 0 && nCoc < 81, nCoc);
+  await pg.fill('#entQ', '625828119'); await pg.waitForTimeout(250);
+  ok('Entrevistas: el buscador encuentra por teléfono', await pg.$$eval('#entrevistasRoot .entrow b', x => x.map(y => y.textContent).join('|')).then(t => /Janira/.test(t)));
+  await pg.click('#entLimpiar').catch(() => {}); await pg.waitForTimeout(200);
+  await pg.click('#entrevistasRoot .entrow'); await pg.waitForTimeout(300);
+  ok('Entrevistas: la ficha se abre con sus cajetines', await pg.$$eval('#candOvl [data-cin]', x => x.length) === 3 && await pg.$$eval('#candOvl [data-cset]', x => x.length) > 8);
+  await pg.click('#candOvl [data-ovx]'); await pg.waitForTimeout(200);
 
   // 6b) Gestor de cobertura desde la planilla: en Semana, «Falta estos días…» sobre una persona abre la hoja
   //     con ese día marcado; plan A / plan B como «quién sale → quién entra»; confirmar aplica y vuelve a la semana

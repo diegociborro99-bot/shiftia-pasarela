@@ -57,6 +57,58 @@ const PUESTOS = [
 ];
 function esApoyo(p) { return !!p && p.puesto === 'apoyo'; }
 
+// ---------- entrevistas (José, 17/09) ----------
+// Dos menús: las entrevistas del grupo y la alerta interna (quien no acude a la cita o
+// ha dado problemas). Cada candidato lleva dos etiquetas: el puesto al que opta y la
+// valoración del encargado.
+const LISTAS_CAND = [
+  { id: 'ent', label: 'Entrevistas', sub: 'la base del grupo' },
+  { id: 'alerta', label: 'Alerta interna', sub: 'no acuden o dan problemas' },
+];
+const VALORACIONES = [
+  { id: 'bien', label: 'Bien', corto: 'bien' },
+  { id: 'regular', label: 'En espera', corto: 'en espera' },
+  { id: 'mal', label: 'Mal', corto: 'mal' },
+];
+const MOTIVOS_ALERTA = [
+  { id: 'NOACUDE', label: 'No acude a la cita' },
+  { id: 'PROBLEMA', label: 'Da problemas' },
+  { id: 'OTRO', label: 'Otro motivo' },
+];
+const VAL_LBL = {}; VALORACIONES.forEach(v => { VAL_LBL[v.id] = v; });
+// «Cocinero bien», «Camarera en espera»…: la etiqueta que pidió José
+function etiquetaCandidato(c) {
+  const p = c && c.puesto === 'cocina' ? 'Cocina' : c && c.puesto === 'sala' ? 'Sala' : 'Sin puesto';
+  const v = c && VAL_LBL[c.val];
+  return v ? `${p} · ${v.corto}` : p;
+}
+function textoCandidato(c) { return [c.nombre, c.tel, c.nota].filter(Boolean).join(' ').toLowerCase(); }
+// filtro combinado: lista, texto libre (nombre o teléfono), puesto y valoración
+function filtrarCandidatos(cands, f) {
+  const o = f || {};
+  const q = String(o.q || '').trim().toLowerCase();
+  const qTel = q.replace(/\D/g, '');
+  return (cands || []).filter(c => {
+    if (o.lista && c.lista !== o.lista) return false;
+    if (o.puesto) { if (o.puesto === 'ninguno' ? c.puesto : c.puesto !== o.puesto) return false; }
+    if (o.val) { if (o.val === 'ninguna' ? c.val : c.val !== o.val) return false; }
+    if (o.motivo && c.motivo !== o.motivo) return false;
+    if (!q) return true;
+    return textoCandidato(c).includes(q) || (!!qTel && String(c.tel || '').includes(qTel));
+  });
+}
+function resumenCandidatos(cands, lista) {
+  const out = { total: 0, sinPuesto: 0, sinValorar: 0 };
+  for (const v of VALORACIONES) out[v.id] = 0;
+  for (const c of cands || []) {
+    if (lista && c.lista !== lista) continue;
+    out.total++;
+    if (!c.puesto) out.sinPuesto++;
+    if (!c.val) out.sinValorar++; else if (out[c.val] !== undefined) out[c.val]++;
+  }
+  return out;
+}
+
 function turnoId(localId, franja) { return `${localId}_${franja}`; }
 function partirTurno(tid) { const i = tid.lastIndexOf('_'); return { localId: tid.slice(0, i), franja: tid.slice(i + 1) }; }
 function turnosDe(cfg) { const out = []; for (const l of cfg.locales) for (const f of FRANJAS) out.push({ id: turnoId(l.id, f), localId: l.id, franja: f, local: l }); return out; }
@@ -1599,7 +1651,8 @@ if (typeof module !== 'undefined') {
     plazasDe, instanciarPatron, patronDesdeSemana,
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
-    migrarPuestos, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse, horasPersonaMes, horasEquipoMes, horasLocalMes,
+    migrarPuestos, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
+    LISTAS_CAND, VALORACIONES, MOTIVOS_ALERTA, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,
     CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
