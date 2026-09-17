@@ -41,13 +41,29 @@ ok('la semilla trae los 4 locales del PDF con su color y 8 turnos (local × fran
   assert.strictEqual(M.turnoId('EL33', 'M'), 'EL33_M');
 });
 
-ok('la semilla trae 23 personas: 21 en activo (con Dulce, alta del 17/09) y 2 de baja sin fecha de fin', () => {
+ok('la semilla trae 24 personas: 21 en activo (con Dulce, alta del 17/09) y 3 de baja sin fecha de fin', () => {
   const st = staffDe(cfgBase());
-  assert.strictEqual(st.length, 23);
+  assert.strictEqual(st.length, 24);
   const bajas = st.filter(p => (p.ausencias || []).some(a => a.tipo === 'BAJ' && !a.hasta));
-  assert.deepStrictEqual(bajas.map(p => p.nombre).sort(), ['Laura', 'Maydeth']);
+  assert.deepStrictEqual(bajas.map(p => p.nombre).sort(), ['Laura', 'Maydeth', 'Susi']);
   assert.ok(st.every(p => Number.isInteger(p.color)), 'cada persona con color de la paleta');
-  assert.strictEqual(new Set(st.map(p => p.id)).size, 23, 'ids únicos');
+  assert.strictEqual(new Set(st.map(p => p.id)).size, 24, 'ids únicos');
+});
+
+ok('Susi: cocinera de baja, y la cubre Adrián (Aroa, 17/09)', () => {
+  const cfg = cfgBase(), st = staffDe(cfg), e = M.nuevoEstado(2026, 10, { festivos: [] });
+  const susi = st.find(p => p.id === 'susi');
+  assert.ok(susi, 'está en la plantilla: ' + st.map(p => p.id).join(', '));
+  assert.equal(susi.nombre, 'Susi');
+  assert.equal(susi.puesto, 'cocina');
+  const baja = (susi.ausencias || []).find(a => a.tipo === 'BAJ');
+  assert.ok(baja && !baja.hasta, 'de baja, sin fecha de vuelta');
+  assert.match(baja.detalle, /Adrián/);
+  assert.match(M.puedeEstar(cfg, st, e, '2026-10-06', 'ZAPA_M', 'susi').motivo, /baja/i, 'el generador no la coloca');
+  const adrian = st.find(p => p.id === 'adrian');
+  assert.ok((adrian.cubreA || []).some(x => x.pid === 'susi'), 'Adrián la cubre: ' + JSON.stringify(adrian.cubreA));
+  assert.ok((susi.supuestos || []).length, 'el local y la fecha de la baja quedan por confirmar');
+  assert.equal(baja.desde, '2026-09-01', 'desde antes de la planilla del cliente, donde ya no salía');
 });
 
 ok('El 33 cierra el lunes y el domingo por la tarde; los demás abren mañana y tarde todos los días', () => {
@@ -421,7 +437,7 @@ ok('horasPersonaMes suma mañanas, tardes, partidos, horas por local, festivos, 
   assert.strictEqual(h.porLocal.ZAPA.horas, 84);
   assert.ok(h.contratoHoras > 0 && typeof h.saldo === 'number');
   const tabla = M.horasEquipoMes(cfg, st, meses, 2026, 10);
-  assert.strictEqual(tabla.length, 23);
+  assert.strictEqual(tabla.length, 24);
   assert.strictEqual(tabla.find(x => x.pid === 'laura').horas, 0);
 });
 

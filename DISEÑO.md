@@ -81,7 +81,7 @@ Con esto, **un día trabajado son ocho horas para todo el equipo**, haga turno s
 
 ## Reunión del 17/09 (José y Aroa)
 
-Puestos: **sala, cocina y apoyo**; el «comodín» se retira como puesto. Sala: Noe, Victoria, Jacquelin, Juani, Susana Luna, Cris Parreño, Susana Capón, Mari Luz, Iván, Lola y Roberto. Cocina: Adrián, Esmeralda, Jenny y Johan. Apoyo: Yilian, Lavinia, Leo, Cristian y Dulce (alta del 17/09). Lola es apoyo pero se queda en sala mientras cubra la baja de Laura. **Tere es apoyo** (Aroa, 17/09).
+Puestos: **sala, cocina y apoyo**; el «comodín» se retira como puesto. Sala: Noe, Victoria, Jacquelin, Juani, Susana Luna, Cris Parreño, Susana Capón, Mari Luz, Iván, Lola y Roberto. Cocina: Adrián, Esmeralda, Jenny, Johan y Susi (de baja). Apoyo: Yilian, Lavinia, Leo, Cristian y Dulce (alta del 17/09). Lola es apoyo pero se queda en sala mientras cubra la baja de Laura. **Tere es apoyo** (Aroa, 17/09).
 
 Reglas: **dos apoyos no pueden quedarse solos** en un turno; **Johan siempre cocina** y quien ese día lleva la cocina no se propone para reforzar sala; los «nunca coincide» de Lavinia–Mari Luz y Leo–Susana Capón se relajan con aviso cuando no hay gente suficiente; y el **día libre puntual** de una semana no toca el día de siempre.
 
@@ -112,6 +112,8 @@ Mientras tanto las 275 fichas están «sin puesto» y «sin valorar», salvo las
 
 **El puesto es una lista, no uno solo** (Aroa, 17/09): «hay algunos que son Camarero Cocinero». En la ficha los dos botones se pulsan a la vez, `puestos` guarda los ids en el orden de siempre (cocina, sala) y `migrarCandidatos` convierte el campo antiguo `puesto` al cargar la app, una sola vez. El filtro de Cocina y el de Sala encuentran a quien lleva los dos, y el chip de cada uno lleva su cuenta.
 
+**La valoración cierra la ficha** (Aroa, 17/09): «está la última del todo, que es lo que decido al terminar la entrevista». Va después de las notas, separada por una línea.
+
 **La ficha empieza por fecha, nombre, teléfono, edad, zona y documentación en regla** (Diego, 17/09): los campos marcados `cabecera` en `CAMPOS_ENTREVISTA` suben arriba del todo y salen del bloque de la entrevista. Un campo con `opciones` se pinta de botones en vez de cajetín (documentación: Sí / No / En trámite); guarda el id y enseña la palabra, y el buscador lee la palabra. **La fecha se pone sola** al registrar a alguien (`fmtLargo(isoHoy())`) y va la primera de todo, tanto en la ficha como en el perfil. Como se rellena sola, va marcada `meta: true` y no cuenta para «entrevista contestada» — si no, cualquier alta recién creada figuraría como contestada.
 
 **Cómo se enseña** (17/09): pulsar en alguien abre su **perfil**, no un formulario. Arriba, la foto de color con sus iniciales, el nombre, las dos etiquetas y el teléfono como dos botones —llamar y WhatsApp—. Debajo, seis tarjetas de dato (edad, zona, fecha, tipología de cocina, incorporación y sueldo), las siete aptitudes coloreadas por sí / con dudas / no, y los textos largos de la entrevista en bloques. Cada dato lleva **su icono**, dibujado en el mismo trazo que la sartén y la bandeja (`SVG_EDAD`, `SVG_ZONA`, `SVG_FECHA`, `SVG_EXP`, `SVG_TIPOCOCINA`, `SVG_INCORP`, `SVG_SUELDO`, `SVG_HORARIO`, `SVG_COND`, `SVG_OBS`, `SVG_ADJ`, `SVG_TEL`, `SVG_WA`, `SVG_NOTA`), y el icono de cada campo se declara en `CAMPOS_ENTREVISTA`, en el modelo, para que lista y ficha no se desincronicen. Los campos vacíos se ven igual, con el recuadro punteado y un guion: así se sabe de un vistazo qué queda por preguntar. Para editar, el botón «Editar» abre los cajetines de siempre y al guardar vuelve al perfil.
@@ -125,7 +127,7 @@ Las **153 fotos y CV** adjuntos (16 MB) no caben en la aplicación de un solo fi
 - El 33 sábado mañana pide 3 y con el PDF solo pueden Victoria y Jenny: la semana tipo pone a **Hojan** como tercero, marcado supuesto.
 - Roberto hace partido viernes y sábado; Yilian partido el lunes cubriendo a Susana Capón; Lavinia por defecto en Pasarela domingo tarde.
 - Los festivos solo marcan el día: ni cierran locales ni recargan horas.
-- Laura y Maydeth siguen en el equipo con baja sin fecha de fin.
+- Laura, Maydeth y Susi (Aroa, 17/09) siguen en el equipo con baja sin fecha de fin. A Susi la cubre Adrián; su local (Zapatillera, porque la cubre él) y la fecha de inicio de la baja son supuestos.
 
 ## Preguntas abiertas para el grupo (C1–C29)
 
@@ -133,7 +135,7 @@ Horas y nómina: **C1 respondida** (WhatsApp de la encargada, 15/09): mañana de
 
 Mínimos y aperturas: C7 confirmar los mínimos con asterisco; C8 Zapatillera mañana ¿3 o 2?; C9 Pasarela domingo ¿2 y 2?; C10 quién abre El 33, Zapatillera y Mónaco por la mañana; C11 quién sale primero cuando el titular libra.
 
-Personas: C12 tercero de El 33 sábado mañana; C13 días de partido reales de Roberto; C14 Hojan en Zapatillera y sus mañanas libres; C15 semana de Jenny; C16 Noe los partidos de Jenny y Victoria; C17 día libre de Yilian y su domingo; C18 apoyo de Pasarela domingo tarde; C19 qué significa «no coinciden»; C20 Susana Capón el martes; C21 Cristian «no abre El 33» y partidos; C22 **respondida** (Aroa, 17/09): Tere es apoyo y está en la mañana de Pasarela; C23 Lavinia viernes, sábado y domingo; C24 vuelta de Laura y Maydeth; C25 las tres decisiones de Highkey.
+Personas: C12 tercero de El 33 sábado mañana; C13 días de partido reales de Roberto; C14 Hojan en Zapatillera y sus mañanas libres; C15 semana de Jenny; C16 Noe los partidos de Jenny y Victoria; C17 día libre de Yilian y su domingo; C18 apoyo de Pasarela domingo tarde; C19 qué significa «no coinciden»; C20 Susana Capón el martes; C21 Cristian «no abre El 33» y partidos; C22 **respondida** (Aroa, 17/09): Tere es apoyo y está en la mañana de Pasarela; C23 Lavinia viernes, sábado y domingo; C24 vuelta de Laura, Maydeth y Susi, y desde cuándo está de baja Susi; C25 las tres decisiones de Highkey.
 
 Fútbol y eventos: C26 refuerzo por equipo y local; C27 quién cubre (plantilla o extras); C28 otros días con refuerzo.
 

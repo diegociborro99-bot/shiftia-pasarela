@@ -282,6 +282,13 @@ try {
   ok('Entrevistas: «No tiene problemas» se queda sola, que es lo que significa',
     await pg.$$eval('#candOvl [data-cbus].on', b => b.map(x => x.dataset.cbus).join(',')) === 'TODO');
   await pg.click('#candOvl [data-cbus="T"]'); await pg.click('#candOvl [data-cbus="FDS"]');
+  ok('Entrevistas: la valoración va la última del todo, que es lo que se decide al terminar (Aroa, 17/09)',
+    await pg.evaluate(() => {
+      const ov = document.getElementById('candOvl');
+      const nota = ov.querySelector('[data-cin="nota"]'), val = ov.querySelector('[data-cset^="val|"]');
+      const ult = [...ov.querySelectorAll('[data-cin],[data-cset],[data-chab],[data-cbus],[data-cpto]')].pop();
+      return !!nota && !!val && !!(nota.compareDocumentPosition(val) & Node.DOCUMENT_POSITION_FOLLOWING) && ult.dataset.cset === 'val|';
+    }));
   await pg.click('#candOvl [data-cset="val|bien"]'); await pg.click('#candOvl [data-cok]'); await pg.waitForTimeout(350);
   const busca = await pg.evaluate(() => (S.entrevistas || []).filter(c => (c.busca || []).length).map(c => c.busca.join(',')));
   ok('Entrevistas: lo que busca se guarda', busca.length === 1 && busca[0] === 'T,FDS', JSON.stringify(busca));

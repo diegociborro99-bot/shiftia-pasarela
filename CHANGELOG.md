@@ -65,6 +65,11 @@
   Camarero Cocinero»). El puesto deja de ser uno solo: en la ficha se pulsan los dos, en la
   lista salen las dos etiquetas y los filtros de Cocina y Sala encuentran a esa persona por
   las dos. Las fichas que ya había se convierten solas al abrir la app.
+- **Susi entra en el equipo, de baja**: cocinera, sin fecha de vuelta, y la cubre Adrián. El
+  local (Zapatillera, por quien la cubre) y la fecha en que empezó la baja quedan marcados
+  como supuestos, a la espera de confirmarlos.
+- **La valoración cierra la ficha del candidato**, después de las notas: es lo que se decide
+  al terminar la entrevista, no al empezarla.
 - **La ficha empieza por lo que se pregunta primero**: fecha, nombre, teléfono, edad, zona y
   **documentación en regla** (Sí / No / En trámite, de tres botones).
   La **fecha se pone sola** con la del día en que se registra a alguien, y es también la

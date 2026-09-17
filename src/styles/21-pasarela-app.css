@@ -670,3 +670,6 @@ table.pvt{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 .candform .pinlbl small{font-family:var(--font);font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink3);margin-left:6px}
 .candfecha input{font-weight:600}
 .habchip.s-busca{background:var(--accent-l);border-color:color-mix(in srgb,var(--accent) 35%,transparent);color:var(--accent)}
+/* la valoración cierra la ficha: es lo que se decide al terminar (Aroa, 17/09) */
+.candval{border-top:1px dashed var(--border);margin-top:4px;padding-top:9px}
+.candval .segrow{margin-bottom:0}

@@ -70,7 +70,7 @@ try {
   const primera = await hasta(async () => { const r = await api(jD, 'GET', '/api/estado'); return r.ok && r.datos.version >= 1 && r.datos.estado ? r.datos : null; }, 10000);
   ok(`la app crea la planilla en el servidor (version ${primera.v ? primera.v.version : '?'} en ${primera.ms} ms)`, !!primera.v && primera.v.version >= 1);
   const e1 = primera.v ? primera.v.estado : null;
-  ok('la planilla lleva las 23 personas del grupo', !!e1 && Array.isArray(e1.staff) && e1.staff.length === 23, e1 && e1.staff && e1.staff.length);
+  ok('la planilla lleva las 24 personas del grupo', !!e1 && Array.isArray(e1.staff) && e1.staff.length === 24, e1 && e1.staff && e1.staff.length);
   ok('y los 4 locales', !!e1 && Array.isArray(e1.locales) && e1.locales.length === 4, e1 && e1.locales && e1.locales.length);
   const mesActual = e1 && e1.meses && e1.meses[CLAVE];
   const plazasMes = mesActual ? Object.values(mesActual.asig || {}).reduce((a, d) => a + Object.values(d).reduce((b, l) => b + l.length, 0), 0) : 0;

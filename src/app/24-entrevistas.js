@@ -187,8 +187,6 @@ function abrirFichaCand(id, editar) {
       ${CAMPOS_ENTREVISTA.filter(x => x.cabecera && x.k !== 'fecha').map(campoFicha).join('')}
       <div class="pinlbl">Puesto al que opta <small>puedes marcar los dos</small></div>
       <div class="segrow">${PUESTOS_CAND.map(x => `<button type="button" class="segk${tmpPtos.includes(x.id) ? ' on' : ''}" data-cpto="${esc(x.id)}">${icoCand(x.ico)}${esc(x.label)}</button>`).join('')}<button type="button" class="segk${tmpPtos.length ? '' : ' on'}" data-cpto="">Sin decidir</button></div>
-      <div class="pinlbl">Valoración</div>
-      ${seg('val', VALORACIONES.concat([{ id: '', label: 'Sin valorar' }]))}
       <div class="pinlbl">Lista</div>
       ${seg('lista', LISTAS_CAND)}
       <div class="candalerta" ${c.lista === 'alerta' ? '' : 'hidden'}>
@@ -202,6 +200,10 @@ function abrirFichaCand(id, editar) {
         ${CAMPOS_ENTREVISTA.filter(x => !x.cabecera).map(x => campoFicha(x) + (x.k === 'horarios' ? bloqueBusca : '')).join('')}
       </div>
       <label class="pinlbl">Notas<textarea class="logininp" data-cin="nota" rows="3" placeholder="Lo que quieras recordar de esta persona">${esc(c.nota || '')}</textarea></label>
+      <div class="candval">
+        <div class="pinlbl">Valoración <small>lo que decides al terminar la entrevista</small></div>
+        ${seg('val', VALORACIONES.concat([{ id: '', label: 'Sin valorar' }]))}
+      </div>
       <div class="candpie">
         ${nuevo ? '' : `<button type="button" class="btn-mini ghost danger" data-cdel>Borrar de la base</button>`}
         <span class="candsp"></span>

@@ -1640,12 +1640,17 @@ function semillaPasarela() {
     P('cristian', 'Cristian', 'apoyo', [], ['M', 'T'], [3], { partido: { dias: [6] }, cocina: { titular: [], reserva: [], soloDias: [], nunca: true }, vetos: [{ localId: 'PASARELA', franja: 'M' }], noAbre: ['EL33'], noPrimero: ['T'], comodin: true, supuestos: ['seis días (la plantilla dice cinco): pendiente del cliente'], nota: 'apoyo de sala; no hace la tarde completa (nunca el primero de la tarde); el martes tarde fijo en el Mónaco' }),
     P('yilian', 'Yilian', 'apoyo', ['MONACO'], ['M', 'T'], [4], { libreVariable: true, cubreA: [{ pid: 'cris', dow: 7 }, { pid: 'scapon', dow: 1, turnoId: 'MONACO_T' }], nota: 'apoyo de Cris Parreño de mañana; le hace el domingo; el lunes abre la tarde por Susana Capón' }),
     P('lola', 'Lola', 'sala', ['PASARELA'], ['M'], [7], { abre: { PASARELA: ['M'] }, cubreA: [{ pid: 'laura' }], nota: 'abre el local; cubre la baja de Laura' }),
-    P('adrian', 'Adrián', 'cocina', ['ZAPA'], ['M', 'T'], [3], { partido: { siempre: true, dias: [1, 2, 4, 5, 6, 7] }, cocina: { titular: ['ZAPA'], reserva: [], soloDias: [] }, nota: 'cocina de Zapatillera, siempre partido' }),
+    P('adrian', 'Adrián', 'cocina', ['ZAPA'], ['M', 'T'], [3], { partido: { siempre: true, dias: [1, 2, 4, 5, 6, 7] }, cocina: { titular: ['ZAPA'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'susi' }], nota: 'cocina de Zapatillera, siempre partido; cubre la baja de Susi' }),
     P('victoria', 'Victoria', 'sala', ['EL33'], ['M', 'T'], [3], { partido: { dias: [5, 6] }, nota: 'de mañana; viernes y sábado partido; Noe la cubre el miércoles' }),
     P('hojan', 'Hojan', 'cocina', ['EL33', 'MONACO'], ['M', 'T'], [2, 7], { soloCocina: true, partido: { dias: [1] }, cocina: { titular: ['EL33', 'MONACO'], reserva: ['ZAPA'], soloDias: [] }, cubreA: [{ pid: 'maydeth' }], nota: 'cubre la baja de Maydeth; el lunes partido: cocina de El 33 y del Mónaco' }),
     P('dulce', 'Dulce', 'apoyo', ['PASARELA', 'MONACO'], ['M', 'T'], [], { standby: true, noPrimero: ['M', 'T'], supuestos: ['en standby hasta confirmar días libres y locales', 'no sale la primera mientras sea nueva', 'quizá el partido del lunes en Pasarela, que taparía los dos huecos; a ver cómo entra (Aroa, 17/09)'], nota: 'apoyo; alta del 17/09, de prueba el fin de semana. En standby: no entra en la planilla hasta que el grupo confirme sus días y sus locales' }),
     P('laura', 'Laura', 'sala', ['PASARELA'], ['M', 'T'], [], { ausencias: [{ tipo: 'BAJ', desde: '2026-09-01', detalle: 'la cubre Lola' }] }),
     P('maydeth', 'Maydeth', 'cocina', ['MONACO'], ['M', 'T'], [], { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] }, ausencias: [{ tipo: 'BAJ', desde: '2026-09-01', detalle: 'la cubre Hojan' }] }),
+    // 17/09 (Aroa): «añade Susi en el apartado bajas, que es cocinera […] y la está cubriendo Adrián»
+    P('susi', 'Susi', 'cocina', ['ZAPA'], ['M', 'T'], [], { cocina: { titular: ['ZAPA'], reserva: [], soloDias: [] },
+      ausencias: [{ tipo: 'BAJ', desde: '2026-09-01', detalle: 'la cubre Adrián' }],
+      supuestos: ['Zapatillera, porque la cubre Adrián: falta confirmarlo', 'la baja se apunta desde el 1/09 porque en la planilla del cliente ya no salía: falta la fecha real'],
+      nota: 'cocina; de baja, la cubre Adrián' }),
   ];
   asignarColores(staff);
   // semana tipo = la planilla corregida del 11/09 (prototipo del cliente). Orden dentro de
