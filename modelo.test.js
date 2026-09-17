@@ -544,8 +544,8 @@ ok('generarSemana del 14 al 20 de septiembre reproduce la planilla corregida del
   assert.equal(r.huecos.length, 0, JSON.stringify(r.huecos.map(h => [h.iso, h.turnoId, h.pos, h.motivo])));
   const lunT = slots('2026-09-14', 'PASARELA_T');
   assert.equal(lunT[0].pid, 'mariluz'); assert.ok(lunT[0].abre && lunT[0].partido, 'Mari Luz abre la tarde del lunes en partido: ' + JSON.stringify(lunT));
-  assert.equal(r.resumen.turnos, 54); assert.equal(r.resumen.descansos, 34); assert.ok(r.resumen.maxDias <= 6);
-  assert.deepEqual(r.libran['2026-09-18'], ['dulce'], 'Dulce entró el 17/09 y aún no está en la semana tipo'); assert.equal(r.libran['2026-09-14'].length, 7); assert.equal(r.libran['2026-09-20'].length, 7);
+  assert.equal(r.resumen.turnos, 54); assert.equal(r.resumen.descansos, 27); assert.ok(r.resumen.maxDias <= 6);
+  assert.deepEqual(r.libran['2026-09-18'], [], 'Dulce está en standby: no cuenta como que libra'); assert.equal(r.libran['2026-09-14'].length, 6); assert.equal(r.libran['2026-09-20'].length, 6);
   const rotas = r.condiciones.filter(c => !c.ok);
   assert.ok(r.condiciones.length >= 30, 'catálogo de condiciones: ' + r.condiciones.length);
   assert.equal(rotas.length, 0, 'condiciones rotas: ' + rotas.map(c => c.texto + ' → ' + c.detalle).join(' | '));
@@ -955,6 +955,11 @@ ok('puestos: fuera «comodín», los puestos son sala, cocina y apoyo, y cada un
   const dulce = M.personaDe(st, 'dulce');
   assert.ok(dulce, 'Dulce entra en la plantilla');
   assert.deepEqual(dulce.franjas, ['M', 'T']);
+  assert.equal(dulce.standby, true, 'en standby hasta confirmar sus días y sus locales');
+  const e = M.nuevoEstado(2026, 10, { festivos: [] });
+  const r = M.puedeEstar(cfg, st, e, '2026-10-08', 'PASARELA_M', 'dulce', {});
+  assert.equal(r.ok, false); assert.match(r.motivo, /standby/i);
+  assert.ok(M.puedeEstar(cfg, st, e, '2026-10-08', 'PASARELA_M', 'dulce', { forzar: true }).ok, 'a mano sí se la puede poner');
   assert.ok(M.personaDe(st, 'hojan').soloCocina, 'Johan siempre cocina');
 });
 ok('migrarPuestos: las fichas guardadas con puesto «comodín» pasan a «apoyo» sin perder el sin-local-fijo', () => {

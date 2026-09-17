@@ -120,7 +120,7 @@ function htmlTarjetaPersona(p, baja) {
   const locs = (p.locales || []).map(id => (localDe(S, id) || { corto: id }).corto).join(' · ');
   return `<div class="pcard${baja ? ' baja' : ''}" data-pcard="${esc(p.id)}">
     <div class="pchead"><span class="av" data-ficha="${esc(p.id)}" style="cursor:pointer;background:${avColor(p.id)}">${esc(initials(p.nombre))}</span>
-      <span data-ficha="${esc(p.id)}" style="min-width:0;cursor:pointer"><b>${esc(p.nombre)}</b><small>${esc(lblPuesto(p.puesto))}${locs ? ' · ' + esc(locs) : ' · sin local fijo'}${baja ? ' · de baja' : ''}</small></span>
+      <span data-ficha="${esc(p.id)}" style="min-width:0;cursor:pointer"><b>${esc(p.nombre)}</b><small>${esc(lblPuesto(p.puesto))}${locs ? ' · ' + esc(locs) : ' · sin local fijo'}${baja ? ' · de baja' : p.standby ? ' · en standby' : ''}</small></span>
       <button type="button" class="pmini" data-ficha="${esc(p.id)}" title="Editar ficha" aria-label="Editar ficha de ${esc(p.nombre)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m13.5 6.5 3 3"/></svg></button></div>
     <div class="traits">${chipsCondiciones(p)}</div>
     <div class="abschips">${chipsAusencias(p)}</div>

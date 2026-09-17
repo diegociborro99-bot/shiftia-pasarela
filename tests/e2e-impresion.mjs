@@ -85,7 +85,7 @@ try {
   const monLm = await cas('2026-09-14', 'MONACO_M');
   ok('Bar Mónaco lunes mañana: Cristian con □ (comodín) en 3.ª', !!monLm && monLm.slots[2] && /Cristian/.test(monLm.slots[2].nombre) && monLm.slots[2].com, JSON.stringify(monLm && monLm.slots));
   const libV = await pg.evaluate(() => { const td = document.querySelector('#printRoot .pxpage tr.pxdesc [data-libran="2026-09-18"]'); return td ? td.textContent.replace(/\s+/g, ' ').trim() : null; });
-  ok('«Quién libra» del viernes 18: solo Dulce, que aún no está en la semana tipo', !!libV && /Dulce/.test(libV) && /1 libra/.test(libV), libV);
+  ok('«Quién libra» del viernes 18 dice nadie (0 libran)', !!libV && /nadie/.test(libV) && /0 libran/.test(libV), libV);
   ok('la hoja lleva los 4 locales con su regla de cocina, 7 días y la leyenda con ▸ ◆ P C □', await pg.evaluate(() => document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc').length === 4 && [...document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc td.sec small')].every(x => /cocina/.test(x.textContent)) && document.querySelectorAll('#printRoot table.pxsem thead th.pxd').length === 7 && /▸/.test(document.querySelector('#printRoot .pxg-ley').textContent) && /□/.test(document.querySelector('#printRoot .pxg-ley').textContent)));
   const altoSem = await pg.evaluate(() => { const p = document.querySelector('#printRoot .pxpage'); return { alto: p.scrollHeight, hoja: Math.round(210 * 96 / 25.4), cls: p.className }; });
   ok(`la hoja semanal cabe en un A4 apaisado (${altoSem.alto}px ≤ ${altoSem.hoja}px · ${altoSem.cls})`, altoSem.alto <= altoSem.hoja + 2, JSON.stringify(altoSem));
@@ -107,7 +107,7 @@ try {
   });
   ok(`página 1: título «${p1.h1}»`, /^Planilla propuesta · semana del 14 al 20 de septiembre de 2026$/.test(p1.h1), p1.h1);
   ok('página 1: la línea de cabecera nombra Shiftia y los cuatro locales', /SHIFTIA/.test(p1.kick) && /El 33/.test(p1.kick) && /Pasarela/.test(p1.kick), p1.kick);
-  ok('página 1: 4 tablas de locales, «Quién libra cada día» y la leyenda', p1.tablas === 4 && p1.libran && /Dulce/.test(p1.libV || '') && /Hueco disponible|hueco disponible/.test(p1.ley || ''), JSON.stringify(p1));
+  ok('página 1: 4 tablas de locales, «Quién libra cada día» y la leyenda', p1.tablas === 4 && p1.libran && /nadie/.test(p1.libV || '') && /Hueco disponible|hueco disponible/.test(p1.ley || ''), JSON.stringify(p1));
   ok(`página 1: casillas con hueco en rojo (${p1.huecos}) = huecos de 1.ª posición del modelo (${gen.primeros})`, p1.huecos === gen.primeros, JSON.stringify({ p1: p1.huecos, gen: gen.primeros }));
   const g33 = await cas('2026-09-15', 'EL33_T');
   ok('página 1: El 33 martes tarde sin hueco, con Noe solo y sin marca de cocina (José, 17/09)', !!g33 && g33.slots.length === 1 && !g33.slots[0].hueco && /Noe/.test(g33.slots[0].nombre) && !g33.slots[0].coc, JSON.stringify(g33));
@@ -145,11 +145,11 @@ try {
     const pag = document.querySelectorAll('#printRoot .pxg-pag')[1];
     return { cambios: res.cambios.map(c => c.turnoId + ':' + c.antes.length + '>' + c.despues.length), h1: document.querySelector('#printRoot .pxg-h1').textContent.replace(/\s+/g, ' ').trim(), sub: document.querySelector('#printRoot .pxg-sub').textContent, cajas: [...pag.querySelectorAll('.pxg-cambio')].map(x => x.textContent.replace(/\s+/g, ' ').trim().slice(0, 200)), tachado: pag.querySelectorAll('.pxg-antes s').length, negrita: pag.querySelectorAll('.pxg-ahora b').length, nueva: pag.querySelectorAll('.pxg-nueva-cas').length, corr: document.querySelectorAll('#printRoot .pxg-pag td.pxg-c.corr').length };
   }, LUNES);
-  ok(`con dos casillas vaciadas generarSemana devuelve los cambios (${cam.cambios.join(', ')})`, cam.cambios.length === 3, JSON.stringify(cam.cambios));
+  ok(`con dos casillas vaciadas generarSemana devuelve los dos cambios (${cam.cambios.join(', ')})`, cam.cambios.length === 2, JSON.stringify(cam.cambios));
   ok(`el título usa opts.titulo («${cam.h1.slice(0, 20)}…») y el resumen dice «Corregido el lunes en Bar Mónaco»`, /^Planilla corregida/.test(cam.h1) && /Corregido el lunes 14 en Bar Mónaco/.test(cam.sub), cam.sub);
   ok('página 2: cada cambio con «antes» tachado y «ahora» en negrita, y «nueva» en la casilla que estaba vacía', cam.tachado >= 2 && cam.negrita >= 2 && cam.nueva === 1, JSON.stringify(cam));
   ok('página 2: el cambio de Bar Mónaco del lunes nombra a Yilian y Hojan', cam.cajas.some(t => /Bar Mónaco · lunes 14/.test(t) && /Yilian/.test(t) && /Hojan/.test(t)), JSON.stringify(cam.cajas));
-  ok('página 1: las casillas corregidas van en ámbar con la marca «corregido»', cam.corr === 3 && await pg.evaluate(() => [...document.querySelectorAll('#printRoot td.pxg-c.corr .pxg-cnt')].every(x => /corregido/.test(x.textContent))), cam.corr);
+  ok('página 1: las casillas corregidas van en ámbar con la marca «corregido»', cam.corr === 2 && await pg.evaluate(() => [...document.querySelectorAll('#printRoot td.pxg-c.corr .pxg-cnt')].every(x => /corregido/.test(x.textContent))), cam.corr);
   if (CAPTURAS) { const pags = await pg.$$('#printRoot .pxg-pag'); await pags[1].screenshot({ path: join(CAPTURAS, 'print-generada-p2-cambios.png') }); }
   await pg.click('#pClose');
 

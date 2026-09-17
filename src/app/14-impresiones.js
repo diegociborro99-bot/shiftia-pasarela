@@ -115,7 +115,8 @@ function pxColsSemana(lunes) {
 // para no repetir el mismo nombre siete veces.
 function pxDescansos(cols, personas) {
   const bajaToda = personas.filter(p => cols.every(c => { const a = ausenciaEn(p, c.iso); return a && a.tipo === 'BAJ'; }));
-  const resto = personas.filter(p => !bajaToda.includes(p));
+  // quien está en standby no aparece en el pie de descansos: aún no entra en la planilla
+  const resto = personas.filter(p => !bajaToda.includes(p) && !p.standby);
   const porDia = cols.map(c => {
     const libran = [], ausentes = [];
     for (const p of resto) {

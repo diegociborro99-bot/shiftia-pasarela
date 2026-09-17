@@ -77,6 +77,7 @@ function openFicha(pid) {
       car('franjas', 'Franjas', '', `<div class="segrow">${franjaChips(p.franjas, 'tfranja')}</div>`) +
       car('libra', 'Libra', '', `<div class="dowset">${dowSet(p.libra, 'tlibra')}</div>
        ${chk('libreVariable', !!p.libreVariable, 'Día libre variable (se decide cada semana)')}
+       ${chk('standby', !!p.standby, 'En standby: no entra en la planilla hasta confirmar sus condiciones')}
        <div class="lpunt">
          <div class="pinlbl">Esta semana libra otro día <small>(solo para la semana de la planilla; después vuelve a su día de siempre)</small></div>
          <div class="dowset">${dowSet(lpDias(p), 'tlpunt')}</div>
@@ -233,6 +234,7 @@ function openFicha(pid) {
     if (ds.chk) {
       const on = t.checked;
       if (ds.chk === 'libreVariable') guarda(`libre variable ${on ? 'sí' : 'no'}`, x => { if (on) x.libreVariable = true; else delete x.libreVariable; });
+      if (ds.chk === 'standby') guarda(on ? 'en standby' : 'fuera de standby: ya entra en la planilla', x => { if (on) x.standby = true; else delete x.standby; });
       else if (ds.chk === 'partidoSiempre') guarda(`siempre partido ${on ? 'sí' : 'no'}`, x => { if (on) x.partido.siempre = true; else delete x.partido.siempre; });
       else if (ds.chk === 'cocinaNunca') guarda(`nunca cocina ${on ? 'sí' : 'no'}`, x => { if (on) x.cocina.nunca = true; else delete x.cocina.nunca; });
       pinta(); return;
