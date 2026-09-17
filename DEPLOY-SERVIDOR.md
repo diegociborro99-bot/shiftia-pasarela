@@ -11,13 +11,13 @@ dependencias npm** (Node ≥ 22.13 estándar; `nixpacks.toml` fija Node 22).
 | `PORT` | `8080` | Puerto (Railway la pone sola). |
 | `DATA_DIR` | `./data` (volátil) | Carpeta de la base de datos. En Railway: `/data`, con un Volume montado ahí. |
 | `SESSION_SECRET` | generado y guardado en la BD | Firma de las cookies de sesión. Mejor fijarla (cadena larga aleatoria). |
-| `ADMIN_PASSWORD` | genérica + cambio obligatorio | Contraseña inicial del usuario `admin` (el encargado). Solo actúa al crear la BD. |
+| `ADMIN_PASSWORD` | genérica + cambio obligatorio | Contraseña inicial de `oficina` (la cuenta del encargado). Solo actúa al crear la BD. |
 | `PROGRAMADOR_USUARIO` | `diego` | Usuario de la cuenta del programador (3–30 minúsculas/números). |
 | `PROGRAMADOR_PASSWORD` | `12345678` (provisional, sin cambio obligatorio) | Contraseña inicial del programador. Solo actúa al crear la BD; después se cambia desde Cuenta. |
-| `JOSE_USUARIO` | `joseadmin` | Usuario de la cuenta del jefe (José). Mismos permisos que el encargado: todo menos Actividad. |
-| `JOSE_PASSWORD` | genérica + cambio obligatorio | Contraseña inicial del jefe. A diferencia de las de arriba, la cuenta se crea aunque la base ya exista (si falta, al arrancar). |
+| `JEFE_USUARIO` | `admin` | Usuario de la cuenta del jefe (José). Mismos permisos que la oficina: todo menos Actividad. |
+| `JEFE_PASSWORD` | genérica + cambio obligatorio | Contraseña inicial del jefe. A diferencia de las de arriba, la cuenta se crea aunque la base ya exista (si falta, al arrancar). |
 | `PASSWORD_GENERICA` | `pasarela2026` | Contraseña genérica de las altas (la app obliga a cambiarla al primer acceso) y valor vetado como contraseña definitiva. |
-| `ADMIN_RESET` / `ADMIN_RESET_USUARIO` | — / `admin` | Puerta de rescate: contraseña temporal (≥ 8 caracteres) que se aplica **una vez** al arrancar a esa cuenta y revoca sus sesiones. Bórrala después de entrar. |
+| `ADMIN_RESET` / `ADMIN_RESET_USUARIO` | — / `admin` | Puerta de rescate (ojo: por defecto abre `admin`, que es la cuenta del jefe; para la oficina, `ADMIN_RESET_USUARIO=oficina`): contraseña temporal (≥ 8 caracteres) que se aplica **una vez** al arrancar a esa cuenta y revoca sus sesiones. Bórrala después de entrar. |
 | `ADMIN_PROMOTE` / `ADMIN_PROMOTE_ROL` | — / `admin` | Asciende un usuario existente a `admin` o `programador` al arrancar (una vez por valor). |
 | `SHIFTIA_CORE_URL` | — | URL del servicio shiftia-core (CP-SAT). Sin ella, el motor «Núcleo» de la app aparece como no configurado y todo funciona con el generador local. |
 | `SHIFTIA_CORE_KEY` | — | `X-API-Key` del servicio; nunca sale del servidor. |
@@ -60,9 +60,10 @@ dependencias npm** (Node ≥ 22.13 estándar; `nixpacks.toml` fija Node 22).
 
 ## Primer arranque
 
-- **Programador**: usuario `diego`, contraseña `12345678` (provisional hasta que la cambie desde Cuenta → Seguridad). **Encargado**: usuario `admin` con `ADMIN_PASSWORD` o, si no se definió, la genérica `pasarela2026` con cambio obligatorio al entrar.
-- **Jefe**: usuario `joseadmin` con `JOSE_PASSWORD` o la genérica `pasarela2026` con cambio obligatorio. Tiene los permisos del encargado y no ve Actividad. Es la única cuenta que se crea también en servidores que ya existían: al arrancar, si falta, nace.
-- Entra como `admin` (el encargado) o con el usuario del programador. Si el
+- **Programador**: usuario `diego`, contraseña `12345678` (provisional hasta que la cambie desde Cuenta → Seguridad). **Encargado (la oficina)**: usuario `oficina` con `ADMIN_PASSWORD` o, si no se definió, la genérica `pasarela2026` con cambio obligatorio al entrar.
+- **Jefe**: usuario `admin` con `JEFE_PASSWORD` o la genérica `pasarela2026` con cambio obligatorio. Tiene los permisos de la oficina y no ve Actividad. Es la única cuenta que se crea también en servidores que ya existían: al arrancar, si falta, nace.
+- **Renombrado del 17/09**: en un servidor que ya estaba en marcha, al arrancar el `admin` de siempre pasa a llamarse `oficina` y `joseadmin` pasa a `admin`, conservando contraseña, rol y ficha. Se hace una sola vez y queda en la auditoría.
+- Entra como `oficina` (el encargado), como `admin` (el jefe) o con el usuario del programador. Si el
   servidor está vacío, la app crea la planilla de fábrica (locales, equipo,
   semana tipo del PDF) o, si ese navegador tenía una planilla local con meses,
   ofrece subirla.

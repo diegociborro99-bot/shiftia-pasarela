@@ -70,7 +70,7 @@ before(async () => {
   dataDir = mkdtempSync(join(tmpdir(), 'shiftia-seg-'));
   const s = await arrancar(dataDir);
   proc = s.p; BASE = s.base;
-  assert.equal((await admin('POST', '/api/login', { usuario: 'admin', password: ADMIN_PASS })).status, 200);
+  assert.equal((await admin('POST', '/api/login', { usuario: 'oficina', password: ADMIN_PASS })).status, 200);
   assert.equal((await prog('POST', '/api/login', { usuario: 'diego', password: PROG_PASS })).status, 200);
   // dos empleadas distintas: hacen falta para probar que una no ve a la otra
   altaEmpleada = (await admin('POST', '/api/usuarios', { usuario: 'lola', rol: 'empleado', pid: 'lola' })).datos;
@@ -242,12 +242,14 @@ test('crear y borrar usuarios es del encargado (y del programador), y el alta us
   assert.equal((await anon('DELETE', '/api/usuarios?id=' + id)).status, 401);
   // el encargado sí, y no puede quedarse el grupo sin encargado
   assert.equal((await admin('DELETE', '/api/usuarios?id=' + id, undefined, { Origin: BASE })).status, 200);
-  // 17/09: de serie hay dos encargados (admin y la cuenta del jefe, joseadmin); se van
-  // todos menos uno para comprobar que el último no se puede borrar
+  // 17/09: de serie hay dos encargados, la oficina y el jefe; se van todos menos el que
+  // tiene la sesión abierta, para comprobar que el último no se puede borrar
   const encargados = (await admin('GET', '/api/usuarios')).datos.usuarios.filter(u => u.rol === 'admin');
-  assert.ok(encargados.length >= 2, 'admin y joseadmin');
-  for (const u of encargados.slice(1)) assert.equal((await admin('DELETE', '/api/usuarios?id=' + u.id, undefined, { Origin: BASE })).status, 200);
-  assert.equal((await admin('DELETE', '/api/usuarios?id=' + encargados[0].id, undefined, { Origin: BASE })).status, 400, 'no se borra el último encargado');
+  assert.ok(encargados.length >= 2, 'la oficina y el jefe');
+  const propio = encargados.find(u => u.usuario === 'oficina');
+  assert.ok(propio, 'la cuenta de la oficina');
+  for (const u of encargados.filter(u => u.id !== propio.id)) assert.equal((await admin('DELETE', '/api/usuarios?id=' + u.id, undefined, { Origin: BASE })).status, 200);
+  assert.equal((await admin('DELETE', '/api/usuarios?id=' + propio.id, undefined, { Origin: BASE })).status, 400, 'no se borra el último encargado');
   // borrar a alguien le cierra la sesión al momento
   assert.equal((await c('GET', '/api/yo')).status, 401, 'la sesión del borrado muere');
 });

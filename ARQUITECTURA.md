@@ -98,6 +98,8 @@ SSE (`/api/eventos`) para repintar todos los dispositivos, copia diaria de la BD
 y el proxy al núcleo (`/api/nucleo/salud`, `/api/nucleo/solve`) con la clave del
 servicio guardada solo en el servidor. Roles: **programador** (todo + auditoría),
 **admin** (el encargado: planilla, condiciones, usuarios), **empleado** (solo lo
-suyo, proyectado por `estado-servidor.js`). Con rol `admin` nacen dos cuentas: `admin`
-(el encargado) y `joseadmin` (el jefe); esta última la crea `asegurarJose()` en cada
-arranque si falta, para que llegue también a los servidores que ya estaban en marcha.
+suyo, proyectado por `estado-servidor.js`). Con rol `admin` nacen dos cuentas: `oficina`
+(el encargado) y `admin` (el jefe); esta última la crea `asegurarJefe()` en cada arranque
+si falta, y `renombrarCuentas()` pone esos nombres una sola vez en los servidores que ya
+estaban en marcha. El rol de una cuenta ya creada se cambia desde la app con
+`POST /api/usuarios/rol` (sube `gen`, así que quien cambia vuelve a entrar).

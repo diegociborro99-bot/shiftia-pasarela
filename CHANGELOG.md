@@ -46,9 +46,18 @@
   horarios, las condiciones, las observaciones y las notas en bloques—, **cada cosa con su
   icono dibujado a mano**, en el mismo trazo que la sartén y la bandeja. Para tocar algo:
   «Editar», que abre los cajetines de siempre y vuelve al perfil al guardar.
-- **Cuenta del jefe**: usuario **`joseadmin`**, con los mismos permisos que el encargado y
-  sin acceso a **Actividad**, que sigue siendo solo del programador. Se crea sola al
-  arrancar aunque el servidor ya estuviera en marcha (`JOSE_USUARIO` / `JOSE_PASSWORD`).
+- **Dos cuentas de administrador, con nombre nuevo**: la oficina (Aroa) pasa a llamarse
+  **`oficina`** y el jefe (José) se queda con **`admin`** a secas. Las dos con los mismos
+  permisos y sin acceso a **Actividad**, que sigue siendo solo del programador. En un
+  servidor que ya estaba en marcha se renombran solas al arrancar, conservando contraseña,
+  rol y ficha; y si la del jefe no existe, nace (`JEFE_USUARIO` / `JEFE_PASSWORD`).
+- **Los permisos se cambian desde la app**: en Cuenta → usuarios, cada cuenta lleva un
+  selector para subirla a administrador o bajarla a empleado —al bajarla se le pide su
+  ficha de la planilla, porque si no entraría y no vería nada suyo—. Nadie puede cambiarse
+  el suyo ni dejar el grupo sin administrador o sin programador, las cuentas de programador
+  solo las toca el programador, y a quien cambia de rol se le cierra la sesión para que
+  vuelva a entrar ya con lo que le toca. Antes esto solo se podía hacer con una variable
+  del servidor (`ADMIN_PROMOTE`) y únicamente hacia arriba.
 - **Dos arreglos de estilo que venían de serie**: la sección de Entrevistas usaba dos
   variables de color que no existían (`--line`, `--bg2`), así que sus tarjetas salían sin
   borde ni fondo; y el pie de la ficha llevaba `btn-cta`/`btn-sec` sin la clase base `btn`,

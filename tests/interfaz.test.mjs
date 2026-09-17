@@ -70,3 +70,10 @@ test('los botones llevan siempre la clase base .btn con su modificador', () => {
     .map(m => m[1]).filter(c => !/(^|\s)btn(\s|$)/.test(c));
   assert.deepEqual([...new Set(sueltos)], [], 'sin la clase base: ' + sueltos.join(' | '));
 });
+
+test('la lista de usuarios de Cuenta deja quitar y dar permisos a cada cuenta', () => {
+  // 17/09 (José): «el usuario de José puede eliminar permisos del usuario de Aroa».
+  assert.match(html, /data-usrrol="\$\{u\.id\}"/, 'selector de permisos por fila');
+  assert.match(html, /'\/api\/usuarios\/rol'/, 'llama al endpoint de rol');
+  assert.match(html, /function pedirPersonaUsuario\(/, 'al bajar a empleado se le pide su persona de la planilla');
+});

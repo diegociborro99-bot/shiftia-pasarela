@@ -119,8 +119,8 @@ try {
   const ctxB = await br.newContext({ viewport: { width: 1280, height: 900 } });
   const B = await ctxB.newPage();
   await prepararPagina(B, errores, 'B (admin)');
-  await entrar(B, 'admin', 'clave12345');
-  ok('admin / clave12345 entra en otro navegador', await appCargada(B) >= 0 && await B.evaluate(() => SRV.rol === 'admin' && SRV.esAdmin));
+  await entrar(B, 'oficina', 'clave12345');
+  ok('oficina / clave12345 entra en otro navegador', await appCargada(B) >= 0 && await B.evaluate(() => SRV.rol === 'admin' && SRV.esAdmin));
   ok('el admin ve la asignación de diego', await chipEn(B, a1, 8000) >= 0);
   ok('el admin está en el mismo día que diego', await B.evaluate(() => isoDia()) === a1.iso, await B.evaluate(() => isoDia()));
   // la edición tiene que ser algo que B aún no tenga en pantalla: se quita a la
@@ -148,18 +148,18 @@ try {
   await A.click('.tab[data-v="actividad"]');
   await llega(A, () => !document.getElementById('view-actividad').classList.contains('hidden') && !!document.querySelector('#actRefresh'), null, 5000);
   await A.click('#actRefresh');
-  const tAdm = await llega(A, () => !!document.querySelector('#actRoot .actrow[data-accion="login"][data-usuario="admin"]'), null, 8000);
+  const tAdm = await llega(A, () => !!document.querySelector('#actRoot .actrow[data-accion="login"][data-usuario="oficina"]'), null, 8000);
   ok(`tras «Actualizar», Actividad lista el inicio de sesión del admin (${tAdm} ms)`, tAdm >= 0, await A.$$eval('#actRoot .actrow', rs => rs.slice(0, 6).map(r => r.dataset.accion + ':' + r.dataset.usuario).join(',')));
-  ok('la tarjeta «último acceso del encargado» dice admin y el aviso desaparece', await A.$eval('#actKpis [data-kpi="acceso"] .knum', k => k.textContent.trim() === 'admin') && await A.$eval('#actAviso', a => !/aún no ha entrado/.test(a.textContent)), await A.$eval('#actKpis [data-kpi="acceso"]', k => k.textContent));
-  ok('el chip de usuario «admin» va marcado como encargado', await A.$eval('#actChipsU [data-actu="admin"]', c => /encargado/.test(c.textContent)));
-  await A.click('#actChipsU [data-actu="admin"]');
-  ok('el chip de usuario «admin» deja solo sus filas', await A.$$eval('#actRoot .actrow', rs => rs.length > 0 && rs.every(r => r.dataset.usuario === 'admin')), await A.$$eval('#actRoot .actrow', rs => rs.map(r => r.dataset.usuario).join(',')));
+  ok('la tarjeta «último acceso del encargado» dice oficina y el aviso desaparece', await A.$eval('#actKpis [data-kpi="acceso"] .knum', k => k.textContent.trim() === 'oficina') && await A.$eval('#actAviso', a => !/aún no ha entrado/.test(a.textContent)), await A.$eval('#actKpis [data-kpi="acceso"]', k => k.textContent));
+  ok('el chip de usuario «oficina» va marcado como encargado', await A.$eval('#actChipsU [data-actu="oficina"]', c => /encargado/.test(c.textContent)));
+  await A.click('#actChipsU [data-actu="oficina"]');
+  ok('el chip de usuario «oficina» deja solo sus filas', await A.$$eval('#actRoot .actrow', rs => rs.length > 0 && rs.every(r => r.dataset.usuario === 'oficina')), await A.$$eval('#actRoot .actrow', rs => rs.map(r => r.dataset.usuario).join(',')));
   await A.click('#actChipsU [data-actu=""]');
   await A.click('.tab[data-v="hoy"]');
 
   // ── 5) empleado: alta con contraseña genérica, cambio obligatorio y vista de empleado
   const jAdm = jar();
-  await api(jAdm, 'POST', '/api/login', { usuario: 'admin', password: 'clave12345' });
+  await api(jAdm, 'POST', '/api/login', { usuario: 'oficina', password: 'clave12345' });
   const alta = await api(jAdm, 'POST', '/api/usuarios', { usuario: 'noe', rol: 'empleado', pid: 'noe' });
   ok('el admin da de alta a «noe» (empleado, pid noe) y recibe la contraseña genérica', alta.ok && alta.datos && !!alta.datos.password && alta.datos.generica === true, JSON.stringify(alta.datos));
   const jNoe = jar();
@@ -185,6 +185,40 @@ try {
   ok('el empleado recibe solo lo suyo: su ficha con ausencias, las ajenas sin ellas, sin historial', tC >= 0 && await C.evaluate(() => { const yo = S.staff.find(p => p.id === 'noe'); const otro = S.staff.find(p => p.id !== 'noe'); return !!yo && Array.isArray(yo.ausencias) && !!otro && !(S.historial || []).length; }));
   ok('el servidor recuerda la contraseña nueva (login con ella)', (await api(jar(), 'POST', '/api/login', { usuario: 'noe', password: 'NoeClave2026' })).ok);
   ok('y la genérica ya no vale', (await api(jar(), 'POST', '/api/login', { usuario: 'noe', password: alta.datos.password })).status === 401);
+
+  // ── 5b) permisos desde Cuenta: la oficina asciende a noe y luego se lo quita (José, 17/09)
+  await B.click('#topCuenta');
+  await B.waitForSelector('#ctaOvl [data-usrrol]', { timeout: 5000 });
+  ok('Cuenta lista un selector de permisos por cuenta, menos para la propia',
+    await B.$$eval('#ctaOvl [data-usrrol]', ss => ss.length) >= 2
+    && await B.evaluate(() => { const fila = [...document.querySelectorAll('#ctaOvl .festrow')].find(f => /\(tú\)/.test(f.textContent)); return !!fila && !fila.querySelector('[data-usrrol]'); }),
+    await B.$$eval('#ctaOvl .festrow', fs => fs.map(f => f.textContent.replace(/\s+/g, ' ').trim()).join(' | ')));
+  const idNoe = await B.evaluate(async () => (await (await fetch('/api/usuarios', { credentials: 'same-origin' })).json()).usuarios.find(u => u.usuario === 'noe').id);
+  await B.evaluate(() => { window.confirm = () => true; });
+  await B.selectOption(`#ctaOvl [data-usrrol="${idNoe}"]`, 'admin');
+  const subido = await llega(B, async id => (await (await fetch('/api/usuarios', { credentials: 'same-origin' })).json()).usuarios.find(u => u.usuario === 'noe').rol === 'admin'
+    && document.querySelector(`[data-usrrol="${id}"]`).value === 'admin', idNoe, 6000);
+  ok('subir a «noe» a administradora desde el selector lo guarda en el servidor', subido >= 0);
+  ok('y a noe le caduca la sesión al momento (vuelve a entrar ya con lo que le toca)',
+    (await api(jNoe, 'GET', '/api/yo')).status === 401);
+  await B.selectOption(`#ctaOvl [data-usrrol="${idNoe}"]`, 'empleado');
+  const bajado = await llega(B, async () => { const u = (await (await fetch('/api/usuarios', { credentials: 'same-origin' })).json()).usuarios.find(u => u.usuario === 'noe'); return u.rol === 'empleado' && u.pid === 'noe'; }, null, 6000);
+  ok('y quitárselos la devuelve a empleada conservando su ficha de la planilla', bajado >= 0,
+    JSON.stringify(await B.evaluate(async () => (await (await fetch('/api/usuarios', { credentials: 'same-origin' })).json()).usuarios.find(u => u.usuario === 'noe'))));
+  // y a una cuenta que no está atada a nadie de la planilla —la del jefe— se le pregunta
+  // de quién es antes de dejarla como empleada
+  const idJefe = await B.evaluate(async () => (await (await fetch('/api/usuarios', { credentials: 'same-origin' })).json()).usuarios.find(u => u.usuario === 'admin').id);
+  await B.selectOption(`#ctaOvl [data-usrrol="${idJefe}"]`, 'empleado');
+  const preguntó = await llega(B, () => !!document.querySelector('#usrPidOvl #usrPidSel'), null, 5000);
+  ok('quitarle los permisos a una cuenta sin ficha pregunta primero de quién es', preguntó >= 0);
+  const quien = await B.$eval('#usrPidOvl #usrPidSel option', o => o.value);
+  await B.selectOption('#usrPidOvl #usrPidSel', quien);
+  await B.click('#usrPidOvl #usrPidOk');
+  const bajoJefe = await llega(B, async q => { const u = (await (await fetch('/api/usuarios', { credentials: 'same-origin' })).json()).usuarios.find(u => u.usuario === 'admin'); return u.rol === 'empleado' && u.pid === q; }, quien, 6000);
+  ok('y al elegirla se guarda como empleada con esa persona', bajoJefe >= 0);
+  await B.selectOption(`#ctaOvl [data-usrrol="${idJefe}"]`, 'admin');
+  ok('devolverle los permisos la deja otra vez de administradora', await llega(B, async () => (await (await fetch('/api/usuarios', { credentials: 'same-origin' })).json()).usuarios.find(u => u.usuario === 'admin').rol === 'admin', null, 6000) >= 0);
+  await B.click('#ctaOvl [data-ovx]');
 
   // ── 6) cerrar sesión devuelve a la pantalla de acceso
   await B.click('#topCuenta');

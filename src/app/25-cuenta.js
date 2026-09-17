@@ -80,6 +80,27 @@ const enlazaCopia = ov => {
   });
 };
 const ROL_LBL = { programador: 'programador', admin: 'administrador', empleado: 'empleado' };
+// Al bajar a alguien a empleado hace falta su ficha de la planilla: sin ella entraría y no
+// vería nada suyo. Devuelve el pid elegido, o null si se cierra sin elegir (José, 17/09).
+function pedirPersonaUsuario(usuario) {
+  return new Promise(resuelve => {
+    const gente = (S.staff || []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    const ov = abrirOverlay('usrPidOvl', `
+      <span class="micro">PERMISOS</span>
+      <h2 class="revh2">¿Quién es «${esc(usuario)}»?</h2>
+      <p class="revsub">Deja de llevar el grupo y pasa a ver solo lo suyo, así que necesita su ficha de la planilla.</p>
+      <label class="pinlbl">Persona<select class="logininp" id="usrPidSel">${gente.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}</select></label>
+      <div class="candpie"><span class="candsp"></span>
+        <button type="button" class="btn btn-sec" data-ovx>Cancelar</button>
+        <button type="button" class="btn btn-cta" id="usrPidOk">Continuar</button></div>`, { ancho: 430 });
+    let listo = false;
+    const acaba = v => { if (listo) return; listo = true; resuelve(v); };
+    ov.querySelector('#usrPidOk').addEventListener('click', () => { const v = ov.querySelector('#usrPidSel').value || null; ov.remove(); acaba(v); });
+    // cerrar de cualquier otra forma (✕, fondo, Escape) cuenta como cancelar
+    const obs = new MutationObserver(() => { if (!ov.isConnected) { obs.disconnect(); acaba(null); } });
+    obs.observe(document.body, { childList: true });
+  });
+}
 
 async function openCuenta() {
   const ex = document.getElementById('ctaOvl'); if (ex) ex.remove();
@@ -194,20 +215,27 @@ async function openCuenta() {
 
   // --- gestión de usuarios (admin o programador en servidor) ---
   if (SRV.on && SRV.esAdmin) {
-    let usados = [];
+    let usados = [], USUARIOS = [];
+    const esProg = SRV.rol === 'programador';
     const sugerencia = p => sugerirUsuario(p.nombre, usados) || p.id;
     const selRol = ov.querySelector('#usrRol'), sel = ov.querySelector('#usrPid'), inp = ov.querySelector('#usrNombre');
     const pintaUsuarios = async () => {
       const r = await api('GET', '/api/usuarios');
       if (!r.ok) { ov.querySelector('#usuariosLista').innerHTML = '<div class="festvacio">No se pudo cargar la lista.</div>'; return; }
-      const usuarios = r.datos.usuarios;
+      const usuarios = USUARIOS = r.datos.usuarios;
       usados = usuarios.map(u => u.usuario);
       const conUsuario = new Set(usuarios.map(u => u.pid).filter(Boolean));
       ov.querySelector('#usuariosLista').innerHTML = usuarios.map(u => {
         const per = S.staff.find(x => x.id === u.pid);
         const propio = u.usuario === SRV.usuario;
+        // los permisos se cambian desde aquí (José, 17/09): el jefe le quita el mando a
+        // quien haga falta sin tocar variables del servidor. Nadie se cambia el suyo, y
+        // las cuentas de programador solo las toca el programador.
+        const tocable = !propio && (u.rol !== 'programador' || esProg);
+        const roles = esProg ? ['programador', 'admin', 'empleado'] : ['admin', 'empleado'];
         return `<div class="festrow f-manual" style="border-left-color:${u.rol === 'programador' ? '#7c5fb8' : u.rol === 'admin' ? 'var(--accent)' : 'var(--teal)'}">
           <span class="festinfo"><b>${esc(u.usuario)}</b>${propio ? ' <small>(tú)</small>' : ''}<small>${ROL_LBL[u.rol] || u.rol}${per ? ' · ' + esc(per.nombre) : u.pid ? ' · ' + esc(u.pid) : ''}</small></span>
+          ${tocable ? `<select class="usrrol" data-usrrol="${u.id}" aria-label="Permisos de ${esc(u.usuario)}">${roles.map(r => `<option value="${r}"${u.rol === r ? ' selected' : ''}>${ROL_LBL[r]}</option>`).join('')}</select>` : ''}
           ${propio ? '' : `<button class="btn-mini ghost" data-usrreset="${u.id}" title="Generar contraseña nueva">reset</button><button class="festrm" data-usrdel="${u.id}" aria-label="Borrar usuario">✕</button>`}</div>`;
       }).join('') || '<div class="festvacio">Solo existe el administrador.</div>';
       const libres = S.staff.filter(p => !conUsuario.has(p.id));
@@ -217,6 +245,30 @@ async function openCuenta() {
     pintaUsuarios();
     sel.addEventListener('change', () => { const p = S.staff.find(x => x.id === sel.value); if (p) inp.value = sugerencia(p); });
     selRol.addEventListener('change', () => { if (selRol.value !== 'empleado') { sel.value = ''; inp.value = ''; } else sel.dispatchEvent(new Event('change')); });
+    ov.addEventListener('change', async e => {
+      const selr = e.target.closest('[data-usrrol]');
+      if (!selr) return;
+      const id = +selr.dataset.usrrol, rol = selr.value;
+      const u = USUARIOS.find(x => x.id === id);
+      if (!u || rol === u.rol) return;
+      const vuelve = () => { selr.value = u.rol; };
+      let pid;
+      if (rol === 'empleado' && !u.pid) {
+        // sin ficha en la planilla un empleado no vería nada suyo: se le pregunta cuál es
+        pid = await pedirPersonaUsuario(u.usuario);
+        if (!pid) { vuelve(); return; }
+      }
+      if (!confirm(`¿Dejar a «${u.usuario}» como ${ROL_LBL[rol]}? Saldrá de sus dispositivos y tendrá que volver a entrar.`)) { vuelve(); return; }
+      const r = await api('POST', '/api/usuarios/rol', { id, rol, pid });
+      if (!r.ok) { toast((r.datos && r.datos.error) || 'No se pudo cambiar', 'bad'); vuelve(); return; }
+      // la lista en memoria se actualiza ya: repintar es asíncrono y, hasta que termina,
+      // un segundo cambio sobre la misma fila se tomaba por «no ha cambiado nada»
+      u.rol = rol; u.pid = r.datos.pid;
+      toast(`«${u.usuario}» ahora es ${ROL_LBL[rol]}`, rol === 'empleado' ? 'warn' : 'ok');
+      registrarCambio(`Permisos de ${u.usuario}: ${ROL_LBL[u.rol]} → ${ROL_LBL[rol]}`, 'cambio');
+      saveState();
+      pintaUsuarios();
+    });
     ov.addEventListener('click', async e => {
       const del = e.target.closest('[data-usrdel]');
       if (del) {

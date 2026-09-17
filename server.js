@@ -138,18 +138,21 @@ function crearUsuario(usuario, pass, rol, pid, cambiar) {
   db.prepare('INSERT INTO users(usuario,hash,salt,rol,pid,creado,cambiar) VALUES (?,?,?,?,?,?,?)')
     .run(usuario.toLowerCase().trim(), hashPass(pass, salt), salt, rol, pid || null, Date.now(), cambiar ? 1 : 0);
 }
+// 17/09 (José): la cuenta del encargado —la oficina, Aroa— se llama «oficina», y «admin»
+// a secas es la del jefe. Las dos con el mismo rol: todo menos Actividad.
+const USU_OFICINA = 'oficina', USU_JEFE = 'admin';
 if (!db.prepare('SELECT COUNT(*) c FROM users').get().c) {
   const passAdmin = process.env.ADMIN_PASSWORD || PASS_GENERICA;
   // sin ADMIN_PASSWORD el encargado entra con la genérica y la app le OBLIGA a cambiarla
-  crearUsuario('admin', passAdmin, 'admin', null, !process.env.ADMIN_PASSWORD);
+  crearUsuario(USU_OFICINA, passAdmin, 'admin', null, !process.env.ADMIN_PASSWORD);
   console.log(process.env.ADMIN_PASSWORD
-    ? '[shiftia] usuario admin creado con ADMIN_PASSWORD'
-    : '[shiftia] AVISO: admin creado con la contraseña genérica — la app pedirá cambiarla al primer acceso; mejor define ADMIN_PASSWORD');
+    ? `[shiftia] usuario ${USU_OFICINA} (la oficina) creado con ADMIN_PASSWORD`
+    : `[shiftia] AVISO: ${USU_OFICINA} creado con la contraseña genérica — la app pedirá cambiarla al primer acceso; mejor define ADMIN_PASSWORD`);
   // 14/09: el programador tiene cuenta propia desde el primer arranque (no comparte
   // la del encargado): PROGRAMADOR_USUARIO (por defecto «diego») y PROGRAMADOR_PASSWORD
   const usuProg = String(process.env.PROGRAMADOR_USUARIO || 'diego').toLowerCase().trim();
-  if (usuProg === 'admin' || !USUARIO_RE.test(usuProg)) {
-    console.error(`[shiftia] PROGRAMADOR_USUARIO «${usuProg}» no vale (3-30 minúsculas/números, distinto de admin): no se crea la cuenta del programador`);
+  if (usuProg === USU_OFICINA || usuProg === USU_JEFE || !USUARIO_RE.test(usuProg)) {
+    console.error(`[shiftia] PROGRAMADOR_USUARIO «${usuProg}» no vale (3-30 minúsculas/números, y no puede ser ${USU_OFICINA} ni ${USU_JEFE}): no se crea la cuenta del programador`);
   } else {
     // sin PROGRAMADOR_PASSWORD nace con la provisional 12345678 (petición de Diego,
     // 14/09) y sin cambio obligatorio: la cambia él desde Cuenta cuando quiera.
@@ -160,21 +163,45 @@ if (!db.prepare('SELECT COUNT(*) c FROM users').get().c) {
   }
 }
 
-// ---------- la cuenta del jefe: «joseadmin» (17/09) ----------
-// José entra con su propia cuenta, con los mismos permisos que el encargado: ve y toca
-// todo menos Actividad, que es del programador. Se crea aunque la base ya tenga usuarios,
-// porque el bloque de arriba solo corre en el primer arranque.
-function asegurarJose() {
-  const usu = String(process.env.JOSE_USUARIO || 'joseadmin').toLowerCase().trim();
-  if (!USUARIO_RE.test(usu)) { console.error(`[shiftia] JOSE_USUARIO «${usu}» no vale: no se crea la cuenta del jefe`); return; }
-  if (db.prepare('SELECT 1 FROM users WHERE usuario = ?').get(usu)) return;
-  const pass = process.env.JOSE_PASSWORD || PASS_GENERICA;
-  crearUsuario(usu, pass, 'admin', null, !process.env.JOSE_PASSWORD);
-  console.log(process.env.JOSE_PASSWORD
-    ? `[shiftia] usuario «${usu}» (jefe, permisos de encargado) creado con JOSE_PASSWORD`
-    : `[shiftia] usuario «${usu}» (jefe, permisos de encargado) creado con la contraseña genérica — la app le pedirá cambiarla al entrar`);
+// ---------- los nombres del 17/09: «oficina» y «admin» ----------
+// Hasta el 17/09 el encargado era «admin» y el jefe «joseadmin». José pidió darle la
+// vuelta: la oficina pasa a «oficina» y él se queda con «admin» a secas. Se hace una sola
+// vez (marca en meta), conservando contraseña, rol y pid; la sesión va por id, así que
+// nadie se cae. Si alguien ya se llama así, se deja como está y no se toca nada.
+function renombrarCuentas() {
+  if (db.prepare('SELECT v FROM meta WHERE k=?').get('usuarios_1709')) return;
+  const quien = u => db.prepare('SELECT id,usuario,rol FROM users WHERE usuario=?').get(u);
+  const renombra = (de, a) => {
+    const u = quien(de);
+    if (!u || quien(a)) return false;
+    db.prepare('UPDATE users SET usuario=? WHERE id=?').run(a, u.id);
+    auditar(null, null, 'usuario-renombrado', `${de} → ${a}`);
+    console.log(`[shiftia] «${de}» pasa a llamarse «${a}»: misma contraseña y mismos permisos`);
+    return true;
+  };
+  const enc = quien('admin');
+  if (enc && enc.rol === 'admin') renombra('admin', USU_OFICINA);   // la oficina deja libre «admin»
+  renombra('joseadmin', USU_JEFE);                                   // y el jefe lo ocupa
+  db.prepare('INSERT INTO meta(k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run('usuarios_1709', '1');
 }
-asegurarJose();
+renombrarCuentas();
+
+// ---------- la cuenta del jefe: «admin» (17/09) ----------
+// José entra con su propia cuenta, con los mismos permisos que la oficina: ve y toca todo
+// menos Actividad, que es del programador. Se crea aunque la base ya tenga usuarios,
+// porque el bloque del primer arranque solo corre con la tabla vacía.
+function asegurarJefe() {
+  const usu = String(process.env.JEFE_USUARIO || USU_JEFE).toLowerCase().trim();
+  if (!USUARIO_RE.test(usu)) { console.error(`[shiftia] JEFE_USUARIO «${usu}» no vale: no se crea la cuenta del jefe`); return; }
+  if (db.prepare('SELECT 1 FROM users WHERE usuario = ?').get(usu)) return;
+  const pass = process.env.JEFE_PASSWORD || process.env.JOSE_PASSWORD || PASS_GENERICA;
+  const propia = !!(process.env.JEFE_PASSWORD || process.env.JOSE_PASSWORD);
+  crearUsuario(usu, pass, 'admin', null, !propia);
+  console.log(propia
+    ? `[shiftia] usuario «${usu}» (el jefe, permisos de encargado) creado con JEFE_PASSWORD`
+    : `[shiftia] usuario «${usu}» (el jefe, permisos de encargado) creado con la contraseña genérica — la app le pedirá cambiarla al entrar`);
+}
+asegurarJefe();
 
 // ---------- puerta de rescate: ADMIN_RESET ----------
 // ADMIN_PASSWORD solo actúa la primera vez (tabla de usuarios vacía), así que si el
@@ -841,6 +868,34 @@ const server = http.createServer(async (req, res) => {
       PUSH.bajaUsuario(+id);
       auditar(yo, ip, 'usuario-reset', u.usuario);
       json(res, 200, { usuario: u.usuario, password, generica: true, inicial: true });
+      return;
+    }
+    // 17/09 (José): quitarle o darle permisos a una cuenta que ya existe. Antes solo se
+    // podía ascender con la variable ADMIN_PROMOTE, y nunca hacia abajo. Sube `gen`: quien
+    // cambia de rol sale de sus dispositivos y vuelve a entrar ya con lo que le toca, en
+    // vez de seguir viendo pestañas que el servidor le va a negar.
+    if (ruta === '/api/usuarios/rol' && req.method === 'POST') {
+      if (!esAdmin) { json(res, 403, { error: 'solo el encargado' }); return; }
+      const b = await leerCuerpo(req);
+      const u = db.prepare('SELECT * FROM users WHERE id=?').get(+b.id);
+      if (!u) { json(res, 404, { error: 'no existe' }); return; }
+      if (u.id === yo.id) { json(res, 400, { error: 'no puedes cambiarte el rol a ti mismo' }); return; }
+      const rol = ROLES.includes(b.rol) ? b.rol : null;
+      if (!rol) { json(res, 400, { error: 'rol inválido' }); return; }
+      if ((u.rol === 'programador' || rol === 'programador') && !esProg) { json(res, 403, { error: 'solo el programador gestiona cuentas de programador' }); return; }
+      if (rol === u.rol) { json(res, 200, { usuario: u.usuario, rol, pid: u.pid }); return; }
+      // el pid se conserva al subir de rol, como hace ADMIN_PROMOTE: el caso «encargado que
+      // además trabaja» sigue atado a su ficha (su jornada, sus peticiones). Al bajar a
+      // empleado es imprescindible: sin ficha entraría y no vería nada suyo.
+      const pid = b.pid || u.pid || null;
+      if (rol === 'empleado' && !pid) { json(res, 400, { error: 'un empleado necesita persona asociada (pid)', necesitaPid: true }); return; }
+      const quedan = r => db.prepare('SELECT COUNT(*) c FROM users WHERE rol=?').get(r).c;
+      if (u.rol === 'admin' && quedan('admin') <= 1) { json(res, 400, { error: 'no puedes dejar el grupo sin encargado' }); return; }
+      if (u.rol === 'programador' && quedan('programador') <= 1) { json(res, 400, { error: 'no puedes dejar el grupo sin programador' }); return; }
+      db.prepare('UPDATE users SET rol=?, pid=?, gen=gen+1 WHERE id=?').run(rol, pid, u.id);
+      PUSH.bajaUsuario(u.id);
+      auditar(yo, ip, 'usuario-rol', `${u.usuario}: ${u.rol} → ${rol}${pid ? ', ' + pid : ''}`);
+      json(res, 200, { usuario: u.usuario, rol, pid });
       return;
     }
     if (ruta === '/api/usuarios' && req.method === 'DELETE') {

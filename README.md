@@ -93,13 +93,19 @@ creado la primera planilla nace igual de generada. Despliegue:
 
 - **Programador** (Diego): usuario `diego`, contraseña provisional `12345678`
   (se cambia desde Cuenta; o define `PROGRAMADOR_PASSWORD` antes del primer arranque).
-- **Encargado**: usuario `admin`, contraseña `ADMIN_PASSWORD` o la genérica
+- **Oficina** (Aroa): usuario `oficina`, contraseña `ADMIN_PASSWORD` o la genérica
   `pasarela2026` con cambio obligatorio al entrar.
-- **Jefe** (José): usuario `joseadmin`, contraseña `JOSE_PASSWORD` o la genérica
-  `pasarela2026` con cambio obligatorio. Los mismos permisos que el encargado:
+- **Jefe** (José): usuario `admin`, contraseña `JEFE_PASSWORD` o la genérica
+  `pasarela2026` con cambio obligatorio. Los mismos permisos que la oficina:
   ve y toca todo menos **Actividad**, que es solo del programador. Si falta, el
   servidor la crea al arrancar (no hace falta empezar de cero).
-- Sin servidor (abrir `index.html` a pelo): usuario `admin`, contraseña `pasarela2026`.
+- Las dos cuentas se **gestionan entre ellas** desde Cuenta → usuarios: el selector
+  de permisos de cada fila sube a administrador o baja a empleado (al bajar pide su
+  ficha de la planilla). Nadie puede cambiarse el suyo ni dejar el grupo sin
+  administrador, y las cuentas de programador solo las toca el programador.
+- Los servidores anteriores al 17/09 se renombran solos al arrancar: el `admin` de
+  siempre pasa a `oficina` y `joseadmin` a `admin`, con su misma contraseña.
+- Sin servidor (abrir `index.html` a pelo): usuario `admin`, contraseña `pasarela2026`. Es el acceso de ese dispositivo, sin relación con las cuentas del servidor.
 
 ## Logo del grupo
 

@@ -84,14 +84,14 @@ test('salud responde sin sesión y dice qué app es', async () => {
 });
 
 test('login con contraseña mala → 401; sin sesión la API cierra', async () => {
-  const r = await anon('POST', '/api/login', { usuario: 'admin', password: 'nope' });
+  const r = await anon('POST', '/api/login', { usuario: 'oficina', password: 'nope' });
   assert.equal(r.status, 401);
   const r2 = await anon('GET', '/api/estado');
   assert.equal(r2.status, 401);
 });
 
 test('login del encargado (admin) y /api/yo', async () => {
-  const r = await admin('POST', '/api/login', { usuario: 'admin', password: ADMIN_PASS });
+  const r = await admin('POST', '/api/login', { usuario: 'oficina', password: ADMIN_PASS });
   assert.equal(r.status, 200);
   assert.equal(r.datos.rol, 'admin');
   assert.equal(r.datos.cambiar, false, 'con ADMIN_PASSWORD no se le pide cambiarla');
@@ -161,19 +161,50 @@ test('crear usuario empleado: contraseña GENÉRICA y cambio obligatorio al entr
   assert.equal((await emp('GET', '/api/estado')).status, 200, 'con contraseña propia ya entra');
 });
 
-test('la cuenta del jefe («joseadmin») nace con permisos de encargado, pero sin Actividad', async () => {
-  // 17/09: José, el jefe del grupo, entra con su propia cuenta. Mismos permisos que el
-  // encargado (rol admin) y, por tanto, sin auditoría: Actividad es del programador.
-  const r = await jefe('POST', '/api/login', { usuario: 'joseadmin', password: GENERICA });
+test('la cuenta del jefe («admin») nace con permisos de encargado, pero sin Actividad', async () => {
+  // 17/09: José, el jefe del grupo, entra con su propia cuenta —«admin» a secas, mientras
+  // que la oficina (Aroa) entra con «oficina»—. Mismos permisos que el encargado (rol
+  // admin) y, por tanto, sin auditoría: Actividad es del programador.
+  const r = await jefe('POST', '/api/login', { usuario: 'admin', password: GENERICA });
   assert.equal(r.status, 200);
   assert.equal(r.datos.rol, 'admin', 'mismos permisos que el encargado');
-  assert.equal(r.datos.cambiar, true, 'sin JOSE_PASSWORD nace con la genérica y la app le pide cambiarla');
+  assert.equal(r.datos.cambiar, true, 'sin JEFE_PASSWORD nace con la genérica y la app le pide cambiarla');
   assert.equal((await jefe('GET', '/api/estado')).status, 403, 'con la genérica aún no entra');
   assert.equal((await jefe('POST', '/api/password', { actual: GENERICA, nueva: 'josepasarela1' })).status, 200);
   assert.equal((await jefe('GET', '/api/estado')).status, 200, 'con contraseña propia ve la planilla');
   assert.equal((await jefe('GET', '/api/auditoria')).status, 403, 'Actividad no: eso es del programador');
   assert.equal((await jefe('POST', '/api/usuarios', { usuario: 'altajefe', rol: 'empleado', pid: 'tere' })).status, 200, 'da altas como el encargado');
   assert.equal((await jefe('POST', '/api/usuarios', { usuario: 'dev3', rol: 'programador' })).status, 403, 'y tampoco crea programadores');
+});
+
+test('el jefe le quita los permisos a la oficina desde la app, y se los devuelve', async () => {
+  // 17/09 (José): «el usuario de José puede eliminar permisos del usuario de Aroa desde
+  // su perfil». Cambiar el rol de una cuenta ya creada no existía: había que hacerlo con
+  // la variable ADMIN_PROMOTE y solo hacia arriba.
+  const lista = () => jefe('GET', '/api/usuarios').then(r => r.datos.usuarios);
+  const ofi = (await lista()).find(u => u.usuario === 'oficina');
+  const yoJefe = (await lista()).find(u => u.usuario === 'admin');
+  assert.ok(ofi && yoJefe);
+
+  assert.equal((await jefe('POST', '/api/usuarios/rol', { id: yoJefe.id, rol: 'empleado', pid: 'tere' })).status, 400, 'nadie se quita los permisos a sí mismo');
+  assert.equal((await jefe('POST', '/api/usuarios/rol', { id: ofi.id, rol: 'programador' })).status, 403, 'un encargado no reparte el rol de programador');
+  assert.equal((await jefe('POST', '/api/usuarios/rol', { id: ofi.id, rol: 'empleado' })).status, 400, 'un empleado necesita su persona de la planilla');
+  assert.equal((await jefe('POST', '/api/usuarios/rol', { id: 99999, rol: 'empleado', pid: 'tere' })).status, 404);
+
+  const baja = await jefe('POST', '/api/usuarios/rol', { id: ofi.id, rol: 'empleado', pid: 'tere' });
+  assert.equal(baja.status, 200);
+  assert.equal(baja.datos.rol, 'empleado');
+  assert.equal((await lista()).find(u => u.usuario === 'oficina').rol, 'empleado', 'la lista ya la enseña como empleada');
+  assert.equal((await admin('GET', '/api/usuarios')).status, 401, 'y su sesión anterior muere: entra de nuevo y ya sin permisos');
+
+  // el jefe se queda solo: ahora ya no puede quitarse a sí mismo ni quedarse el grupo sin encargado
+  assert.equal((await jefe('POST', '/api/usuarios/rol', { id: yoJefe.id, rol: 'empleado', pid: 'tere' })).status, 400);
+
+  const alta = await jefe('POST', '/api/usuarios/rol', { id: ofi.id, rol: 'admin' });
+  assert.equal(alta.status, 200); assert.equal(alta.datos.rol, 'admin');
+  assert.equal((await lista()).find(u => u.usuario === 'oficina').pid, 'tere', 'conserva su ficha de la planilla, como hace ADMIN_PROMOTE con el encargado que además trabaja');
+  assert.equal((await admin('POST', '/api/login', { usuario: 'oficina', password: ADMIN_PASS })).status, 200, 'su contraseña no se ha tocado');
+  assert.equal((await admin('GET', '/api/estado')).status, 200);
 });
 
 test('roles: la auditoría es solo del programador; el encargado crea empleados y encargados, nunca programadores', async () => {
@@ -205,10 +236,10 @@ test('roles: la auditoría es solo del programador; el encargado crea empleados 
   assert.equal((await prog('DELETE', `/api/usuarios?id=${dev2.id}`)).status, 200);
   assert.equal((await prog('DELETE', `/api/usuarios?id=${diego.id}`)).status, 400, 'último programador');
   assert.equal((await prog('DELETE', `/api/usuarios?id=${enc2.id}`)).status, 200, 'el programador borra encargados');
-  const jose = lista.find(u => u.usuario === 'joseadmin');
+  const jose = lista.find(u => u.usuario === 'admin');
   assert.ok(jose && jose.rol === 'admin', 'la cuenta del jefe sale en la lista con rol de encargado');
   assert.equal((await prog('DELETE', `/api/usuarios?id=${jose.id}`)).status, 200, 'se borra como cualquier encargado');
-  const adminU = lista.find(u => u.usuario === 'admin');
+  const adminU = lista.find(u => u.usuario === 'oficina');
   assert.equal((await prog('DELETE', `/api/usuarios?id=${adminU.id}`)).status, 400, 'último encargado');
   // y el programador escribe la planilla, ve versiones y copia como el encargado
   const cur = await prog('GET', '/api/estado');
@@ -286,7 +317,7 @@ test('avisos: el empleado oculta el suyo y queda registrado', async () => {
 
 test('SSE emite la versión al escribir', async () => {
   const cookie = (await (async () => {
-    const r = await fetch(BASE + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario: 'admin', password: ADMIN_PASS }) });
+    const r = await fetch(BASE + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario: 'oficina', password: ADMIN_PASS }) });
     return r.headers.get('set-cookie').split(';')[0];
   })());
   const ctl = new AbortController();
@@ -388,7 +419,7 @@ test('«salir de todos los dispositivos» revoca las cookies; «mantener sesión
 test('reset de contraseña vuelve a una inicial y borrado del último encargado bloqueado', async () => {
   const lista = await admin('GET', '/api/usuarios');
   const lola = lista.datos.usuarios.find(u => u.usuario === 'lola');
-  const propio = lista.datos.usuarios.find(u => u.usuario === 'admin');
+  const propio = lista.datos.usuarios.find(u => u.usuario === 'oficina');
   assert.equal((await admin('POST', '/api/usuarios/reset', { id: propio.id })).status, 400, 'el encargado no se resetea a sí mismo');
   const reset = await admin('POST', '/api/usuarios/reset', { id: lola.id });
   assert.equal(reset.status, 200);
@@ -407,7 +438,7 @@ test('rate limit de login: a la novena va la vencida (429)', async () => {
   const otro = cliente();
   let ultimo = 0;
   for (let i = 0; i < 9; i++) {
-    const r = await otro('POST', '/api/login', { usuario: 'admin', password: 'mal' + i });
+    const r = await otro('POST', '/api/login', { usuario: 'oficina', password: 'mal' + i });
     ultimo = r.status;
   }
   assert.equal(ultimo, 429);
@@ -420,7 +451,7 @@ test('el rate limit NO se evade rotando X-Forwarded-For (misma IP de socket)', a
     const r = await fetch(BASE + '/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `1.2.3.${i}` },
-      body: JSON.stringify({ usuario: 'admin', password: 'malXFF' + i }),
+      body: JSON.stringify({ usuario: 'oficina', password: 'malXFF' + i }),
     });
     ultimo = r.status;
   }
@@ -433,7 +464,7 @@ test('un delta de empleado NO puede crear la planilla si el servidor está vací
   const s2 = await arrancar(dir2);
   const call = cliente(s2.base);
   try {
-    await call('POST', '/api/login', { usuario: 'admin', password: ADMIN_PASS });
+    await call('POST', '/api/login', { usuario: 'oficina', password: ADMIN_PASS });
     const alta = await call('POST', '/api/usuarios', { usuario: 'emplola', rol: 'empleado', pid: 'lola' });
     assert.equal(alta.status, 200);
     const e = cliente(s2.base);
@@ -676,7 +707,7 @@ test('núcleo configurado: salud sondea /healthz sin exponer la clave; solve ree
   const a = cliente(s.base);
   try {
     assert.match(s.log(), /núcleo de optimización: .*con clave/);
-    assert.equal((await a('POST', '/api/login', { usuario: 'admin', password: ADMIN_PASS })).status, 200);
+    assert.equal((await a('POST', '/api/login', { usuario: 'oficina', password: ADMIN_PASS })).status, 200);
     const salud = await a('GET', '/api/nucleo/salud');
     assert.equal(salud.status, 200);
     assert.deepEqual(salud.datos, { configurado: true, url: urlCore, ok: true });
@@ -727,7 +758,7 @@ test('sin PROGRAMADOR_PASSWORD, el programador «diego» entra con 12345678 y no
     assert.equal(d.rol, 'programador');
     assert.equal(d.cambiar, false, 'no hay cambio obligatorio: la cambia el programador desde Cuenta');
     // el encargado sigue naciendo con la genérica y cambio obligatorio: es la cuenta del cliente
-    const a = await entrar(s, 'admin', 'pasarela2026');
+    const a = await entrar(s, 'oficina', 'pasarela2026');
     assert.equal(a.status, 200); assert.equal((await a.json()).cambiar, true);
     assert.equal((await entrar(s, 'diego', 'pasarela2026')).status, 401, 'la genérica no abre la cuenta del programador');
   } finally { await s.parar(); rmSync(dir, { recursive: true, force: true }); }
@@ -744,45 +775,47 @@ test('ADMIN_RESET y ADMIN_PROMOTE: la puerta de vuelta si el encargado pierde su
     // 1) primer arranque: el encargado nace con ADMIN_PASSWORD y el programador con la suya
     let s = await arrancar(dir, { ADMIN_PASSWORD: 'arranque123', PROGRAMADOR_PASSWORD: 'progarranque1', PROGRAMADOR_USUARIO: 'diego' });
     assert.match(s.log(), /programador «diego» creado con PROGRAMADOR_PASSWORD/);
-    assert.equal((await entrar(s, 'admin', 'arranque123')).status, 200);
+    assert.equal((await entrar(s, 'oficina', 'arranque123')).status, 200);
     const rp = await entrar(s, 'diego', 'progarranque1');
     assert.equal(rp.status, 200); assert.equal((await rp.json()).rol, 'programador');
     // un empleado que luego ascenderemos
-    const ck = (await entrar(s, 'admin', 'arranque123')).headers.get('set-cookie').split(';')[0];
+    const ck = (await entrar(s, 'oficina', 'arranque123')).headers.get('set-cookie').split(';')[0];
     const alta = await fetch(s.base + '/api/usuarios', { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: ck }, body: JSON.stringify({ usuario: 'roberto', rol: 'empleado', pid: 'roberto' }) });
     assert.equal(alta.status, 200);
     await s.parar();
 
     // 2) cambiar ADMIN_PASSWORD y reiniciar NO cambia nada: la tabla ya tiene usuarios
     s = await arrancar(dir, { ADMIN_PASSWORD: 'otracosa999', PROGRAMADOR_PASSWORD: 'otraprog999' });
-    assert.equal((await entrar(s, 'admin', 'otracosa999')).status, 401, 'ADMIN_PASSWORD no reescribe un encargado que ya existe');
-    assert.equal((await entrar(s, 'admin', 'arranque123')).status, 200, 'la de verdad sigue siendo la primera');
+    assert.equal((await entrar(s, 'oficina', 'otracosa999')).status, 401, 'ADMIN_PASSWORD no reescribe un encargado que ya existe');
+    assert.equal((await entrar(s, 'oficina', 'arranque123')).status, 200, 'la de verdad sigue siendo la primera');
     assert.equal((await entrar(s, 'diego', 'otraprog999')).status, 401, 'PROGRAMADOR_PASSWORD tampoco');
     await s.parar();
 
     // 3) valores que no se aceptan: cortos o la genérica
     s = await arrancar(dir, { ADMIN_RESET: 'corta' });
     assert.match(s.log(), /ADMIN_RESET ignorado/);
-    assert.equal((await entrar(s, 'admin', 'corta')).status, 401);
+    assert.equal((await entrar(s, 'oficina', 'corta')).status, 401);
     await s.parar();
 
-    // 4) ADMIN_RESET entra, obliga a crear una personal y revoca lo anterior
-    s = await arrancar(dir, { ADMIN_RESET: 'rescate12345' });
-    assert.match(s.log(), /ADMIN_RESET aplicado a «admin»/);
-    const r = await entrar(s, 'admin', 'rescate12345');
+    // 4) ADMIN_RESET entra, obliga a crear una personal y revoca lo anterior. La cuenta
+    // de la oficina se nombra con ADMIN_RESET_USUARIO: por defecto la puerta abre «admin»,
+    // que desde el 17/09 es la del jefe.
+    s = await arrancar(dir, { ADMIN_RESET: 'rescate12345', ADMIN_RESET_USUARIO: 'oficina' });
+    assert.match(s.log(), /ADMIN_RESET aplicado a «oficina»/);
+    const r = await entrar(s, 'oficina', 'rescate12345');
     assert.equal(r.status, 200);
     assert.equal((await r.json()).cambiar, true, 'la app le obliga a crear la suya');
-    assert.equal((await entrar(s, 'admin', 'arranque123')).status, 401, 'la anterior ya no vale');
+    assert.equal((await entrar(s, 'oficina', 'arranque123')).status, 401, 'la anterior ya no vale');
     await s.parar();
 
     // 5) el mismo valor no se reaplica: olvidar la variable no reabre la puerta
-    s = await arrancar(dir, { ADMIN_RESET: 'rescate12345' });
+    s = await arrancar(dir, { ADMIN_RESET: 'rescate12345', ADMIN_RESET_USUARIO: 'oficina' });
     assert.match(s.log(), /ya aplicado con este valor/);
     await s.parar();
 
     // 6) un usuario que no existe se dice, con la lista de administradores (encargados y programadores)
     s = await arrancar(dir, { ADMIN_RESET: 'otrorescate1', ADMIN_RESET_USUARIO: 'nadie' });
-    assert.match(s.log(), /no existe el usuario «nadie»[\s\S]*admin, diego/);
+    assert.match(s.log(), /no existe el usuario «nadie»[\s\S]*oficina, diego, admin/);
     await s.parar();
 
     // 7) ADMIN_RESET también rescata al programador
@@ -821,7 +854,7 @@ test('SIGTERM cierra ordenadamente: código 0, aun con un canal SSE abierto', as
   const p = s.p;
   try {
     // un canal SSE abierto es una conexión viva: server.close() solo no la cerraría nunca
-    const rl = await fetch(s.base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario: 'admin', password: ADMIN_PASS }) });
+    const rl = await fetch(s.base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario: 'oficina', password: ADMIN_PASS }) });
     assert.equal(rl.status, 200);
     const galleta = rl.headers.get('set-cookie').split(';')[0];
     const ac = new AbortController();
@@ -841,4 +874,41 @@ test('SIGTERM cierra ordenadamente: código 0, aun con un canal SSE abierto', as
     if (p.exitCode === null) p.kill('SIGKILL');
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('renombrado del 17/09: el encargado pasa a «oficina» y el jefe a «admin» sin tocar contraseñas', async () => {
+  // Las instalaciones que ya existían tenían al encargado como «admin» y al jefe como
+  // «joseadmin». Al arrancar se renombran una sola vez, conservando contraseña, rol y pid.
+  const dir = mkdtempSync(join(tmpdir(), 'shiftia-nombres-'));
+  const entrar = (s, usuario, pass) => fetch(s.base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario, password: pass }) });
+  try {
+    let s = await arrancar(dir, { ADMIN_PASSWORD: 'oficina12345', JEFE_PASSWORD: 'jefe12345' });
+    assert.equal((await entrar(s, 'oficina', 'oficina12345')).status, 200, 'de primeras ya nacen con los nombres nuevos');
+    assert.equal((await entrar(s, 'admin', 'jefe12345')).status, 200);
+    await s.parar();
+
+    // lo dejamos como estaba antes del 17/09 y borramos la marca del renombrado
+    const { DatabaseSync } = await import('node:sqlite');
+    const bd = new DatabaseSync(join(dir, 'shiftia.db'));
+    bd.prepare("UPDATE users SET usuario='joseadmin' WHERE usuario='admin'").run();
+    bd.prepare("UPDATE users SET usuario='admin' WHERE usuario='oficina'").run();
+    bd.prepare("DELETE FROM meta WHERE k='usuarios_1709'").run();
+    bd.close();
+
+    s = await arrancar(dir, { ADMIN_PASSWORD: 'oficina12345', JEFE_PASSWORD: 'jefe12345' });
+    assert.match(s.log(), /«admin» pasa a llamarse «oficina»/);
+    assert.match(s.log(), /«joseadmin» pasa a llamarse «admin»/);
+    assert.equal((await entrar(s, 'oficina', 'oficina12345')).status, 200, 'la oficina entra con la contraseña de siempre');
+    const j = await entrar(s, 'admin', 'jefe12345');
+    assert.equal(j.status, 200, 'y el jefe con la suya');
+    assert.equal((await j.json()).rol, 'admin');
+    assert.equal((await entrar(s, 'joseadmin', 'jefe12345')).status, 401, 'el nombre viejo ya no existe');
+    await s.parar();
+
+    // y no se repite: un arranque más lo deja todo igual
+    s = await arrancar(dir, { ADMIN_PASSWORD: 'oficina12345', JEFE_PASSWORD: 'jefe12345' });
+    assert.ok(!/pasa a llamarse/.test(s.log()), 'la segunda vez no toca nada');
+    assert.equal((await entrar(s, 'oficina', 'oficina12345')).status, 200);
+    await s.parar();
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
