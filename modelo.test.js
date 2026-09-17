@@ -1160,11 +1160,28 @@ ok('la entrevista pregunta también por aperturas y cierres (Aroa, 17/09)', () =
   assert.equal(M.tieneEntrevista(cands[1]), true, 'contestar que no también es contestar');
 });
 
+ok('documentación en regla: sí, no o en trámite, justo detrás de zona (Diego, 17/09)', () => {
+  const ks = M.CAMPOS_ENTREVISTA.map(x => x.k);
+  assert.deepStrictEqual(ks.slice(0, 4), ['fecha', 'edad', 'zona', 'doc']);
+  const x = M.CAMPOS_ENTREVISTA[3];
+  assert.equal(x.label, 'Documentación en regla');
+  assert.deepStrictEqual(x.opciones.map(o => o.id), ['si', 'no', 'tramite']);
+  assert.deepStrictEqual(x.opciones.map(o => o.label), ['Sí', 'No', 'En trámite']);
+  assert.ok(x.cabecera && !x.meta, 'va arriba con la zona, y contestarla es contestar la entrevista');
+  assert.equal(M.textoCampo({ doc: 'tramite' }, x), 'En trámite', 'se guarda el id y se enseña la palabra');
+  assert.equal(M.textoCampo({ doc: 'si' }, x), 'Sí');
+  assert.equal(M.textoCampo({}, x), '');
+  assert.equal(M.textoCampo({ zona: 'Elche' }, M.CAMPOS_ENTREVISTA[2]), 'Elche', 'los campos de texto, tal cual');
+  assert.equal(M.tieneEntrevista({ doc: 'no' }), true);
+  const cands = [{ id: 'c1', lista: 'ent', doc: 'tramite' }, { id: 'c2', lista: 'ent', doc: 'si' }];
+  assert.deepStrictEqual(M.filtrarCandidatos(cands, { q: 'trámite' }).map(c => c.id), ['c1'], 'el buscador la lee por su palabra');
+});
+
 ok('la fecha de la entrevista va la primera de todos los datos (Aroa, 17/09)', () => {
   assert.equal(M.CAMPOS_ENTREVISTA[0].k, 'fecha', 'es lo primero que se ve en la ficha y en el perfil');
   // 17/09 (Diego): fecha, nombre, teléfono, edad y zona son lo primero de la ficha; el resto
   // de la entrevista va más abajo. Edad y zona sí son respuestas, así que cuentan como tal.
-  assert.deepStrictEqual(M.CAMPOS_ENTREVISTA.filter(x => x.cabecera).map(x => x.k), ['fecha', 'edad', 'zona']);
+  assert.deepStrictEqual(M.CAMPOS_ENTREVISTA.filter(x => x.cabecera).map(x => x.k), ['fecha', 'edad', 'zona', 'doc']);
   assert.equal(M.tieneEntrevista({ edad: '30' }), true);
   assert.equal(M.tieneEntrevista({ zona: 'Elche' }), true);
   assert.ok(M.CAMPOS_ENTREVISTA.every(x => x.ico), 'y todos siguen con su icono');

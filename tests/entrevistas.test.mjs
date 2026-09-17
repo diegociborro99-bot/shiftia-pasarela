@@ -63,7 +63,7 @@ test('la entrevista entera del grupo está dentro: aptitudes y campos', () => {
   assert.match(html, /data-chab="\$\{h\.id\}\|\$\{e\}"/, 'sí / con dudas / no en la ficha');
 });
 test('el buscador mira toda la entrevista, no solo el nombre', () => {
-  assert.match(html, /return \[c\.nombre, c\.tel, c\.nota\]\.concat\(CAMPOS_ENTREVISTA\.map\(x => c\[x\.k\]\)\)/);
+  assert.match(html, /return \[c\.nombre, c\.tel, c\.nota\]\.concat\(CAMPOS_ENTREVISTA\.map\(x => textoCampo\(c, x\)\)\)/, 'y por la palabra de los campos de opciones, no por su id');
 });
 
 test('la ficha se abre como perfil: toda la entrevista a la vista, con un icono por dato', () => {

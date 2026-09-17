@@ -65,7 +65,8 @@
   Camarero Cocinero»). El puesto deja de ser uno solo: en la ficha se pulsan los dos, en la
   lista salen las dos etiquetas y los filtros de Cocina y Sala encuentran a esa persona por
   las dos. Las fichas que ya había se convierten solas al abrir la app.
-- **La ficha empieza por lo que se pregunta primero**: fecha, nombre, teléfono, edad y zona.
+- **La ficha empieza por lo que se pregunta primero**: fecha, nombre, teléfono, edad, zona y
+  **documentación en regla** (Sí / No / En trámite, de tres botones).
   La **fecha se pone sola** con la del día en que se registra a alguien, y es también la
   primera tarjeta del perfil; como se rellena sola, no cuenta por sí misma como «entrevista
   contestada». El resto de la entrevista —experiencia, horarios, condiciones…— va debajo.

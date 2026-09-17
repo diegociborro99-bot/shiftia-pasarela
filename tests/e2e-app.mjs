@@ -253,8 +253,8 @@ try {
   ok('Entrevistas: el buscador encuentra por teléfono', await pg.$$eval('#entrevistasRoot .entrow b', x => x.map(y => y.textContent).join('|')).then(t => /Janira/.test(t)));
   await pg.click('#entLimpiar').catch(() => {}); await pg.waitForTimeout(200);
   await pg.click('#entrevistasRoot .entrow'); await pg.waitForTimeout(300);
-  ok('Entrevistas: pulsar en alguien abre su perfil (seis tarjetas de dato y las ocho aptitudes)',
-    !!(await pg.$('#candOvl .cperf')) && await pg.$$eval('#candOvl .cperfk', x => x.length) === 6 && await pg.$$eval('#candOvl .habchip', x => x.length) === 8,
+  ok('Entrevistas: pulsar en alguien abre su perfil (siete tarjetas de dato y las ocho aptitudes)',
+    !!(await pg.$('#candOvl .cperf')) && await pg.$$eval('#candOvl .cperfk', x => x.length) === 7 && await pg.$$eval('#candOvl .habchip', x => x.length) === 8,
     JSON.stringify({ datos: await pg.$$eval('#candOvl .cperfk', x => x.length), aptitudes: await pg.$$eval('#candOvl .habchip', x => x.length) }));
   const perfil = await pg.evaluate(() => {
     const llenos = c => CAMPOS_ENTREVISTA.filter(x => c[x.k]).length;

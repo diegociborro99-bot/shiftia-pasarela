@@ -122,6 +122,9 @@ const CAMPOS_ENTREVISTA = [
   // además es `meta`: se pone sola al registrar, así que no cuenta como entrevista contestada.
   { k: 'fecha', label: 'Fecha de la entrevista', corto: true, ico: 'fecha', meta: true, cabecera: true },
   { k: 'edad', label: 'Edad', corto: true, ico: 'edad', cabecera: true }, { k: 'zona', label: 'Zona', ico: 'zona', cabecera: true },
+  // 17/09 (Diego): detrás de la zona, y de tres botones en vez de a mano
+  { k: 'doc', label: 'Documentación en regla', corto: true, ico: 'doc', cabecera: true,
+    opciones: [{ id: 'si', label: 'Sí' }, { id: 'no', label: 'No' }, { id: 'tramite', label: 'En trámite' }] },
   { k: 'exp', label: 'Experiencia', largo: true, ico: 'exp' }, { k: 'tipoCocina', label: 'Tipología de cocina', ico: 'tipoCocina' },
   { k: 'incorp', label: 'Incorporación', ico: 'incorp' }, { k: 'sueldo', label: 'Expectativas salariales', ico: 'sueldo' },
   { k: 'horarios', label: 'Horarios', largo: true, ico: 'horarios' }, { k: 'cond', label: 'Condiciones', largo: true, ico: 'cond' },
@@ -160,10 +163,18 @@ function etiquetaCandidato(c) {
   const v = c && VAL_LBL[c.val];
   return v ? `${p} · ${v.corto}` : p;
 }
+// lo que se enseña de un campo: los de opciones guardan el id («tramite») y lucen su
+// palabra («En trámite»); los de texto, lo escrito tal cual
+function textoCampo(c, x) {
+  const v = c && c[x.k];
+  if (!v) return '';
+  if (x.opciones) { const o = x.opciones.find(o => o.id === v); return o ? o.label : String(v); }
+  return String(v);
+}
 // el buscador mira todo lo que hay escrito de esa persona, no solo el nombre
 function textoCandidato(c) {
   const busca = BUSCA.filter(x => (c.busca || []).includes(x.id)).map(x => x.label);
-  return [c.nombre, c.tel, c.nota].concat(CAMPOS_ENTREVISTA.map(x => c[x.k])).concat(busca).filter(Boolean).join(' ').toLowerCase();
+  return [c.nombre, c.tel, c.nota].concat(CAMPOS_ENTREVISTA.map(x => textoCampo(c, x))).concat(busca).filter(Boolean).join(' ').toLowerCase();
 }
 // filtro combinado: lista, texto libre (nombre o teléfono), puesto y valoración
 function filtrarCandidatos(cands, f) {
@@ -1774,7 +1785,7 @@ if (typeof module !== 'undefined') {
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
     LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
-    puestosDe, textoPuestos, migrarCandidatos,
+    puestosDe, textoPuestos, migrarCandidatos, textoCampo,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,
