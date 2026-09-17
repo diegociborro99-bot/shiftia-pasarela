@@ -51,6 +51,13 @@
   permisos y sin acceso a **Actividad**, que sigue siendo solo del programador. En un
   servidor que ya estaba en marcha se renombran solas al arrancar, conservando contraseña,
   rol y ficha; y si la del jefe no existe, nace (`JEFE_USUARIO` / `JEFE_PASSWORD`).
+- **Un candidato puede ser camarero y cocinero a la vez** (Aroa: «hay algunos que son
+  Camarero Cocinero»). El puesto deja de ser uno solo: en la ficha se pulsan los dos, en la
+  lista salen las dos etiquetas y los filtros de Cocina y Sala encuentran a esa persona por
+  las dos. Las fichas que ya había se convierten solas al abrir la app.
+- **La fecha de la entrevista se pone sola** el día que se registra a alguien, y pasa a ser
+  **lo primero de la ficha** y la primera tarjeta del perfil. Como se rellena sola, ya no
+  cuenta por sí misma como «entrevista contestada».
 - **El lunes de Pasarela, como lo contó Aroa**: Mari Luz no hace partido los lunes; hace la
   **tarde entera, de 16:00 a cierre**, así que esa mañana no puede trabajar. La mañana se
   queda con Lola y Tere —falta uno— y la tarde con Mari Luz —falta otro—; los dos los

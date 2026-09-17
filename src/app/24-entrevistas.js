@@ -13,7 +13,13 @@ const ICO_CAND = { cocina: () => SVG_COCINA, camarero: () => SVG_CAMARERO, bien:
   incorp: () => SVG_INCORP, sueldo: () => SVG_SUELDO, horarios: () => SVG_HORARIO, cond: () => SVG_COND, obs: () => SVG_OBS,
   adj: () => SVG_ADJ, tel: () => SVG_TEL, wa: () => SVG_WA, nota: () => SVG_NOTA, aptitud: () => SVG_APTITUD };
 const icoCand = k => (ICO_CAND[k] ? ICO_CAND[k]() : '');
-const icoPuesto = p => { const x = PUESTOS_CAND.find(v => v.id === p); return x ? icoCand(x.ico) : ''; };
+const icoPuesto = id => { const x = PUESTOS_CAND.find(v => v.id === id); return x ? icoCand(x.ico) : ''; };
+// las etiquetas de puesto de un candidato: una por cada uno al que opta, o «Sin puesto»
+function chipsPuesto(c) {
+  const ps = PUESTOS_CAND.filter(x => puestosDe(c).includes(x.id));
+  if (!ps.length) return '<em class="entp p-no">Sin puesto</em>';
+  return ps.map(x => `<em class="entp p-${esc(x.id)}">${icoCand(x.ico)}${esc(x.corto)}</em>`).join('');
+}
 const icoVal = v => { const x = VAL_LBL[v]; return x ? icoCand(x.ico) : ''; };
 
 function candidatos() { S.entrevistas = S.entrevistas || []; return S.entrevistas; }
@@ -39,7 +45,7 @@ function renderEntrevistas() {
 
   const chip = (k, v, txt, n, ico) => `<button class="entchip${ENT[k] === v ? ' on' : ''}" data-entf="${k}|${esc(v)}">${ico || ''}${esc(txt)}${n !== undefined ? `<i>${n}</i>` : ''}</button>`;
   const puestoChips = `<div class="entchips" role="group" aria-label="Filtrar por puesto">
-    ${chip('puesto', '', 'Todos', r.total)}${PUESTOS_CAND.map(x => chip('puesto', x.id, x.corto, undefined, icoCand(x.ico))).join('')}${chip('puesto', 'ninguno', 'Sin puesto', r.sinPuesto)}</div>`;
+    ${chip('puesto', '', 'Todos', r.total)}${PUESTOS_CAND.map(x => chip('puesto', x.id, x.corto, r.puesto[x.id], icoCand(x.ico))).join('')}${chip('puesto', 'ninguno', 'Sin puesto', r.sinPuesto)}</div>`;
   const valChips = `<div class="entchips" role="group" aria-label="Filtrar por valoración">
     ${chip('val', '', 'Todas')}${VALORACIONES.map(v => chip('val', v.id, v.label, r[v.id], icoCand(v.ico))).join('')}${chip('val', 'ninguna', 'Sin valorar', r.sinValorar)}</div>`;
   const habChips = `<div class="entchips" role="group" aria-label="Filtrar por aptitud">
@@ -82,7 +88,7 @@ function filaCand(c) {
     <span class="entav" style="--pc:${avColor(c.id)}">${esc(initials(nombreCand(c)))}</span>
     <span class="enttxt"><b>${esc(nombreCand(c))}${tieneEntrevista(c) ? '<i class="entok" title="Entrevista contestada">●</i>' : ''}</b><small>${c.tel ? esc(telBonito(c.tel)) : 'sin teléfono'}${c.edad ? ' · ' + esc(c.edad) + ' años' : ''}${c.zona ? ' · ' + esc(c.zona.split(/[,.]/)[0].slice(0, 22)) : ''}</small></span>
     <span class="entetq">
-      <em class="entp p-${esc(c.puesto || 'no')}">${icoPuesto(c.puesto)}${c.puesto === 'cocina' ? 'Cocina' : c.puesto === 'sala' ? 'Sala' : 'Sin puesto'}</em>
+      ${chipsPuesto(c)}
       ${v ? `<em class="entv v-${esc(v.id)}">${icoVal(v.id)}${esc(v.label)}</em>` : '<em class="entv v-no">Sin valorar</em>'}
       ${mot ? `<em class="entm">${esc(mot.label)}</em>` : ''}
     </span>
@@ -102,7 +108,7 @@ function fichaCandHTML(c) {
   const cortos = CAMPOS_ENTREVISTA.filter(x => !x.largo);
   const largos = CAMPOS_ENTREVISTA.filter(x => x.largo).filter(x => c[x.k]);
 
-  const etq = `<em class="entp p-${esc(c.puesto || 'no')}">${icoPuesto(c.puesto)}${c.puesto === 'cocina' ? 'Cocina' : c.puesto === 'sala' ? 'Sala' : 'Sin puesto'}</em>
+  const etq = `${chipsPuesto(c)}
     ${v ? `<em class="entv v-${esc(v.id)}">${icoVal(v.id)}${esc(v.label)}</em>` : '<em class="entv v-no">Sin valorar</em>'}
     ${mot ? `<em class="entm">${esc(mot.label)}</em>` : ''}
     ${c.adj ? `<em class="entadj">${icoCand('adj')}${c.adj} ${c.adj === 1 ? 'foto o CV' : 'fotos y CV'} en Notion</em>` : ''}`;
@@ -150,19 +156,21 @@ function abrirPerfilCand(c) {
 // ---------- ficha de un candidato (cajetines) ----------
 function abrirFichaCand(id, editar) {
   const nuevo = !id;
-  const c = nuevo ? { id: nuevoIdCand(), nombre: '', tel: '', puesto: null, val: null, motivo: null, nota: '', hab: {}, lista: ENT.lista } : candidatoDe(id);
+  const c = nuevo ? { id: nuevoIdCand(), nombre: '', tel: '', puestos: [], val: null, motivo: null, nota: '', hab: {}, lista: ENT.lista, fecha: fmtLargo(isoHoy()) } : candidatoDe(id);
   if (!c) return;
   if (!nuevo && !editar) { abrirPerfilCand(c); return; }
   const tmpHab = Object.assign({}, c.hab || {});
+  const tmpPtos = puestosDe(c).slice();
   const seg = (k, opts) => `<div class="segrow">${opts.map(o => `<button type="button" class="segk${(c[k] || '') === o.id ? ' on' : ''}" data-cset="${k}|${esc(o.id)}">${o.ico ? icoCand(o.ico) : ''}${esc(o.label)}</button>`).join('')}</div>`;
   const ov = abrirOverlay('candOvl', `
     <span class="micro">${nuevo ? 'ENTREVISTAS' : esc((LISTAS_CAND.find(l => l.id === c.lista) || {}).label || '')}</span>
     <h2 class="revh2">${nuevo ? 'Registrar candidato' : esc(nombreCand(c))}</h2>
     <div class="candform">
+      <label class="pinlbl candfecha">${icoCand('fecha')}Fecha de la entrevista<input class="logininp" data-cin="fecha" value="${esc(c.fecha || '')}" placeholder="${esc(fmtLargo(isoHoy()))}">${nuevo ? '<small>la de hoy, puesta sola</small>' : ''}</label>
       <label class="pinlbl">Nombre<input class="logininp" data-cin="nombre" value="${esc(c.nombre || '')}" placeholder="Nombre y apellidos" autocomplete="off"></label>
       <label class="pinlbl">Teléfono<input class="logininp" data-cin="tel" inputmode="tel" value="${esc(c.tel || '')}" placeholder="600 00 00 00" autocomplete="off"></label>
-      <div class="pinlbl">Puesto al que opta</div>
-      ${seg('puesto', PUESTOS_CAND.map(x => ({ id: x.id, label: x.label, ico: x.ico })).concat([{ id: '', label: 'Sin decidir' }]))}
+      <div class="pinlbl">Puesto al que opta <small>puedes marcar los dos</small></div>
+      <div class="segrow">${PUESTOS_CAND.map(x => `<button type="button" class="segk${tmpPtos.includes(x.id) ? ' on' : ''}" data-cpto="${esc(x.id)}">${icoCand(x.ico)}${esc(x.label)}</button>`).join('')}<button type="button" class="segk${tmpPtos.length ? '' : ' on'}" data-cpto="">Sin decidir</button></div>
       <div class="pinlbl">Valoración</div>
       ${seg('val', VALORACIONES.concat([{ id: '', label: 'Sin valorar' }]))}
       <div class="pinlbl">Lista</div>
@@ -175,7 +183,7 @@ function abrirFichaCand(id, editar) {
         <div class="pinlbl">La entrevista <small>${tieneEntrevista(c) ? 'contestada' : 'sin contestar'}${c.adj ? ` · ${c.adj} ${c.adj === 1 ? 'foto o CV' : 'fotos o CV'} en Notion` : ''}</small></div>
         <div class="candhab">${HABILIDADES.map(h => `<span class="habrow"><em>${icoCand(h.ico)}${esc(h.label)}</em>
           <span class="segrow">${['si', 'dudas', 'no'].map(e => `<button type="button" class="segk mini${(tmpHab[h.id] || '') === e ? ' on e-' + e : ''}" data-chab="${h.id}|${e}">${esc(HAB_ESTADO[e])}</button>`).join('')}</span></span>`).join('')}</div>
-        ${CAMPOS_ENTREVISTA.map(x => `<label class="pinlbl${x.largo ? ' ancho' : ''}">${esc(x.label)}${x.largo
+        ${CAMPOS_ENTREVISTA.filter(x => x.k !== 'fecha').map(x => `<label class="pinlbl${x.largo ? ' ancho' : ''}">${icoCand(x.ico)}${esc(x.label)}${x.largo
           ? `<textarea class="logininp" data-cin="${x.k}" rows="${(c[x.k] || '').length > 160 ? 5 : 2}" placeholder="—">${esc(c[x.k] || '')}</textarea>`
           : `<input class="logininp" data-cin="${x.k}" value="${esc(c[x.k] || '')}" placeholder="—">`}</label>`).join('')}
       </div>
@@ -190,9 +198,17 @@ function abrirFichaCand(id, editar) {
 
   const tmp = Object.assign({}, c);
   ov.addEventListener('click', ev => {
-    const b = ev.target.closest('[data-cset],[data-cok],[data-cdel],[data-chab],[data-cperf]');
+    const b = ev.target.closest('[data-cset],[data-cok],[data-cdel],[data-chab],[data-cperf],[data-cpto]');
     if (!b) return;
     if (b.dataset.cperf !== undefined) { abrirPerfilCand(c); return; }
+    if (b.dataset.cpto !== undefined) {
+      const id = b.dataset.cpto;
+      if (!id) tmpPtos.length = 0;
+      else if (tmpPtos.includes(id)) tmpPtos.splice(tmpPtos.indexOf(id), 1);
+      else tmpPtos.push(id);
+      ov.querySelectorAll('[data-cpto]').forEach(x => x.classList.toggle('on', x.dataset.cpto ? tmpPtos.includes(x.dataset.cpto) : !tmpPtos.length));
+      return;
+    }
     if (b.dataset.chab !== undefined) {
       const [h, e] = b.dataset.chab.split('|');
       tmpHab[h] = tmpHab[h] === e ? undefined : e;
@@ -217,10 +233,12 @@ function abrirFichaCand(id, editar) {
     }
     ov.querySelectorAll('[data-cin]').forEach(i => { tmp[i.dataset.cin] = i.value.trim(); });
     tmp.hab = tmpHab;
+    tmp.puestos = PUESTOS_CAND.filter(x => tmpPtos.includes(x.id)).map(x => x.id);   // en el orden de siempre
+    delete tmp.puesto;
     tmp.tel = telLimpio(tmp.tel);
     if (!tmp.nombre && !tmp.tel) { alert('Pon al menos un nombre o un teléfono.'); return; }
     if (tmp.lista !== 'alerta') tmp.motivo = null;
-    if (nuevo) { tmp.fecha = tmp.fecha || fmtLargo(isoHoy()); candidatos().push(tmp); }
+    if (nuevo) { tmp.fecha = tmp.fecha || fmtLargo(isoHoy()); candidatos().push(tmp); }   // por si la borró
     else Object.assign(c, tmp);
     ENT.lista = tmp.lista;
     ov.remove();

@@ -1097,6 +1097,43 @@ ok('entrevistas: dos listas, dos etiquetas por candidato y filtro combinado', ()
   assert.equal(r.total, 3); assert.equal(r.bien, 1); assert.equal(r.mal, 1); assert.equal(r.regular, 1); assert.equal(r.sinValorar, 0);
 });
 
+ok('puesto múltiple: hay quien opta a camarero y a cocinero a la vez (Aroa, 17/09)', () => {
+  const est = { entrevistas: [
+    { id: 'c1', nombre: 'Uno', puesto: 'cocina', lista: 'ent' },
+    { id: 'c2', nombre: 'Dos', puesto: 'sala', lista: 'ent' },
+    { id: 'c3', nombre: 'Tres', lista: 'ent' },
+  ] };
+  const r = M.migrarCandidatos(est);
+  assert.equal(r.candidatos, 3, 'los tres pasan de un puesto suelto a una lista');
+  assert.deepStrictEqual(est.entrevistas.map(c => c.puestos), [['cocina'], ['sala'], []]);
+  assert.ok(est.entrevistas.every(c => c.puesto === undefined), 'el campo viejo se retira');
+  // y ahora uno puede llevar los dos
+  est.entrevistas[2].puestos = ['cocina', 'sala'];
+  assert.equal(M.etiquetaCandidato(est.entrevistas[2]), 'Cocina y sala');
+  assert.equal(M.etiquetaCandidato(est.entrevistas[0]), 'Cocina');
+  assert.equal(M.etiquetaCandidato({ puestos: [], val: 'bien' }), 'Sin puesto · bien');
+  const ids = f => M.filtrarCandidatos(est.entrevistas, f).map(c => c.id);
+  assert.deepStrictEqual(ids({ puesto: 'cocina' }), ['c1', 'c3'], 'el filtro de cocina lo encuentra');
+  assert.deepStrictEqual(ids({ puesto: 'sala' }), ['c2', 'c3'], 'y el de sala también');
+  assert.deepStrictEqual(ids({ puesto: 'ninguno' }), [], 'ya no queda nadie sin puesto');
+  const res = M.resumenCandidatos(est.entrevistas, 'ent');
+  assert.equal(res.sinPuesto, 0);
+  assert.deepStrictEqual(res.puesto, { cocina: 2, sala: 2 }, 'quien lleva los dos cuenta en los dos');
+  // pasar la migración otra vez no toca lo ya migrado
+  assert.equal(M.migrarCandidatos(est).candidatos, 0);
+  assert.deepStrictEqual(est.entrevistas[2].puestos, ['cocina', 'sala']);
+});
+
+ok('la fecha de la entrevista va la primera de todos los datos (Aroa, 17/09)', () => {
+  assert.equal(M.CAMPOS_ENTREVISTA[0].k, 'fecha', 'es lo primero que se ve en la ficha y en el perfil');
+  assert.ok(M.CAMPOS_ENTREVISTA.every(x => x.ico), 'y todos siguen con su icono');
+  // la fecha se pone sola al registrar, así que por sí sola no significa «entrevista contestada»
+  assert.equal(M.tieneEntrevista({ fecha: '17 de septiembre' }), false, 'solo con la fecha, no');
+  assert.equal(M.tieneEntrevista({ fecha: '17 de septiembre', edad: '30' }), true);
+  assert.equal(M.tieneEntrevista({ hab: { cafetera: 'si' } }), true);
+  assert.equal(M.resumenCandidatos([{ lista: 'ent', fecha: 'hoy' }, { lista: 'ent', fecha: 'hoy', zona: 'Elche' }], 'ent').conEntrevista, 1);
+});
+
 ok('vacaciones para la nómina: días y fechas del mes por persona, y la vista del año entero', () => {
   const cfg = cfgBase(), st = staffDe(cfg);
   const aroa = M.personaDe(st, 'yilian');

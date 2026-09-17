@@ -46,7 +46,7 @@ test('las etiquetas llevan los mismos iconos que el grupo usa en su base: sarté
   assert.match(html, /const SVG_VETO = ICO\(/);
   assert.match(html, /const ICO_CAND = \{ cocina: [\s\S]*?espera: \(\) => SVG_ESPERA,/);
   // y salen tanto en la lista como en los filtros y en la ficha
-  assert.match(html, /<em class="entp p-\$\{esc\(c\.puesto \|\| 'no'\)\}">\$\{icoPuesto\(c\.puesto\)\}/);
+  assert.match(html, /<em class="entp p-\$\{esc\(x\.id\)\}">\$\{icoCand\(x\.ico\)\}/, 'una etiqueta por cada puesto al que opta');
   assert.match(html, /chip\('val', v\.id, v\.label, r\[v\.id\], icoCand\(v\.ico\)\)/);
   assert.match(html, /\$\{o\.ico \? icoCand\(o\.ico\) : ''\}/, 'la ficha también');
 });
@@ -83,4 +83,18 @@ test('el perfil del candidato tiene estilo propio (tarjetas de dato, aptitudes y
   for (const sel of ['.cperf{', '.cperfhead{', '.cperfk{', '.cperfk.vacio{', '.habchip{', '.cbloq{'])
     assert.ok(html.includes(sel), sel + ' en los estilos');
   assert.match(html, /\.habchip\.s-si\{/, 'las aptitudes se colorean por sí/dudas/no');
+});
+
+test('el puesto se marca doble (camarero y cocinero) y la fecha se pone sola al registrar', () => {
+  // 17/09 (Aroa): «hay algunos que son Camarero Cocinero, pon la opción para que pueda
+  // pulsar las dos» y «la fecha de la entrevista se podría hacer automática el día que abro
+  // la casilla? Quizá aparezca lo primero del todo».
+  assert.match(html, /function migrarCandidatos\(estado\)/, 'la migración del campo viejo va dentro');
+  assert.match(html, /migrarCandidatos\(estado\)/, 'y se llama al cargar el estado');
+  assert.match(html, /data-cpto="/, 'cada puesto se pulsa por su cuenta');
+  assert.match(html, /puedes marcar los dos/, 'y la ficha lo dice');
+  assert.match(html, /fecha: fmtLargo\(isoHoy\(\)\)/, 'al registrar a alguien la fecha ya viene puesta');
+  const campos = html.match(/const CAMPOS_ENTREVISTA = \[[\s\S]*?\n\];/)[0];
+  assert.match(campos, /\[\s*\n\s*\/\/[^\n]*\n\s*\{ k: 'fecha'/, 'la fecha es el primer dato de todos');
+  assert.ok(!/function icoPuesto|c\.puesto ===/.test(html.slice(html.indexOf('function filaCand'), html.indexOf('function abrirFichaCand'))), 'la fila ya no mira un puesto suelto');
 });

@@ -107,6 +107,7 @@ function migrarEstado(estado) {
   migrarPuestos(estado);    // 17/09: el puesto «comodín» pasa a ser «apoyo»
   // 17/09: la base de entrevistas de Notion (entrevistas + alerta interna)
   if (!Array.isArray(estado.entrevistas) || !estado.entrevistas.length) estado.entrevistas = JSON.parse(JSON.stringify(ENTREVISTAS_SEMILLA));
+  migrarCandidatos(estado);   // 17/09: el puesto del candidato pasa de uno suelto a una lista
   limpiarLibrePuntual(estado.staff, isoHoy());   // los días libres puntuales caducan solos
   asignarColores(estado.staff);
   estado.esquema = 1;

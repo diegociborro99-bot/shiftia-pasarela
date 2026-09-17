@@ -104,8 +104,9 @@ const HAB_ESTADO = { si: 'Sí', dudas: 'Con dudas', no: 'No' };
 // El resto de la entrevista, tal como la tiene el grupo en su plantilla
 // cada dato con su icono: la ficha del candidato los pinta con él (José, 17/09)
 const CAMPOS_ENTREVISTA = [
+  // la fecha va la primera de todas: es lo que Aroa mira al abrir la ficha (17/09)
+  { k: 'fecha', label: 'Fecha de la entrevista', corto: true, ico: 'fecha', meta: true },
   { k: 'edad', label: 'Edad', corto: true, ico: 'edad' }, { k: 'zona', label: 'Zona', ico: 'zona' },
-  { k: 'fecha', label: 'Fecha de la entrevista', corto: true, ico: 'fecha' },
   { k: 'exp', label: 'Experiencia', largo: true, ico: 'exp' }, { k: 'tipoCocina', label: 'Tipología de cocina', ico: 'tipoCocina' },
   { k: 'incorp', label: 'Incorporación', ico: 'incorp' }, { k: 'sueldo', label: 'Expectativas salariales', ico: 'sueldo' },
   { k: 'horarios', label: 'Horarios', largo: true, ico: 'horarios' }, { k: 'cond', label: 'Condiciones', largo: true, ico: 'cond' },
@@ -117,9 +118,30 @@ const MOTIVOS_ALERTA = [
   { id: 'OTRO', label: 'Otro motivo' },
 ];
 const VAL_LBL = {}; VALORACIONES.forEach(v => { VAL_LBL[v.id] = v; });
-// «Cocinero bien», «Camarera en espera»…: la etiqueta que pidió José
+// 17/09 (Aroa): «hay algunos que son Camarero Cocinero». El puesto deja de ser uno solo y
+// pasa a ser una lista; `puesto` (el campo viejo, de un valor) se migra al cargar.
+function puestosDe(c) {
+  if (c && Array.isArray(c.puestos)) return c.puestos;
+  return c && c.puesto ? [c.puesto] : [];
+}
+function textoPuestos(c) {
+  const ps = PUESTOS_CAND.filter(x => puestosDe(c).includes(x.id));
+  if (!ps.length) return 'Sin puesto';
+  return ps.map((x, i) => i ? x.corto.toLowerCase() : x.corto).join(' y ');
+}
+function migrarCandidatos(estado) {
+  const r = { candidatos: 0 };
+  for (const c of (estado && estado.entrevistas) || []) {
+    if (Array.isArray(c.puestos)) { delete c.puesto; continue; }
+    c.puestos = c.puesto ? [c.puesto] : [];
+    delete c.puesto;
+    r.candidatos++;
+  }
+  return r;
+}
+// «Cocinero bien», «Camarera en espera», «Cocina y sala»…: la etiqueta que pidió José
 function etiquetaCandidato(c) {
-  const p = c && c.puesto === 'cocina' ? 'Cocina' : c && c.puesto === 'sala' ? 'Sala' : 'Sin puesto';
+  const p = textoPuestos(c);
   const v = c && VAL_LBL[c.val];
   return v ? `${p} · ${v.corto}` : p;
 }
@@ -134,7 +156,7 @@ function filtrarCandidatos(cands, f) {
   const qTel = q.replace(/\D/g, '');
   return (cands || []).filter(c => {
     if (o.lista && c.lista !== o.lista) return false;
-    if (o.puesto) { if (o.puesto === 'ninguno' ? c.puesto : c.puesto !== o.puesto) return false; }
+    if (o.puesto) { const ps = puestosDe(c); if (o.puesto === 'ninguno' ? ps.length : !ps.includes(o.puesto)) return false; }
     if (o.val) { if (o.val === 'ninguna' ? c.val : c.val !== o.val) return false; }
     if (o.motivo && c.motivo !== o.motivo) return false;
     if (o.hab && ((c.hab || {})[o.hab] !== 'si')) return false;
@@ -143,21 +165,25 @@ function filtrarCandidatos(cands, f) {
   });
 }
 function resumenCandidatos(cands, lista) {
-  const out = { total: 0, sinPuesto: 0, sinValorar: 0, conEntrevista: 0, hab: {} };
+  const out = { total: 0, sinPuesto: 0, sinValorar: 0, conEntrevista: 0, hab: {}, puesto: {} };
   for (const v of VALORACIONES) out[v.id] = 0;
   for (const h of HABILIDADES) out.hab[h.id] = 0;
+  for (const x of PUESTOS_CAND) out.puesto[x.id] = 0;
   for (const c of cands || []) {
     if (lista && c.lista !== lista) continue;
     out.total++;
-    if (!c.puesto) out.sinPuesto++;
+    const ps = puestosDe(c);
+    if (!ps.length) out.sinPuesto++;
+    for (const x of PUESTOS_CAND) if (ps.includes(x.id)) out.puesto[x.id]++;
     if (!c.val) out.sinValorar++; else if (out[c.val] !== undefined) out[c.val]++;
-    if (CAMPOS_ENTREVISTA.some(x => c[x.k]) || Object.keys(c.hab || {}).length) out.conEntrevista++;
+    if (tieneEntrevista(c)) out.conEntrevista++;
     for (const h of HABILIDADES) if ((c.hab || {})[h.id] === 'si') out.hab[h.id]++;
   }
   return out;
 }
-// ¿esta persona tiene la entrevista contestada?
-function tieneEntrevista(c) { return !!(c && (CAMPOS_ENTREVISTA.some(x => c[x.k]) || Object.keys(c.hab || {}).length)); }
+// ¿esta persona tiene la entrevista contestada? La fecha no cuenta: se pone sola al
+// registrarla (Aroa, 17/09), así que por sí sola no dice que se le haya preguntado nada.
+function tieneEntrevista(c) { return !!(c && (CAMPOS_ENTREVISTA.some(x => !x.meta && c[x.k]) || Object.keys(c.hab || {}).length)); }
 
 function turnoId(localId, franja) { return `${localId}_${franja}`; }
 function partirTurno(tid) { const i = tid.lastIndexOf('_'); return { localId: tid.slice(0, i), franja: tid.slice(i + 1) }; }
@@ -1732,6 +1758,7 @@ if (typeof module !== 'undefined') {
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
     LISTAS_CAND, VALORACIONES, PUESTOS_CAND, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
+    puestosDe, textoPuestos, migrarCandidatos,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,

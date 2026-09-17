@@ -266,7 +266,15 @@ try {
   await pg.click('#candOvl [data-cedit]'); await pg.waitForTimeout(250);
   ok('Entrevistas: «Editar» abre la entrevista entera para tocarla', await pg.$$eval('#candOvl [data-cin]', x => x.length) >= 12 && await pg.$$eval('#candOvl [data-chab]', x => x.length) === 21,
     JSON.stringify({ cajetines: await pg.$$eval('#candOvl [data-cin]', x => x.length), aptitudes: await pg.$$eval('#candOvl [data-chab]', x => x.length) }));
+  for (const puesto of ['cocina', 'sala']) {
+    const ya = await pg.$eval(`#candOvl [data-cpto="${puesto}"]`, b => b.classList.contains('on'));
+    if (!ya) await pg.click(`#candOvl [data-cpto="${puesto}"]`);
+  }
+  ok('Entrevistas: los dos puestos se pueden pulsar a la vez (Aroa, 17/09)',
+    await pg.$$eval('#candOvl [data-cpto].on', b => b.map(x => x.dataset.cpto).sort().join(',')) === 'cocina,sala');
   await pg.click('#candOvl [data-cset="val|bien"]'); await pg.click('#candOvl [data-cok]'); await pg.waitForTimeout(350);
+  const dosPuestos = await pg.evaluate(() => (S.entrevistas || []).filter(c => (c.puestos || []).length === 2).map(c => c.nombre));
+  ok('Entrevistas: quien es camarero y cocinero se guarda con los dos', dosPuestos.length === 1, JSON.stringify(dosPuestos));
   const valBien = await pg.evaluate(() => (S.entrevistas || []).filter(c => c.lista === 'alerta' && c.val === 'bien').length);
   ok('Entrevistas: valorar a alguien se guarda, queda en el historial y vuelve al perfil ya valorado', valBien === 1
     && !!(await pg.$('#candOvl .cperfetq .entv.v-bien'))
