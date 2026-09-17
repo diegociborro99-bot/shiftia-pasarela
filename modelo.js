@@ -56,6 +56,17 @@ const PUESTOS = [
   { id: 'sala', label: 'Sala' }, { id: 'cocina', label: 'Cocina' }, { id: 'apoyo', label: 'Apoyo' },
 ];
 function esApoyo(p) { return !!p && p.puesto === 'apoyo'; }
+// Un veto es «no hace esa franja en ese local». Desde el 17/09 puede llevar `dow` (un día o
+// varios) para los casos como Mari Luz: la mañana de Pasarela solo se le veta los lunes,
+// porque esa tarde la hace entera. Sin `dow`, el veto es de todos los días, como el de Cristian.
+function dowsVeto(v) { return v.dow === undefined || v.dow === null ? null : (Array.isArray(v.dow) ? v.dow : [v.dow]); }
+function vetoDe(p, localId, franja, dow) {
+  return (p.vetos || []).find(v => v.localId === localId && v.franja === franja && (dowsVeto(v) === null || dowsVeto(v).includes(dow))) || null;
+}
+function textoVeto(v, nombreLocal) {
+  const dows = dowsVeto(v);
+  return `no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'} en ${nombreLocal}${dows ? ' ' + dows.map(d => DOW_PL[d]).join(' y ') : ''}`;
+}
 
 // ---------- entrevistas (José, 17/09) ----------
 // Dos menús: las entrevistas del grupo y la alerta interna (quien no acude a la cita o
@@ -376,7 +387,7 @@ function puedeEstar(cfg, staff, est, iso, tid, pid, opts) {
   if (!m && act('franjas') && Array.isArray(p.franjas) && p.franjas.length && !p.franjas.includes(franja)) m = forzable(p.franjas.length === 1 ? (p.franjas[0] === 'M' ? 'siempre de mañana' : 'solo tardes') : 'franja no permitida');
   if (!m && p.standby) m = forzable('en standby: aún no entra en la planilla');
   if (!m && act('libra') && libraEn(p, iso)) m = forzable(libraPuntualVigente(p, iso) ? `libra ${DOW_PL[dow]} esta semana` : `libra ${DOW_PL[dow]}`);
-  if (!m && act('vetos') && (p.vetos || []).some(v => v.localId === localId && v.franja === franja)) m = forzable(`no hace ${franja === 'M' ? 'mañanas' : 'tardes'} en ${l.nombre}`);
+  if (!m && act('vetos')) { const v = vetoDe(p, localId, franja, isoDow(iso)); if (v) m = forzable(textoVeto(v, l.nombre)); }
   if (!m && act('partido')) {
     const otra = franja === 'M' ? 'T' : 'M';
     const enOtra = turnosDe(cfg).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(pid));
@@ -851,7 +862,7 @@ function condicionesDe(cfg, staff) {
     if (caracteristicaActiva(p, 'franjas') && (p.franjas || []).length === 1) add(`p:${p.id}:franjas`, `${p.nombre} solo hace ${p.franjas[0] === 'M' ? 'mañanas' : 'tardes'}`, { tipo: 'persona', pid: p.id, k: 'franjas' });
     if (regla(cfg, 'libra') && caracteristicaActiva(p, 'libra') && (p.libra || []).length) add(`p:${p.id}:libra`, `${p.nombre} libra ${p.libra.map(d => DOW_PL[d]).join(' y ')}${p.libreVariable ? ' (día libre variable)' : ''}`, { tipo: 'persona', pid: p.id, k: 'libra' });
     if (regla(cfg, 'partido') && caracteristicaActiva(p, 'partido') && ((p.partido || {}).siempre || ((p.partido || {}).dias || []).length)) add(`p:${p.id}:partido`, `${p.nombre} hace partido ${p.partido.siempre ? 'siempre' : 'los ' + dowsTxt(p.partido.dias)}`, { tipo: 'persona', pid: p.id, k: 'partido' });
-    if (regla(cfg, 'vetos') && caracteristicaActiva(p, 'vetos')) for (const v of p.vetos || []) add(`p:${p.id}:veto:${v.localId}:${v.franja}`, `${p.nombre} no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'} en ${(localDe(cfg, v.localId) || {}).nombre || v.localId}`, { tipo: 'persona', pid: p.id, k: 'vetos' });
+    if (regla(cfg, 'vetos') && caracteristicaActiva(p, 'vetos')) for (const v of p.vetos || []) add(`p:${p.id}:veto:${v.localId}:${v.franja}`, `${p.nombre} ${textoVeto(v, (localDe(cfg, v.localId) || {}).nombre || v.localId)}`, { tipo: 'persona', pid: p.id, k: 'vetos' });
     if (regla(cfg, 'nuncaCon') && caracteristicaActiva(p, 'nuncaCon')) for (const q of p.nuncaCon || []) { const key = [p.id, q].sort().join('|'); if (vistos.has(key)) continue; vistos.add(key); add(`p:${p.id}:nuncaCon:${q}`, `${p.nombre} y ${nom(q)} no coinciden`, { tipo: 'persona', pid: p.id, k: 'nuncaCon', otro: q }); }
     if (regla(cfg, 'cubreA') && caracteristicaActiva(p, 'cubreA')) for (const c of p.cubreA || []) add(`p:${p.id}:cubre:${c.pid}:${c.dow || ''}`, `${p.nombre} cubre a ${nom(c.pid)}${c.dow ? ' ' + DOW_PL[c.dow] : ''}${c.turnoId ? ' en ' + (localDe(cfg, partirTurno(c.turnoId).localId) || {}).nombre + ' por la ' + FRANJA_LBL[partirTurno(c.turnoId).franja].toLowerCase() : ''}`, { tipo: 'persona', pid: p.id, k: 'cubreA', informativa: true });
     if (regla(cfg, 'cocina') && caracteristicaActiva(p, 'cocina') && p.cocina) {
@@ -893,7 +904,7 @@ function verificarSemana(cfg, staff, est, lunes) {
         if (c.k === 'franjas') for (const t of mis) if (!p.franjas.includes(t.franja)) v.push(`${dl(iso)}: ${FRANJA_LBL[t.franja].toLowerCase()}`);
         if (c.k === 'libra' && mis.length && p.libra.includes(dow)) v.push(`${dl(iso)}: trabaja`);
         if (c.k === 'partido' && mis.some(t => t.franja === 'M') && mis.some(t => t.franja === 'T') && !(p.partido.siempre || p.partido.dias.includes(dow))) v.push(`${dl(iso)}: partido no declarado`);
-        if (c.k === 'vetos') for (const t of mis) if ((p.vetos || []).some(x => x.localId === t.local.id && x.franja === t.franja)) v.push(`${dl(iso)}: ${t.local.nombre} ${FRANJA_LBL[t.franja].toLowerCase()}`);
+        if (c.k === 'vetos') for (const t of mis) if (vetoDe(p, t.local.id, t.franja, dow)) v.push(`${dl(iso)}: ${t.local.nombre} ${FRANJA_LBL[t.franja].toLowerCase()}`);
         if (c.k === 'nuncaCon') for (const t of mis) if (pidsEn(est, iso, t.id).includes(c.otro)) v.push(`${dl(iso)}: juntos en ${t.local.nombre}`);
         if (c.k === 'cocina') for (const t of mis) { const e = asignados(est, iso, t.id).find(x => x.pid === c.pid); if (e && e.cocina && !puedeCocina(cfg, p, t.local.id, iso)) v.push(`${dl(iso)}: lleva la cocina en ${t.local.nombre}`); }
         if (c.k === 'abre') { const tid = turnoId(c.localId, c.franja); if (pidsEn(est, iso, tid).includes(c.pid)) { const s = slots(iso, tid).find(x => x.pid === c.pid); if (s && s.pos !== 1) v.push(`${dl(iso)}: sale ${s.pos}.º`); } }
@@ -1376,7 +1387,7 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
     indices.forEach((x, i) => {
       const bloqueada = ausenciaEn(p, x.iso) || (p.libra || []).includes(x.dow) || ((p.franjas || []).length && !p.franjas.includes(x.franja));
       if (bloqueada) { w.unavailable[i] = '*'; return; }
-      const vet = (p.vetos || []).filter(v => v.franja === x.franja).map(v => v.localId);
+      const vet = (p.vetos || []).filter(v => v.franja === x.franja && (dowsVeto(v) === null || dowsVeto(v).includes(x.dow))).map(v => v.localId);
       if (vet.length) w.unavailable[i] = vet;
     });
     for (const l of cfg.locales) for (const dow of TODOS) if (puedeCocina(cfg, p, l.id, isoDe(2026, 10, 4 + dow))) { const s = skillDe(l.id, dow); if (!w.skills.includes(s)) w.skills.push(s); }
@@ -1562,7 +1573,7 @@ function semillaPasarela() {
     P('jacquelin', 'Jacquelin', 'sala', ['ZAPA'], ['M'], [7]),
     P('cris', 'Cris Parreño', 'sala', ['MONACO'], ['M'], [7], { nota: 'Yilian le hace el día libre' }),
     P('esmeralda', 'Esmeralda', 'cocina', ['MONACO'], ['M'], [1], { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] }, nota: 'la sustituye Jenny los lunes' }),
-    P('mariluz', 'Mari Luz', 'sala', ['PASARELA'], ['M', 'T'], [3], { partido: { dias: [1, 2, 4, 5, 6] }, nuncaCon: ['lavinia'], nuncaConFlexible: true, nota: 'siempre partido; el domingo hace la mañana' }),
+    P('mariluz', 'Mari Luz', 'sala', ['PASARELA'], ['M', 'T'], [3], { partido: { dias: [2, 4, 5, 6] }, vetos: [{ localId: 'PASARELA', franja: 'M', dow: 1 }], nuncaCon: ['lavinia'], nuncaConFlexible: true, nota: 'casi siempre partido; el lunes hace la tarde entera, de 16:00 a cierre, y por eso no puede la mañana (Aroa, 17/09); el domingo hace la mañana' }),
     P('noe', 'Noe', 'sala', ['EL33'], ['M', 'T'], [1], { partido: { dias: [2, 3] }, cocina: { titular: ['EL33'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'jenny', dow: 2 }, { pid: 'victoria', dow: 3 }], nota: 'siempre de tarde; cocina cuando cubre; el domingo estira el turno en El 33' }),
     P('scapon', 'Susana Capón', 'sala', ['MONACO'], ['T'], [1], { nuncaConFlexible: true, cocina: { titular: ['MONACO'], reserva: [], soloDias: [2] }, abre: { MONACO: ['T'] }, nota: 'sale la primera; camarera, no cocinera salvo el martes (día flojo) para que libre Hojan' }),
     P('ivan', 'Iván', 'sala', ['PASARELA'], ['T'], [1], { abre: { PASARELA: ['T'] }, nota: 'sale el primero' }),
@@ -1571,7 +1582,7 @@ function semillaPasarela() {
     P('roberto', 'Roberto', 'sala', ['ZAPA', 'PASARELA'], ['M', 'T'], [1], { partido: { dias: [3, 5, 6] }, cocina: { titular: [], reserva: ['ZAPA'], soloDias: [] }, cubreA: [{ pid: 'sluna' }, { pid: 'adrian' }], nota: 'tercero de apoyo por las mañanas en Zapatillera; los jueves abre la tarde por Susana Luna; el domingo, Pasarela con Mari Luz' }),
     P('lavinia', 'Lavinia', 'apoyo', ['PASARELA', 'ZAPA'], ['M', 'T'], [1, 2, 4], { partido: { dias: [3, 7] }, nuncaCon: ['mariluz'], nuncaConFlexible: true, cubreA: [{ pid: 'mariluz', dow: 3 }], comodin: true, nota: 'el miércoles (libre de Mari Luz) hace partido en Pasarela; viernes y sábado, tarde en Zapatillera; el domingo dobla' }),
     P('tere', 'Tere', 'apoyo', ['PASARELA', 'MONACO'], ['M'], [6, 7], { comodin: true, nota: 'apoyo de mañanas; no trabaja fines de semana' }),
-    P('leo', 'Leo', 'apoyo', [], ['T'], [3, 4, 7], { nuncaCon: ['scapon'], nuncaConFlexible: true, noPrimero: ['M', 'T'], comodin: true, nota: 'apoyo de tardes en cualquier local; entra siempre a partir del segundo puesto' }),
+    P('leo', 'Leo', 'apoyo', [], ['T'], [3, 4, 7], { nuncaCon: ['scapon'], nuncaConFlexible: true, noPrimero: ['M', 'T'], comodin: true, supuestos: ['en la semana tipo solo le salen dos días (viernes y sábado): falta saber dónde hace los demás'], nota: 'apoyo de tardes en cualquier local; entra siempre a partir del segundo puesto' }),
     P('jenny', 'Jenny', 'cocina', ['EL33', 'MONACO'], ['M', 'T'], [2], { partido: { dias: [3, 4, 5, 6, 7] }, cocina: { titular: ['EL33', 'MONACO'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'esmeralda', dow: 1 }], nota: 'cocina de El 33 en partido; los lunes cocina del Mónaco por Esmeralda; el domingo dobla (mañana El 33, tarde Mónaco)' }),
     P('cristian', 'Cristian', 'apoyo', [], ['M', 'T'], [3], { partido: { dias: [6] }, cocina: { titular: [], reserva: [], soloDias: [], nunca: true }, vetos: [{ localId: 'PASARELA', franja: 'M' }], noAbre: ['EL33'], noPrimero: ['T'], comodin: true, supuestos: ['seis días (la plantilla dice cinco): pendiente del cliente'], nota: 'apoyo de sala; no hace la tarde completa (nunca el primero de la tarde); el martes tarde fijo en el Mónaco' }),
     P('yilian', 'Yilian', 'apoyo', ['MONACO'], ['M', 'T'], [4], { libreVariable: true, cubreA: [{ pid: 'cris', dow: 7 }, { pid: 'scapon', dow: 1, turnoId: 'MONACO_T' }], nota: 'apoyo de Cris Parreño de mañana; le hace el domingo; el lunes abre la tarde por Susana Capón' }),
@@ -1579,7 +1590,7 @@ function semillaPasarela() {
     P('adrian', 'Adrián', 'cocina', ['ZAPA'], ['M', 'T'], [3], { partido: { siempre: true, dias: [1, 2, 4, 5, 6, 7] }, cocina: { titular: ['ZAPA'], reserva: [], soloDias: [] }, nota: 'cocina de Zapatillera, siempre partido' }),
     P('victoria', 'Victoria', 'sala', ['EL33'], ['M', 'T'], [3], { partido: { dias: [5, 6] }, nota: 'de mañana; viernes y sábado partido; Noe la cubre el miércoles' }),
     P('hojan', 'Hojan', 'cocina', ['EL33', 'MONACO'], ['M', 'T'], [2, 7], { soloCocina: true, partido: { dias: [1] }, cocina: { titular: ['EL33', 'MONACO'], reserva: ['ZAPA'], soloDias: [] }, cubreA: [{ pid: 'maydeth' }], nota: 'cubre la baja de Maydeth; el lunes partido: cocina de El 33 y del Mónaco' }),
-    P('dulce', 'Dulce', 'apoyo', ['PASARELA', 'MONACO'], ['M', 'T'], [], { standby: true, noPrimero: ['M', 'T'], supuestos: ['en standby hasta confirmar días libres y locales', 'no sale la primera mientras sea nueva'], nota: 'apoyo; alta del 17/09, de prueba el fin de semana. En standby: no entra en la planilla hasta que el grupo confirme sus días y sus locales' }),
+    P('dulce', 'Dulce', 'apoyo', ['PASARELA', 'MONACO'], ['M', 'T'], [], { standby: true, noPrimero: ['M', 'T'], supuestos: ['en standby hasta confirmar días libres y locales', 'no sale la primera mientras sea nueva', 'quizá el partido del lunes en Pasarela, que taparía los dos huecos; a ver cómo entra (Aroa, 17/09)'], nota: 'apoyo; alta del 17/09, de prueba el fin de semana. En standby: no entra en la planilla hasta que el grupo confirme sus días y sus locales' }),
     P('laura', 'Laura', 'sala', ['PASARELA'], ['M', 'T'], [], { ausencias: [{ tipo: 'BAJ', desde: '2026-09-01', detalle: 'la cubre Lola' }] }),
     P('maydeth', 'Maydeth', 'cocina', ['MONACO'], ['M', 'T'], [], { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] }, ausencias: [{ tipo: 'BAJ', desde: '2026-09-01', detalle: 'la cubre Hojan' }] }),
   ];
@@ -1592,7 +1603,7 @@ function semillaPasarela() {
     1: [pl('EL33_M', 'victoria'), pl('EL33_M', 'hojan', 'c', { n: 'cocina de El 33' }),
         pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'),
         pl('MONACO_M', 'cris'), pl('MONACO_M', 'jenny', 'c', { por: 'esmeralda' }), pl('MONACO_M', 'cristian', 's'), pl('MONACO_T', 'yilian', 'a', { por: 'scapon' }), pl('MONACO_T', 'hojan', 'c'),
-        pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'mariluz'), pl('PASARELA_M', 'tere', 's'), pl('PASARELA_T', 'mariluz'), pl('PASARELA_T', 'leo', 's')],
+        pl('PASARELA_M', 'lola', 'a'), pl('PASARELA_M', 'tere'), pl('PASARELA_T', 'mariluz', '', { n: 'la tarde entera, de 16:00 a cierre' })],
     2: [pl('EL33_M', 'victoria'), pl('EL33_M', 'noe', 'c', { por: 'jenny' }), pl('EL33_T', 'noe', 'c', { por: 'jenny' }),
         pl('ZAPA_M', 'jacquelin'), pl('ZAPA_M', 'juani'), pl('ZAPA_M', 'adrian', 'c'), pl('ZAPA_M', 'roberto'), pl('ZAPA_T', 'sluna'), pl('ZAPA_T', 'adrian', 'c'),
         pl('MONACO_M', 'cris'), pl('MONACO_M', 'esmeralda', 'c'), pl('MONACO_M', 'yilian'), pl('MONACO_T', 'scapon', 'ac', { n: 'excepción del martes' }), pl('MONACO_T', 'cristian'),

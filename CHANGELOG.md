@@ -51,6 +51,15 @@
   permisos y sin acceso a **Actividad**, que sigue siendo solo del programador. En un
   servidor que ya estaba en marcha se renombran solas al arrancar, conservando contraseña,
   rol y ficha; y si la del jefe no existe, nace (`JEFE_USUARIO` / `JEFE_PASSWORD`).
+- **El lunes de Pasarela, como lo contó Aroa**: Mari Luz no hace partido los lunes; hace la
+  **tarde entera, de 16:00 a cierre**, así que esa mañana no puede trabajar. La mañana se
+  queda con Lola y Tere —falta uno— y la tarde con Mari Luz —falta otro—; los dos los
+  taparía una misma persona haciendo el partido, y Aroa apunta a Dulce «a lo mejor», a ver
+  cómo entra. La planilla enseña los dos huecos en vez de rellenarlos con quien no toca.
+- **Vetos por día**: «no hace mañanas en Pasarela» pasa a poder ser «no hace mañanas en
+  Pasarela **los lunes**». Es lo que hace falta para el caso de Mari Luz, y el generador,
+  la cobertura, el catálogo de condiciones y la exportación al núcleo lo respetan igual.
+- **Tere es apoyo** (confirmado por Aroa; era la última persona con el puesto pendiente).
 - **Los permisos se cambian desde la app**: en Cuenta → usuarios, cada cuenta lleva un
   selector para subirla a administrador o bajarla a empleado —al bajarla se le pide su
   ficha de la planilla, porque si no entraría y no vería nada suyo—. Nadie puede cambiarse

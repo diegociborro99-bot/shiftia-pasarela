@@ -42,7 +42,7 @@ function montarImpresion(h, apaisado, nombre, opts) {
   const altoContenido = b => { const u = b.lastElementChild; return u ? u.getBoundingClientRect().bottom - b.getBoundingClientRect().top : b.scrollHeight; };
   for (const bloque of paginas.length ? paginas : [pg]) {
     const alto = () => paginas.length ? altoContenido(bloque) + margen : pg.scrollHeight;
-    for (const cls of ['compacto', 'compacto2']) { if (alto() <= altoHoja) break; bloque.classList.add(cls); }
+    for (const cls of ['compacto', 'compacto2', 'compacto3']) { if (alto() <= altoHoja) break; bloque.classList.add(cls); }
   }
   $('#pClose').addEventListener('click', cerrarImpresion);
   const pv = $('#pVolcar'); if (pv) pv.addEventListener('click', () => o.volcar.fn());

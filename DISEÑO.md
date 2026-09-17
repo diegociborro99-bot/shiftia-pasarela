@@ -36,21 +36,27 @@ cada día y la lista de las 32 condiciones comprobadas. Tres condiciones nuevas:
   continuo (C).
 - **32** Leo no va nunca de primero, ni de mañana ni de tarde.
 - **Excepción acordada el 15/09** (reunión con la encargada): en Pasarela, quien hace
-  partido puede abrir la tarde. Con Iván libre el lunes, la tarde la hace Mari Luz en
-  partido y no hace falta pedir una cobertura entera. Es un interruptor por local
-  (Ajustes de los locales → «Quién abre»); en El 33 sigue apagado porque José da el
-  martes por insalvable si no entra otra persona o vuelve alguna de las bajas.
+  partido puede abrir la tarde. Es un interruptor por local (Ajustes de los locales →
+  «Quién abre»); en El 33 sigue apagado porque José da el martes por insalvable si no
+  entra otra persona o vuelve alguna de las bajas.
+- **El lunes de Pasarela, aclarado por Aroa el 17/09**: Mari Luz **no hace partido los
+  lunes**; hace **la tarde entera, de 16:00 a cierre**, y por eso esa mañana no puede
+  trabajar. La mañana se queda con **Lola y Tere** y falta uno; la tarde, con **Mari Luz**
+  y falta otro. Los dos los taparía una sola persona haciendo el partido —Aroa apunta a
+  **Dulce**, «a lo mejor», cuando se vea cómo entra—. En la app es un **veto por día**
+  (Mari Luz, mañanas de Pasarela, solo los lunes), así que ni el generador ni la cobertura
+  la colocan ahí, y el hueco se ve en la planilla en vez de taparse solo.
 
 La semana tipo de la app es esa planilla corregida, y un test del modelo la
-reproduce casilla a casilla, con el hueco de El 33 del martes por la tarde (el de
-Pasarela del lunes desapareció con la excepción del 15/09). Las decisiones del prototipo que el cliente aún no ha confirmado
+reproduce casilla a casilla, con el hueco de El 33 del martes por la tarde y los dos
+del lunes en Pasarela. Las decisiones del prototipo que el cliente aún no ha confirmado
 (Cristian a seis días, quién abre El 33, Zapatillera y el Mónaco por la mañana,
 horarios reales) siguen marcadas como supuestos.
 
 ## Cómo se aplican las reglas
 
 - **Interruptores**: cada regla del grupo y cada característica de una ficha se puede apagar desde Equipo; lo apagado no lo comprueba nadie (ni el generador, ni la revisión, ni el selector).
-- **Duras** (nunca las rompe el generador; a mano solo con «forzar» y motivo, salvo cierres, ausencias y estar dos veces en la misma casilla, que no se pueden forzar): cierres de cada local por día, ausencias, franja que no trabaja, vetos local + franja, días que libra, «nunca con», cocina obligatoria en el Mónaco.
+- **Duras** (nunca las rompe el generador; a mano solo con «forzar» y motivo, salvo cierres, ausencias y estar dos veces en la misma casilla, que no se pueden forzar): cierres de cada local por día, ausencias, franja que no trabaja, vetos local + franja (y, si lo llevan, solo ciertos días), días que libra, «nunca con», cocina obligatoria en el Mónaco.
 - **Blandas** (avisan): no es su local habitual, partido no declarado, día que evita, más turnos que su contrato, cocina de reserva en vez de titular.
 - **Mínimos**: los del PDF; los que llevaban asterisco se marcan **supuesto** y se ven así en toda la app. Un evento con refuerzo sube el mínimo de esas casillas ese día.
 - **Posición de la cocina** por local y franja (2.ª en El 33 y Mónaco; 3.ª en Zapatillera mañana con tres o más, 2.ª por la tarde; 1.ª el mañana de Pasarela); **quien abre** va el primero y se marca «ABRE».
@@ -67,7 +73,7 @@ Manda, por este orden: **horario puesto a mano en la casilla** → **tramo del p
 
 El **turno partido no son dos jornadas enteras**: quien lo hace entra a mediodía y vuelve por la noche (Adrián «solo viene como al mediodía»). Son **las mismas ocho horas repartidas entre las dos franjas**, y el reparto lo dio el cliente el 16/09: **entre semana 5 y 3, el fin de semana 4 y 4**, «aunque depende a veces según la necesidad». De fábrica, eso son 11:00–16:00 y 21:00–00:00 de lunes a viernes, y 12:00–16:00 y 20:00–00:00 sábado y domingo.
 
-**Quien abre una franja** entra a la hora de apertura y hace el tramo largo de los dos; el otro tramo se queda con el corto, pegado al final de su franja. Así Mari Luz, que abre la tarde de Pasarela haciendo partido (acuerdo del 15/09), hace 16:00–21:00 y 13:00–16:00: ocho horas, como todo el mundo.
+**Quien abre una franja** entra a la hora de apertura y hace el tramo largo de los dos; el otro tramo se queda con el corto, pegado al final de su franja. Así Mari Luz, que abre la tarde de Pasarela haciendo partido (acuerdo del 15/09), hace 16:00–21:00 y 13:00–16:00: ocho horas, como todo el mundo. Los lunes no: ese día hace la tarde seguida, de 16:00 a cierre, que son las mismas ocho.
 
 Un **turno continuo** —la misma persona abre la mañana y la tarde del mismo local— es **un turno seguido y se cuenta una vez**: la mañana suma 0 y la tarde lleva las horas y las nocturnas del tirón. El contador de horas lo dice por persona («N días de turno continuo»).
 
@@ -75,7 +81,7 @@ Con esto, **un día trabajado son ocho horas para todo el equipo**, haga turno s
 
 ## Reunión del 17/09 (José y Aroa)
 
-Puestos: **sala, cocina y apoyo**; el «comodín» se retira como puesto. Sala: Noe, Victoria, Jacquelin, Juani, Susana Luna, Cris Parreño, Susana Capón, Mari Luz, Iván, Lola y Roberto. Cocina: Adrián, Esmeralda, Jenny y Johan. Apoyo: Yilian, Lavinia, Leo, Cristian y Dulce (alta del 17/09). Lola es apoyo pero se queda en sala mientras cubra la baja de Laura. **Tere no la nombró**: su puesto sigue pendiente.
+Puestos: **sala, cocina y apoyo**; el «comodín» se retira como puesto. Sala: Noe, Victoria, Jacquelin, Juani, Susana Luna, Cris Parreño, Susana Capón, Mari Luz, Iván, Lola y Roberto. Cocina: Adrián, Esmeralda, Jenny y Johan. Apoyo: Yilian, Lavinia, Leo, Cristian y Dulce (alta del 17/09). Lola es apoyo pero se queda en sala mientras cubra la baja de Laura. **Tere es apoyo** (Aroa, 17/09).
 
 Reglas: **dos apoyos no pueden quedarse solos** en un turno; **Johan siempre cocina** y quien ese día lleva la cocina no se propone para reforzar sala; los «nunca coincide» de Lavinia–Mari Luz y Leo–Susana Capón se relajan con aviso cuando no hay gente suficiente; y el **día libre puntual** de una semana no toca el día de siempre.
 
@@ -119,7 +125,7 @@ Horas y nómina: **C1 respondida** (WhatsApp de la encargada, 15/09): mañana de
 
 Mínimos y aperturas: C7 confirmar los mínimos con asterisco; C8 Zapatillera mañana ¿3 o 2?; C9 Pasarela domingo ¿2 y 2?; C10 quién abre El 33, Zapatillera y Mónaco por la mañana; C11 quién sale primero cuando el titular libra.
 
-Personas: C12 tercero de El 33 sábado mañana; C13 días de partido reales de Roberto; C14 Hojan en Zapatillera y sus mañanas libres; C15 semana de Jenny; C16 Noe los partidos de Jenny y Victoria; C17 día libre de Yilian y su domingo; C18 apoyo de Pasarela domingo tarde; C19 qué significa «no coinciden»; C20 Susana Capón el martes; C21 Cristian «no abre El 33» y partidos; C22 Tere como tercera de Pasarela; C23 Lavinia viernes, sábado y domingo; C24 vuelta de Laura y Maydeth; C25 las tres decisiones de Highkey.
+Personas: C12 tercero de El 33 sábado mañana; C13 días de partido reales de Roberto; C14 Hojan en Zapatillera y sus mañanas libres; C15 semana de Jenny; C16 Noe los partidos de Jenny y Victoria; C17 día libre de Yilian y su domingo; C18 apoyo de Pasarela domingo tarde; C19 qué significa «no coinciden»; C20 Susana Capón el martes; C21 Cristian «no abre El 33» y partidos; C22 **respondida** (Aroa, 17/09): Tere es apoyo y está en la mañana de Pasarela; C23 Lavinia viernes, sábado y domingo; C24 vuelta de Laura y Maydeth; C25 las tres decisiones de Highkey.
 
 Fútbol y eventos: C26 refuerzo por equipo y local; C27 quién cubre (plantilla o extras); C28 otros días con refuerzo.
 

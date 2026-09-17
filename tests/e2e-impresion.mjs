@@ -2,8 +2,8 @@
 // genera con la semana tipo), semana del 14 al 20 de septiembre de 2026, la del
 // prototipo del cliente del 11/09. Se comprueba:
 //   (1) #printBtn en Semana pinta las casillas con posicionesDe: El 33 martes tarde
-//       con «Hueco disponible» y Noe ◆ en 2.ª, Pasarela lunes tarde con Mari Luz abriendo
-//       en partido (acordado el 15/09: sin hueco), Lola con ▸, marcas P y C (Noe miércoles)
+//       con «Hueco disponible» y Noe ◆ en 2.ª, Pasarela lunes tarde con Mari Luz la primera
+//       haciendo la tarde entera (Aroa, 17/09), Lola con ▸, marcas P y C (Noe miércoles)
 //       y «Quién libra» del viernes = nadie;
 //   (2) abrirImpresionSemanaGenerada(generarSemana(…)) monta las dos páginas del
 //       prototipo: título, 4 tablas de locales, «Qué ha cambiado», ≥ 30 condiciones
@@ -76,10 +76,11 @@ try {
   ok('El 33 martes tarde: Noe en la 1.ª con «por Jenny» debajo y sin marca de cocina en el papel', !!el33mt && el33mt.slots[0] && el33mt.slots[0].n === '1' && !el33mt.slots[0].coc && el33mt.slots[0].sub.some(x => /por Jenny/.test(x)), JSON.stringify(el33mt && el33mt.slots[0]));
   ok('El 33 martes tarde: la cuenta dice 1/1* y la casilla ya no va en rojo', !!el33mt && /1\/1\*/.test(el33mt.cuenta) && !/hueco/.test(el33mt.cls), el33mt && el33mt.cuenta + ' · ' + el33mt.cls);
   const pasLt = await cas('2026-09-14', 'PASARELA_T');
-  ok('Pasarela lunes tarde: Mari Luz abre en partido (P) en la 1.ª, sin hueco (acordado con el cliente el 15/09)', !!pasLt && pasLt.slots[0] && !pasLt.slots[0].hueco && /Mari Luz/.test(pasLt.slots[0].nombre) && pasLt.slots[0].P && !pasLt.slots.some(s => s.hueco), JSON.stringify(pasLt));
+  ok('Pasarela lunes tarde: Mari Luz la 1.ª y sin hueco; turno entero, no partido (Aroa, 17/09)', !!pasLt && pasLt.slots[0] && !pasLt.slots[0].hueco && /Mari Luz/.test(pasLt.slots[0].nombre) && !pasLt.slots[0].P && !pasLt.slots.some(s => s.hueco), JSON.stringify(pasLt));
+  ok('Pasarela lunes tarde: la casilla lo explica — «la tarde entera, de 16:00 a cierre»', !!pasLt && pasLt.slots[0] && pasLt.slots[0].sub.some(x => /16:00 a cierre/.test(x)), JSON.stringify(pasLt && pasLt.slots[0]));
   const pasLm = await cas('2026-09-14', 'PASARELA_M');
   ok('Pasarela lunes mañana: Lola lleva ▸ (sale la primera, fijo) en la 1.ª', !!pasLm && pasLm.slots[0] && /Lola/.test(pasLm.slots[0].nombre) && pasLm.slots[0].abre, JSON.stringify(pasLm && pasLm.slots[0]));
-  ok('Pasarela lunes mañana: Mari Luz con P (partido)', !!pasLm && pasLm.slots.some(s => /Mari Luz/.test(s.nombre) && s.P), JSON.stringify(pasLm && pasLm.slots));
+  ok('Pasarela lunes mañana: Mari Luz no está (esa tarde la hace entera) y quedan Lola y Tere', !!pasLm && !pasLm.slots.some(s => /Mari Luz/.test(s.nombre)) && pasLm.slots.some(s => /Tere/.test(s.nombre)), JSON.stringify(pasLm && pasLm.slots));
   const el33xm = await cas('2026-09-16', 'EL33_M');
   ok('El 33 miércoles mañana: Noe con C (turno continuo) y «por Victoria»; Jenny con P y sin marca de cocina', !!el33xm && el33xm.slots[0] && /Noe/.test(el33xm.slots[0].nombre) && el33xm.slots[0].C && el33xm.slots[0].sub.some(x => /por Victoria/.test(x)) && el33xm.slots[1] && /Jenny/.test(el33xm.slots[1].nombre) && !el33xm.slots[1].coc && el33xm.slots[1].P, JSON.stringify(el33xm && el33xm.slots));
   const monLm = await cas('2026-09-14', 'MONACO_M');
@@ -157,7 +158,7 @@ try {
   await pg.evaluate(() => abrirImpresionLocal('PASARELA'));
   ok('abrirImpresionLocal(PASARELA) monta la hoja vertical con las casillas nuevas', await llega(pg, () => !!document.querySelector('#printRoot .pxpage:not(.apaisado) table.pxlocal') && document.querySelectorAll('#printRoot table.pxlocal .pxg-s').length > 10, null, 4000) >= 0);
   const pl = await cas('2026-09-14', 'PASARELA_T');
-  ok('hoja del local: Pasarela lunes tarde con Mari Luz abriendo en partido, sin hueco', !!pl && pl.slots[0] && !pl.slots[0].hueco && /Mari Luz/.test(pl.slots[0].nombre) && !/hueco/.test(pl.cls), JSON.stringify(pl));
+  ok('hoja del local: Pasarela lunes tarde con Mari Luz la primera, sin hueco', !!pl && pl.slots[0] && !pl.slots[0].hueco && /Mari Luz/.test(pl.slots[0].nombre) && !/hueco/.test(pl.cls), JSON.stringify(pl));
   if (CAPTURAS) { const alto = await pg.evaluate(() => document.querySelector('#printRoot .pxpage').scrollHeight); await pg.setViewportSize({ width: 1400, height: alto + 80 }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-local.png'), fullPage: true }); }
   await pg.click('#pClose');
 
