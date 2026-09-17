@@ -1,0 +1,84 @@
+/* ===================================================================
+   TAMAÑO DE DEDO (17/09) — va el último a propósito: los estilos se
+   concatenan por orden de fichero y este tiene que ganar a los demás.
+   En cualquier pantalla táctil y en tablet, nada por debajo de lo que
+   pilla un dedo. Referencia: 34px de alto para un botón, 38 para un
+   campo de texto y 44 para lo que se usa a diario.
+   =================================================================== */
+@media (pointer:coarse), (max-width:1024px){
+  .btn-mini,.lmini .btn-mini,.abschip,.entchip,.segk,.segm button,
+  .dowset button,.locset button,.condchip,.filtchip,.wtg,.chipx,.addabs,.addrow button{min-height:34px}
+  .segm button{padding:0 14px}
+  .rmx{width:26px;height:26px;font-size:15px}
+  .glink{min-height:32px;padding:4px 2px}
+  .pnaus{min-height:26px}
+  input.logininp,select.logininp,textarea.logininp,.entbusca input,
+  input[type="time"],input[type="date"],input[type="number"],input[type="search"]{min-height:38px}
+  /* iOS hace zoom si el texto del campo baja de 16px */
+  input,select,textarea{font-size:max(16px,1em)}
+  .btn,.btn-cta,.btn-sec{min-height:40px}
+}
+/* en el escritorio de verdad, nada de esto */
+@media (pointer:fine) and (min-width:1025px){
+  input,select,textarea{font-size:inherit}
+}
+
+/* ===================================================================
+   PASADA DE MÓVIL (17/09) — 320, 360, 375, 390, 430 y tablet vertical.
+   Lo nuevo de hoy: Entrevistas, las vacaciones del año y el día libre
+   puntual. Va aquí, en el último fichero, porque los estilos se
+   concatenan por orden y estas reglas tienen que ganar a las de arriba.
+   =================================================================== */
+
+
+/* --- Entrevistas y alerta interna --- */
+@media (max-width:640px){
+  .enthead{gap:8px;margin-bottom:8px}
+  .enttabs{gap:6px}
+  .enttab{padding:8px 34px 8px 11px}
+  .enttab b{font-size:13px}
+  .enttab span{font-size:10px;line-height:1.25}
+  .enttab i{top:8px;right:9px;font-size:11.5px}
+  .entacts{flex-direction:row;gap:6px;min-width:0;flex:1 1 100%}
+  .entbusca{flex:1 1 auto;min-width:0}
+  .entbusca input{min-width:0;width:100%;font-size:16px}   /* 16px: iOS no hace zoom al enfocar */
+  #entNuevo{flex:0 0 auto;white-space:nowrap;padding:0 12px}
+  /* los filtros en una tira que se desliza, para no comerse media pantalla */
+  .entfiltros{display:block;margin-bottom:6px}
+  .entchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    padding:2px 12px 6px;margin:0 -12px}
+  .entchips::-webkit-scrollbar{display:none}
+  .entchip{flex:none}
+  .entcount{margin-bottom:6px}
+  /* la ficha de cada candidato: nombre arriba, etiquetas debajo, sin desbordar */
+  .entrow{align-items:flex-start;gap:9px;padding:9px 11px;flex-wrap:wrap}
+  .enttxt{flex:1 1 auto;min-width:0}
+  .entetq{flex:1 0 100%;justify-content:flex-start;padding-left:41px;margin-top:2px}
+  .entrow:hover{transform:none}
+  .candpie{flex-wrap:wrap}
+  .candpie .btn-sec,.candpie .btn-cta{flex:1}
+}
+@media (max-width:360px){
+  #entNuevo{padding:0 9px;font-size:12.5px}
+  .enttab{padding:7px 28px 7px 9px}
+  .enttab span{display:none}          /* en pantallas muy justas, solo el título y la cuenta */
+  .entetq{padding-left:0}
+  .entetq em{font-size:10px;padding:3px 7px}
+  .enttxt b{font-size:13px}
+}
+
+/* --- Vacaciones del año: la rejilla de 12 meses se desliza --- */
+@media (max-width:640px){
+  .vacacts{flex-wrap:wrap}
+  .vacsp{flex:1 0 100%;height:0}
+  .vactab{min-width:640px}
+  .vactab td.per{position:sticky;left:0;background-color:var(--surface);z-index:1}
+  .hausl{flex-direction:column}
+  .hausx{width:100%}
+}
+
+/* --- Día libre puntual en la ficha --- */
+@media (max-width:640px){
+  .lpunt .pinlbl small{display:block;margin-top:1px}
+  .lpuntpie{font-size:11.5px}
+}

@@ -24,6 +24,13 @@
 - **Vacaciones para la nómina**: columna de días de vacaciones en el contador de horas,
   las fechas en el desglose de cada persona y un botón **«Vacaciones del año»** con
   toda la plantilla mes a mes, exportable a Excel.
+- **Dulce en standby**: entra en la plantilla pero el generador no la coloca hasta que
+  el grupo confirme sus días libres y sus locales. Se quita con un interruptor en su ficha.
+- **Pasada de móvil** en 320, 360, 375, 390, 430 y tablet en vertical: ninguna pantalla
+  desborda ni tiene botones por debajo de lo que pilla un dedo, el buscador de Entrevistas
+  y «Registrar» van en una fila, los filtros en una tira que se desliza, las etiquetas de
+  cada candidato bajan a su línea, la tabla de vacaciones deja el nombre fijo al deslizar
+  los meses y los campos no hacen zoom al enfocarlos en el iPhone.
 
 ## v0.5.0 · 15/09/2026 — Lo que pidió el cliente en la reunión del 15/09
 
