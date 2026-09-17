@@ -91,12 +91,14 @@ const HABILIDADES = [
 ];
 const HAB_ESTADO = { si: 'Sí', dudas: 'Con dudas', no: 'No' };
 // El resto de la entrevista, tal como la tiene el grupo en su plantilla
+// cada dato con su icono: la ficha del candidato los pinta con él (José, 17/09)
 const CAMPOS_ENTREVISTA = [
-  { k: 'edad', label: 'Edad', corto: true }, { k: 'zona', label: 'Zona' }, { k: 'fecha', label: 'Fecha de la entrevista', corto: true },
-  { k: 'exp', label: 'Experiencia', largo: true }, { k: 'tipoCocina', label: 'Tipología de cocina' },
-  { k: 'incorp', label: 'Incorporación' }, { k: 'sueldo', label: 'Expectativas salariales' },
-  { k: 'horarios', label: 'Horarios', largo: true }, { k: 'cond', label: 'Condiciones', largo: true },
-  { k: 'obs', label: 'Observaciones', largo: true },
+  { k: 'edad', label: 'Edad', corto: true, ico: 'edad' }, { k: 'zona', label: 'Zona', ico: 'zona' },
+  { k: 'fecha', label: 'Fecha de la entrevista', corto: true, ico: 'fecha' },
+  { k: 'exp', label: 'Experiencia', largo: true, ico: 'exp' }, { k: 'tipoCocina', label: 'Tipología de cocina', ico: 'tipoCocina' },
+  { k: 'incorp', label: 'Incorporación', ico: 'incorp' }, { k: 'sueldo', label: 'Expectativas salariales', ico: 'sueldo' },
+  { k: 'horarios', label: 'Horarios', largo: true, ico: 'horarios' }, { k: 'cond', label: 'Condiciones', largo: true, ico: 'cond' },
+  { k: 'obs', label: 'Observaciones', largo: true, ico: 'obs' },
 ];
 const MOTIVOS_ALERTA = [
   { id: 'NOACUDE', label: 'No acude a la cita' },

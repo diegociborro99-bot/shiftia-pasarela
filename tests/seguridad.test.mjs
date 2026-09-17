@@ -242,8 +242,12 @@ test('crear y borrar usuarios es del encargado (y del programador), y el alta us
   assert.equal((await anon('DELETE', '/api/usuarios?id=' + id)).status, 401);
   // el encargado sí, y no puede quedarse el grupo sin encargado
   assert.equal((await admin('DELETE', '/api/usuarios?id=' + id, undefined, { Origin: BASE })).status, 200);
-  const idAdmin = (await admin('GET', '/api/usuarios')).datos.usuarios.find(u => u.rol === 'admin').id;
-  assert.equal((await admin('DELETE', '/api/usuarios?id=' + idAdmin, undefined, { Origin: BASE })).status, 400, 'no se borra el último encargado');
+  // 17/09: de serie hay dos encargados (admin y la cuenta del jefe, joseadmin); se van
+  // todos menos uno para comprobar que el último no se puede borrar
+  const encargados = (await admin('GET', '/api/usuarios')).datos.usuarios.filter(u => u.rol === 'admin');
+  assert.ok(encargados.length >= 2, 'admin y joseadmin');
+  for (const u of encargados.slice(1)) assert.equal((await admin('DELETE', '/api/usuarios?id=' + u.id, undefined, { Origin: BASE })).status, 200);
+  assert.equal((await admin('DELETE', '/api/usuarios?id=' + encargados[0].id, undefined, { Origin: BASE })).status, 400, 'no se borra el último encargado');
   // borrar a alguien le cierra la sesión al momento
   assert.equal((await c('GET', '/api/yo')).status, 401, 'la sesión del borrado muere');
 });

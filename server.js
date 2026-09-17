@@ -160,6 +160,22 @@ if (!db.prepare('SELECT COUNT(*) c FROM users').get().c) {
   }
 }
 
+// ---------- la cuenta del jefe: «joseadmin» (17/09) ----------
+// José entra con su propia cuenta, con los mismos permisos que el encargado: ve y toca
+// todo menos Actividad, que es del programador. Se crea aunque la base ya tenga usuarios,
+// porque el bloque de arriba solo corre en el primer arranque.
+function asegurarJose() {
+  const usu = String(process.env.JOSE_USUARIO || 'joseadmin').toLowerCase().trim();
+  if (!USUARIO_RE.test(usu)) { console.error(`[shiftia] JOSE_USUARIO «${usu}» no vale: no se crea la cuenta del jefe`); return; }
+  if (db.prepare('SELECT 1 FROM users WHERE usuario = ?').get(usu)) return;
+  const pass = process.env.JOSE_PASSWORD || PASS_GENERICA;
+  crearUsuario(usu, pass, 'admin', null, !process.env.JOSE_PASSWORD);
+  console.log(process.env.JOSE_PASSWORD
+    ? `[shiftia] usuario «${usu}» (jefe, permisos de encargado) creado con JOSE_PASSWORD`
+    : `[shiftia] usuario «${usu}» (jefe, permisos de encargado) creado con la contraseña genérica — la app le pedirá cambiarla al entrar`);
+}
+asegurarJose();
+
 // ---------- puerta de rescate: ADMIN_RESET ----------
 // ADMIN_PASSWORD solo actúa la primera vez (tabla de usuarios vacía), así que si el
 // encargado pierde su contraseña se queda fuera y /api/usuarios/reset no le sirve

@@ -53,6 +53,7 @@ function cliente(base) {
 }
 const admin = cliente();
 const prog = cliente();
+const jefe = cliente();
 const emp = cliente();
 const anon = cliente();
 
@@ -160,6 +161,21 @@ test('crear usuario empleado: contraseña GENÉRICA y cambio obligatorio al entr
   assert.equal((await emp('GET', '/api/estado')).status, 200, 'con contraseña propia ya entra');
 });
 
+test('la cuenta del jefe («joseadmin») nace con permisos de encargado, pero sin Actividad', async () => {
+  // 17/09: José, el jefe del grupo, entra con su propia cuenta. Mismos permisos que el
+  // encargado (rol admin) y, por tanto, sin auditoría: Actividad es del programador.
+  const r = await jefe('POST', '/api/login', { usuario: 'joseadmin', password: GENERICA });
+  assert.equal(r.status, 200);
+  assert.equal(r.datos.rol, 'admin', 'mismos permisos que el encargado');
+  assert.equal(r.datos.cambiar, true, 'sin JOSE_PASSWORD nace con la genérica y la app le pide cambiarla');
+  assert.equal((await jefe('GET', '/api/estado')).status, 403, 'con la genérica aún no entra');
+  assert.equal((await jefe('POST', '/api/password', { actual: GENERICA, nueva: 'josepasarela1' })).status, 200);
+  assert.equal((await jefe('GET', '/api/estado')).status, 200, 'con contraseña propia ve la planilla');
+  assert.equal((await jefe('GET', '/api/auditoria')).status, 403, 'Actividad no: eso es del programador');
+  assert.equal((await jefe('POST', '/api/usuarios', { usuario: 'altajefe', rol: 'empleado', pid: 'tere' })).status, 200, 'da altas como el encargado');
+  assert.equal((await jefe('POST', '/api/usuarios', { usuario: 'dev3', rol: 'programador' })).status, 403, 'y tampoco crea programadores');
+});
+
 test('roles: la auditoría es solo del programador; el encargado crea empleados y encargados, nunca programadores', async () => {
   assert.equal((await admin('GET', '/api/auditoria')).status, 403, 'el encargado no ve la auditoría');
   assert.equal((await emp('GET', '/api/auditoria')).status, 403);
@@ -189,6 +205,9 @@ test('roles: la auditoría es solo del programador; el encargado crea empleados 
   assert.equal((await prog('DELETE', `/api/usuarios?id=${dev2.id}`)).status, 200);
   assert.equal((await prog('DELETE', `/api/usuarios?id=${diego.id}`)).status, 400, 'último programador');
   assert.equal((await prog('DELETE', `/api/usuarios?id=${enc2.id}`)).status, 200, 'el programador borra encargados');
+  const jose = lista.find(u => u.usuario === 'joseadmin');
+  assert.ok(jose && jose.rol === 'admin', 'la cuenta del jefe sale en la lista con rol de encargado');
+  assert.equal((await prog('DELETE', `/api/usuarios?id=${jose.id}`)).status, 200, 'se borra como cualquier encargado');
   const adminU = lista.find(u => u.usuario === 'admin');
   assert.equal((await prog('DELETE', `/api/usuarios?id=${adminU.id}`)).status, 400, 'último encargado');
   // y el programador escribe la planilla, ve versiones y copia como el encargado

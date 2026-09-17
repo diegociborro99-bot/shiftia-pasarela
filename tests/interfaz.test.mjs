@@ -51,3 +51,22 @@ test('cerrar dos capas a la vez no retrocede dos veces en el historial', () => {
   assert.match(html, /if \(CERRANDO_POR_HISTORIAL \|\| atrasPendiente\) return;/);
   assert.match(html, /let soltarAtras = \(\) => \{\};/);
 });
+
+test('no queda ninguna variable de estilo huérfana (usada con var() y nunca definida)', () => {
+  // 17/09: la sección de Entrevistas usaba var(--line) y var(--bg2), que no existen en
+  // ningún sitio; el navegador tira la declaración entera y las tarjetas se quedaban sin
+  // borde ni fondo. Este test lo impide para toda la app.
+  // solo las que se usan «a pelo»: con var(--x, algo) el navegador tiene su plan B
+  const usadas = new Set([...html.matchAll(/var\((--[a-z0-9-]+)\s*\)/g)].map(m => m[1]));
+  const definidas = new Set([...html.matchAll(/(--[a-z0-9-]+)\s*['"]?\s*[:,]/g)].map(m => m[1]));
+  const huerfanas = [...usadas].filter(v => !definidas.has(v)).sort();
+  assert.deepEqual(huerfanas, [], 'variables usadas y nunca definidas: ' + huerfanas.join(', '));
+});
+
+test('los botones llevan siempre la clase base .btn con su modificador', () => {
+  // .btn es quien pone el tamaño y el aire; .btn-cta/.btn-sec/.btn-ghost solo el color.
+  // Sin ella el botón sale sin padding (le pasó al pie de la ficha de candidato, 17/09).
+  const sueltos = [...html.matchAll(/class="([^"]*\bbtn-(?:cta|sec|ghost)\b[^"]*)"/g)]
+    .map(m => m[1]).filter(c => !/(^|\s)btn(\s|$)/.test(c));
+  assert.deepEqual([...new Set(sueltos)], [], 'sin la clase base: ' + sueltos.join(' | '));
+});

@@ -38,6 +38,21 @@
   toda la plantilla mes a mes, exportable a Excel.
 - **Dulce en standby**: entra en la plantilla pero el generador no la coloca hasta que
   el grupo confirme sus días libres y sus locales. Se quita con un interruptor en su ficha.
+- **La ficha del candidato es ahora un perfil**: al pulsar en alguien se abre su hoja de
+  lectura con **todo** lo que trajimos de Notion —foto de color con sus iniciales, las dos
+  etiquetas, el teléfono para llamar o abrir WhatsApp de un toque, seis tarjetas de dato
+  (edad, zona, fecha de la entrevista, tipología de cocina, incorporación y lo que pide de
+  sueldo), las siete aptitudes coloreadas por sí / con dudas / no, y la experiencia, los
+  horarios, las condiciones, las observaciones y las notas en bloques—, **cada cosa con su
+  icono dibujado a mano**, en el mismo trazo que la sartén y la bandeja. Para tocar algo:
+  «Editar», que abre los cajetines de siempre y vuelve al perfil al guardar.
+- **Cuenta del jefe**: usuario **`joseadmin`**, con los mismos permisos que el encargado y
+  sin acceso a **Actividad**, que sigue siendo solo del programador. Se crea sola al
+  arrancar aunque el servidor ya estuviera en marcha (`JOSE_USUARIO` / `JOSE_PASSWORD`).
+- **Dos arreglos de estilo que venían de serie**: la sección de Entrevistas usaba dos
+  variables de color que no existían (`--line`, `--bg2`), así que sus tarjetas salían sin
+  borde ni fondo; y el pie de la ficha llevaba `btn-cta`/`btn-sec` sin la clase base `btn`,
+  que es la que pone el tamaño. Hay dos tests nuevos para que no vuelva a pasar en toda la app.
 - **Pasada de móvil** en 320, 360, 375, 390, 430 y tablet en vertical: ninguna pantalla
   desborda ni tiene botones por debajo de lo que pilla un dedo, el buscador de Entrevistas
   y «Registrar» van en una fila, los filtros en una tira que se desliza, las etiquetas de

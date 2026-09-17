@@ -98,4 +98,6 @@ SSE (`/api/eventos`) para repintar todos los dispositivos, copia diaria de la BD
 y el proxy al núcleo (`/api/nucleo/salud`, `/api/nucleo/solve`) con la clave del
 servicio guardada solo en el servidor. Roles: **programador** (todo + auditoría),
 **admin** (el encargado: planilla, condiciones, usuarios), **empleado** (solo lo
-suyo, proyectado por `estado-servidor.js`).
+suyo, proyectado por `estado-servidor.js`). Con rol `admin` nacen dos cuentas: `admin`
+(el encargado) y `joseadmin` (el jefe); esta última la crea `asegurarJose()` en cada
+arranque si falta, para que llegue también a los servidores que ya estaban en marcha.

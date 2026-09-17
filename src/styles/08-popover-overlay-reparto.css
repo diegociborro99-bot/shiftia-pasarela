@@ -152,9 +152,9 @@
 .achip{display:flex;align-items:center;gap:6px;width:100%;text-align:left;border:1.5px dashed var(--border);background:none;border-radius:9px;padding:4.5px 7px;margin-bottom:4px;font-size:10.5px;font-weight:700;color:var(--ink3);cursor:pointer;transition:all .12s}
 .achip em{font-style:normal;font-size:8.5px;font-family:var(--mono);color:var(--ink3)}
 .achip .amk{width:16px;height:16px;border-radius:5.5px;border:1.5px solid var(--border);display:grid;place-items:center;font-size:9px;font-weight:800;flex:none;color:var(--ink3)}
-.achip:hover{border-color:var(--sc);color:var(--ink)}
-.achip.on{border-style:solid;border-color:color-mix(in srgb,var(--sc) 45%,transparent);background:color-mix(in srgb,var(--sc) 12%,transparent);color:var(--ink)}
-.achip.on .amk{background:var(--sc);border-color:var(--sc);color:#fff}
+.achip:hover{border-color:var(--sc,var(--accent));color:var(--ink)}
+.achip.on{border-style:solid;border-color:color-mix(in srgb,var(--sc,var(--accent)) 45%,transparent);background:color-mix(in srgb,var(--sc,var(--accent)) 12%,transparent);color:var(--ink)}
+.achip.on .amk{background:var(--sc,var(--accent));border-color:var(--sc,var(--accent));color:#fff}
 .apn{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:var(--ink2)}
 .dayfoot{display:flex;gap:6px;padding:7px 9px;border-top:1px dashed var(--border2)}
 .dayfoot .btn-mini{flex:1;justify-content:center}

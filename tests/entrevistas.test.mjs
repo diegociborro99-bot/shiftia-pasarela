@@ -25,7 +25,7 @@ test('los filtros combinan puesto y valoración, y el buscador va por nombre o t
   assert.match(html, /function filtrarCandidatos\(cands, f\)/);
   assert.match(html, /placeholder="Buscar por nombre o teléfono…"/);
   assert.match(html, /const MOTIVOS_ALERTA = \[[\s\S]*?NOACUDE[\s\S]*?PROBLEMA/);
-  assert.match(html, /function abrirFichaCand\(id\)/);
+  assert.match(html, /function abrirFichaCand\(id, editar\)/);
 });
 test('la navegación conoce la vista y el móvil la lista en «Más»', () => {
   assert.match(html, /const VISTAS = \[[^\]]*'entrevistas'/);
@@ -62,4 +62,25 @@ test('la entrevista entera del grupo está dentro: aptitudes y campos', () => {
 });
 test('el buscador mira toda la entrevista, no solo el nombre', () => {
   assert.match(html, /return \[c\.nombre, c\.tel, c\.nota\]\.concat\(CAMPOS_ENTREVISTA\.map\(x => c\[x\.k\]\)\)/);
+});
+
+test('la ficha se abre como perfil: toda la entrevista a la vista, con un icono por dato', () => {
+  // 17/09 (José): «que se vea premium y visual». La ficha ya no es un formulario: es un
+  // perfil de lectura con todo lo que sacamos de Notion, y se edita con «Editar».
+  assert.match(html, /function fichaCandHTML\(c\)/);
+  const campos = html.match(/const CAMPOS_ENTREVISTA = \[[\s\S]*?\n\];/)[0];
+  for (const k of ['edad', 'zona', 'fecha', 'exp', 'tipoCocina', 'incorp', 'sueldo', 'horarios', 'cond', 'obs'])
+    assert.match(campos, new RegExp(`k: '${k}'[^}]*ico: '`), `${k} lleva su icono en el modelo`);
+  for (const k of ['SVG_EDAD', 'SVG_ZONA', 'SVG_FECHA', 'SVG_EXP', 'SVG_TIPOCOCINA', 'SVG_INCORP', 'SVG_SUELDO', 'SVG_HORARIO', 'SVG_COND', 'SVG_OBS', 'SVG_ADJ', 'SVG_TEL', 'SVG_WA', 'SVG_NOTA'])
+    assert.match(html, new RegExp('const ' + k + ' = ICO\\('), k + ' definido');
+  assert.match(html, /href="tel:\$\{/, 'el teléfono se llama desde la ficha');
+  assert.match(html, /wa\.me\/34/, 'y se abre WhatsApp con el prefijo de España');
+  assert.match(html, /data-cedit/, 'botón de editar');
+  assert.match(html, /data-cperf/, 'y de volver al perfil desde el formulario');
+});
+
+test('el perfil del candidato tiene estilo propio (tarjetas de dato, aptitudes y bloques)', () => {
+  for (const sel of ['.cperf{', '.cperfhead{', '.cperfk{', '.cperfk.vacio{', '.habchip{', '.cbloq{'])
+    assert.ok(html.includes(sel), sel + ' en los estilos');
+  assert.match(html, /\.habchip\.s-si\{/, 'las aptitudes se colorean por sí/dudas/no');
 });

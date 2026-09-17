@@ -82,3 +82,18 @@
   .lpunt .pinlbl small{display:block;margin-top:1px}
   .lpuntpie{font-size:11.5px}
 }
+
+/* el perfil del candidato en el móvil: una columna y el teléfono a lo ancho (17/09) */
+@media (max-width:640px){
+  /* la foto y el nombre en la misma línea; el hueco de la derecha es de la ✕ */
+  .cperfhead{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px 11px;padding:12px}
+  .cperfav{width:46px;height:46px;font-size:16px}
+  .cperfid{min-width:0;padding-right:40px}
+  .cperfid h2{font-size:18px;margin:2px 0 6px}
+  .cperfacts{grid-column:1/-1}
+  .cperfacts .btn-mini{flex:1;justify-content:center;min-height:40px}
+  .cperfkpis{grid-template-columns:1fr 1fr}
+  .cperfbloques{grid-template-columns:1fr}
+  .cperf .candpie .btn-sec,.cperf .candpie .btn-cta{flex:1;min-height:42px}
+}
+@media (max-width:380px){ .cperfkpis{grid-template-columns:1fr} }

@@ -95,6 +95,10 @@ creado la primera planilla nace igual de generada. Despliegue:
   (se cambia desde Cuenta; o define `PROGRAMADOR_PASSWORD` antes del primer arranque).
 - **Encargado**: usuario `admin`, contraseña `ADMIN_PASSWORD` o la genérica
   `pasarela2026` con cambio obligatorio al entrar.
+- **Jefe** (José): usuario `joseadmin`, contraseña `JOSE_PASSWORD` o la genérica
+  `pasarela2026` con cambio obligatorio. Los mismos permisos que el encargado:
+  ve y toca todo menos **Actividad**, que es solo del programador. Si falta, el
+  servidor la crea al arrancar (no hace falta empezar de cero).
 - Sin servidor (abrir `index.html` a pelo): usuario `admin`, contraseña `pasarela2026`.
 
 ## Logo del grupo

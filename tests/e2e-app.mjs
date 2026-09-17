@@ -253,13 +253,26 @@ try {
   ok('Entrevistas: el buscador encuentra por teléfono', await pg.$$eval('#entrevistasRoot .entrow b', x => x.map(y => y.textContent).join('|')).then(t => /Janira/.test(t)));
   await pg.click('#entLimpiar').catch(() => {}); await pg.waitForTimeout(200);
   await pg.click('#entrevistasRoot .entrow'); await pg.waitForTimeout(300);
-  ok('Entrevistas: la ficha se abre con la entrevista entera', await pg.$$eval('#candOvl [data-cin]', x => x.length) >= 12 && await pg.$$eval('#candOvl [data-chab]', x => x.length) === 21,
+  ok('Entrevistas: pulsar en alguien abre su perfil (seis tarjetas de dato y las siete aptitudes)',
+    !!(await pg.$('#candOvl .cperf')) && await pg.$$eval('#candOvl .cperfk', x => x.length) === 6 && await pg.$$eval('#candOvl .habchip', x => x.length) === 7,
+    JSON.stringify({ datos: await pg.$$eval('#candOvl .cperfk', x => x.length), aptitudes: await pg.$$eval('#candOvl .habchip', x => x.length) }));
+  const perfil = await pg.evaluate(() => {
+    const llenos = c => CAMPOS_ENTREVISTA.filter(x => c[x.k]).length;
+    const c = (S.entrevistas || []).filter(tieneEntrevista).sort((a, b) => llenos(b) - llenos(a))[0];
+    const h = fichaCandHTML(c);
+    return { quien: c.nombre, datos: llenos(c), falta: CAMPOS_ENTREVISTA.filter(x => c[x.k] && !h.includes(esc(String(c[x.k])))).map(x => x.k) };
+  });
+  ok(`Entrevistas: el perfil saca los ${perfil.datos} datos de ${perfil.quien} sin dejarse ninguno`, perfil.falta.length === 0, JSON.stringify(perfil));
+  await pg.click('#candOvl [data-cedit]'); await pg.waitForTimeout(250);
+  ok('Entrevistas: «Editar» abre la entrevista entera para tocarla', await pg.$$eval('#candOvl [data-cin]', x => x.length) >= 12 && await pg.$$eval('#candOvl [data-chab]', x => x.length) === 21,
     JSON.stringify({ cajetines: await pg.$$eval('#candOvl [data-cin]', x => x.length), aptitudes: await pg.$$eval('#candOvl [data-chab]', x => x.length) }));
   await pg.click('#candOvl [data-cset="val|bien"]'); await pg.click('#candOvl [data-cok]'); await pg.waitForTimeout(350);
   const valBien = await pg.evaluate(() => (S.entrevistas || []).filter(c => c.lista === 'alerta' && c.val === 'bien').length);
-  ok('Entrevistas: valorar a alguien se guarda y queda en el historial', !(await pg.$('#candOvl')) && valBien === 1
+  ok('Entrevistas: valorar a alguien se guarda, queda en el historial y vuelve al perfil ya valorado', valBien === 1
+    && !!(await pg.$('#candOvl .cperfetq .entv.v-bien'))
     && await pg.evaluate(() => (S.historial || []).some(x => /Candidato actualizado/.test(x.txt || ''))),
     await pg.evaluate(() => JSON.stringify((S.historial || []).slice(0, 2))));
+  await pg.click('#candOvl [data-ovx]'); await pg.waitForTimeout(200);
   await pg.click('#entrevistasRoot [data-entf="val|bien"]'); await pg.waitForTimeout(250);
   ok('Entrevistas: el filtro de valoración encuentra a quien acabamos de valorar', await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === 1);
   await pg.click('#entLimpiar'); await pg.waitForTimeout(200);

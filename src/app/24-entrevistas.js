@@ -8,7 +8,10 @@ const ENT = { lista: 'ent', q: '', puesto: '', val: '', motivo: '', hab: '', abi
 
 // El icono de cada etiqueta, los mismos que el grupo usa en su base de Notion
 const ICO_CAND = { cocina: () => SVG_COCINA, camarero: () => SVG_CAMARERO, bien: () => SVG_BIEN, mal: () => SVG_MAL, espera: () => SVG_ESPERA, veto: () => SVG_VETO,
-  cafetera: () => SVG_CAFETERA, barril: () => SVG_BARRIL, jamon: () => SVG_JAMON, tpv: () => SVG_TPV, pda: () => SVG_PDA };
+  cafetera: () => SVG_CAFETERA, barril: () => SVG_BARRIL, jamon: () => SVG_JAMON, tpv: () => SVG_TPV, pda: () => SVG_PDA,
+  edad: () => SVG_EDAD, zona: () => SVG_ZONA, fecha: () => SVG_FECHA, exp: () => SVG_EXP, tipoCocina: () => SVG_TIPOCOCINA,
+  incorp: () => SVG_INCORP, sueldo: () => SVG_SUELDO, horarios: () => SVG_HORARIO, cond: () => SVG_COND, obs: () => SVG_OBS,
+  adj: () => SVG_ADJ, tel: () => SVG_TEL, wa: () => SVG_WA, nota: () => SVG_NOTA, aptitud: () => SVG_APTITUD };
 const icoCand = k => (ICO_CAND[k] ? ICO_CAND[k]() : '');
 const icoPuesto = p => { const x = PUESTOS_CAND.find(v => v.id === p); return x ? icoCand(x.ico) : ''; };
 const icoVal = v => { const x = VAL_LBL[v]; return x ? icoCand(x.ico) : ''; };
@@ -53,7 +56,7 @@ function renderEntrevistas() {
     <div class="entacts">
       <label class="entbusca"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
         <input type="search" id="entQ" placeholder="Buscar por nombre o teléfono…" value="${esc(ENT.q)}" aria-label="Buscar candidato"></label>
-      <button class="btn-cta" id="entNuevo">+ Registrar</button>
+      <button class="btn btn-cta" id="entNuevo">+ Registrar</button>
     </div>
   </div>
   <div class="entfiltros">${puestoChips}${valChips}${motChips}${Object.values(r.hab).some(Boolean) ? habChips : ''}</div>
@@ -87,11 +90,69 @@ function filaCand(c) {
     </button>`;
 }
 
+// ---------- perfil del candidato: la entrevista entera, de un vistazo ----------
+// 17/09 (José): «que se vea premium y visual». Al pulsar en alguien se abre su perfil de
+// lectura con TODO lo que trajimos de la base del grupo —etiquetas, datos, aptitudes y los
+// textos largos de la entrevista—, cada cosa con su icono. Para tocar algo: «Editar».
+function fichaCandHTML(c) {
+  const v = VAL_LBL[c.val];
+  const mot = c.motivo && MOTIVOS_ALERTA.find(m => m.id === c.motivo);
+  const lista = LISTAS_CAND.find(l => l.id === c.lista) || LISTAS_CAND[0];
+  const tel = telLimpio(c.tel);
+  const cortos = CAMPOS_ENTREVISTA.filter(x => !x.largo);
+  const largos = CAMPOS_ENTREVISTA.filter(x => x.largo).filter(x => c[x.k]);
+
+  const etq = `<em class="entp p-${esc(c.puesto || 'no')}">${icoPuesto(c.puesto)}${c.puesto === 'cocina' ? 'Cocina' : c.puesto === 'sala' ? 'Sala' : 'Sin puesto'}</em>
+    ${v ? `<em class="entv v-${esc(v.id)}">${icoVal(v.id)}${esc(v.label)}</em>` : '<em class="entv v-no">Sin valorar</em>'}
+    ${mot ? `<em class="entm">${esc(mot.label)}</em>` : ''}
+    ${c.adj ? `<em class="entadj">${icoCand('adj')}${c.adj} ${c.adj === 1 ? 'foto o CV' : 'fotos y CV'} en Notion</em>` : ''}`;
+
+  const acciones = tel
+    ? `<a class="btn-mini" href="tel:${esc(tel)}">${icoCand('tel')}${esc(telBonito(tel))}</a>
+       ${tel.length === 9 ? `<a class="btn-mini wa" href="https://wa.me/34${esc(tel)}" target="_blank" rel="noopener">${icoCand('wa')}WhatsApp</a>` : ''}`
+    : '<span class="cperfsin">Sin teléfono</span>';
+
+  const dato = x => `<div class="cperfk${c[x.k] ? '' : ' vacio'}">${icoCand(x.ico)}<em>${esc(x.label)}</em><b>${c[x.k] ? esc(c[x.k]) : '—'}</b></div>`;
+  const bloque = (ico, titulo, txt) => `<article class="cbloq"><h5>${icoCand(ico)}${esc(titulo)}</h5><p>${esc(txt)}</p></article>`;
+
+  return `<div class="cperf">
+    <header class="cperfhead" style="--pc:${avColor(c.id)}">
+      <span class="cperfav">${esc(initials(nombreCand(c)))}</span>
+      <div class="cperfid">
+        <span class="micro">${esc(lista.label)}${tieneEntrevista(c) ? ' · entrevista contestada' : ''}</span>
+        <h2>${esc(nombreCand(c))}</h2>
+        <div class="cperfetq">${etq}</div>
+      </div>
+      <div class="cperfacts">${acciones}</div>
+    </header>
+    <div class="cperfkpis">${cortos.map(dato).join('')}</div>
+    <section class="cperfsec">
+      <h4>${icoCand('aptitud')}Aptitudes</h4>
+      <div class="habgrid">${HABILIDADES.map(h => { const e = (c.hab || {})[h.id];
+        return `<span class="habchip s-${e || 'vacio'}">${icoCand(h.ico)}${esc(h.label)}<i>${e ? esc(HAB_ESTADO[e]) : 'sin preguntar'}</i></span>`; }).join('')}</div>
+    </section>
+    ${largos.length || c.nota ? `<div class="cperfbloques">
+      ${largos.map(x => bloque(x.ico, x.label, c[x.k])).join('')}
+      ${c.nota ? bloque('nota', 'Notas', c.nota) : ''}</div>` : ''}
+    ${tieneEntrevista(c) ? '' : '<div class="cperfvacia">Esta persona aún no tiene la entrevista contestada. Pulsa <b>Editar</b> para ir rellenándola.</div>'}
+    <div class="candpie">
+      <span class="candsp"></span>
+      <button type="button" class="btn btn-sec" data-ovx>Cerrar</button>
+      <button type="button" class="btn btn-cta" data-cedit>Editar</button>
+    </div>
+  </div>`;
+}
+function abrirPerfilCand(c) {
+  const ov = abrirOverlay('candOvl', fichaCandHTML(c), { ancho: 780 });
+  ov.addEventListener('click', ev => { if (ev.target.closest('[data-cedit]')) abrirFichaCand(c.id, true); });
+}
+
 // ---------- ficha de un candidato (cajetines) ----------
-function abrirFichaCand(id) {
+function abrirFichaCand(id, editar) {
   const nuevo = !id;
   const c = nuevo ? { id: nuevoIdCand(), nombre: '', tel: '', puesto: null, val: null, motivo: null, nota: '', hab: {}, lista: ENT.lista } : candidatoDe(id);
   if (!c) return;
+  if (!nuevo && !editar) { abrirPerfilCand(c); return; }
   const tmpHab = Object.assign({}, c.hab || {});
   const seg = (k, opts) => `<div class="segrow">${opts.map(o => `<button type="button" class="segk${(c[k] || '') === o.id ? ' on' : ''}" data-cset="${k}|${esc(o.id)}">${o.ico ? icoCand(o.ico) : ''}${esc(o.label)}</button>`).join('')}</div>`;
   const ov = abrirOverlay('candOvl', `
@@ -122,15 +183,16 @@ function abrirFichaCand(id) {
       <div class="candpie">
         ${nuevo ? '' : `<button type="button" class="btn-mini ghost danger" data-cdel>Borrar de la base</button>`}
         <span class="candsp"></span>
-        <button type="button" class="btn-sec" data-ovx>Cancelar</button>
-        <button type="button" class="btn-cta" data-cok>${nuevo ? 'Registrar' : 'Guardar'}</button>
+        <button type="button" class="btn btn-sec" ${nuevo ? 'data-ovx' : 'data-cperf'}>${nuevo ? 'Cancelar' : 'Volver al perfil'}</button>
+        <button type="button" class="btn btn-cta" data-cok>${nuevo ? 'Registrar' : 'Guardar'}</button>
       </div>
     </div>`);
 
   const tmp = Object.assign({}, c);
   ov.addEventListener('click', ev => {
-    const b = ev.target.closest('[data-cset],[data-cok],[data-cdel],[data-chab]');
+    const b = ev.target.closest('[data-cset],[data-cok],[data-cdel],[data-chab],[data-cperf]');
     if (!b) return;
+    if (b.dataset.cperf !== undefined) { abrirPerfilCand(c); return; }
     if (b.dataset.chab !== undefined) {
       const [h, e] = b.dataset.chab.split('|');
       tmpHab[h] = tmpHab[h] === e ? undefined : e;
@@ -163,6 +225,7 @@ function abrirFichaCand(id) {
     ENT.lista = tmp.lista;
     ov.remove();
     guardarCand(`${nuevo ? 'Candidato registrado' : 'Candidato actualizado'}: ${nombreCand(tmp)} (${etiquetaCandidato(tmp)})`);
+    if (!nuevo) abrirPerfilCand(c);
   });
 }
 
