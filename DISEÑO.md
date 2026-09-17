@@ -73,6 +73,14 @@ Un **turno continuo** —la misma persona abre la mañana y la tarde del mismo l
 
 Con esto, **un día trabajado son ocho horas para todo el equipo**, haga turno suelto, partido o continuo. En septiembre: 3.904 h entre veinte personas, y cada ficha cuadra exactamente en días × 8.
 
+## Reunión del 17/09 (José y Aroa)
+
+Puestos: **sala, cocina y apoyo**; el «comodín» se retira como puesto. Sala: Noe, Victoria, Jacquelin, Juani, Susana Luna, Cris Parreño, Susana Capón, Mari Luz, Iván, Lola y Roberto. Cocina: Adrián, Esmeralda, Jenny y Johan. Apoyo: Yilian, Lavinia, Leo, Cristian y Dulce (alta del 17/09). Lola es apoyo pero se queda en sala mientras cubra la baja de Laura. **Tere no la nombró**: su puesto sigue pendiente.
+
+Reglas: **dos apoyos no pueden quedarse solos** en un turno; **Johan siempre cocina** y quien ese día lleva la cocina no se propone para reforzar sala; los «nunca coincide» de Lavinia–Mari Luz y Leo–Susana Capón se relajan con aviso cuando no hay gente suficiente; y el **día libre puntual** de una semana no toca el día de siempre.
+
+El 33 los martes es día flojo: mínimo 1, se queda Noe y abre él viniendo de la mañana (`partidoAbre.T`), igual que Pasarela. La **cocina no se imprime**.
+
 ## Supuestos (marcados «supuesto» en la app hasta confirmación)
 
 - Un turno cuenta **8 h** («más o menos», dice el cliente: C2, pendiente), independientemente de las nueve horas que abre el local por la mañana. Editable por local y franja en Equipo → Ajustes de los locales.

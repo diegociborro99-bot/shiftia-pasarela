@@ -247,7 +247,14 @@ try {
   await pg.click('#entLimpiar').catch(() => {}); await pg.waitForTimeout(200);
   await pg.click('#entrevistasRoot .entrow'); await pg.waitForTimeout(300);
   ok('Entrevistas: la ficha se abre con sus cajetines', await pg.$$eval('#candOvl [data-cin]', x => x.length) === 3 && await pg.$$eval('#candOvl [data-cset]', x => x.length) > 8);
-  await pg.click('#candOvl [data-ovx]'); await pg.waitForTimeout(200);
+  await pg.click('#candOvl [data-cset="val|bien"]'); await pg.click('#candOvl [data-cok]'); await pg.waitForTimeout(350);
+  ok('Entrevistas: valorar a alguien se guarda y queda en el historial', !(await pg.$('#candOvl'))
+    && await pg.evaluate(() => (S.entrevistas || []).filter(c => c.val === 'bien').length) === 1
+    && await pg.evaluate(() => (S.historial || []).some(x => /Candidato actualizado/.test(x.txt || ''))),
+    await pg.evaluate(() => JSON.stringify((S.historial || []).slice(0, 2))));
+  await pg.click('#entrevistasRoot [data-entf="val|bien"]'); await pg.waitForTimeout(250);
+  ok('Entrevistas: el filtro de valoración encuentra a quien acabamos de valorar', await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === 1);
+  await pg.click('#entLimpiar'); await pg.waitForTimeout(200);
 
   // 6b) Gestor de cobertura desde la planilla: en Semana, «Falta estos días…» sobre una persona abre la hoja
   //     con ese día marcado; plan A / plan B como «quién sale → quién entra»; confirmar aplica y vuelve a la semana

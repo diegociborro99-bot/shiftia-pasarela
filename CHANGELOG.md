@@ -1,5 +1,30 @@
 # Changelog — Shiftia · Grupo Pasarela
 
+## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
+
+- **Los puestos son tres: sala, cocina y apoyo.** El «comodín» desaparece como puesto
+  (sigue existiendo «sin local fijo», que es otra cosa: quien puede ir a cualquier bar).
+  Cada persona queda con el puesto que dictó José. Alta de **Dulce** (apoyo), que de
+  momento no abre local mientras sea nueva.
+- **Reglas nuevas del grupo**: dos apoyos no pueden quedarse solos en un turno (la
+  casilla avisa); **Johan siempre cocina**; la cobertura no propone para sala a quien
+  ese día lleva la cocina —el fallo que salió en directo al cubrir a Cris Parreño—; y
+  los «nunca coincide» de Lavinia–Mari Luz y Leo–Susana Capón se respetan **si hay
+  gente suficiente** y, si no, se relajan dejando el aviso.
+- **Día libre puntual**: debajo de «libra», uno o dos días sueltos solo para esa
+  semana. A la siguiente vuelve su día de siempre, sin tener que acordarse de nada.
+- **El 33 los martes**: se quita el hueco que no correspondía. Es día flojo, se queda
+  Noe solo y abre él viniendo de la mañana.
+- **La cocina no se imprime**: sigue siendo variable interna, pero en el papel sobraba.
+- **La vista Semana enseña nombres** en vez de iniciales.
+- **Entrevistas y alerta interna**: dentro están ya las dos bases de Notion de José
+  (192 candidatos y 81 en alerta, con su teléfono). Dos menús separados, dos etiquetas
+  por persona —puesto y valoración (bien / en espera / mal)—, filtros que combinan las
+  dos, buscador por nombre o teléfono y ficha para registrar, editar o mover de lista.
+- **Vacaciones para la nómina**: columna de días de vacaciones en el contador de horas,
+  las fechas en el desglose de cada persona y un botón **«Vacaciones del año»** con
+  toda la plantilla mes a mes, exportable a Excel.
+
 ## v0.5.0 · 15/09/2026 — Lo que pidió el cliente en la reunión del 15/09
 
 - **Pasada de interfaz**: el menú superior encoge la letra por tramos para que las nueve

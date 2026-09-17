@@ -13,7 +13,7 @@ function nuevoIdCand() {
   while (usados.has('c' + i)) i++;
   return 'c' + i;
 }
-function guardarCand(txt) { registrarCambio(txt, 'entrevistas'); guardar(); renderEntrevistas(); }
+function guardarCand(txt) { registrarCambio(txt, 'entrevistas'); saveState(); renderEntrevistas(); }
 function nombreCand(c) { return c.nombre || (c.tel ? `Sin nombre · ${c.tel}` : 'Sin nombre'); }
 function telLimpio(t) { return String(t || '').replace(/\D/g, ''); }
 function telBonito(t) { const n = telLimpio(t); return n.length === 9 ? `${n.slice(0, 3)} ${n.slice(3, 5)} ${n.slice(5, 7)} ${n.slice(7)}` : n; }

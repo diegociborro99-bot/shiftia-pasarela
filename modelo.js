@@ -1227,6 +1227,27 @@ function turnoDelDia(cfg, est, iso, pid) {
   for (const t of turnosDe(cfg)) { const e = asignados(est, iso, t.id).find(x => x.pid === pid); if (e) mias.push({ e, localId: t.local.id, franja: t.franja }); }
   return repartoDelDia(mias);
 }
+// Días de un tipo de ausencia en un mes, con las fechas (José, 17/09: «que dándole a un
+// botón vea los cinco días que se ha ido para ponérselo en su nómina»).
+function diasAusenciaMes(p, y, m, tipo) {
+  const out = [];
+  const n = diasDelMes(y, m);
+  for (let d = 1; d <= n; d++) {
+    const iso = isoDe(y, m, d), a = ausenciaEn(p, iso);
+    if (a && (!tipo || a.tipo === tipo)) out.push(iso);
+  }
+  return out;
+}
+// Las vacaciones de toda la plantilla en un año, mes a mes, para pasarlas a nómina
+function vacacionesAno(staff, y, tipo) {
+  const t = tipo || 'VAC';
+  return (staff || []).map(p => {
+    const meses = [];
+    let total = 0;
+    for (let m = 1; m <= 12; m++) { const d = diasAusenciaMes(p, y, m, t); meses.push(d); total += d.length; }
+    return { pid: p.id, nombre: p.nombre, meses, total, fechas: meses.flat() };
+  }).filter(x => x.total > 0).sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre, 'es'));
+}
 function horasPersonaMes(cfg, staff, meses, pid, y, m) {
   const p = personaDe(staff, pid);
   const k = claveMes(y, m);
@@ -1264,6 +1285,13 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
     if (mias.length) { out.dias++; if (partido) out.partidos++; if (festivo) { out.festivas++; out.festivasMin += minDia; } if (dow === 7) { out.domingos++; out.domingosMin += minDia; } }
     else if (p && ausenciaEn(p, iso)) out.ausencias++;
   }
+  if (p) {
+    out.vacacionesDias = diasAusenciaMes(p, y, m, 'VAC');
+    out.vacaciones = out.vacacionesDias.length;
+    out.libresDias = diasAusenciaMes(p, y, m, 'LD');
+    out.libres = out.libresDias.length;
+    out.bajaDias = diasAusenciaMes(p, y, m, 'BAJ').length;
+  } else { out.vacacionesDias = []; out.vacaciones = 0; out.libresDias = []; out.libres = 0; out.bajaDias = 0; }
   for (const x of cfg.extras || []) if (x.pid === pid && x.iso && x.iso.startsWith(k)) out.extrasMin += +x.min || 0;
   out.horas = Math.round((out.minutos + out.extrasMin) / 6) / 10;
   out.horasNocturnas = Math.round(out.nocturnosMin / 6) / 10;
@@ -1652,7 +1680,8 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
-    LISTAS_CAND, VALORACIONES, MOTIVOS_ALERTA, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos, horasPersonaMes, horasEquipoMes, horasLocalMes,
+    LISTAS_CAND, VALORACIONES, MOTIVOS_ALERTA, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
+    diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,
     CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,

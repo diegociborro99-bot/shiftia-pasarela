@@ -1049,4 +1049,25 @@ ok('entrevistas: dos listas, dos etiquetas por candidato y filtro combinado', ()
   assert.equal(r.total, 3); assert.equal(r.bien, 1); assert.equal(r.mal, 1); assert.equal(r.regular, 1); assert.equal(r.sinValorar, 0);
 });
 
+ok('vacaciones para la nómina: días y fechas del mes por persona, y la vista del año entero', () => {
+  const cfg = cfgBase(), st = staffDe(cfg);
+  const aroa = M.personaDe(st, 'yilian');
+  M.anadirAusencia(aroa, { tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-05' });
+  M.anadirAusencia(aroa, { tipo: 'LD', desde: '2026-10-20' });
+  M.anadirAusencia(M.personaDe(st, 'adrian'), { tipo: 'VAC', desde: '2026-12-24', hasta: '2026-12-26' });
+  const h = M.horasPersonaMes(cfg, st, {}, 'yilian', 2026, 10);
+  assert.equal(h.vacaciones, 5, 'cinco días de vacaciones en octubre');
+  assert.deepEqual(h.vacacionesDias, ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05']);
+  assert.equal(h.libres, 1); assert.deepEqual(h.libresDias, ['2026-10-20']);
+  const ano = M.vacacionesAno(st, 2026);
+  const filaA = ano.find(x => x.pid === 'yilian');
+  assert.equal(filaA.total, 5);
+  assert.equal(filaA.meses[9].length, 5, 'octubre es el mes 10');
+  assert.equal(filaA.meses[0].length, 0);
+  const filaAd = ano.find(x => x.pid === 'adrian');
+  assert.equal(filaAd.total, 3); assert.equal(filaAd.meses[11].length, 3, 'diciembre');
+  assert.ok(ano.every(x => x.total > 0), 'solo sale quien tiene vacaciones');
+  assert.equal(ano[0].pid, 'yilian', 'ordenado de más a menos días');
+});
+
 console.log(`\n${n} tests OK`);
