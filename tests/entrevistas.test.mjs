@@ -42,6 +42,8 @@ test('las etiquetas llevan los mismos iconos que el grupo usa en su base: sarté
   assert.match(html, /\{ id: 'bien'[^}]*ico: 'bien' \}/);
   assert.match(html, /\{ id: 'regular'[^}]*ico: 'espera' \}/, 'el reloj de arena es «en espera»');
   assert.match(html, /\{ id: 'mal'[^}]*ico: 'mal' \}/);
+  assert.match(html, /\{ id: 'veto'[^}]*ico: 'veto' \}/, 'el ⛔ de la base del grupo');
+  assert.match(html, /const SVG_VETO = ICO\(/);
   assert.match(html, /const ICO_CAND = \{ cocina: [\s\S]*?espera: \(\) => SVG_ESPERA,/);
   // y salen tanto en la lista como en los filtros y en la ficha
   assert.match(html, /<em class="entp p-\$\{esc\(c\.puesto \|\| 'no'\)\}">\$\{icoPuesto\(c\.puesto\)\}/);

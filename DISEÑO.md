@@ -87,7 +87,11 @@ El grupo marca cada ficha de su base con un emoticono, y ahí está toda la clas
 
 Lo que **no** llegó son los datos: **Notion no exporta el icono de cada ficha**, ni en el CSV ni en el Markdown ni en los nombres de fichero (comprobado sobre el zip del 17/09: cero emoticonos en 273 fichas). El icono de página solo sale por la API (`GET /v1/pages/{id}` → `icon`).
 
-Dos maneras de recuperarlo:
+**Los emoticonos son cinco**, no tres (capturas del 17/09): 👍 bien · ⏳ en espera · 👎 mal · ⛔ **vetado** (no volver a llamar; es más fuerte que el pulgar abajo) · 👨‍🍳 el puesto es cocinero. La ficha sin marcar lleva el icono de documento por defecto.
+
+De las capturas se transcribieron **41 valoraciones y un puesto**; las otras 234 fichas siguen sin marcar porque solo se veían esas en pantalla.
+
+Dos maneras de recuperar el resto:
 
 1. **Que José añada dos columnas en Notion** (dos «Select»: puesto y valoración) y vuelva a exportar a CSV. Es lo más limpio y el volcado se rehace en minutos.
 2. **Por la API de Notion**: José crea una integración interna, la comparte con las dos bases y pasa el token. Así se leen los iconos tal cual están, sin que él toque nada.

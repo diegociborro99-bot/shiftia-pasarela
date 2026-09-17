@@ -7,7 +7,7 @@
 const ENT = { lista: 'ent', q: '', puesto: '', val: '', motivo: '', hab: '', abierta: null };
 
 // El icono de cada etiqueta, los mismos que el grupo usa en su base de Notion
-const ICO_CAND = { cocina: () => SVG_COCINA, camarero: () => SVG_CAMARERO, bien: () => SVG_BIEN, mal: () => SVG_MAL, espera: () => SVG_ESPERA,
+const ICO_CAND = { cocina: () => SVG_COCINA, camarero: () => SVG_CAMARERO, bien: () => SVG_BIEN, mal: () => SVG_MAL, espera: () => SVG_ESPERA, veto: () => SVG_VETO,
   cafetera: () => SVG_CAFETERA, barril: () => SVG_BARRIL, jamon: () => SVG_JAMON, tpv: () => SVG_TPV, pda: () => SVG_PDA };
 const icoCand = k => (ICO_CAND[k] ? ICO_CAND[k]() : '');
 const icoPuesto = p => { const x = PUESTOS_CAND.find(v => v.id === p); return x ? icoCand(x.ico) : ''; };

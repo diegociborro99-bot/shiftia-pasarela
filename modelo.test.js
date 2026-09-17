@@ -1031,7 +1031,7 @@ ok('día libre puntual: libra otro día solo esa semana y luego vuelve a su día
 
 ok('entrevistas: dos listas, dos etiquetas por candidato y filtro combinado', () => {
   assert.deepEqual(M.LISTAS_CAND.map(x => x.id), ['ent', 'alerta']);
-  assert.deepEqual(M.VALORACIONES.map(x => x.id), ['bien', 'regular', 'mal']);
+  assert.deepEqual(M.VALORACIONES.map(x => x.id), ['bien', 'regular', 'mal', 'veto'], 'los cuatro emoticonos del grupo: pulgar arriba, reloj, pulgar abajo y prohibido');
   const cands = [
     { id: 'a', nombre: 'Janira Cocinera', tel: '625828119', puesto: 'cocina', val: 'bien', lista: 'ent' },
     { id: 'b', nombre: 'Maria Camarera', tel: '634719182', puesto: 'sala', val: 'mal', lista: 'ent' },

@@ -18,7 +18,7 @@
 - **La cocina no se imprime**: sigue siendo variable interna, pero en el papel sobraba.
 - **La vista Semana enseña nombres** en vez de iniciales.
 - **Los iconos de la base del grupo**: sartén (cocinero), bandeja (camarero), pulgar
-  arriba (bien), reloj de arena (en espera) y pulgar abajo (mal), dibujados a mano en la
+  arriba (bien), reloj de arena (en espera), pulgar abajo (mal) y **⛔ vetado**, dibujados a mano en la
   misma línea que la sartén de la cocina. Salen en la lista, en los filtros y en la ficha.
   *Los datos de esos iconos no vinieron en la exportación*: Notion no incluye el icono de
   cada ficha ni en el CSV ni en el Markdown, así que las etiquetas están por rellenar

@@ -71,6 +71,7 @@ const VALORACIONES = [
   { id: 'bien', label: 'Bien', corto: 'bien', ico: 'bien' },
   { id: 'regular', label: 'En espera', corto: 'en espera', ico: 'espera' },
   { id: 'mal', label: 'Mal', corto: 'mal', ico: 'mal' },
+  { id: 'veto', label: 'Vetado', corto: 'vetado', ico: 'veto' },
 ];
 // El puesto al que opta: cocinero (sartén) o camarero (bandeja)
 const PUESTOS_CAND = [

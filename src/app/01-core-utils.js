@@ -18,6 +18,7 @@ const ICO = (d, cls) => `<svg class="ico ${cls || ''}" viewBox="0 0 24 24" aria-
 const SVG_CAMARERO = ICO('<path d="M3.4 12.6h17.2a8.6 8.6 0 0 1-17.2 0Z"/><path d="M12 12.6V9.4"/><circle cx="12" cy="7.9" r="1.5"/><path d="M6.5 21.2h11"/>', 'icam');
 const SVG_BIEN = ICO('<path d="M7.6 20.4V10.2l4.2-7a2 2 0 0 1 2.9 2.4l-1.3 4h4.9a2 2 0 0 1 2 2.4l-1.3 6.4a2.6 2.6 0 0 1-2.6 2h-8.8Z"/><path d="M7.6 10.4H4.2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3.4"/>', 'ibien');
 const SVG_MAL = ICO('<path d="M7.6 3.6v10.2l4.2 7a2 2 0 0 0 2.9-2.4l-1.3-4h4.9a2 2 0 0 0 2-2.4L19 5.6a2.6 2.6 0 0 0-2.6-2H7.6Z"/><path d="M7.6 13.6H4.2a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h3.4"/>', 'imal');
+const SVG_VETO = ICO('<circle cx="12" cy="12" r="9.2"/><path d="M6.6 12h10.8"/>', 'ivet');
 const SVG_ESPERA = ICO('<path d="M6.6 2.8h10.8M6.6 21.2h10.8"/><path d="M7.8 2.8v3.6c0 2.4 4.2 3.9 4.2 5.6s-4.2 3.2-4.2 5.6v3.6"/><path d="M16.2 2.8v3.6c0 2.4-4.2 3.9-4.2 5.6s4.2 3.2 4.2 5.6v3.6"/>', 'iesp');
 // Las aptitudes que el grupo pregunta en la entrevista, cada una con su dibujo
 const SVG_CAFETERA = ICO('<path d="M4.2 8.4h11.2v5.4a4.4 4.4 0 0 1-4.4 4.4H8.6a4.4 4.4 0 0 1-4.4-4.4Z"/><path d="M15.4 9.8h2.4a2.3 2.3 0 0 1 0 4.6h-2.4"/><path d="M7.4 5.4V3.2M11 5.4V3.2M3.4 21h12.8"/>', 'icaf');
