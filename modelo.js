@@ -157,6 +157,46 @@ function migrarCandidatos(estado) {
   }
   return r;
 }
+// 17/09: las 150 entrevistas que estaban en papel dentro de Notion. La semilla solo se
+// sembraba cuando la lista estaba vacía, así que a quien ya tenía la app en marcha no le
+// llegaba nada: seguía viendo las fichas de solo nombre y teléfono. Esta fusión mete lo
+// leído de las hojas en las fichas que ya existen, **sin pisar nada de lo que el grupo
+// haya escrito en la app**: solo rellena lo que está en blanco. Se cruza por `id` y, si
+// no, por teléfono (en Notion hay diez tecleados con un dígito cambiado).
+function fundirSemillaEntrevistas(estado, semilla) {
+  const r = { rellenadas: 0, nuevas: 0 };
+  if (!estado || !Array.isArray(estado.entrevistas) || !Array.isArray(semilla)) return r;
+  const tel = t => String(t || '').replace(/\D/g, '');
+  const porId = new Map(), porTel = new Map();
+  for (const c of estado.entrevistas) {
+    if (c.id) porId.set(c.id, c);
+    const t = tel(c.tel);
+    if (t && !porTel.has(t)) porTel.set(t, c);
+  }
+  for (const s of semilla) {
+    const c = porId.get(s.id) || porTel.get(tel(s.tel));
+    if (!c) {
+      estado.entrevistas.push(JSON.parse(JSON.stringify(s)));
+      r.nuevas++;
+      continue;
+    }
+    let tocada = false;
+    for (const k of Object.keys(s)) {
+      if (k === 'id' || k === 'tel' || k === 'lista' || k === 'hab' || k === 'puesto' || k === 'puestos') continue;
+      if (s[k] == null || s[k] === '') continue;
+      if (c[k] != null && c[k] !== '') continue;
+      c[k] = JSON.parse(JSON.stringify(s[k])); tocada = true;
+    }
+    if (s.hab && typeof s.hab === 'object') {
+      c.hab = c.hab || {};
+      for (const [k, v] of Object.entries(s.hab)) if (!c.hab[k]) { c.hab[k] = v; tocada = true; }
+    }
+    const suyos = puestosDe(s);
+    if (suyos.length && !puestosDe(c).length) { c.puestos = suyos.slice(); delete c.puesto; tocada = true; }
+    if (tocada) r.rellenadas++;
+  }
+  return r;
+}
 // «Cocinero bien», «Camarera en espera», «Cocina y sala»…: la etiqueta que pidió José
 function etiquetaCandidato(c) {
   const p = textoPuestos(c);
@@ -1809,7 +1849,7 @@ if (typeof module !== 'undefined') {
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, migrarAltas, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
     LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
-    puestosDe, textoPuestos, migrarCandidatos, textoCampo,
+    puestosDe, textoPuestos, migrarCandidatos, fundirSemillaEntrevistas, textoCampo,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,

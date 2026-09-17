@@ -23,6 +23,11 @@
   *Los datos de esos iconos no vinieron en la exportación*: Notion no incluye el icono de
   cada ficha ni en el CSV ni en el Markdown, así que las etiquetas están por rellenar
   (ver DISEÑO.md).
+- **Y llegan a la instalación que ya estaba en marcha.** La semilla de entrevistas solo
+  se sembraba cuando la lista estaba vacía, así que quien ya tenía la app abierta habría
+  seguido viendo las fichas de solo nombre y teléfono. Ahora se funden en las que ya
+  existen —cruzando por id y, si no, por teléfono— **sin pisar nada de lo que el grupo
+  haya escrito en la app**: solo se rellena lo que está en blanco, y una sola vez.
 - **Las entrevistas que solo estaban en papel, leídas y volcadas.** El grueso de la base
   de Notion tenía tecleados solo el nombre y el teléfono: la entrevista de verdad era una
   hoja manuscrita escaneada dentro de la ficha. Se han leído las **150 hojas** y está todo

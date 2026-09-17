@@ -108,6 +108,13 @@ function migrarEstado(estado) {
   migrarAltas(estado);      // 17/09: Dulce y Susi, que entraron después del primer arranque
   // 17/09: la base de entrevistas de Notion (entrevistas + alerta interna)
   if (!Array.isArray(estado.entrevistas) || !estado.entrevistas.length) estado.entrevistas = JSON.parse(JSON.stringify(ENTREVISTAS_SEMILLA));
+  // 17/09: las 150 entrevistas que estaban en papel. A quien ya tenía la app en marcha no
+  // le llegaban, porque la semilla de arriba solo siembra la lista vacía: se funden aquí,
+  // una sola vez y sin pisar nada de lo que el grupo haya escrito ya en la app.
+  if ((estado.semillaEnt || 0) < SEMILLA_ENT_V) {
+    fundirSemillaEntrevistas(estado, ENTREVISTAS_SEMILLA);
+    estado.semillaEnt = SEMILLA_ENT_V;
+  }
   migrarCandidatos(estado);   // 17/09: el puesto del candidato pasa de uno suelto a una lista
   limpiarLibrePuntual(estado.staff, isoHoy());   // los días libres puntuales caducan solos
   asignarColores(estado.staff);

@@ -1157,6 +1157,49 @@ ok('puesto múltiple: hay quien opta a camarero y a cocinero a la vez (Aroa, 17/
   assert.deepStrictEqual(est.entrevistas[2].puestos, ['cocina', 'sala']);
 });
 
+ok('las entrevistas de papel llegan a quien ya tenía la app abierta, sin pisar lo que haya escrito (Diego, 17/09)', () => {
+  // La semilla solo se sembraba si la lista estaba vacía, así que una instalación en
+  // marcha se quedaba con las fichas de solo nombre y teléfono. Esta fusión las rellena.
+  const semilla = [
+    { id: 'c1', nombre: 'Uno', tel: '600111222', lista: 'ent', edad: '31', zona: 'Elche', exp: 'Dos años de barra', hab: { cafetera: 'si', tpv: 'no' }, val: 'bien', puestos: ['cocina', 'sala'] },
+    { id: 'c2', nombre: 'Dos', tel: '600333444', lista: 'ent', edad: '22', obs: 'Lo de la semilla' },
+    { id: 'c3', nombre: 'Tres', tel: '600555666', lista: 'alerta', edad: '40' },
+  ];
+  const est = { entrevistas: [
+    { id: 'c1', nombre: 'Uno', tel: '600111222', lista: 'ent', puestos: [] },
+    // el mismo, pero con el teléfono tecleado distinto en Notion: se cruza por id
+    { id: 'c2', nombre: 'Dos', tel: '600333999', lista: 'ent', puestos: [], obs: 'Lo que escribió el encargado', val: 'mal' },
+  ] };
+  const r = M.fundirSemillaEntrevistas(est, semilla);
+  assert.equal(r.rellenadas, 2, 'las dos que ya estaban se completan');
+  assert.equal(r.nuevas, 1, 'y la que faltaba se añade');
+  const c1 = est.entrevistas.find(c => c.id === 'c1');
+  assert.equal(c1.edad, '31'); assert.equal(c1.zona, 'Elche'); assert.equal(c1.exp, 'Dos años de barra');
+  assert.deepStrictEqual(c1.hab, { cafetera: 'si', tpv: 'no' }, 'las aptitudes de la hoja');
+  assert.equal(c1.val, 'bien', 'y la valoración que el grupo escribió en el papel');
+  assert.deepStrictEqual(c1.puestos, ['cocina', 'sala'], 'camarero y cocinero');
+  const c2 = est.entrevistas.find(c => c.id === 'c2');
+  assert.equal(c2.obs, 'Lo que escribió el encargado', 'lo escrito en la app manda sobre la hoja');
+  assert.equal(c2.val, 'mal', 'y su valoración también');
+  assert.equal(c2.edad, '22', 'pero lo que estaba en blanco se rellena');
+  assert.equal(c2.tel, '600333999', 'el teléfono de la app no se toca');
+  assert.ok(est.entrevistas.some(c => c.id === 'c3' && c.lista === 'alerta'), 'la nueva entra en su lista');
+  // pasarla otra vez no cambia nada
+  const r2 = M.fundirSemillaEntrevistas(est, semilla);
+  assert.equal(r2.rellenadas, 0); assert.equal(r2.nuevas, 0);
+  assert.equal(est.entrevistas.length, 3);
+});
+
+ok('la fusión también cruza por teléfono cuando el id no coincide (Diego, 17/09)', () => {
+  const semilla = [{ id: 'nuevo-id', nombre: 'Ana', tel: '611 22 33 44', lista: 'ent', edad: '28' }];
+  const est = { entrevistas: [{ id: 'viejo-id', nombre: 'Ana', tel: '611223344', lista: 'ent' }] };
+  const r = M.fundirSemillaEntrevistas(est, semilla);
+  assert.equal(r.nuevas, 0, 'no se duplica a Ana');
+  assert.equal(r.rellenadas, 1);
+  assert.equal(est.entrevistas[0].edad, '28');
+  assert.equal(est.entrevistas[0].id, 'viejo-id', 'conserva su id, que es lo que guarda el servidor');
+});
+
 ok('las mismas palabras en los filtros y en la ficha: cocinero/camarero, y en plural al filtrar (Diego, 17/09)', () => {
   assert.deepStrictEqual(M.PUESTOS_CAND.map(x => x.label), ['Cocinero/a', 'Camarero/a'], 'en la ficha y en cada persona');
   assert.deepStrictEqual(M.PUESTOS_CAND.map(x => x.plural), ['Cocineros', 'Camareros'], 'en los filtros, que agrupan gente');

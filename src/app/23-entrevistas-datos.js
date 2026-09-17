@@ -29,6 +29,10 @@
 // que el propio grupo escribió a mano al final de cada hoja («ni de coña», «me gusta»,
 // «un impresentable que nos dejó tirados»). Son 117 valoradas: 44 bien, 25 en espera,
 // 39 mal y 9 vetadas. El resto siguen sin valorar. Ver DISEÑO.md.
+// Versión de este volcado. Al subirla, una app que ya estaba en marcha funde la semilla
+// en sus fichas (ver `fundirSemillaEntrevistas`): 1 = la exportación de Notion del 17/09,
+// 2 = las 150 hojas escaneadas leídas a mano.
+const SEMILLA_ENT_V = 2;
 const C = o => Object.assign({ nombre: '', tel: '', puesto: null, val: null, motivo: null, nota: '', fecha: null, hab: {} }, o);
 const ENTREVISTAS_SEMILLA = [
   C({"id": "ainohacamarera", "nombre": "Ainoha camarera", "tel": "616664691", "lista": "alerta", "puesto": "sala"}),

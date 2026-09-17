@@ -115,6 +115,16 @@ De **275 fichas**: **192 con zona, 191 con edad, 188 con la experiencia contada,
 
 **117 fichas valoradas**: 44 bien, 25 en espera, 39 mal y 9 vetadas. Las nuevas salen de lo que el propio grupo escribió a mano al final de cada hoja —«ni de coña», «me gusta mucho y tiene mucha experiencia», «un impresentable que nos dejó tirados el día de entrar a trabajar»—, que es más rico que el emoticono. Las 158 restantes son hojas sin conclusión escrita.
 
+### Que llegue a quien ya tenía la app abierta
+
+La semilla de entrevistas solo se siembra cuando la lista está vacía (`if (!estado.entrevistas.length)`), que es lo correcto para no pisar la base del grupo en cada arranque. Pero eso dejaba fuera justo al que importa: la instalación de Railway ya tenía las 275 fichas, así que el volcado nuevo no le habría llegado y habría seguido viendo las tarjetas de solo nombre y teléfono.
+
+`fundirSemillaEntrevistas(estado, semilla)` resuelve eso: recorre la semilla, busca cada ficha en la base guardada **por `id` y, si no aparece, por teléfono**, y rellena **solo los campos que estén en blanco**. Lo que el encargado haya escrito en la app —una observación, una valoración, un puesto— manda siempre sobre la hoja de papel. Las aptitudes se funden clave a clave, no se sustituye el bloque entero. Se ejecuta una sola vez, marcada con `estado.semillaEnt = SEMILLA_ENT_V`, y es idempotente: pasarla de nuevo no cambia nada.
+
+Va dentro de `migrarEstado`, que es por donde pasan los tres caminos de carga —arranque local, estado recibido del servidor y planilla nueva—, así que el encargado lo ve al recargar y queda guardado en el servidor con su siguiente cambio.
+
+**Privacidad**: estas fichas llevan teléfonos de 275 personas y lo que el grupo opina de cada una por escrito. La proyección del empleado (`estadoParaEmpleado`) es una lista blanca de claves, así que `entrevistas` nunca ha viajado; ahora hay un test en `tests/seguridad.test.mjs` que lo fija, porque el día que alguien añada una clave a esa lista conviene que salte.
+
 **Pendiente**: la segunda base, «Alerta interna» (81 fichas), sigue sin duplicar en el espacio de Diego, así que sus escaneos no se han podido leer.
 
 **Lo que pregunta la entrevista** (Aroa, 17/09): a las siete aptitudes de siempre se suma **«Aperturas o cierres»** —«para saber si ha hecho aperturas o cierres en otros locales, que ahí veo yo si tiene experiencia»—, con las mismas tres respuestas y su propio filtro. Y detrás del campo Horarios va **«El entrevistado busca»**: mañanas, tardes, turno partido, fin de semana y «no tiene problemas», varias a la vez; la última es excluyente porque quiere decir justo eso. Se guarda en `busca` (lista de ids) y entra en el buscador por su texto.

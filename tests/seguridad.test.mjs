@@ -283,6 +283,11 @@ test('el estado que recibe un empleado va proyectado: de los demás solo lo mín
   assert.ok(pets.length && pets.every(x => x.pid === 'lola'), 'solo sus peticiones');
   const deOtra = await otra('GET', '/api/estado');
   assert.ok(!(deOtra.datos.estado.peticiones || []).some(x => x.pid === 'lola'), 'la otra no ve las de lola');
+  // 17/09: la base de entrevistas lleva teléfonos de 275 personas y lo que el grupo
+  // opina de cada una por escrito («un poco choni», «mala gente»). Es de RRHH: a un
+  // empleado no le llega ni la lista ni una sola palabra de ella.
+  assert.equal(e.entrevistas, undefined, 'las entrevistas no viajan al empleado');
+  assert.ok(!/entrevista/i.test(JSON.stringify(e)), 'ni rastro en todo el estado proyectado');
 });
 
 // (el enlace del calendario personal y su revocación se prueban en la fase 3, con iCal)
