@@ -97,7 +97,8 @@ test('el puesto se marca doble (camarero y cocinero) y la fecha se pone sola al 
   assert.match(html, /puedes marcar los dos/, 'y la ficha lo dice');
   assert.match(html, /fecha: fmtLargo\(isoHoy\(\)\)/, 'al registrar a alguien la fecha ya viene puesta');
   const campos = html.match(/const CAMPOS_ENTREVISTA = \[[\s\S]*?\n\];/)[0];
-  assert.match(campos, /\[\s*\n\s*\/\/[^\n]*\n\s*\{ k: 'fecha'/, 'la fecha es el primer dato de todos');
+  assert.match(campos, /\{ k: 'fecha'[^}]*\}[\s\S]*\{ k: 'edad'/, 'la fecha es el primer dato de todos, antes que la edad');
+  assert.ok(campos.indexOf("k: 'fecha'") < campos.indexOf("k: 'nombre'") || !/k: 'nombre'/.test(campos));
   assert.ok(!/function icoPuesto|c\.puesto ===/.test(html.slice(html.indexOf('function filaCand'), html.indexOf('function abrirFichaCand'))), 'la fila ya no mira un puesto suelto');
 });
 

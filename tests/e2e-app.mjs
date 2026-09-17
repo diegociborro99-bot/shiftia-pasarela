@@ -272,6 +272,9 @@ try {
   }
   ok('Entrevistas: los dos puestos se pueden pulsar a la vez (Aroa, 17/09)',
     await pg.$$eval('#candOvl [data-cpto].on', b => b.map(x => x.dataset.cpto).sort().join(',')) === 'cocina,sala');
+  ok('Entrevistas: la ficha empieza por fecha, nombre, teléfono, edad y zona (Diego, 17/09)',
+    await pg.$$eval('#candOvl [data-cin]', is => is.slice(0, 5).map(i => i.dataset.cin).join(',')) === 'fecha,nombre,tel,edad,zona',
+    await pg.$$eval('#candOvl [data-cin]', is => is.map(i => i.dataset.cin).join(',')));
   await pg.click('#candOvl [data-cbus="T"]'); await pg.click('#candOvl [data-cbus="FDS"]');
   ok('Entrevistas: «el entrevistado busca» deja marcar varias a la vez (Aroa, 17/09)',
     await pg.$$eval('#candOvl [data-cbus].on', b => b.map(x => x.dataset.cbus).join(',')) === 'T,FDS');

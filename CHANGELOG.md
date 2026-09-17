@@ -65,9 +65,10 @@
   Camarero Cocinero»). El puesto deja de ser uno solo: en la ficha se pulsan los dos, en la
   lista salen las dos etiquetas y los filtros de Cocina y Sala encuentran a esa persona por
   las dos. Las fichas que ya había se convierten solas al abrir la app.
-- **La fecha de la entrevista se pone sola** el día que se registra a alguien, y pasa a ser
-  **lo primero de la ficha** y la primera tarjeta del perfil. Como se rellena sola, ya no
-  cuenta por sí misma como «entrevista contestada».
+- **La ficha empieza por lo que se pregunta primero**: fecha, nombre, teléfono, edad y zona.
+  La **fecha se pone sola** con la del día en que se registra a alguien, y es también la
+  primera tarjeta del perfil; como se rellena sola, no cuenta por sí misma como «entrevista
+  contestada». El resto de la entrevista —experiencia, horarios, condiciones…— va debajo.
 - **El lunes de Pasarela, como lo contó Aroa**: Mari Luz no hace partido los lunes; hace la
   **tarde entera, de 16:00 a cierre**, así que esa mañana no puede trabajar. La mañana se
   queda con Lola y Tere —falta uno— y la tarde con Mari Luz —falta otro—; los dos los

@@ -1162,6 +1162,11 @@ ok('la entrevista pregunta también por aperturas y cierres (Aroa, 17/09)', () =
 
 ok('la fecha de la entrevista va la primera de todos los datos (Aroa, 17/09)', () => {
   assert.equal(M.CAMPOS_ENTREVISTA[0].k, 'fecha', 'es lo primero que se ve en la ficha y en el perfil');
+  // 17/09 (Diego): fecha, nombre, teléfono, edad y zona son lo primero de la ficha; el resto
+  // de la entrevista va más abajo. Edad y zona sí son respuestas, así que cuentan como tal.
+  assert.deepStrictEqual(M.CAMPOS_ENTREVISTA.filter(x => x.cabecera).map(x => x.k), ['fecha', 'edad', 'zona']);
+  assert.equal(M.tieneEntrevista({ edad: '30' }), true);
+  assert.equal(M.tieneEntrevista({ zona: 'Elche' }), true);
   assert.ok(M.CAMPOS_ENTREVISTA.every(x => x.ico), 'y todos siguen con su icono');
   // la fecha se pone sola al registrar, así que por sí sola no significa «entrevista contestada»
   assert.equal(M.tieneEntrevista({ fecha: '17 de septiembre' }), false, 'solo con la fecha, no');

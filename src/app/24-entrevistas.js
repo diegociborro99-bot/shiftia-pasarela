@@ -178,6 +178,7 @@ function abrirFichaCand(id, editar) {
       <label class="pinlbl candfecha">${icoCand('fecha')}Fecha de la entrevista<input class="logininp" data-cin="fecha" value="${esc(c.fecha || '')}" placeholder="${esc(fmtLargo(isoHoy()))}">${nuevo ? '<small>la de hoy, puesta sola</small>' : ''}</label>
       <label class="pinlbl">Nombre<input class="logininp" data-cin="nombre" value="${esc(c.nombre || '')}" placeholder="Nombre y apellidos" autocomplete="off"></label>
       <label class="pinlbl">Teléfono<input class="logininp" data-cin="tel" inputmode="tel" value="${esc(c.tel || '')}" placeholder="600 00 00 00" autocomplete="off"></label>
+      ${CAMPOS_ENTREVISTA.filter(x => x.cabecera && x.k !== 'fecha').map(x => `<label class="pinlbl">${icoCand(x.ico)}${esc(x.label)}<input class="logininp" data-cin="${x.k}" value="${esc(c[x.k] || '')}" placeholder="—"></label>`).join('')}
       <div class="pinlbl">Puesto al que opta <small>puedes marcar los dos</small></div>
       <div class="segrow">${PUESTOS_CAND.map(x => `<button type="button" class="segk${tmpPtos.includes(x.id) ? ' on' : ''}" data-cpto="${esc(x.id)}">${icoCand(x.ico)}${esc(x.label)}</button>`).join('')}<button type="button" class="segk${tmpPtos.length ? '' : ' on'}" data-cpto="">Sin decidir</button></div>
       <div class="pinlbl">Valoración</div>
@@ -192,7 +193,7 @@ function abrirFichaCand(id, editar) {
         <div class="pinlbl">La entrevista <small>${tieneEntrevista(c) ? 'contestada' : 'sin contestar'}${c.adj ? ` · ${c.adj} ${c.adj === 1 ? 'foto o CV' : 'fotos o CV'} en Notion` : ''}</small></div>
         <div class="candhab">${HABILIDADES.map(h => `<span class="habrow"><em>${icoCand(h.ico)}${esc(h.label)}</em>
           <span class="segrow">${['si', 'dudas', 'no'].map(e => `<button type="button" class="segk mini${(tmpHab[h.id] || '') === e ? ' on e-' + e : ''}" data-chab="${h.id}|${e}">${esc(HAB_ESTADO[e])}</button>`).join('')}</span></span>`).join('')}</div>
-        ${CAMPOS_ENTREVISTA.filter(x => x.k !== 'fecha').map(x => `<label class="pinlbl${x.largo ? ' ancho' : ''}">${icoCand(x.ico)}${esc(x.label)}${x.largo
+        ${CAMPOS_ENTREVISTA.filter(x => !x.cabecera).map(x => `<label class="pinlbl${x.largo ? ' ancho' : ''}">${icoCand(x.ico)}${esc(x.label)}${x.largo
           ? `<textarea class="logininp" data-cin="${x.k}" rows="${(c[x.k] || '').length > 160 ? 5 : 2}" placeholder="—">${esc(c[x.k] || '')}</textarea>`
           : `<input class="logininp" data-cin="${x.k}" value="${esc(c[x.k] || '')}" placeholder="—">`}</label>${x.k === 'horarios' ? bloqueBusca : ''}`).join('')}
       </div>

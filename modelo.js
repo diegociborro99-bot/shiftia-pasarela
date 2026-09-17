@@ -118,9 +118,10 @@ const HAB_ESTADO = { si: 'Sí', dudas: 'Con dudas', no: 'No' };
 // El resto de la entrevista, tal como la tiene el grupo en su plantilla
 // cada dato con su icono: la ficha del candidato los pinta con él (José, 17/09)
 const CAMPOS_ENTREVISTA = [
-  // la fecha va la primera de todas: es lo que Aroa mira al abrir la ficha (17/09)
-  { k: 'fecha', label: 'Fecha de la entrevista', corto: true, ico: 'fecha', meta: true },
-  { k: 'edad', label: 'Edad', corto: true, ico: 'edad' }, { k: 'zona', label: 'Zona', ico: 'zona' },
+  // `cabecera`: lo primero de la ficha, con el nombre y el teléfono (Diego, 17/09). La fecha
+  // además es `meta`: se pone sola al registrar, así que no cuenta como entrevista contestada.
+  { k: 'fecha', label: 'Fecha de la entrevista', corto: true, ico: 'fecha', meta: true, cabecera: true },
+  { k: 'edad', label: 'Edad', corto: true, ico: 'edad', cabecera: true }, { k: 'zona', label: 'Zona', ico: 'zona', cabecera: true },
   { k: 'exp', label: 'Experiencia', largo: true, ico: 'exp' }, { k: 'tipoCocina', label: 'Tipología de cocina', ico: 'tipoCocina' },
   { k: 'incorp', label: 'Incorporación', ico: 'incorp' }, { k: 'sueldo', label: 'Expectativas salariales', ico: 'sueldo' },
   { k: 'horarios', label: 'Horarios', largo: true, ico: 'horarios' }, { k: 'cond', label: 'Condiciones', largo: true, ico: 'cond' },
