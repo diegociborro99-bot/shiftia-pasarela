@@ -77,6 +77,26 @@ const PUESTOS_CAND = [
   { id: 'cocina', label: 'Cocinero/a', corto: 'Cocina', ico: 'cocina' },
   { id: 'sala', label: 'Camarero/a', corto: 'Sala', ico: 'camarero' },
 ];
+// Lo que el grupo pregunta en la entrevista: si maneja cada cosa. Las respuestas del
+// candidato se guardan como sí / con dudas / no.
+const HABILIDADES = [
+  { id: 'cafetera', label: 'Cafetera', ico: 'cafetera' },
+  { id: 'barril', label: 'Cambiar barril', ico: 'barril' },
+  { id: 'bandeja', label: 'Bandeja', ico: 'camarero' },
+  { id: 'cocina', label: 'Cocina', ico: 'cocina' },
+  { id: 'jamon', label: 'Jamón', ico: 'jamon' },
+  { id: 'tpv', label: 'TPV', ico: 'tpv' },
+  { id: 'pda', label: 'PDA', ico: 'pda' },
+];
+const HAB_ESTADO = { si: 'Sí', dudas: 'Con dudas', no: 'No' };
+// El resto de la entrevista, tal como la tiene el grupo en su plantilla
+const CAMPOS_ENTREVISTA = [
+  { k: 'edad', label: 'Edad', corto: true }, { k: 'zona', label: 'Zona' }, { k: 'fecha', label: 'Fecha de la entrevista', corto: true },
+  { k: 'exp', label: 'Experiencia', largo: true }, { k: 'tipoCocina', label: 'Tipología de cocina' },
+  { k: 'incorp', label: 'Incorporación' }, { k: 'sueldo', label: 'Expectativas salariales' },
+  { k: 'horarios', label: 'Horarios', largo: true }, { k: 'cond', label: 'Condiciones', largo: true },
+  { k: 'obs', label: 'Observaciones', largo: true },
+];
 const MOTIVOS_ALERTA = [
   { id: 'NOACUDE', label: 'No acude a la cita' },
   { id: 'PROBLEMA', label: 'Da problemas' },
@@ -89,7 +109,10 @@ function etiquetaCandidato(c) {
   const v = c && VAL_LBL[c.val];
   return v ? `${p} · ${v.corto}` : p;
 }
-function textoCandidato(c) { return [c.nombre, c.tel, c.nota].filter(Boolean).join(' ').toLowerCase(); }
+// el buscador mira todo lo que hay escrito de esa persona, no solo el nombre
+function textoCandidato(c) {
+  return [c.nombre, c.tel, c.nota].concat(CAMPOS_ENTREVISTA.map(x => c[x.k])).filter(Boolean).join(' ').toLowerCase();
+}
 // filtro combinado: lista, texto libre (nombre o teléfono), puesto y valoración
 function filtrarCandidatos(cands, f) {
   const o = f || {};
@@ -100,21 +123,27 @@ function filtrarCandidatos(cands, f) {
     if (o.puesto) { if (o.puesto === 'ninguno' ? c.puesto : c.puesto !== o.puesto) return false; }
     if (o.val) { if (o.val === 'ninguna' ? c.val : c.val !== o.val) return false; }
     if (o.motivo && c.motivo !== o.motivo) return false;
+    if (o.hab && ((c.hab || {})[o.hab] !== 'si')) return false;
     if (!q) return true;
     return textoCandidato(c).includes(q) || (!!qTel && String(c.tel || '').includes(qTel));
   });
 }
 function resumenCandidatos(cands, lista) {
-  const out = { total: 0, sinPuesto: 0, sinValorar: 0 };
+  const out = { total: 0, sinPuesto: 0, sinValorar: 0, conEntrevista: 0, hab: {} };
   for (const v of VALORACIONES) out[v.id] = 0;
+  for (const h of HABILIDADES) out.hab[h.id] = 0;
   for (const c of cands || []) {
     if (lista && c.lista !== lista) continue;
     out.total++;
     if (!c.puesto) out.sinPuesto++;
     if (!c.val) out.sinValorar++; else if (out[c.val] !== undefined) out[c.val]++;
+    if (CAMPOS_ENTREVISTA.some(x => c[x.k]) || Object.keys(c.hab || {}).length) out.conEntrevista++;
+    for (const h of HABILIDADES) if ((c.hab || {})[h.id] === 'si') out.hab[h.id]++;
   }
   return out;
 }
+// ¿esta persona tiene la entrevista contestada?
+function tieneEntrevista(c) { return !!(c && (CAMPOS_ENTREVISTA.some(x => c[x.k]) || Object.keys(c.hab || {}).length)); }
 
 function turnoId(localId, franja) { return `${localId}_${franja}`; }
 function partirTurno(tid) { const i = tid.lastIndexOf('_'); return { localId: tid.slice(0, i), franja: tid.slice(i + 1) }; }
@@ -1688,7 +1717,7 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
-    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, MOTIVOS_ALERTA, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
+    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,

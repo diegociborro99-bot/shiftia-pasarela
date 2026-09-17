@@ -42,9 +42,22 @@ test('las etiquetas llevan los mismos iconos que el grupo usa en su base: sarté
   assert.match(html, /\{ id: 'bien'[^}]*ico: 'bien' \}/);
   assert.match(html, /\{ id: 'regular'[^}]*ico: 'espera' \}/, 'el reloj de arena es «en espera»');
   assert.match(html, /\{ id: 'mal'[^}]*ico: 'mal' \}/);
-  assert.match(html, /const ICO_CAND = \{ cocina: [\s\S]*?espera: \(\) => SVG_ESPERA \}/);
+  assert.match(html, /const ICO_CAND = \{ cocina: [\s\S]*?espera: \(\) => SVG_ESPERA,/);
   // y salen tanto en la lista como en los filtros y en la ficha
   assert.match(html, /<em class="entp p-\$\{esc\(c\.puesto \|\| 'no'\)\}">\$\{icoPuesto\(c\.puesto\)\}/);
   assert.match(html, /chip\('val', v\.id, v\.label, r\[v\.id\], icoCand\(v\.ico\)\)/);
   assert.match(html, /\$\{o\.ico \? icoCand\(o\.ico\) : ''\}/, 'la ficha también');
+});
+test('la entrevista entera del grupo está dentro: aptitudes y campos', () => {
+  assert.match(html, /const HABILIDADES = \[[\s\S]*?cafetera[\s\S]*?barril[\s\S]*?bandeja[\s\S]*?cocina[\s\S]*?jamon[\s\S]*?tpv[\s\S]*?pda/);
+  assert.match(html, /const HAB_ESTADO = \{ si: 'Sí', dudas: 'Con dudas', no: 'No' \}/);
+  assert.match(html, /const CAMPOS_ENTREVISTA = \[[\s\S]*?'edad'[\s\S]*?'zona'[\s\S]*?'exp'[\s\S]*?'sueldo'[\s\S]*?'obs'/);
+  for (const k of ['SVG_CAFETERA', 'SVG_BARRIL', 'SVG_JAMON', 'SVG_TPV', 'SVG_PDA'])
+    assert.match(html, new RegExp('const ' + k + ' = ICO\\('), k);
+  assert.match(html, /if \(o\.hab && \(\(c\.hab \|\| \{\}\)\[o\.hab\] !== 'si'\)\) return false;/, 'se puede filtrar por aptitud');
+  assert.match(html, /function tieneEntrevista\(c\)/);
+  assert.match(html, /data-chab="\$\{h\.id\}\|\$\{e\}"/, 'sí / con dudas / no en la ficha');
+});
+test('el buscador mira toda la entrevista, no solo el nombre', () => {
+  assert.match(html, /return \[c\.nombre, c\.tel, c\.nota\]\.concat\(CAMPOS_ENTREVISTA\.map\(x => c\[x\.k\]\)\)/);
 });

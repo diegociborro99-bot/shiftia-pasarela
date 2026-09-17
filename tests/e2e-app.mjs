@@ -235,8 +235,15 @@ try {
   ok(`Horas: la tabla tiene ≥ 20 filas de persona (${nHoras})`, nHoras >= 20, nHoras);
   ok('Horas: hay un total de horas del mes', await pg.$$eval('#horasRoot table.htab tfoot .hh', x => x.length >= 1));
   await vista(pg, 'entrevistas');
-  ok('Entrevistas: la base de José está dentro y se reparte en dos listas', await pg.evaluate(() => (S.entrevistas || []).length) === 273);
-  ok('Entrevistas: la lista arranca en «Entrevistas» con sus 192 personas', await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === 192);
+  ok('Entrevistas: la base de José está dentro y se reparte en dos listas', await pg.evaluate(() => (S.entrevistas || []).length) === 275, await pg.evaluate(() => (S.entrevistas || []).length));
+  ok('Entrevistas: la lista arranca en «Entrevistas» con sus 194 personas', await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === 194, await pg.$$eval('#entrevistasRoot .entrow', x => x.length));
+  ok('Entrevistas: 35 traen la entrevista contestada, con sus aptitudes', await pg.evaluate(() => (S.entrevistas || []).filter(tieneEntrevista).length) >= 35, await pg.evaluate(() => (S.entrevistas || []).filter(tieneEntrevista).length));
+  await pg.click('#entrevistasRoot [data-entf="hab|cafetera"]'); await pg.waitForTimeout(250);
+  const nCaf = await pg.$$eval('#entrevistasRoot .entrow', x => x.length);
+  ok(`Entrevistas: el filtro «cafetera» deja ${nCaf}`, nCaf > 10 && nCaf < 194, nCaf);
+  await pg.fill('#entQ', 'springfield'); await pg.waitForTimeout(300);
+  ok('Entrevistas: el buscador entra en el texto de la experiencia', await pg.$$eval('#entrevistasRoot .entrow b', x => x.length) === 1);
+  await pg.click('#entLimpiar'); await pg.waitForTimeout(250);
   await pg.click('#entrevistasRoot [data-entlista="alerta"]'); await pg.waitForTimeout(250);
   ok('Entrevistas: «Alerta interna» enseña sus 81', await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === 81);
   await pg.click('#entrevistasRoot [data-entf="puesto|cocina"]'); await pg.waitForTimeout(250);
@@ -246,7 +253,8 @@ try {
   ok('Entrevistas: el buscador encuentra por teléfono', await pg.$$eval('#entrevistasRoot .entrow b', x => x.map(y => y.textContent).join('|')).then(t => /Janira/.test(t)));
   await pg.click('#entLimpiar').catch(() => {}); await pg.waitForTimeout(200);
   await pg.click('#entrevistasRoot .entrow'); await pg.waitForTimeout(300);
-  ok('Entrevistas: la ficha se abre con sus cajetines', await pg.$$eval('#candOvl [data-cin]', x => x.length) === 3 && await pg.$$eval('#candOvl [data-cset]', x => x.length) > 8);
+  ok('Entrevistas: la ficha se abre con la entrevista entera', await pg.$$eval('#candOvl [data-cin]', x => x.length) >= 12 && await pg.$$eval('#candOvl [data-chab]', x => x.length) === 21,
+    JSON.stringify({ cajetines: await pg.$$eval('#candOvl [data-cin]', x => x.length), aptitudes: await pg.$$eval('#candOvl [data-chab]', x => x.length) }));
   await pg.click('#candOvl [data-cset="val|bien"]'); await pg.click('#candOvl [data-cok]'); await pg.waitForTimeout(350);
   ok('Entrevistas: valorar a alguien se guarda y queda en el historial', !(await pg.$('#candOvl'))
     && await pg.evaluate(() => (S.entrevistas || []).filter(c => c.val === 'bien').length) === 1

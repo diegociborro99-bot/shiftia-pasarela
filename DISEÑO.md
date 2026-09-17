@@ -92,7 +92,11 @@ Dos maneras de recuperarlo:
 1. **Que José añada dos columnas en Notion** (dos «Select»: puesto y valoración) y vuelva a exportar a CSV. Es lo más limpio y el volcado se rehace en minutos.
 2. **Por la API de Notion**: José crea una integración interna, la comparte con las dos bases y pasa el token. Así se leen los iconos tal cual están, sin que él toque nada.
 
-Mientras tanto las 273 fichas están «sin puesto» y «sin valorar», salvo las 26 en las que el puesto venía escrito en el propio nombre («Janira Cocinera»).
+Mientras tanto las 275 fichas están «sin puesto» y «sin valorar», salvo las 26 en las que el puesto venía escrito en el propio nombre («Janira Cocinera»).
+
+**Lo que sí trajo la exportación y ya está dentro**: de cada ficha se saca todo lo que había escrito —edad, zona, fecha de la entrevista, la experiencia contada, tipología de cocina, incorporación, expectativas salariales, horarios, condiciones y observaciones— y las siete aptitudes que pregunta el grupo: **cafetera, cambiar barril, bandeja, cocina, jamón, TPV y PDA**, cada una como sí / con dudas / no. Son **275 fichas**, de las que **35 tienen la entrevista contestada** y 31 la experiencia escrita. Se puede filtrar por aptitud («quién sabe cafetera») y el buscador entra en todo el texto, no solo en el nombre.
+
+Las **153 fotos y CV** adjuntos (16 MB) no caben en la aplicación de un solo fichero: de momento solo se guarda cuántos tenía cada persona. Para verlos haría falta subirlos al servidor, que es otro paso.
 
 ## Supuestos (marcados «supuesto» en la app hasta confirmación)
 

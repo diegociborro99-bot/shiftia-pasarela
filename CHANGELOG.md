@@ -23,8 +23,14 @@
   *Los datos de esos iconos no vinieron en la exportación*: Notion no incluye el icono de
   cada ficha ni en el CSV ni en el Markdown, así que las etiquetas están por rellenar
   (ver DISEÑO.md).
+- **La entrevista entera de cada candidato**, que estaba en la exportación y no se había
+  usado: edad, zona, fecha, la experiencia contada, incorporación, lo que pide de sueldo,
+  horarios, condiciones y observaciones, más las siete aptitudes que pregunta el grupo
+  —cafetera, cambiar barril, bandeja, cocina, jamón, TPV y PDA— como sí / con dudas / no.
+  Se filtra por aptitud y el buscador entra en todo el texto: buscar «Springfield»
+  encuentra a quien lo contó en su experiencia.
 - **Entrevistas y alerta interna**: dentro están ya las dos bases de Notion de José
-  (192 candidatos y 81 en alerta, con su teléfono). Dos menús separados, dos etiquetas
+  (194 candidatos y 81 en alerta). Dos menús separados, dos etiquetas
   por persona —puesto y valoración (bien / en espera / mal)—, filtros que combinan las
   dos, buscador por nombre o teléfono y ficha para registrar, editar o mover de lista.
 - **Vacaciones para la nómina**: columna de días de vacaciones en el contador de horas,

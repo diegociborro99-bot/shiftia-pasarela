@@ -19,6 +19,12 @@ const SVG_CAMARERO = ICO('<path d="M3.4 12.6h17.2a8.6 8.6 0 0 1-17.2 0Z"/><path 
 const SVG_BIEN = ICO('<path d="M7.6 20.4V10.2l4.2-7a2 2 0 0 1 2.9 2.4l-1.3 4h4.9a2 2 0 0 1 2 2.4l-1.3 6.4a2.6 2.6 0 0 1-2.6 2h-8.8Z"/><path d="M7.6 10.4H4.2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3.4"/>', 'ibien');
 const SVG_MAL = ICO('<path d="M7.6 3.6v10.2l4.2 7a2 2 0 0 0 2.9-2.4l-1.3-4h4.9a2 2 0 0 0 2-2.4L19 5.6a2.6 2.6 0 0 0-2.6-2H7.6Z"/><path d="M7.6 13.6H4.2a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h3.4"/>', 'imal');
 const SVG_ESPERA = ICO('<path d="M6.6 2.8h10.8M6.6 21.2h10.8"/><path d="M7.8 2.8v3.6c0 2.4 4.2 3.9 4.2 5.6s-4.2 3.2-4.2 5.6v3.6"/><path d="M16.2 2.8v3.6c0 2.4-4.2 3.9-4.2 5.6s4.2 3.2 4.2 5.6v3.6"/>', 'iesp');
+// Las aptitudes que el grupo pregunta en la entrevista, cada una con su dibujo
+const SVG_CAFETERA = ICO('<path d="M4.2 8.4h11.2v5.4a4.4 4.4 0 0 1-4.4 4.4H8.6a4.4 4.4 0 0 1-4.4-4.4Z"/><path d="M15.4 9.8h2.4a2.3 2.3 0 0 1 0 4.6h-2.4"/><path d="M7.4 5.4V3.2M11 5.4V3.2M3.4 21h12.8"/>', 'icaf');
+const SVG_BARRIL = ICO('<rect x="5.4" y="3.2" width="13.2" height="17.6" rx="3.4"/><path d="M5.4 8.6h13.2M5.4 15.4h13.2"/>', 'ibar');
+const SVG_JAMON = ICO('<path d="M17.6 4.4c2.6 2.6 2 7.2-1.4 10.6s-8 4-10.6 1.4 1-6.2 2.6-7.8 6.8-6.8 9.4-4.2Z"/><path d="m5.6 16.4-2.2 2.2M4.5 17.5l2 2"/>', 'ijam');
+const SVG_TPV = ICO('<rect x="4.4" y="2.8" width="15.2" height="18.4" rx="2.6"/><path d="M7.6 6.6h8.8v4H7.6Z"/><path d="M8 14.4h.02M12 14.4h.02M16 14.4h.02M8 17.8h.02M12 17.8h.02M16 17.8h.02"/>', 'itpv');
+const SVG_PDA = ICO('<rect x="6.6" y="2.6" width="10.8" height="18.8" rx="2.4"/><path d="M9.4 6h5.2v7.4H9.4Z"/><path d="M12 17.6h.02"/>', 'ipda');
 const SVG_COCINA = '<svg class="icoc" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.9 10.3h12.3v2.4a5 5 0 0 1-5 5H7.9a5 5 0 0 1-5-5Z"/><path d="m15.4 11.2 5.7-2.8"/></svg>';
 function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"'`]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c])); }
 function initials(n) { const p = String(n || '').trim().split(/\s+/); return ((p[0] && p[0][0] || '') + (p[1] ? p[1][0] : '')).toUpperCase(); }
