@@ -9,6 +9,11 @@
   contenido y mandaban los chips del pie de descansos, así que el lunes se llevaba 192 px y
   el viernes se quedaba en 73, con los nombres largos pegados al borde. Ahora son 132 px
   cada día, y un nombre kilométrico se recorta en su casilla en vez de invadir la de al lado.
+- **Fuera el pie de descansos del imprimible de la semana** (Diego, 18/09): «quién libra» y
+  «quién de baja» se miran en la app, que es donde se decide; en el papel del bar va la
+  rejilla de nombres y nada más. La hoja de cada bar y la del generador sí lo conservan.
+  Con el hueco que deja, la rejilla crece hasta la última talla que cabe en el A4 —10,5 px
+  en vez de 8,5 en la semana del 14— y los nombres, que ahora se leen de pie desde la barra.
 - **Al imprimir, solo los nombres** (José, 18/09, repetido siete veces en la reunión). La
   hoja que Aroa recorta para dejar en cada bar ya no lleva horas, ni «Mañana/Tarde», ni el
   número de posición, ni las marcas ▸ □ P C, ni «por», ni «forzado», ni el mínimo supuesto,

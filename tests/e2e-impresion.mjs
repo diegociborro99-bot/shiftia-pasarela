@@ -101,8 +101,15 @@ try {
   ok('ni «Mañana»/«Tarde» de etiqueta de fila', !/Mañana|Tarde/.test(limpio.txt), (limpio.txt.match(/Mañana|Tarde/g) || []).join(','));
   ok('ni «forzado», ni «Hueco disponible», ni «faltan»', !/forzado|Hueco disponible|faltan/i.test(limpio.txt));
   ok('ni leyenda explicando símbolos que ya no salen', !limpio.ley);
-  const libV = await pg.evaluate(() => { const td = document.querySelector('#printRoot .pxpage tr.pxdesc [data-libran="2026-09-18"]'); return td ? td.textContent.replace(/\s+/g, ' ').trim() : null; });
-  ok('«Quién libra» del viernes 18 dice nadie (0 libran)', !!libV && /nadie/.test(libV) && /0 libran/.test(libV), libV);
+  // 18/09 (Diego): «la fila quien libra y quien de baja en el imprimible de la semana fuera
+  // también». El papel del bar es la rejilla de nombres y nada más; quién libra, quién está
+  // de vacaciones y quién de baja se mira en la app, que es donde se decide.
+  const pie = await pg.evaluate(() => ({
+    filas: document.querySelectorAll('#printRoot table.pxsem tr.pxdesc').length,
+    txt: document.querySelector('#printRoot .pxpage').textContent.replace(/\s+/g, ' '),
+  }));
+  ok('la hoja del equipo ya no lleva pie de descansos', pie.filas === 0, String(pie.filas));
+  ok('ni «Libran», ni «Ausencias», ni «De baja» en toda la hoja', !/Libran|Ausencias|De baja|Pie de descansos/i.test(pie.txt), (pie.txt.match(/Libran|Ausencias|De baja|Pie de descansos/gi) || []).join(','));
   ok('la hoja sigue llevando los 4 locales y los 7 días: eso sí hace falta en el bar', await pg.evaluate(() => document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc').length === 4 && document.querySelectorAll('#printRoot table.pxsem thead th.pxd').length === 7));
   // 18/09 (Diego): «que quede más visual, las celdas con un espacio similar entre todos en
   // la variante semanas». Ahora que en la casilla solo van nombres, la rejilla tiene que
@@ -137,9 +144,13 @@ try {
         if (h < holgura) { holgura = h; quien = nm.textContent.trim(); }
       }
     }
-    return { dias, min: Math.min(...dias), max: Math.max(...dias), holgura, quien };
+    const rot = document.querySelector('#printRoot table.pxsem thead th.act');
+    return { dias, rotulo: Math.round(rot.getBoundingClientRect().width), min: Math.min(...dias), max: Math.max(...dias), holgura, quien };
   });
   ok(`los siete días miden lo mismo (${anchos.min}px)`, anchos.max - anchos.min <= 1, JSON.stringify(anchos.dias));
+  // sin el pie de descansos, la columna de la izquierda se queda sin una sola letra: es el
+  // rail de color del bar y nada más, así que no puede llevarse el ancho de un día entero
+  ok(`la columna del rótulo, ya vacía, no se lleva el ancho de un día (${anchos.rotulo}px frente a ${anchos.min}px)`, anchos.rotulo <= anchos.min / 2, JSON.stringify(anchos));
   ok(`ningún nombre roza el borde de su casilla (el más justo, ${anchos.quien}, deja ${anchos.holgura}px)`, anchos.holgura >= 3, JSON.stringify(anchos));
   // y la columna de la izquierda tiene que seguir cabiendo: «sin turno ese día» o
   // «vacaciones · permisos · libres» no pueden salirse del rótulo y montarse sobre el lunes
@@ -185,6 +196,20 @@ try {
   });
   ok(`un nombre larguísimo se queda dentro de su casilla (se sale ${largo.peor}px) y sigue leyéndose`, largo.peor <= 0 && largo.salio, JSON.stringify(largo));
 
+  // sin el pie de descansos sobraba un tercio de hoja. La rejilla del bar crece hasta la
+  // última talla que cabe: se lee de pie desde la barra y los nombres dejan de ir apretados.
+  const crece = await pg.evaluate(() => {
+    const pag = document.querySelector('#printRoot .pxpage');
+    const t = pag.querySelector('table.pxsem');
+    const A4 = 210 * 96 / 25.4;
+    const f = parseFloat(getComputedStyle(t).fontSize);
+    const cabe = pag.scrollHeight <= A4;
+    t.style.fontSize = (f + 0.5) + 'px';
+    const cabeUnaMas = pag.scrollHeight <= A4;
+    t.style.fontSize = f + 'px';
+    return { f, cabe, cabeUnaMas, alto: pag.scrollHeight, A4: Math.round(A4) };
+  });
+  ok(`la rejilla crece hasta la última talla que cabe (${crece.f}px; media más ya no entra)`, crece.f > 8.5 && crece.cabe && !crece.cabeUnaMas, JSON.stringify(crece));
   const altoSem = await pg.evaluate(() => { const p = document.querySelector('#printRoot .pxpage'); return { alto: p.scrollHeight, hoja: Math.round(210 * 96 / 25.4), cls: p.className }; });
   ok(`la hoja semanal cabe en un A4 apaisado (${altoSem.alto}px ≤ ${altoSem.hoja}px · ${altoSem.cls})`, altoSem.alto <= altoSem.hoja + 2, JSON.stringify(altoSem));
   if (CAPTURAS) { await pg.setViewportSize({ width: 1400, height: Math.max(1000, altoSem.alto + 80) }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-semana.png'), fullPage: true }); await pg.setViewportSize({ width: 1400, height: 1000 }); }
@@ -261,6 +286,9 @@ try {
     return { alturas, min: Math.min(...alturas), max: Math.max(...alturas) };
   });
   ok(`la hoja del local también lleva todas las casillas iguales (${rejillaLocal.min}px)`, rejillaLocal.max - rejillaLocal.min <= 1, JSON.stringify(rejillaLocal.alturas));
+  // la hoja de un bar sí conserva su pie de descansos: Diego pidió quitarlo «del imprimible
+  // de la semana», y esta es la que se cuelga en el local con su propia plantilla
+  ok('la hoja del local conserva su pie de descansos', await pg.evaluate(() => !!document.querySelector('#printRoot table.pxdesct') && /Libran/.test(document.querySelector('#printRoot .pxpage').textContent)));
   const pl = await cas('2026-09-14', 'PASARELA_T');
   ok('hoja del local: Pasarela lunes tarde con Mari Luz la primera, sin hueco', !!pl && pl.slots[0] && !pl.slots[0].hueco && /Mari Luz/.test(pl.slots[0].nombre) && !/hueco/.test(pl.cls), JSON.stringify(pl));
   if (CAPTURAS) { const alto = await pg.evaluate(() => document.querySelector('#printRoot .pxpage').scrollHeight); await pg.setViewportSize({ width: 1400, height: alto + 80 }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-local.png'), fullPage: true }); }

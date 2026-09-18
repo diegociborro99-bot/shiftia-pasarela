@@ -27,17 +27,25 @@
    todas las filas miden lo mismo: se reserva sitio para --pxn nombres (la casilla más
    llena de la semana, que calcula abrirImpresion) y el hueco entre nombres es constante.
    La banda de cada local adelgaza: ya solo lleva el nombre del bar. */
-.pxw[style*="--pxn"] td[data-cas]{box-sizing:border-box;height:calc(var(--pxn) * 1.38em + 5px);vertical-align:top}
-.pxw[style*="--pxn"] .pxg-s{margin:0;height:1.38em;line-height:1.38}
+.pxw[style*="--pxn"]{--pxl:1.38}
+.pxw[style*="--pxn"] td[data-cas]{box-sizing:border-box;height:calc(var(--pxn) * var(--pxl) * 1em + 5px);vertical-align:top}
+.pxw[style*="--pxn"] .pxg-s{margin:0;height:calc(var(--pxl) * 1em);line-height:var(--pxl)}
 .pxw[style*="--pxn"] .pxg-nm{font-size:1.04em;letter-spacing:.005em}
-.pxsem[style*="--pxn"] tr.pxloc td.sec{padding-top:1.5px;padding-bottom:1.5px;line-height:1.2}
+.pxsem[style*="--pxn"] tr.pxloc td.sec{font-size:.95em;padding-top:1.5px;padding-bottom:1.5px;line-height:1.2}
 /* 18/09 (Diego, segunda pasada): «sigue quedando muy apretado algunas casillas como el
    viernes». El ancho se repartía por el contenido —mandaban los chips del pie de descansos—
    y el lunes se llevaba 192 px mientras el viernes se quedaba en 73, con los nombres largos
    pegados al borde. Con table-layout fijo los siete días miden lo mismo pase lo que pase
    debajo. La columna del rótulo se queda en sus 128 px: es la única que lleva texto largo
    («vacaciones · permisos · libres»). */
-.pxsem[style*="--pxn"]{table-layout:fixed}
+/* y el aire entre nombres: en la hoja del bar la caja de cada nombre es 1,5 veces la letra
+   —no 1,38 como en la del local, que ya va en cuerpo 12,5— para que no salgan apretados.
+   montarImpresion sube el cuerpo de la tabla hasta la última talla que cabe en la hoja. */
+.pxw.pxsem[style*="--pxn"]{table-layout:fixed;--pxl:1.5}
+/* sin el pie de descansos, la columna de la izquierda se queda sin una sola letra: es el
+   rail de color del bar (el nombre va en su banda) y nada más, así que se estrecha y esos
+   84 px se reparten entre los siete días. */
+.pxsem[style*="--pxn"] th.act{width:44px}
 /* al fijar el ancho, un nombre kilométrico ya no ensancha su columna: se corta en su
    casilla con puntos suspensivos en vez de meterse en el día siguiente. */
 .pxsem[style*="--pxn"] .pxg-b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

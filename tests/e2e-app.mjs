@@ -435,7 +435,8 @@ try {
   await pg.click('#printBtn');
   ok('#printBtn en Semana genera #printRoot .pxpage', await llega(pg, () => { const r = document.getElementById('printRoot'); return !!r && !r.classList.contains('hidden') && !!r.querySelector('.pxpage'); }, null, 4000) >= 0);
   ok('la hoja lleva cabecera, tabla de la semana y pie', await pg.evaluate(() => !!document.querySelector('#printRoot .pxhead') && !!document.querySelector('#printRoot table.pxsem') && !!document.querySelector('#printRoot .pxfoot')));
-  ok('la hoja lleva los 4 locales, 7 días y el pie de descansos', await pg.evaluate(() => document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc').length === 4 && document.querySelectorAll('#printRoot table.pxsem thead th.pxd').length === 7 && !!document.querySelector('#printRoot table.pxsem tr.pxdesc')));
+  // el pie de descansos se quedó en la app (Diego, 18/09: fuera del imprimible de la semana)
+  ok('la hoja lleva los 4 locales y 7 días, y ya no el pie de descansos', await pg.evaluate(() => document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc').length === 4 && document.querySelectorAll('#printRoot table.pxsem thead th.pxd').length === 7 && !document.querySelector('#printRoot table.pxsem tr.pxdesc')));
   await pg.click('#pClose');
   ok('«Cerrar» oculta la vista previa', await pg.$eval('#printRoot', r => r.classList.contains('hidden')));
 

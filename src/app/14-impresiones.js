@@ -44,6 +44,17 @@ function montarImpresion(h, apaisado, nombre, opts) {
     const alto = () => paginas.length ? altoContenido(bloque) + margen : pg.scrollHeight;
     for (const cls of ['compacto', 'compacto2', 'compacto3']) { if (alto() <= altoHoja) break; bloque.classList.add(cls); }
   }
+  // y al revés (18/09): la hoja del bar se lee de pie desde la barra y, desde que no lleva
+  // pie de descansos, le sobraba un tercio de papel. Si cabe, la rejilla crece hasta la
+  // última talla que entra en la hoja. Solo cuando no ha hecho falta compactar.
+  if (o.crecer && !pg.classList.contains('compacto')) {
+    const t = pg.querySelector(o.crecer);
+    if (t) for (const f of [13, 12.5, 12, 11.5, 11, 10.5, 10, 9.5, 9]) {
+      t.style.fontSize = f + 'px';
+      if (pg.scrollHeight <= altoHoja) break;
+      t.style.fontSize = '';
+    }
+  }
   $('#pClose').addEventListener('click', cerrarImpresion);
   const pv = $('#pVolcar'); if (pv) pv.addEventListener('click', () => o.volcar.fn());
   $('#pGo').addEventListener('click', () => { try { window.print(); } catch (e) { toast('Usa Ctrl+P para imprimir', 'warn'); } });
@@ -220,11 +231,16 @@ function abrirImpresion() {
       h += `<tr class="pxloc" style="--lc:${esc(l.color)}"><td class="lblp">${PX.soloNombres ? '' : FRANJA_LBL[f]}<small>${esc(horarioTxt(l, f)) || '&nbsp;'}</small></td>${cols.map(c => pxCasilla(c, l, f)).join('')}</tr>`;
     }
   }
-  h += pxFilasDescansos(cols, S.staff, 8);
+  // 18/09 (Diego): «la fila quien libra y quien de baja en el imprimible de la semana fuera
+  // también». En el papel del bar va la rejilla de nombres y nada más; quién libra, quién
+  // está de vacaciones y quién de baja se mira en la app, que es donde se decide. La hoja
+  // de cada bar sí lo conserva —ahí es la plantilla de ese local— y la del generador
+  // también, que es con la que la oficina repasa antes de volcar.
+  if (!PX.soloNombres) h += pxFilasDescansos(cols, S.staff, 8);
   h += '</tbody></table>';
   h += PX_LEYENDA_SEMANA();
-  h += pxPie('El pie de descansos dice quién libra cada día y quién está ausente.');
-  montarImpresion(h, true, `Planilla_semana_${lunes}`);
+  h += pxPie(PX.soloNombres ? 'Quién descansa cada día y quién falta se consulta en la app.' : 'El pie de descansos dice quién libra cada día y quién está ausente.');
+  montarImpresion(h, true, `Planilla_semana_${lunes}`, PX.soloNombres ? { crecer: 'table.pxsem' } : null);
   });
 }
 
