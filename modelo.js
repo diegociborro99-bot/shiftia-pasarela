@@ -667,7 +667,7 @@ function posicionesDe(cfg, staff, est, iso, tid) {
     const abreFijo = !!(l && l.primero && l.primero[franja] === e.pid) || !!(p.abre && p.abre[localId] && p.abre[localId].includes(franja));
     const por = e.por || ((e.razon || '').match(/^cubre a (.+)$/) ? (staff.find(q => q.nombre === e.razon.slice(8)) || {}).id || null : null);
     const avisos = avisosVigentes(cfg, staff, est, iso, tid, e.pid);
-    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && abreFijo, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: !(p.locales || []).length, por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual' };
+    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && abreFijo, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: !(p.locales || []).length, por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null };
   });
 }
 // recalcula cocina, abre y orden salvo lo que el encargado haya fijado a mano
@@ -1404,6 +1404,57 @@ function turnoDelDia(cfg, est, iso, pid) {
   for (const t of turnosDe(cfg)) { const e = asignados(est, iso, t.id).find(x => x.pid === pid); if (e) mias.push({ e, localId: t.local.id, franja: t.franja }); }
   return repartoDelDia(mias);
 }
+// ---------- apoyos: el registro de horas para pagarles ----------
+// José, 18/09: «a partir del 1 de octubre… un registro, que los apoyos son los extras que
+// hay que pagarle». Aroa manda las horas del fin de semana por correo («Dulce de 11:30 a 15
+// y de 20:30 a 01», «Leo de 19 a cierre») y se apuntan casilla a casilla como ini/fin de la
+// asignación: es lo que se ve en Hoy y lo que se paga. En el papel del bar no salen nunca.
+// la hora a la que cierra el local ese día: lo que rellena el botón «hasta el cierre»
+function cierreDe(l, dow) { const h = horarioDe(l, dow, 'T'); return h ? h.fin : null; }
+// el tramo que hace de verdad una persona en una casilla: el puesto a mano manda; si no,
+// el del partido; y si no, el del local. null si no está en la casilla.
+function tramoDe(cfg, est, iso, tid, pid) {
+  const e = asignados(est, iso, tid).find(x => x.pid === pid);
+  if (!e) return null;
+  if (e.ini && e.fin) return { ini: e.ini, fin: e.fin, aMano: true };
+  const { localId, franja } = partirTurno(tid);
+  const { partido, continuo, abre } = turnoDelDia(cfg, est, iso, pid);
+  const h = horarioDe(localDe(cfg, localId), isoDow(iso), franja, partido && !continuo, abre);
+  return h ? { ini: h.ini, fin: h.fin, aMano: false } : null;
+}
+// el registro del mes: cada apoyo con sus días, y cada día con sus tramos (bar, franja,
+// de qué hora a qué hora, minutos) y si se ajustaron a mano. Las horas se calculan igual
+// que en horasPersonaMes, así que el registro y la tabla de la nómina dicen lo mismo;
+// sinHoras cuenta los tramos sin ajustar, que cuentan el turno entero del local.
+function registroApoyos(cfg, staff, meses, y, m) {
+  const k = claveMes(y, m);
+  const est = (meses && meses[k]) || { asig: {} };
+  const n = diasDelMes(y, m);
+  const out = [];
+  for (const p of staff.filter(esApoyo)) {
+    const r = { pid: p.id, nombre: p.nombre, dias: [], minutos: 0, horas: 0, sinHoras: 0 };
+    for (let d = 1; d <= n; d++) {
+      const iso = isoDe(y, m, d), dow = isoDow(iso);
+      const mias = [];
+      for (const t of turnosDe(cfg)) { const e = asignados(est, iso, t.id).find(x => x.pid === p.id); if (e) mias.push({ e, localId: t.local.id, franja: t.franja, tid: t.id }); }
+      if (!mias.length) continue;
+      const { partido, continuo, abre } = repartoDelDia(mias);
+      const dia = { iso, tramos: [], minutos: 0 };
+      for (const { e, localId, franja, tid } of mias) {
+        const seguido = continuo === localId && franja === 'M';
+        const min = seguido ? 0 : minutosTurno(localDe(cfg, localId), dow, franja, e, partido && !continuo, abre);
+        const tr = tramoDe(cfg, est, iso, tid, p.id) || { ini: null, fin: null, aMano: false };
+        dia.tramos.push({ localId, franja, ini: tr.ini, fin: tr.fin, aMano: tr.aMano, minutos: min });
+        dia.minutos += min;
+        if (!tr.aMano) r.sinHoras++;
+      }
+      r.dias.push(dia); r.minutos += dia.minutos;
+    }
+    r.horas = Math.round(r.minutos / 6) / 10;
+    out.push(r);
+  }
+  return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
 // Días de un tipo de ausencia en un mes, con las fechas (José, 17/09: «que dándole a un
 // botón vea los cinco días que se ha ido para ponérselo en su nómina»).
 function diasAusenciaMes(p, y, m, tipo) {
@@ -1883,7 +1934,7 @@ if (typeof module !== 'undefined') {
     migrarPuestos, migrarAltas, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
     LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos, fundirSemillaEntrevistas, textoCampo,
-    diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,
+    diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes, cierreDe, tramoDe, registroApoyos,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,
     CARACTERISTICAS, REGLAS, REGLA_NOMBRE, nombreRegla, regla, caracteristicaActiva, avisosVigentes, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,

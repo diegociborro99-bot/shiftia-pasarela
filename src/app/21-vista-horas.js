@@ -54,6 +54,7 @@ function renderHoras() {
   $('#hStats').innerHTML = `<span class="dstat"><b>${fmtHoras(totHoras)}</b>del equipo</span>
     <span class="dstat"><b>${conHoras}</b>${conHoras === 1 ? 'persona con horas' : 'personas con horas'}</span>
     <span class="dstat${totExtras ? ' warn' : ''}"><b>${fmtHoras(totExtras)}</b>extras</span>
+    <span class="dstat"><b>${fmtHoras(registroApoyos(S, S.staff, S.meses, y, m).reduce((a, r) => a + r.minutos, 0) / 60)}</b>de apoyos</span>
     <span class="dstat${cierre ? ' ok' : ''}"><b>${cierre ? 'Cerrado' : 'Abierto'}</b>${cierre ? 'para la nómina' : 'provisional'}</span>`;
   const bC = $('#hCerrar');
   bC.textContent = cierre ? 'Reabrir mes' : 'Cerrar mes';
@@ -103,6 +104,24 @@ function renderHoras() {
   }
   h += `</tbody><tfoot><tr><td>Total · ${pl(orden.length, 'persona', 'personas')}</td><td class="num">${tot.dias}</td><td class="num">${tot.mananas}</td><td class="num">${tot.tardes}</td><td class="num">${tot.partidos}</td><td class="num hh"><b>${numHoras(tot.horas)}</b></td><td class="num">${numHoras(tot.extras)}</td><td class="num">${tot.vac || ''}</td><td class="num opt">${tot.festivas}</td><td class="num opt">${tot.domingos}</td><td class="num opt">${numHoras(tot.noct)}</td><td class="num">${tot.conContrato ? numHoras(tot.contrato) : '—'}</td><td class="num saldo ${tot.saldo > 0 ? 'pos' : tot.saldo < 0 ? 'neg' : ''}">${tot.conContrato ? (tot.saldo > 0 ? '+' : '') + numHoras(tot.saldo) : '—'}</td></tr></tfoot></table></div></div>`;
   h += '<p class="hfoot">Horas = turnos + extras. Contrato = horas semanales de la ficha × días del mes, descontados los días de ausencia. Saldo = horas − contrato. Festivos y domingos cuentan días trabajados; nocturnas, las horas entre las 22:00 y las 06:00. Pulsa una fila para ver el desglose por local y sus extras.</p>';
+
+  // ---- registro de apoyos (José, 18/09: «los apoyos son los extras que hay que pagarle») ----
+  // cada apoyo con sus días: en qué bar, de qué hora a qué hora y cuántas horas. Las horas
+  // son las mismas que arriba (las calcula el mismo modelo); aquí se ven día a día para pagar.
+  const reg = registroApoyos(S, S.staff, S.meses, y, m);
+  const totApoyos = reg.reduce((a, r) => a + r.minutos, 0) / 60;
+  const sinAjustar = reg.reduce((a, r) => a + r.sinHoras, 0);
+  h += `<div class="hsub"><span class="micro">Registro de apoyos</span></div><div class="tablewrap card hapoyos"><div class="tscroll"><table class="htab hapt"><thead><tr><th>Apoyo</th><th>Día</th><th>Bar</th><th>De · a</th><th class="num">Horas</th></tr></thead>`;
+  for (const r of reg) {
+    const p = personaDeId(r.pid) || { id: r.pid, nombre: r.nombre };
+    h += `<tbody data-apoyo="${esc(r.pid)}"><tr class="hgrp"><td class="per"><span class="av" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span><span class="pn2"><b>${esc(p.nombre)}</b><small>${r.dias.length ? pl(r.dias.length, 'día', 'días') : 'sin turnos este mes'}${r.sinHoras ? ` · ${r.sinHoras} sin ajustar` : ''}</small></span></td><td colspan="3"></td><td class="num hh"><b>${r.dias.length ? numHoras(r.horas) : mut}</b></td></tr>`;
+    for (const d of r.dias) for (const t of d.tramos) {
+      h += `<tr class="hdia"><td></td><td class="hor"><b>${fmtDM(d.iso)}</b> <small>${esc(DIAS_L[isoDow(d.iso)].slice(0, 3).toLowerCase())}</small></td><td class="per"><span class="hlocdot" style="--lc:${esc(colorLocal(t.localId))}"></span>${esc(nombreLocal(t.localId))} <small>${FRANJA_LBL[t.franja].toLowerCase()}</small></td><td class="hor">${t.ini ? `${esc(t.ini)}–${esc(t.fin)}` : '—'}${t.aMano ? '' : '<span class="hsup" title="No se ajustaron las horas: cuenta el turno entero del local">sin ajustar</span>'}</td><td class="num">${numHoras(t.minutos / 60)}</td></tr>`;
+    }
+    h += '</tbody>';
+  }
+  h += `<tfoot><tr><td>Total · ${pl(reg.length, 'apoyo', 'apoyos')}</td><td colspan="3">${sinAjustar ? `<span class="hsup">${sinAjustar} sin ajustar</span> cuentan el turno entero del local` : reg.some(r => r.dias.length) ? 'todas las horas ajustadas' : ''}</td><td class="num hh"><b>${numHoras(totApoyos)}</b></td></tr></tfoot></table></div></div>`;
+  h += '<p class="hfoot">Los apoyos se pagan por horas: cada día lleva de qué hora a qué hora, y se ajusta desde Hoy o Semana tocando a la persona → «Ajustar apoyo». Un tramo sin ajustar cuenta el turno entero del local. En el papel del bar no salen horas.</p>';
 
   // ---- por local ----
   const locs = horasLocalMes(S, S.staff, S.meses, y, m);

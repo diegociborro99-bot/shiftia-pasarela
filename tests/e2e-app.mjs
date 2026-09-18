@@ -109,6 +109,39 @@ try {
   ok('el selector se cierra tras elegir', !(await pg.$('#pickerPop')));
   ok('la asignación queda en el estado con origen manual', !!asig && await pg.evaluate(a => (est.asig[a.iso] && est.asig[a.iso][a.tid] || []).some(x => x.pid === a.pid && x.origen === 'manual'), asig));
 
+  // 2b) Registro de apoyos (José, 18/09: «al tocar en los que estén marcados como apoyo…
+  // ajustar apoyo… a qué hora tiene que entrar, cada día»; «los apoyos son los extras que
+  // hay que pagarle»). Se mete por la interfaz el «Leo de 19 a cierre» del correo de Aroa.
+  const objetivo = await pg.evaluate(() => {
+    for (const [iso, dia] of Object.entries(est.asig)) for (const [tid, lista] of Object.entries(dia)) for (const x of lista) if (esApoyo(personaDeId(x.pid)) && !x.ini) return { iso, tid, pid: x.pid };
+    return null;
+  });
+  ok('en el mes hay algún apoyo colocado en una casilla', !!objetivo, 'ningún apoyo en la planilla del demo');
+  await pg.evaluate(o => { S.day = +o.iso.slice(8, 10); renderDia(); }, objetivo);
+  const selChip = `#view-hoy .pchip[data-pid="${objetivo.pid}"][data-turno="${objetivo.iso}|${objetivo.tid}"]`;
+  await pg.click(selChip);
+  ok('el chip de un apoyo abre su menú', await llega(pg, () => !!document.querySelector('#menuTurnoPop'), null, 3000) >= 0);
+  ok('y «Ajustar apoyo» va el primero', await pg.$eval('#menuTurnoPop [data-mt]', b => b.dataset.mt === 'hora' && /Ajustar apoyo/.test(b.textContent)));
+  await pg.click('#menuTurnoPop [data-mt="hora"]');
+  ok('se despliega el formulario de entrada y salida, con «hasta el cierre»', await llega(pg, () => !!document.querySelector('#menuTurnoPop #trIni') && !!document.querySelector('#menuTurnoPop #trFin') && !!document.querySelector('#menuTurnoPop [data-trcierre]'), null, 3000) >= 0);
+  await pg.fill('#menuTurnoPop #trIni', '19:00');
+  await pg.click('#menuTurnoPop [data-trcierre]');
+  const cierreEsperado = await pg.evaluate(o => cierreDe(localDe(S, partirTurno(o.tid).localId), isoDow(o.iso)), objetivo);
+  const cierreForm = await pg.$eval('#menuTurnoPop #trFin', i => i.value);
+  ok(`«hasta el cierre» rellena la hora de cierre del local ese día (${cierreForm})`, /^\d\d:\d\d$/.test(cierreForm) && cierreForm === cierreEsperado, JSON.stringify({ cierreForm, cierreEsperado }));
+  await pg.click('#menuTurnoPop [data-trok]');
+  ok('al guardar, el chip de Hoy enseña el tramo («de tal hora a tal hora»)', await llega(pg, ([sel, c]) => { const ch = document.querySelector(sel); return !!ch && ch.textContent.includes('19:00–' + c); }, [selChip, cierreForm], 3000) >= 0);
+  ok('y queda en la asignación como ini/fin', await pg.evaluate(([o, c]) => { const x = est.asig[o.iso][o.tid].find(y => y.pid === o.pid); return x.ini === '19:00' && x.fin === c; }, [objetivo, cierreForm]));
+  await vista(pg, 'semana');
+  await pg.evaluate(o => { S.semLunes = mondayOf(o.iso); renderSemana(); }, objetivo);
+  ok('en Semana el chip también lo lleva, compacto', await pg.evaluate(o => { const w = document.querySelector(`#semRoot [data-wpers="${o.iso}|${o.tid}|${o.pid}"]`); return !!w && /19/.test(w.textContent); }, objetivo));
+  await vista(pg, 'horas');
+  await pg.evaluate(() => { S.hY = S.y; S.hM = S.m; renderHoras(); });
+  const regApoyo = await pg.evaluate(o => { const t = document.querySelector(`#horasRoot .hapoyos [data-apoyo="${o.pid}"]`); return t ? t.textContent.replace(/\s+/g, ' ') : null; }, objetivo);
+  ok('Horas lleva el registro de apoyos, con ese día y ese tramo', !!regApoyo && regApoyo.includes('19:00') && regApoyo.includes(cierreForm), regApoyo);
+  ok('y avisa de los tramos sin ajustar, que cuentan el turno entero', await pg.evaluate(() => /sin ajustar/i.test((document.querySelector('#horasRoot .hapoyos') || {}).textContent || '')));
+  await vista(pg, 'hoy');
+
   // 3) Semana: 8 filas local×franja, sin desbordar, con pie de descansos
   await vista(pg, 'semana');
   await pg.waitForSelector('table.semt', { timeout: 5000 });

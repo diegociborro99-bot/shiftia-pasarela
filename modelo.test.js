@@ -1328,4 +1328,46 @@ ok('vacaciones para la nómina: días y fechas del mes por persona, y la vista d
   assert.equal(ano[0].pid, 'yilian', 'ordenado de más a menos días');
 });
 
+ok('registro de apoyos: el tramo de cada día y sus horas, para pagarles (José y Aroa, 18/09)', () => {
+  // José: «a partir del 1 de octubre… un registro, que los apoyos son los extras que hay que
+  // pagarle». Aroa manda las horas del fin de semana por correo: «Dulce de 11:30 a 15 y de
+  // 20:30 a 01 · Leo de 19 a cierre · Yiliam de 10 a 16 · Cristian de 20 a cierre».
+  const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();   // octubre 2026: sábado 3, domingo 4
+  const SAB = '2026-10-03', DOM = '2026-10-04';
+  // la hora a la que cierra el local ese día es lo que rellena «hasta el cierre»
+  assert.strictEqual(M.cierreDe(M.localDe(cfg, 'EL33'), 6), '00:00');
+  const pon = (iso, tid, pid, ini, fin) => {
+    assert.ok(M.asignar(e, cfg, st, iso, tid, pid, { forzar: true }).ok, `${pid} en ${tid}`);
+    const x = e.asig[iso][tid].find(y => y.pid === pid);
+    if (ini) { x.ini = ini; x.fin = fin; }
+  };
+  pon(SAB, 'PASARELA_M', 'dulce', '11:30', '15:00'); pon(SAB, 'PASARELA_T', 'dulce', '20:30', '01:00');
+  pon(SAB, 'PASARELA_T', 'leo', '19:00', M.cierreDe(M.localDe(cfg, 'PASARELA'), 6));
+  pon(SAB, 'MONACO_M', 'yilian', '10:00', '16:00');
+  pon(SAB, 'MONACO_T', 'cristian');                       // sin ajustar: cuenta el turno del local
+  pon(DOM, 'PASARELA_M', 'dulce', '11:00', '16:00'); pon(DOM, 'PASARELA_T', 'dulce', '20:00', '23:00');
+  // el tramo de una casilla: el puesto a mano manda; sin él, el del local
+  assert.deepStrictEqual(M.tramoDe(cfg, e, SAB, 'PASARELA_M', 'dulce'), { ini: '11:30', fin: '15:00', aMano: true });
+  const tc = M.tramoDe(cfg, e, SAB, 'MONACO_T', 'cristian');
+  assert.ok(tc && !tc.aMano && tc.ini === '16:00', JSON.stringify(tc));
+  assert.strictEqual(M.tramoDe(cfg, e, SAB, 'MONACO_T', 'lola'), null, 'quien no está en la casilla no tiene tramo');
+  const reg = M.registroApoyos(cfg, st, { '2026-10': e }, 2026, 10);
+  const de = pid => reg.find(r => r.pid === pid);
+  assert.deepStrictEqual(reg.map(r => r.pid).sort(), st.filter(M.esApoyo).map(p => p.id).sort(), 'todos los apoyos, tengan turnos o no');
+  const dulce = de('dulce');
+  assert.strictEqual(dulce.dias.length, 2);
+  assert.strictEqual(dulce.dias[0].minutos, 210 + 270, 'sábado: 11:30–15 y 20:30–01, y el segundo tramo cruza la medianoche');
+  assert.strictEqual(dulce.dias[1].minutos, 300 + 180);
+  assert.strictEqual(dulce.horas, 16);
+  assert.deepStrictEqual(dulce.dias[0].tramos.map(t => [t.localId, t.franja, t.ini, t.fin, t.aMano, t.minutos]),
+    [['PASARELA', 'M', '11:30', '15:00', true, 210], ['PASARELA', 'T', '20:30', '01:00', true, 270]]);
+  assert.strictEqual(de('leo').horas, 5, 'de 19 al cierre (00:00)');
+  assert.strictEqual(de('yilian').horas, 6);
+  assert.strictEqual(de('cristian').sinHoras, 1, 'un tramo sin horas ajustadas: se avisa, porque cuenta el turno entero');
+  assert.strictEqual(dulce.sinHoras, 0);
+  assert.strictEqual(de('tere').dias.length, 0);
+  // lo que sale en el registro es exactamente lo que cuenta la tabla de horas de la nómina
+  for (const pid of ['dulce', 'leo', 'yilian', 'cristian']) assert.strictEqual(de(pid).minutos, M.horasPersonaMes(cfg, st, { '2026-10': e }, pid, 2026, 10).minutos, pid);
+});
+
 console.log(`\n${n} tests OK`);

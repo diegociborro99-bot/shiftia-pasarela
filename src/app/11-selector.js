@@ -91,24 +91,66 @@ function openMenuTurno(iso, tid, pid, anchor) {
   // los avisos se recalculan: los que se guardaron al ponerla pueden haber caducado
   // (Diego y Aroa, 18/09: el «forzado a mano» de Lola)
   const avisosAhora = avisosVigentes(S, S.staff, e, iso, tid, pid);
+  // 18/09 (José): «al tocar en los que estén marcados como apoyo… ajustar apoyo… a qué hora
+  // tiene que entrar, cada día». Para un apoyo es lo primero del menú; para el resto sigue
+  // siendo «horario distinto este día», al final. Las horas se apuntan en la asignación
+  // (ini/fin) y son las que cuenta la nómina y las que enseña Hoy; en el papel no salen.
+  const tramoTxt = entry.ini ? `${esc(entry.ini)}–${esc(entry.fin)}` : '';
+  const btnTramo = `<button class="popb full${esApoyo(p) ? ' rec' : ''}" data-mt="hora">${esApoyo(p) ? 'Ajustar apoyo' : 'Horario distinto este día'}${tramoTxt ? `<small>${tramoTxt}</small>` : esApoyo(p) ? '<small>de qué hora a qué hora, hoy</small>' : ''}</button>`;
   const pop = document.createElement('div');
   pop.className = 'pop'; pop.id = 'menuTurnoPop'; pop.setAttribute('role', 'dialog');
   pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div>
     <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${i + 1} de ${lista.length}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${avisosAhora.length ? `<br><small style="color:var(--warn)">Incumple ${esc(avisosAhora.join(' · '))}</small>` : ''}</div>
+    ${esApoyo(p) ? btnTramo : ''}
     <button class="popb full" data-mt="ficha">Ver y editar su ficha</button>
     <button class="popb full rec" data-mt="cobertura">Falta estos días… buscar quién cubre</button>
     ${i > 0 ? '<button class="popb full" data-mt="subir">▲ Subir en la casilla</button>' : ''}
     ${i < lista.length - 1 ? '<button class="popb full" data-mt="bajar">▼ Bajar en la casilla</button>' : ''}
     ${entry.abre ? '' : '<button class="popb full" data-mt="abre">Sale primero (abre el local)</button>'}
     ${localTieneCocina(l, franja) || entry.cocina ? (entry.cocina ? '<button class="popb full" data-mt="nococina">Quitar la marca de cocina</button>' : `<button class="popb full" data-mt="cocina">Lleva la cocina${puedeCocina(S, p, localId, iso) ? '' : ' (no es cocina de este local)'}</button>`) : ''}
-    <button class="popb full" data-mt="hora">Horario distinto este día${entry.ini ? ` (${esc(entry.ini)}–${esc(entry.fin)})` : ''}</button>
+    ${esApoyo(p) ? '' : btnTramo}
     <button class="popb full peligro" data-mt="quitar">Quitar de la casilla</button>`;
   document.body.appendChild(pop);
   colocarPop(pop, anchor);
   cierraFuera(pop);
+  // el formulario del tramo, dentro del mismo popover: entra, sale, «hasta el cierre»
+  const pintarTramo = () => {
+    const dow = isoDow(iso);
+    const cierre = cierreDe(l, dow);
+    const hLocal = horarioDe(l, dow, franja);
+    pop.innerHTML = `<div class="ph">${esApoyo(p) ? 'Ajustar apoyo' : 'Horario distinto'} · ${esc(p.nombre)}</div>
+      <div class="pd">${esc(l.nombre)} · ${fmtLargo(iso)}${hLocal ? ` · el local, ${esc(hLocal.ini)}–${esc(hLocal.fin)}` : ''}</div>
+      <div class="trform">
+        <label>Entra<input type="time" id="trIni" data-libre value="${esc(entry.ini || '')}"></label>
+        <label>Sale<input type="time" id="trFin" data-libre value="${esc(entry.fin || '')}"></label>
+        ${cierre ? `<button type="button" class="btn-mini ghost" data-trcierre="${esc(cierre)}">hasta el cierre (${esc(cierre)})</button>` : ''}
+      </div>
+      <div class="trbar">${entry.ini ? '<button type="button" class="popb peligro" data-trquitar>Quitar las horas</button>' : ''}<button type="button" class="popb rec" data-trok>Guardar</button></div>`;
+    const ini = pop.querySelector('#trIni'); if (ini && matchMedia('(hover:hover)').matches) ini.focus();
+  };
+  const guardarTramo = quitar => {
+    if (!confirmarSiCerrado(iso)) return;
+    const ew = estadoDeIso(iso, true);
+    const en = asignados(ew, iso, tid).find(x => x.pid === pid); if (!en) { pop.remove(); return; }
+    if (quitar) { pushUndo('horas del apoyo'); delete en.ini; delete en.fin; }
+    else {
+      const vi = (pop.querySelector('#trIni') || {}).value, vf = (pop.querySelector('#trFin') || {}).value;
+      if (!/^\d\d:\d\d$/.test(vi || '') || !/^\d\d:\d\d$/.test(vf || '')) { toast('Hacen falta la hora de entrada y la de salida', 'warn'); return; }
+      pushUndo('horas del apoyo'); en.ini = vi; en.fin = vf;
+    }
+    registrarCambio(`${esApoyo(p) ? 'Apoyo de' : 'Horario de'} ${p.nombre} en ${l.nombre} el ${fmtDM(iso)}: ${en.ini ? en.ini + '–' + en.fin : 'el del local'}`, 'asig');
+    pop.remove(); saveState(); renderVistaActiva();
+    toast(en.ini ? `${nombreCorto(p.nombre)}: de ${en.ini} a ${en.fin} en ${l.nombre}` : `${nombreCorto(p.nombre)}: el horario del local`, 'ok');
+  };
   pop.addEventListener('click', ev => {
+    const tc = ev.target.closest('[data-trcierre]'); if (tc) { const f = pop.querySelector('#trFin'); if (f) f.value = tc.dataset.trcierre; return; }
+    if (ev.target.closest('[data-trok]')) { guardarTramo(false); return; }
+    if (ev.target.closest('[data-trquitar]')) { guardarTramo(true); return; }
     const b = ev.target.closest('[data-mt]'); if (!b) return;
     const a = b.dataset.mt;
+    // en el siguiente tick: cierraFuera mira si el botón pulsado sigue dentro del popover, y
+    // si se repinta ahora mismo el botón ya no está en ningún sitio y lo cerraría
+    if (a === 'hora') { setTimeout(pintarTramo, 0); return; }
     pop.remove();
     if (a === 'ficha') { openFicha(pid); return; }
     if (a === 'cobertura') { openCobertura({ pid, dias: [iso], tipo: 'LD' }); return; }
@@ -118,14 +160,6 @@ function openMenuTurno(iso, tid, pid, anchor) {
     else if (a === 'abre') { pushUndo('quién abre'); marcarAbre(ew, iso, tid, pid, S); registrarCambio(`${p.nombre} abre ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); }
     else if (a === 'cocina') { pushUndo('cocina'); marcarCocina(ew, iso, tid, pid); if (!manualDe(ew, iso, tid).orden) ew.asig[iso][tid] = ordenarCasilla(S, iso, tid, ew.asig[iso][tid]); registrarCambio(`${p.nombre} lleva la cocina de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); }
     else if (a === 'nococina') { pushUndo('cocina'); entry.cocina = false; marcarManual(ew, iso, tid, 'cocina'); registrarCambio(`${p.nombre} deja la cocina de ${l.nombre} del ${fmtDM(iso)}`, 'asig'); }
-    else if (a === 'hora') {
-      const v = prompt('Horario de entrada y salida de esta persona en este turno (p. ej. 12:00-20:00). Vacío = el del local.', entry.ini ? `${entry.ini}-${entry.fin}` : '');
-      if (v === null) return;
-      const m = v.trim().match(/^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})$/);
-      pushUndo('horario del turno');
-      if (!v.trim()) { delete entry.ini; delete entry.fin; } else if (m) { entry.ini = m[1].padStart(5, '0'); entry.fin = m[2].padStart(5, '0'); } else { toast('Formato: 12:00-20:00', 'warn'); return; }
-      registrarCambio(`Horario de ${p.nombre} el ${fmtDM(iso)}: ${entry.ini ? entry.ini + '–' + entry.fin : 'el del local'}`, 'asig');
-    }
     else if (a === 'quitar') { pushUndo(`quitar a ${p.nombre}`); desasignarUI(iso, tid, pid); }
     saveState(); renderVistaActiva();
   });

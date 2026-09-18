@@ -2,6 +2,16 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Registro de apoyos** (José, 18/09: «a partir del 1 de octubre… un registro, que los
+  apoyos son los extras que hay que pagarle»). Tocando a un apoyo en Hoy o en Semana, lo
+  primero del menú es **«Ajustar apoyo»**: a qué hora entra y a qué hora sale ese día, con
+  un botón «hasta el cierre» que pone la hora de cierre del local. El chip de Hoy lo enseña
+  («Leo · 19:00–01:00»), el de Semana también, compacto, y en Horas hay un bloque nuevo,
+  **Registro de apoyos**: cada apoyo con sus días, en qué bar, de qué hora a qué hora y
+  cuántas horas, con aviso en los tramos sin ajustar (cuentan el turno entero del local).
+  Las horas son las mismas que cuenta la nómina: las calcula el mismo modelo. En el papel
+  del bar no salen nunca. Para el resto de la plantilla el mismo formulario sigue siendo
+  «Horario distinto este día», y ya no es un cuadro de texto libre.
 - **Guardar tú no cierra la ventana de los demás** (Diego, 18/09). Cuando alguien guardaba
   un cambio en la planilla, a todo el que tuviera un panel abierto —la ficha de un
   empleado, por ejemplo— se le cerraba en las narices. Ahora cada panel dice qué registro
