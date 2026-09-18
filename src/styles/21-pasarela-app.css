@@ -61,6 +61,10 @@
 .picker{width:340px}
 .prowp .prsub{display:block;font-size:10px;color:var(--ink3);font-weight:600;white-space:normal;line-height:1.3}
 .prowp.dis{opacity:.55}
+/* 18/09 (Diego): «un aviso que cuando fuerzas un trabajador te diga QUÉ REGLA estás
+   incumpliendo». Encima del motivo va el nombre de la regla, que es lo que se corrige
+   en Equipo si la equivocada resulta ser la ficha. */
+.prowp .prregla{display:block;font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--warn);line-height:1.3}
 .prowp .forzar{margin-left:auto;flex:none;border:1px solid var(--border);background:var(--surface);border-radius:7px;font-size:9.5px;font-weight:800;padding:3px 7px;color:var(--warn);font-family:var(--mono)}
 .prowp .forzar:hover{background:var(--warn-bg)}
 .popb.peligro{color:var(--bad)}

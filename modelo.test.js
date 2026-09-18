@@ -325,6 +325,45 @@ ok('semana patrón: los días de cada persona cuadran con la columna DÍAS del P
   for (const [pid, d] of Object.entries(esperado)) assert.strictEqual(dias(pid), d, `${pid}: ${dias(pid)} días, esperaba ${d}`);
 });
 
+ok('puedeEstar dice QUÉ regla se está rompiendo, no solo el motivo (Diego, 18/09)', () => {
+  // «hay que meter también un aviso que cuando fuerzas un trabajador te diga qué regla
+  // estás incumpliendo»: el motivo en castellano no basta, hace falta el nombre de la
+  // regla para poder ir a la ficha y corregirla si la equivocada es la ficha.
+  const cfg = cfgBase(), st = staffDe(cfg), e = M.nuevoEstado(2026, 10, { festivos: [] });
+  const veto = M.puedeEstar(cfg, st, e, '2026-10-05', 'PASARELA_M', 'mariluz');     // lunes
+  assert.strictEqual(veto.regla, 'vetos');
+  assert.strictEqual(M.nombreRegla(veto.regla), 'No hace (local y franja)');
+  assert.strictEqual(M.puedeEstar(cfg, st, e, '2026-10-07', 'PASARELA_M', 'mariluz').regla, 'libra');
+  assert.strictEqual(M.puedeEstar(cfg, st, e, '2026-10-06', 'EL33_M', 'mariluz').regla, 'locales');
+  assert.strictEqual(M.puedeEstar(cfg, st, e, '2026-10-06', 'PASARELA_M', 'mariluz').regla, null, 'si puede, no hay regla rota');
+  // las que no se pueden forzar también se nombran: el encargado tiene que entender por qué
+  // no le sale ni el botón de forzar
+  M.asignar(e, cfg, st, '2026-10-06', 'PASARELA_M', 'mariluz', {});
+  assert.strictEqual(M.puedeEstar(cfg, st, e, '2026-10-06', 'PASARELA_M', 'mariluz').regla, 'duplicado');
+  assert.strictEqual(M.puedeEstar(cfg, st, e, '2026-10-06', 'EL33_M', 'mariluz', { forzar: true }).regla, 'otraFranja', 'estar en dos bares a la vez no se fuerza');
+});
+
+ok('el «forzado a mano» se cae solo cuando el motivo ya no existe (Diego y Aroa, 18/09: el caso de Lola)', () => {
+  // «Puede ser que Lola esté puesta que libra los domingos y esta semana libra un miércoles».
+  // El forzado se estampaba al poner a la persona y no se volvía a mirar nunca: la planilla
+  // seguía diciendo «forzado a mano» semanas después de que el motivo hubiera desaparecido.
+  const cfg = cfgBase(), st = staffDe(cfg), e = M.nuevoEstado(2026, 10, { festivos: [] });
+  const MIE = '2026-10-07';                                   // Mari Luz libra los miércoles
+  const r = M.asignar(e, cfg, st, MIE, 'PASARELA_M', 'mariluz', { forzar: true, razon: 'hace falta' });
+  assert.ok(r.ok && r.avisos.some(x => /libra/.test(x)), 'se la pone a la fuerza y queda el aviso');
+  const enCasilla = () => M.posicionesDe(cfg, st, e, MIE, 'PASARELA_M').find(x => x.pid === 'mariluz');
+  assert.strictEqual(enCasilla().forzado, true, 'mientras libra ese día, la casilla lo dice');
+  assert.strictEqual(M.revisarTurno(cfg, st, e, MIE, 'PASARELA_M').forzados, 1);
+  assert.deepStrictEqual(enCasilla().avisos, ['libra los miércoles'], 'y dice qué regla se está rompiendo');
+  // esta semana su día libre se mueve al domingo: el miércoles ya no libra
+  M.personaDe(st, 'mariluz').libraPuntual = { semana: M.mondayOf(MIE), dias: [7] };
+  assert.strictEqual(enCasilla().forzado, false, 'sin motivo vigente, el papel no puede seguir diciendo «forzado a mano»');
+  assert.deepStrictEqual(enCasilla().avisos, []);
+  assert.strictEqual(M.revisarTurno(cfg, st, e, MIE, 'PASARELA_M').forzados, 0);
+  // y la constancia de que se forzó no se borra: el historial es historial
+  assert.strictEqual(e.asig[MIE]['PASARELA_M'].find(x => x.pid === 'mariluz').forzado, true);
+});
+
 ok('vetos por día: Mari Luz no hace la mañana de Pasarela los lunes, porque esa tarde la hace entera (Aroa, 17/09)', () => {
   const cfg = cfgBase(), st = staffDe(cfg), e = M.nuevoEstado(2026, 10, { festivos: [] });
   const r = M.puedeEstar(cfg, st, e, '2026-10-05', 'PASARELA_M', 'mariluz');   // lunes

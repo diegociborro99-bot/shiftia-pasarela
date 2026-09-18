@@ -2,6 +2,18 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **El «forzado a mano» que no era** (Diego y Aroa, 18/09). El forzado se estampaba al
+  poner a la persona y no se volvía a mirar nunca, así que la planilla seguía avisando de
+  un motivo que ya no existía: «puede ser que Lola esté puesta que libra los domingos y
+  esta semana libra un miércoles». Ahora la casilla comprueba, cada vez que se pinta, si
+  esa persona **sigue** rompiendo alguna regla ahí; si el día libre se movió, el veto se
+  quitó o la ficha se corrigió, el aviso desaparece solo. La constancia de que se forzó se
+  queda en el historial, que para eso es historial.
+- **Y al forzar, qué regla se está incumpliendo** (Diego, 18/09). El selector ya decía el
+  motivo («solo Pasarela»); ahora dice además **qué regla** es —Locales donde trabaja,
+  Días que libra, Días de partido, «Nunca con»…—, que es lo que se va a corregir en Equipo
+  si la equivocada resulta ser la ficha. Lo nombran la fila de «no pueden», el aviso antes
+  de forzar, el que salta desde el Mes, el menú de la casilla y el historial.
 - **Y la hoja de la semana, más visual** (Diego, 18/09): todas las casillas miden lo mismo
   —se reserva sitio para la más llena de esa semana, calculado de los datos— y el hueco
   entre nombres es idéntico en toda la hoja. Antes las filas bailaban entre 42 y 55 px.

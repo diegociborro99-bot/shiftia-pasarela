@@ -134,7 +134,8 @@ function openDiaPersona(pid, iso, anchor) {
       const tid = pon.dataset.pon;
       const r0 = puedeEstar(S, S.staff, e, iso, tid, pid, { permitirPartido: true });
       let opts = { origen: 'manual', permitirPartido: true };
-      if (!r0.ok) { if (!confirm(`${p.nombre}: ${r0.motivo}. ¿Forzar de todas formas? Quedará constancia.`)) return; opts.forzar = true; opts.razon = 'forzado desde el mes'; }
+      // el aviso nombra la regla, no solo el motivo (Diego, 18/09)
+      if (!r0.ok) { if (!confirm(`${p.nombre} incumpliría esta regla:\n\n${nombreRegla(r0.regla)} — ${r0.motivo}\n\n¿Ponerlo de todas formas? Quedará constancia.`)) return; opts.forzar = true; opts.razon = `forzado desde el mes · ${nombreRegla(r0.regla)}`; }
       pushUndo(`poner a ${p.nombre}`);
       const r = asignarUI(iso, tid, pid, opts);
       if (r.ok) { renderVistaActiva(); toast(r.avisos.length ? `Con aviso: ${r.avisos.join(', ')}` : 'Añadido', r.avisos.length ? 'warn' : 'ok'); } else toast(r.motivo, 'bad');

@@ -22,7 +22,10 @@ function openPicker(iso, tid, anchor) {
   const fila = (c, cls, sub, extra) => `<button class="prowp ${cls}" data-pickpid="${c.pid}"${extra || ''}><span class="av" style="background:${avColor(c.pid)}">${esc(initials(c.nombre))}</span><span class="pn2">${esc(c.nombre)}<span class="prsub">${esc(sub)}</span></span>${cls === 'rec' ? '<span class="star">★ RECOMENDADO</span>' : ''}</button>`;
   const pop = document.createElement('div');
   pop.className = 'pop picker'; pop.id = 'pickerPop'; pop.setAttribute('role', 'dialog');
-  const filaNo = ({ p, r }) => `<div class="prowp dis"><span class="av" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span><span class="pn2">${esc(p.nombre)}<span class="prsub">${esc(r.motivo)}</span></span>${/no abre|ya en|ya está|de baja|vacaciones|permiso|día libre|ausente/i.test(r.motivo) ? '' : `<button class="forzar" data-forzar="${p.id}" title="Ponerlo de todas formas y dejar constancia">forzar</button>`}</div>`;
+  // cada fila dice QUÉ regla choca, no solo el motivo: es lo que se va a corregir en Equipo
+  // si la equivocada es la ficha (Diego, 18/09)
+  const porPid = new Map(noPueden.map(x => [x.p.id, x.r]));
+  const filaNo = ({ p, r }) => `<div class="prowp dis"><span class="av" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span><span class="pn2">${esc(p.nombre)}<span class="prregla">${esc(nombreRegla(r.regla))}</span><span class="prsub">${esc(r.motivo)}</span></span>${/no abre|ya en|ya está|de baja|vacaciones|permiso|día libre|ausente/i.test(r.motivo) ? '' : `<button class="forzar" data-forzar="${p.id}" title="Ponerlo de todas formas y dejar constancia">forzar</button>`}</div>`;
   // las filas ya filtradas por lo que se haya escrito en la lupa. Los grupos que se quedan
   // sin nadie desaparecen con su cabecera: un «PUEDEN · 0» solo estorba.
   const filasPicker = q => {
@@ -56,11 +59,13 @@ function openPicker(iso, tid, anchor) {
     const f = ev.target.closest('[data-forzar]');
     if (f) {
       const pid = f.dataset.forzar;
-      const motivo = prompt(`Vas a poner a ${nombrePid(pid)} rompiendo una regla del grupo. Escribe el motivo (quedará en el historial):`);
+      const rr = porPid.get(pid) || {};
+      const cual = rr.regla ? `${nombreRegla(rr.regla)} — ${rr.motivo}` : 'una regla del grupo';
+      const motivo = prompt(`Vas a poner a ${nombrePid(pid)} incumpliendo esta regla:\n\n${cual}\n\nSi la equivocada es la ficha, se corrige en Equipo. Escribe por qué lo haces (quedará en el historial):`);
       if (motivo === null) return;
       pushUndo(`forzar a ${nombrePid(pid)}`);
       const res = asignarUI(iso, tid, pid, { origen: 'manual', forzar: true, permitirPartido: true, razon: motivo.trim() || 'forzado por el encargado' });
-      if (res.ok) { closePicker(); renderVistaActiva(); toast(`${nombrePid(pid)} puesto a la fuerza (${res.avisos.join(', ')})`, 'warn'); } else toast(res.motivo, 'bad');
+      if (res.ok) { closePicker(); renderVistaActiva(); toast(`${nombrePid(pid)} puesto a la fuerza · incumple ${nombreRegla(rr.regla).toLowerCase()}: ${res.avisos.join(', ')}`, 'warn'); } else toast(`${nombreRegla(res.regla)} — ${res.motivo}`, 'bad');
       return;
     }
     const b = ev.target.closest('[data-pickpid]'); if (!b) return;
@@ -83,10 +88,13 @@ function openMenuTurno(iso, tid, pid, anchor) {
   const p = personaDeId(pid);
   const { localId, franja } = partirTurno(tid);
   const l = localDe(S, localId);
+  // los avisos se recalculan: los que se guardaron al ponerla pueden haber caducado
+  // (Diego y Aroa, 18/09: el «forzado a mano» de Lola)
+  const avisosAhora = avisosVigentes(S, S.staff, e, iso, tid, pid);
   const pop = document.createElement('div');
   pop.className = 'pop'; pop.id = 'menuTurnoPop'; pop.setAttribute('role', 'dialog');
   pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div>
-    <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${i + 1} de ${lista.length}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${entry.avisos && entry.avisos.length ? `<br><small style="color:var(--warn)">${esc(entry.avisos.join(' · '))}</small>` : ''}</div>
+    <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${i + 1} de ${lista.length}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${avisosAhora.length ? `<br><small style="color:var(--warn)">Incumple ${esc(avisosAhora.join(' · '))}</small>` : ''}</div>
     <button class="popb full" data-mt="ficha">Ver y editar su ficha</button>
     <button class="popb full rec" data-mt="cobertura">Falta estos días… buscar quién cubre</button>
     ${i > 0 ? '<button class="popb full" data-mt="subir">▲ Subir en la casilla</button>' : ''}

@@ -368,6 +368,16 @@ try {
   await pg.fill('#pickerPop #pickQ', '');
   await pg.waitForTimeout(250);
   ok('al vaciar la lupa vuelve la lista entera', await pg.$$eval('#pickerPop .plist .prowp', x => x.length) === antes);
+  // 18/09 (Diego): «un aviso que cuando fuerzas un trabajador te diga QUÉ REGLA estás
+  // incumpliendo». En el grupo «no pueden» cada fila nombra la regla, no solo el motivo.
+  const noPueden = await pg.evaluate(() => [...document.querySelectorAll('#pickerPop .plist .prowp.dis')].map(f => ({
+    quien: (f.querySelector('.pn2') || {}).firstChild ? f.querySelector('.pn2').firstChild.textContent.trim() : '',
+    regla: (f.querySelector('.prregla') || {}).textContent || '',
+    motivo: (f.querySelector('.prsub') || {}).textContent || '',
+    forzar: !!f.querySelector('[data-forzar]'),
+  })));
+  ok(`en «no pueden» cada fila nombra su regla (${noPueden.length} filas)`, noPueden.length > 0 && noPueden.every(f => f.regla.trim().length > 2 && f.motivo.trim().length > 2), JSON.stringify(noPueden.slice(0, 4)));
+  ok('y quien se puede forzar lleva el botón junto a la regla que se salta', noPueden.some(f => f.forzar), JSON.stringify(noPueden.slice(0, 4)));
   // y sigue sirviendo para lo suyo: poner a alguien
   const pidPick = await pg.$eval('#pickerPop .plist [data-pickpid]', e => e.dataset.pickpid).catch(() => null);
   if (pidPick) {

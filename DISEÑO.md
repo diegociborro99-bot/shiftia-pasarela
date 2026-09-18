@@ -225,3 +225,9 @@ Fútbol y eventos: C26 refuerzo por equipo y local; C27 quién cubre (plantilla 
 Planilla: C29 foto o archivo de la planilla que usan y cómo llega a cada trabajador.
 
 Todas se pueden responder cambiando datos en la app (ficha de persona, ajustes del local, equipos): no hace falta tocar código.
+
+## El forzado, y qué regla se rompe (18/09)
+
+`puedeEstar` devolvía `{ok, motivo, avisos}`: un texto en castellano y poco más. Ahora devuelve también **`regla`**, la clave de la que choca (`locales`, `franjas`, `libra`, `vetos`, `partido`, `nuncaCon`, `standby`, y las que no se pueden forzar de ninguna manera: `cerrado`, `duplicado`, `ausencia`, `otraFranja`), y `nombreRegla(k)` le pone el nombre que ve el encargado. Con eso, la fila de «no pueden» del selector, el aviso antes de forzar, el del Mes y el menú de la casilla dicen *qué* regla se está incumpliendo y no solo el síntoma — Diego, 18/09: *«un aviso que cuando fuerzas un trabajador te diga QUÉ REGLA ESTÁS INCUMPLIENDO»*. Es la diferencia entre «no puedo poner a Adrián» y «Adrián tiene Zapatillera como único local: se corrige en su ficha».
+
+El otro medio problema era el contrario: avisos que ya no valían. `entry.forzado` se estampaba al asignar y **no se volvía a mirar nunca**, así que la planilla imprimía «forzado a mano» semanas después de que el motivo se hubiera evaporado (Aroa, 18/09: *«puede ser que Lola esté puesta que libra los domingos y esta semana libra un miércoles»*). La solución no es limpiar el dato cuando algo cambia —habría que acordarse en cada sitio que toca una ficha—, sino no preguntárselo al dato: `avisosVigentes(cfg, staff, est, iso, tid, pid)` vuelve a pasar a esa persona por `puedeEstar` con `{forzar:true, yaDentro:true}` y devuelve las reglas que rompe **ahora**. `posicionesDe` y `revisarTurno` lo usan, así que la marca aparece y desaparece sola. `entry.forzado` se queda en el estado como lo que es: la constancia de que alguien lo forzó, para el historial.

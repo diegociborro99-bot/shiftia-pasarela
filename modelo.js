@@ -454,6 +454,16 @@ const REGLAS = [
   { k: 'primeroCompleto', lbl: 'El primero de cada franja hace turno completo: quien viene de la mañana no abre la tarde (salvo turno continuo, o partido donde el local lo permita)', nueva: true },
   { k: 'cubreA', lbl: '«Cubre a»: quién ocupa el sitio de quien falta' }, { k: 'abre', lbl: 'Quién sale el primero (fijo por local)' },
 ];
+// el nombre que se le enseña al encargado cuando algo choca: las seis primeras son las
+// características de la ficha (se corrigen en Equipo); las otras cuatro, situaciones que no
+// se pueden forzar de ninguna manera.
+const REGLA_NOMBRE = {
+  locales: 'Locales donde trabaja', franjas: 'Mañanas y tardes', libra: 'Días que libra',
+  vetos: 'No hace (local y franja)', partido: 'Días de partido', nuncaCon: '«Nunca con»',
+  standby: 'En standby', cerrado: 'El local no abre', duplicado: 'Ya está en la casilla',
+  ausencia: 'Ausencia', otraFranja: 'Ya está en otro bar esa franja',
+};
+function nombreRegla(k) { return REGLA_NOMBRE[k] || k || ''; }
 function regla(cfg, k) { return !(cfg && cfg.reglas && cfg.reglas[k] === false); }
 function caracteristicaActiva(p, k) { return !(p && Array.isArray(p.inactivas) && p.inactivas.includes(k)); }
 
@@ -473,19 +483,22 @@ function puedeEstar(cfg, staff, est, iso, tid, pid, opts) {
   if (!l) return { ok: false, motivo: 'local desconocido', avisos: [] };
   const dow = isoDow(iso);
   const avisos = [];
-  const forzable = motivo => { if (o.forzar) { avisos.push(motivo); return null; } return motivo; };
-  if (!turnoAbierto(cfg, est, iso, tid)) return { ok: false, motivo: `${l.nombre} no abre la ${FRANJA_LBL[franja].toLowerCase()} ${DOW_PL[dow].replace('los ', 'el ')}`, avisos };
-  if (pidsEn(est, iso, tid).includes(pid)) return { ok: false, motivo: 'ya está en esta casilla', avisos };
+  // 18/09 (Diego): «un aviso que cuando fuerzas un trabajador te diga QUÉ REGLA estás
+  // incumpliendo». Cada motivo viaja con la clave de su regla, para poder nombrarla en el
+  // selector, en el aviso de forzar y en el historial, e ir a corregir la ficha si hace falta.
+  let m = null, mk = null;
+  const forzable = (k, motivo) => { if (o.forzar) { avisos.push(motivo); return null; } mk = k; return motivo; };
+  if (!turnoAbierto(cfg, est, iso, tid)) return { ok: false, motivo: `${l.nombre} no abre la ${FRANJA_LBL[franja].toLowerCase()} ${DOW_PL[dow].replace('los ', 'el ')}`, regla: 'cerrado', avisos };
+  if (!o.yaDentro && pidsEn(est, iso, tid).includes(pid)) return { ok: false, motivo: 'ya está en esta casilla', regla: 'duplicado', avisos };
   const aus = ausenciaEn(p, iso);
-  if (aus) return { ok: false, motivo: motivoAusencia(aus) + (aus.detalle ? ' · ' + aus.detalle : ''), avisos };
-  for (const t of turnosDe(cfg)) if (t.franja === franja && t.id !== tid && pidsEn(est, iso, t.id).includes(pid)) return { ok: false, motivo: `ya en ${t.local.nombre} esta ${FRANJA_LBL[franja].toLowerCase()}`, avisos };
-  let m = null;
+  if (aus) return { ok: false, motivo: motivoAusencia(aus) + (aus.detalle ? ' · ' + aus.detalle : ''), regla: 'ausencia', avisos };
+  for (const t of turnosDe(cfg)) if (t.franja === franja && t.id !== tid && pidsEn(est, iso, t.id).includes(pid)) return { ok: false, motivo: `ya en ${t.local.nombre} esta ${FRANJA_LBL[franja].toLowerCase()}`, regla: 'otraFranja', avisos };
   const act = k => regla(cfg, k) && caracteristicaActiva(p, k);
-  if (act('locales') && Array.isArray(p.locales) && p.locales.length && !p.locales.includes(localId)) m = forzable(`solo ${lblLocales(cfg, p.locales)}`);
-  if (!m && act('franjas') && Array.isArray(p.franjas) && p.franjas.length && !p.franjas.includes(franja)) m = forzable(p.franjas.length === 1 ? (p.franjas[0] === 'M' ? 'siempre de mañana' : 'solo tardes') : 'franja no permitida');
-  if (!m && p.standby) m = forzable('en standby: aún no entra en la planilla');
-  if (!m && act('libra') && libraEn(p, iso)) m = forzable(libraPuntualVigente(p, iso) ? `libra ${DOW_PL[dow]} esta semana` : `libra ${DOW_PL[dow]}`);
-  if (!m && act('vetos')) { const v = vetoDe(p, localId, franja, isoDow(iso)); if (v) m = forzable(textoVeto(v, l.nombre)); }
+  if (act('locales') && Array.isArray(p.locales) && p.locales.length && !p.locales.includes(localId)) m = forzable('locales', `solo ${lblLocales(cfg, p.locales)}`);
+  if (!m && act('franjas') && Array.isArray(p.franjas) && p.franjas.length && !p.franjas.includes(franja)) m = forzable('franjas', p.franjas.length === 1 ? (p.franjas[0] === 'M' ? 'siempre de mañana' : 'solo tardes') : 'franja no permitida');
+  if (!m && p.standby) m = forzable('standby', 'en standby: aún no entra en la planilla');
+  if (!m && act('libra') && libraEn(p, iso)) m = forzable('libra', libraPuntualVigente(p, iso) ? `libra ${DOW_PL[dow]} esta semana` : `libra ${DOW_PL[dow]}`);
+  if (!m && act('vetos')) { const v = vetoDe(p, localId, franja, isoDow(iso)); if (v) m = forzable('vetos', textoVeto(v, l.nombre)); }
   if (!m && act('partido')) {
     const otra = franja === 'M' ? 'T' : 'M';
     const enOtra = turnosDe(cfg).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(pid));
@@ -494,12 +507,13 @@ function puedeEstar(cfg, staff, est, iso, tid, pid, opts) {
       const permitido = pd.siempre || (pd.dias || []).includes(dow);
       if (!permitido) {
         if (o.permitirPartido) avisos.push(`partido no declarado ${DOW_PL[dow]}`);
-        else m = forzable(`no hace partido ${DOW_PL[dow]}`);
+        else m = forzable('partido', `no hace partido ${DOW_PL[dow]}`);
       }
     }
   }
   if (!m && regla(cfg, 'nuncaCon')) {
     for (const q of asignados(est, iso, tid)) {
+      if (q.pid === pid) continue;
       const qp = personaDe(staff, q.pid);
       if (!qp) continue;
       const mio = caracteristicaActiva(p, 'nuncaCon') && (p.nuncaCon || []).includes(q.pid);
@@ -508,11 +522,22 @@ function puedeEstar(cfg, staff, est, iso, tid, pid, opts) {
       // «nunca coincide» flexible (José, 17/09): se respeta si hay gente suficiente; si no,
       // se relaja y queda el aviso para que el encargado lo vea
       if (o.relajarNuncaCon && (p.nuncaConFlexible || qp.nuncaConFlexible)) { avisos.push(`nunca con ${qp.nombre}: no había nadie más`); continue; }
-      m = forzable(`nunca con ${qp.nombre}`); break;
+      m = forzable('nuncaCon', `nunca con ${qp.nombre}`); break;
     }
   }
-  if (m) return { ok: false, motivo: m, avisos };
-  return { ok: true, motivo: null, avisos };
+  if (m) return { ok: false, motivo: m, regla: mk, avisos };
+  return { ok: true, motivo: null, regla: null, avisos };
+}
+
+// ¿Qué reglas rompe AHORA MISMO tener a esta persona en esta casilla? El «forzado» que se
+// guarda al ponerla es historia, y la historia no cambia; pero la ficha y la semana sí —un
+// día libre puntual que se mueve, un veto que se quita, un turno que se cierra—, y la
+// planilla no puede seguir avisando de un motivo que ya no existe (Diego y Aroa, 18/09:
+// «puede ser que Lola esté puesta que libra los domingos y esta semana libra un miércoles»).
+// Devuelve [] cuando ya no rompe nada.
+function avisosVigentes(cfg, staff, est, iso, tid, pid) {
+  const r = puedeEstar(cfg, staff, est, iso, tid, pid, { forzar: true, yaDentro: true });
+  return r.ok ? r.avisos : r.avisos.concat(r.motivo ? [r.motivo] : []);
 }
 
 // ---------- casilla: orden, cocina, abre ----------
@@ -641,7 +666,8 @@ function posicionesDe(cfg, staff, est, iso, tid) {
     const continuo = e.pid === primero && esContinuo(cfg, staff, est, iso, localId, e.pid);
     const abreFijo = !!(l && l.primero && l.primero[franja] === e.pid) || !!(p.abre && p.abre[localId] && p.abre[localId].includes(franja));
     const por = e.por || ((e.razon || '').match(/^cubre a (.+)$/) ? (staff.find(q => q.nombre === e.razon.slice(8)) || {}).id || null : null);
-    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && abreFijo, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: !(p.locales || []).length, por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, forzado: !!e.forzado, origen: e.origen || 'manual' };
+    const avisos = avisosVigentes(cfg, staff, est, iso, tid, e.pid);
+    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && abreFijo, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: !(p.locales || []).length, por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual' };
   });
 }
 // recalcula cocina, abre y orden salvo lo que el encargado haya fijado a mano
@@ -724,6 +750,8 @@ function revisarTurno(cfg, staff, est, iso, tid) {
   const n = lista.length;
   const tieneCocina = l && localTieneCocina(l, franja);
   const coc = lista.find(e => e.cocina);
+  const cache = new Map();
+  const vigentes = pid => { if (!cache.has(pid)) cache.set(pid, avisosVigentes(cfg, staff, est, iso, tid, pid)); return cache.get(pid); };
   const out = {
     abierto, n, minimo: m.min, supuesto: m.supuesto, refuerzo: m.refuerzo, faltan: abierto ? Math.max(0, m.min - n) : 0,
     sinCocina: !!(abierto && tieneCocina && !coc),
@@ -733,8 +761,8 @@ function revisarTurno(cfg, staff, est, iso, tid) {
     motivoAbre: abierto && n > 0 && !primeroDe(cfg, staff, est, iso, tid) ? motivoSinPrimero(cfg, staff, est, iso, tid) : null,
     // dos apoyos no pueden quedarse solos en un turno (José, 17/09): hace falta un veterano
     soloApoyos: !!(abierto && lista.length && lista.every(e => esApoyo(personaDe(staff, e.pid)))),
-    forzados: lista.filter(e => e.forzado).length,
-    avisos: lista.filter(e => e.avisos && e.avisos.length).map(e => `${nombreDe(staff, e.pid)}: ${e.avisos.join(', ')}`),
+    forzados: lista.filter(e => e.forzado && vigentes(e.pid).length).length,
+    avisos: lista.filter(e => vigentes(e.pid).length).map(e => `${nombreDe(staff, e.pid)}: ${vigentes(e.pid).join(', ')}`),
     incompatibles: [],
   };
   for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
@@ -1858,7 +1886,7 @@ if (typeof module !== 'undefined') {
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes,
     toProblem, desdeSolucion,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,
-    CARACTERISTICAS, REGLAS, regla, caracteristicaActiva, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
+    CARACTERISTICAS, REGLAS, REGLA_NOMBRE, nombreRegla, regla, caracteristicaActiva, avisosVigentes, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
     resumenMinimos, descripcionCocina, condicionesDe, verificarSemana, generarSemana, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
     TIPOS_INCIDENCIA, turnosAfectados, turnosSemanaDe, candidatosCobertura, planesCobertura, aplicarCobertura, vaciarPlanilla,
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,
