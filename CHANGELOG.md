@@ -2,6 +2,11 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Guardar tú no cierra la ventana de los demás** (Diego, 18/09). Cuando alguien guardaba
+  un cambio en la planilla, a todo el que tuviera un panel abierto —la ficha de un
+  empleado, por ejemplo— se le cerraba en las narices. Ahora cada panel dice qué registro
+  está mirando: si ese registro llega igual del servidor, el panel se repinta con el estado
+  nuevo y el usuario ni se entera; solo se cierra si han tocado justo lo que tiene abierto.
 - **El «forzado a mano» que no era** (Diego y Aroa, 18/09). El forzado se estampaba al
   poner a la persona y no se volvía a mirar nunca, así que la planilla seguía avisando de
   un motivo que ya no existía: «puede ser que Lola esté puesta que libra los domingos y

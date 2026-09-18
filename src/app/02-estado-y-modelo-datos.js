@@ -126,16 +126,52 @@ let bcSync = null;
 try { bcSync = new BroadcastChannel('shiftia_pas_sync'); } catch (e) {}
 let syncTimer = null;
 const OVL_PERSISTENTES = ['cambioPassOvl', 'ctaOvl', 'pendienteOvl', 'migraOvl', 'sinConexionOvl'];
-function cerrarTransitorios() {
-  document.querySelectorAll('.ovl').forEach(o => { if (!OVL_PERSISTENTES.includes(o.id)) o.remove(); });
+function cerrarTransitorios(salvar) {
+  const vivos = salvar || [];
+  document.querySelectorAll('.ovl').forEach(o => { if (!OVL_PERSISTENTES.includes(o.id) && !vivos.includes(o.id)) o.remove(); });
   cerrarPops();
+}
+// 18/09 (Diego): «cuando un usuario hace cualquier cambio en la planilla, al guardar, a otro
+// usuario que tiene una ventana abierta —por ejemplo el perfil de un empleado— se la cierra
+// forzosamente». Cerrarlo TODO al recibir un estado nuevo era pasarse: lo único que puede
+// quedar desfasado es el panel cuyo registro ha cambiado. Cada panel dice qué mira
+// (data-vigila) y cómo repintarse; si su registro llega igual, se vuelve a pintar contra el
+// estado nuevo —no vale dejar el DOM viejo, que escribiría en objetos ya huérfanos— y el
+// usuario ni se entera.
+const VIGILADO = {
+  staff: (e, id) => (e.staff || []).find(p => p.id === id),
+  cand: (e, id) => (e.entrevistas || []).find(c => String(c.id) === String(id)),
+  local: (e, id) => (e.locales || []).find(l => l.id === id),
+};
+function registroVigilado(estado, clave) {
+  const i = String(clave || '').indexOf(':');
+  if (i < 0 || !estado) return undefined;
+  const f = VIGILADO[clave.slice(0, i)];
+  return f ? JSON.stringify(f(estado, clave.slice(i + 1)) || null) : undefined;
+}
+function panelesVigilados(nuevo) {
+  const out = [];
+  for (const o of document.querySelectorAll('.ovl')) {
+    if (OVL_PERSISTENTES.includes(o.id) || !o.dataset.vigila || !o._reabrir) continue;
+    const antes = registroVigilado(S, o.dataset.vigila);
+    if (antes === undefined) continue;
+    const caja = o.querySelector('.ovcard');
+    out.push({ id: o.id, fn: o._reabrir, top: caja ? caja.scrollTop : 0, igual: antes === registroVigilado(nuevo, o.dataset.vigila) });
+  }
+  return out;
 }
 const mesesConContenido = m => Object.fromEntries(Object.entries(m || {}).filter(([, v]) => v && (Object.keys(v.apertura || {}).length || Object.keys(v.asig || {}).length)));
 const huellaPlanilla = e => JSON.stringify([mesesConContenido(e.meses), e.staff || [], e.locales || [], e.patron || {}, e.eventos || [], e.extras || [], e.festivos || [], e.cierres || {}]);
 function aplicarEstadoExterno(nuevo) {
   const suave = !!S && huellaPlanilla(nuevo) === huellaPlanilla(S);
-  const habiaOvl = !suave && !!document.querySelector('.ovl:not(#cambioPassOvl), .pop');
-  if (!suave) { cerrarTransitorios(); undoStack.length = 0; actualizarUndoBtn(); }
+  // los paneles que miran un registro concreto se juzgan por ese registro, cambie o no la
+  // planilla: si sigue igual se repintan contra el estado nuevo, y si lo han tocado se
+  // cierran aunque el resto no se mueva (una entrevista no entra en la huella de la planilla)
+  const vigilados = panelesVigilados(nuevo);
+  const siguen = vigilados.filter(x => x.igual), caen = vigilados.filter(x => !x.igual);
+  const habiaOvl = !!caen.length || (!suave && !siguen.length && !!document.querySelector('.ovl:not(#cambioPassOvl), .pop'));
+  for (const x of caen) { const o = document.getElementById(x.id); if (o) o.remove(); }
+  if (!suave) { cerrarTransitorios(siguen.map(x => x.id)); undoStack.length = 0; actualizarUndoBtn(); }
   const nav = { y: S.y, m: S.m, day: S.day, semLunes: S.semLunes, guiaOff: S.guiaOff, hY: S.hY, hM: S.hM };
   S = Object.assign(freshState(), nuevo);
   for (const k of Object.keys(nav)) if (nav[k] !== undefined) S[k] = nav[k];
@@ -144,6 +180,8 @@ function aplicarEstadoExterno(nuevo) {
   cargarMes();
   if (document.body.classList.contains('modo-empleado')) { if (typeof activarModoEmpleado === 'function') activarModoEmpleado(); }
   else { renderVistaActiva(); if (habiaOvl) toast('Otro dispositivo guardó cambios: el panel abierto se ha cerrado para evitar pisarlos', 'warn'); }
+  // los paneles que sobreviven se repintan contra el estado nuevo, conservando el scroll
+  for (const x of siguen) { try { x.fn(); const c = document.querySelector('#' + x.id + ' .ovcard'); if (c) c.scrollTop = x.top; } catch (e) {} }
 }
 function sincronizarDesdeFuera() {
   clearTimeout(syncTimer);

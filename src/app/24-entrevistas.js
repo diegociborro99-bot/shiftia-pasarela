@@ -186,7 +186,7 @@ function fichaCandHTML(c) {
   </div>`;
 }
 function abrirPerfilCand(c) {
-  const ov = abrirOverlay('candOvl', fichaCandHTML(c), { ancho: 780 });
+  const ov = abrirOverlay('candOvl', fichaCandHTML(c), { ancho: 780, vigila: 'cand:' + c.id, reabrir: () => abrirPerfilCand(candidatoDe(c.id) || c) });
   ov.addEventListener('click', ev => { if (ev.target.closest('[data-cedit]')) abrirFichaCand(c.id, true); });
 }
 

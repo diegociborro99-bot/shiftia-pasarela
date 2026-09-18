@@ -43,7 +43,7 @@ function openFicha(pid) {
       <div><div class="pinlbl">Color en la planilla</div><div class="colorset" id="fichColores"></div></div>
     </div>
     <div id="fichBody"></div>
-    <div class="fichfoot"><button type="button" class="btn btn-ghost" data-baja>Quitar del equipo</button><button type="button" class="btn btn-cta" data-ovx>Listo</button></div>`, { ancho: 640 });
+    <div class="fichfoot"><button type="button" class="btn btn-ghost" data-baja>Quitar del equipo</button><button type="button" class="btn btn-cta" data-ovx>Listo</button></div>`, { ancho: 640, vigila: 'staff:' + p.id, reabrir: () => openFicha(p.id) });
 
   const body = ov.querySelector('#fichBody');
   const locChips = (sel, attr, opts) => S.locales.map(l => `<button type="button" class="locchip${sel.includes(l.id) ? ' on' : ''}" data-${attr}="${esc(l.id)}" data-libre style="--lc:${esc(l.color)}"><i class="ldot"></i>${esc(opts && opts.corto ? l.corto : l.nombre)}</button>`).join('');

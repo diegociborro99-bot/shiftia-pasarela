@@ -231,3 +231,16 @@ Todas se pueden responder cambiando datos en la app (ficha de persona, ajustes d
 `puedeEstar` devolvía `{ok, motivo, avisos}`: un texto en castellano y poco más. Ahora devuelve también **`regla`**, la clave de la que choca (`locales`, `franjas`, `libra`, `vetos`, `partido`, `nuncaCon`, `standby`, y las que no se pueden forzar de ninguna manera: `cerrado`, `duplicado`, `ausencia`, `otraFranja`), y `nombreRegla(k)` le pone el nombre que ve el encargado. Con eso, la fila de «no pueden» del selector, el aviso antes de forzar, el del Mes y el menú de la casilla dicen *qué* regla se está incumpliendo y no solo el síntoma — Diego, 18/09: *«un aviso que cuando fuerzas un trabajador te diga QUÉ REGLA ESTÁS INCUMPLIENDO»*. Es la diferencia entre «no puedo poner a Adrián» y «Adrián tiene Zapatillera como único local: se corrige en su ficha».
 
 El otro medio problema era el contrario: avisos que ya no valían. `entry.forzado` se estampaba al asignar y **no se volvía a mirar nunca**, así que la planilla imprimía «forzado a mano» semanas después de que el motivo se hubiera evaporado (Aroa, 18/09: *«puede ser que Lola esté puesta que libra los domingos y esta semana libra un miércoles»*). La solución no es limpiar el dato cuando algo cambia —habría que acordarse en cada sitio que toca una ficha—, sino no preguntárselo al dato: `avisosVigentes(cfg, staff, est, iso, tid, pid)` vuelve a pasar a esa persona por `puedeEstar` con `{forzar:true, yaDentro:true}` y devuelve las reglas que rompe **ahora**. `posicionesDe` y `revisarTurno` lo usan, así que la marca aparece y desaparece sola. `entry.forzado` se queda en el estado como lo que es: la constancia de que alguien lo forzó, para el historial.
+
+## Un guardado ajeno ya no cierra tu ventana (18/09)
+
+Diego, 18/09: *«cuando una persona hace cualquier tipo de cambio en la planilla, al guardar, si otro usuario tiene una ventana abierta, por ejemplo perfil de empleado, se la cierra forzosamente»*.
+
+`aplicarEstadoExterno` cerraba **todos** los paneles en cuanto la huella de la planilla cambiaba. La intención era buena —que nadie guarde encima de lo que otro acaba de escribir— pero el precio lo pagaba quien no tenía nada que ver: Aroa mueve un turno y a José se le cierra la ficha que estaba leyendo.
+
+Lo que de verdad puede quedar desfasado no es «un panel», es **el registro que ese panel está mirando**. Así que cada panel lo declara al abrirse: `abrirOverlay(id, html, { vigila: 'staff:adrian', reabrir: () => openFicha('adrian') })`. Al llegar un estado de fuera se compara ese registro antes y después:
+
+- **Igual** → el panel sobrevive. No basta con no borrarlo: el DOM viejo guarda referencias a objetos del `S` anterior y, al tocar un campo, escribiría en un huérfano. Se vuelve a pintar con `reabrir()` contra el estado nuevo, conservando el scroll. Como el registro es idéntico, sale exactamente igual.
+- **Distinto** → se cierra, con su aviso. Y se cierra *aunque la planilla no se haya movido*: una entrevista no entra en la huella de la planilla, y antes ese panel se quedaba abierto con datos viejos sin que nadie dijera nada.
+
+Lo llevan hoy la ficha de persona (`staff:`) y la de una entrevista (`cand:`), que son las dos en las que se está un rato. Los popovers de casilla siguen cerrándose siempre: son menús de dos líneas anclados a una celda que se repinta.

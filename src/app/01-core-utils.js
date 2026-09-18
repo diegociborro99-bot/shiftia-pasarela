@@ -168,6 +168,10 @@ function abrirOverlay(id, html, opts) {
   const ov = document.createElement('div');
   ov.className = 'ovl'; ov.id = id;
   ov.innerHTML = `<div class="ovcard big"${opts && opts.ancho ? ` style="max-width:${opts.ancho}px"` : ''}><button class="ovx" data-ovx aria-label="Cerrar">✕</button>${html}</div>`;
+  // qué registro está mirando este panel («staff:pid», «cand:id») y cómo volver a pintarlo.
+  // Con eso, un estado que llega de otro usuario solo cierra los paneles cuyo registro ha
+  // cambiado de verdad, en vez de cerrarlos todos (Diego, 18/09).
+  if (opts && opts.vigila) { ov.dataset.vigila = opts.vigila; if (opts.reabrir) ov._reabrir = opts.reabrir; }
   document.body.appendChild(ov);
   ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('[data-ovx]')) ov.remove(); });
   return ov;

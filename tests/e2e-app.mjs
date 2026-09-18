@@ -378,6 +378,59 @@ try {
   })));
   ok(`en «no pueden» cada fila nombra su regla (${noPueden.length} filas)`, noPueden.length > 0 && noPueden.every(f => f.regla.trim().length > 2 && f.motivo.trim().length > 2), JSON.stringify(noPueden.slice(0, 4)));
   ok('y quien se puede forzar lleva el botón junto a la regla que se salta', noPueden.some(f => f.forzar), JSON.stringify(noPueden.slice(0, 4)));
+  // 18/09 (Diego): «cuando un usuario hace cualquier cambio en la planilla, al guardar, a
+  // otro usuario que tiene una ventana abierta —por ejemplo el perfil de un empleado— se la
+  // cierra forzosamente». Solo tiene que cerrarse el panel cuyo registro haya cambiado.
+  await pg.evaluate(() => { const p = document.querySelector('#pickerPop'); if (p) p.remove(); });
+  const ventana = await pg.evaluate(() => {
+    const quien = S.staff[0].id, otro = S.staff[1].id;
+    const clon = () => JSON.parse(JSON.stringify(S));
+    openFicha(quien);
+    const abierta = () => { const o = document.getElementById('fichaOvl'); return o ? (o.querySelector('#fichNombre') || {}).value : null; };
+    const tras = {};
+    tras.abre = abierta();
+    // otro usuario toca la planilla: la ficha abierta no es suya, se queda
+    const a = clon(); a.historial = [{ ts: Date.now(), tipo: 'asig', txt: 'otro usuario movió un turno' }].concat(a.historial || []);
+    a.meses = a.meses || {}; const k = Object.keys(a.meses)[0];
+    if (k) a.meses[k].asig = Object.assign({}, a.meses[k].asig, { '2026-01-02': { EL33_M: [] } });
+    aplicarEstadoExterno(a);
+    tras.trasPlanilla = abierta();
+    // otro usuario toca a OTRA persona: tampoco es la suya
+    const b = clon(); (b.staff.find(x => x.id === otro) || {}).nombre = 'Otro Nombre';
+    aplicarEstadoExterno(b);
+    tras.trasOtraFicha = abierta();
+    // y ahora tocan justo a quien tiene abierto: eso sí se cierra
+    const c = clon(); (c.staff.find(x => x.id === quien) || {}).nombre = 'Cambiado Desde Fuera';
+    aplicarEstadoExterno(c);
+    tras.trasSuFicha = abierta();
+    const o = document.getElementById('fichaOvl'); if (o) o.remove();
+    return tras;
+  });
+  ok('un cambio de otro usuario en la planilla no cierra la ficha abierta', !!ventana.abre && ventana.trasPlanilla === ventana.abre, JSON.stringify(ventana));
+  ok('ni un cambio en la ficha de otra persona', ventana.trasOtraFicha === ventana.abre, JSON.stringify(ventana));
+  ok('pero si cambian la ficha que tienes abierta, esa sí se cierra', ventana.trasSuFicha === null, JSON.stringify(ventana));
+  // lo mismo con la ficha de una entrevista, que es la otra ventana en la que se está un rato
+  const ventanaCand = await pg.evaluate(() => {
+    S.entrevistas = S.entrevistas || [];
+    if (!S.entrevistas.length) S.entrevistas.push({ id: 'C1', nombre: 'Prueba Uno', tel: '600000000', lista: 'activos', hab: {} });
+    const c = S.entrevistas[0];
+    const clon = () => JSON.parse(JSON.stringify(S));
+    abrirPerfilCand(c);
+    const abierta = () => !!document.getElementById('candOvl');
+    const t = { abre: abierta() };
+    const a = clon(); a.historial = [{ ts: Date.now(), tipo: 'asig', txt: 'otro usuario movió un turno' }].concat(a.historial || []);
+    a.staff = a.staff.slice(); a.staff[1] = Object.assign({}, a.staff[1], { nombre: 'Otro Más' });
+    aplicarEstadoExterno(a);
+    t.trasOtroCambio = abierta();
+    const b = clon(); b.entrevistas[0] = Object.assign({}, b.entrevistas[0], { nombre: 'Corregido Desde Fuera' });
+    aplicarEstadoExterno(b);
+    t.trasSuFicha = abierta();
+    const o = document.getElementById('candOvl'); if (o) o.remove();
+    return t;
+  });
+  ok('la ficha de una entrevista aguanta el cambio de otro usuario', ventanaCand.abre && ventanaCand.trasOtroCambio, JSON.stringify(ventanaCand));
+  ok('y se cierra solo si tocan esa misma entrevista', ventanaCand.trasSuFicha === false, JSON.stringify(ventanaCand));
+
   // y sigue sirviendo para lo suyo: poner a alguien
   const pidPick = await pg.$eval('#pickerPop .plist [data-pickpid]', e => e.dataset.pickpid).catch(() => null);
   if (pidPick) {
