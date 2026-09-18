@@ -103,6 +103,10 @@ Desaparecen del papel: las horas del local (`horarioTxt` se calla en origen), la
 - **La del generador** (`abrirImpresionSemanaGenerada`): no se recorta ni se cuelga; es con la que Aroa repasa antes de volcar, y ahí el número de posición, el hueco y el «forzado» son justo lo que hay que mirar.
 - **El tablón del MES**: es personas × días y su vocabulario entero es la píldora M/T/P. Quitarle la letra deja píldoras de color vacías, o sea una hoja que no dice nada. No es la hoja que se recorta para el bar, así que se queda como está hasta que el cliente diga lo contrario.
 
+**La rejilla, regular** (Diego, 18/09: *«que quede más visual, las celdas con un espacio similar entre todos en la variante semanas»*). Con solo nombres en la casilla, la hoja se lee de un vistazo si nada baila: `abrirImpresion` y `abrirImpresionLocal` calculan cuántos nombres tiene la casilla más llena de esa semana y lo pasan al CSS como `--pxn`; cada casilla reserva ese alto y cada nombre ocupa una caja exacta de `1.38em`, así que todas las filas de turno miden lo mismo y el hueco entre nombres es idéntico en toda la hoja. Se calcula de los datos y no a ojo: el día que el grupo crezca, la rejilla se ajusta sola.
+
+Dos detalles que costaron una vuelta: en la hoja de un local, la línea del partido (*«Juega el Barcelona»*) se reserva **todos** los días aunque esté vacía, porque si solo la llevara el día que hay fútbol esa fila crecería y rompería la rejilla; y la banda de color de cada bar adelgaza, que ahora solo lleva el nombre. Con eso la hoja general queda en 764 px de los 794 que caben en un A4 apaisado, sin que salte el compactado automático.
+
 Las etiquetas `Mañana`/`Tarde` se van **al pie de la letra** (decisión de Diego, 18/09): en la hoja de un local quedan dos columnas sin título, la de la izquierda es la mañana y la de la derecha la tarde. En la general, dos filas por bar en el mismo orden.
 
 ## La lupa del selector de personas (18/09)

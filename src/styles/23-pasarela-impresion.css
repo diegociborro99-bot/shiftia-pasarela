@@ -22,6 +22,15 @@
 .pxw td.hueco,.pxlocal td.hueco{background:#fff4f2;border-left:3px solid #d9534f}
 .pxw td.corta{border-left:3px solid #e0a02a}
 .pxw td[data-cas]{padding-top:2px;padding-bottom:2.5px}
+/* 18/09 (Diego): «que quede más visual, las celdas con un espacio similar entre todos en la
+   variante semanas». Con solo nombres en la casilla, la rejilla se lee de un vistazo si
+   todas las filas miden lo mismo: se reserva sitio para --pxn nombres (la casilla más
+   llena de la semana, que calcula abrirImpresion) y el hueco entre nombres es constante.
+   La banda de cada local adelgaza: ya solo lleva el nombre del bar. */
+.pxw[style*="--pxn"] td[data-cas]{box-sizing:border-box;height:calc(var(--pxn) * 1.38em + 5px);vertical-align:top}
+.pxw[style*="--pxn"] .pxg-s{margin:0;height:1.38em;line-height:1.38}
+.pxw[style*="--pxn"] .pxg-nm{font-size:1.04em;letter-spacing:.005em}
+.pxsem[style*="--pxn"] tr.pxloc td.sec{padding-top:1.5px;padding-bottom:1.5px;line-height:1.2}
 .pxw th.pxd span small{font-size:7.5px;font-weight:600;color:#c8d3da;margin-left:2px;letter-spacing:0}
 .pxw th.pxd i.ev{display:block;font-style:normal;font-size:6.5px;font-weight:700;letter-spacing:.02em;text-transform:none;color:#ffd48a;white-space:normal;line-height:1.1;margin-top:1px}
 .pxw td .nm+.nm{margin-top:1px}
@@ -85,7 +94,7 @@
 .pxlocal .nm i{width:8px;height:8px}
 .pxlocal td .nm+.nm{margin-top:2px}
 .pxlocal td[data-cas]{vertical-align:top}
-.pxlocal .pxg-s{margin-top:.3em} .pxlocal .pxg-cnt{margin-bottom:.3em}
+.pxlocal .pxg-s{margin-top:.3em} .pxlocal[style*="--pxn"] .pxg-s{margin-top:0} .pxlocal .pxg-cnt{margin-bottom:.3em}
 .pxh3{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#5c6b75;margin:12px 0 5px}
 /* pie de descansos del local: tabla pequeña debajo */
 .pxdesct{font-size:10px}

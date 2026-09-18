@@ -206,7 +206,14 @@ function abrirImpresion() {
   const supuesto = S.locales.some(l => l.horarioSupuesto);
   let h = pxCabecera('Planilla semanal', 'Grupo Pasarela · los cuatro locales',
     `Semana ${rangoSemanaTxt(lunes)}`, `${S.locales.length} locales`);
-  h += `<table class="pxw pxsem"><thead><tr><th class="act">${PX.soloNombres ? 'Local' : 'Local · franja'}</th>${cols.map(pxThDia).join('')}</tr></thead><tbody>`;
+  // 18/09 (Diego): «que quede más visual, las celdas con un espacio similar entre todos».
+  // Ahora que en la casilla solo van nombres, la rejilla se lee de un vistazo si todas las
+  // filas miden lo mismo. Se reserva sitio para tantos nombres como tenga la casilla más
+  // llena de la semana, así ninguna fila baila y no hace falta tocarlo a mano cuando el
+  // grupo crezca.
+  const maxNombres = Math.max(1, ...S.locales.flatMap(l => FRANJAS.flatMap(f =>
+    cols.map(c => turnoAbierto(S, c.est, c.iso, turnoId(l.id, f)) ? posicionesDe(S, S.staff, c.est, c.iso, turnoId(l.id, f)).filter(x => !x.hueco).length : 0))));
+  h += `<table class="pxw pxsem"${PX.soloNombres ? ` style="--pxn:${maxNombres}"` : ''}><thead><tr><th class="act">${PX.soloNombres ? 'Local' : 'Local · franja'}</th>${cols.map(pxThDia).join('')}</tr></thead><tbody>`;
   for (const l of S.locales) {
     h += `<tr class="secrow pxloc" style="--lc:${esc(l.color)}"><td class="sec" colspan="8"><span>${esc(l.nombre)}</span><small>${PX.soloNombres ? '' : esc(descripcionCocina(S, l))}</small></td></tr>`;
     for (const f of FRANJAS) {
@@ -234,10 +241,18 @@ function abrirImpresionLocal(localId) {
   let h = pxCabecera(esc(l.nombre), 'Grupo Pasarela · planilla de la semana para colgar en el local', `Semana ${rangoSemanaTxt(lunes)}`, '');
   // las dos columnas siguen siendo la de mañana y la de tarde, pero sin decirlo ni poner
   // horas: José, 18/09, «sin las horas y sin mañana y tarde»
-  h += `<table class="pxw pxlocal" style="--lc:${esc(l.color)}"><thead><tr><th class="act">Día</th><th class="pxd">&nbsp;</th><th class="pxd">&nbsp;</th></tr></thead><tbody>`;
+  // misma rejilla regular que la hoja general (Diego, 18/09): todas las filas miden lo
+  // mismo, reservando sitio para la casilla más llena de la semana en este local
+  const maxNombres = Math.max(1, ...cols.flatMap(c => FRANJAS.map(f =>
+    turnoAbierto(S, c.est, c.iso, turnoId(l.id, f)) ? posicionesDe(S, S.staff, c.est, c.iso, turnoId(l.id, f)).filter(x => !x.hueco).length : 0)));
+  h += `<table class="pxw pxlocal" style="--lc:${esc(l.color)}${PX.soloNombres ? `;--pxn:${maxNombres}` : ''}"><thead><tr><th class="act">Día</th><th class="pxd">&nbsp;</th><th class="pxd">&nbsp;</th></tr></thead><tbody>`;
   for (const c of cols) {
     const wk = c.dow >= 6 || c.festivo;
-    h += `<tr${wk ? ' class="wk"' : ''}><td class="lbld"><b>${DIAS_L[c.dow]}</b><span>${c.d} de ${MESES[c.mes - 1].toLowerCase()}</span>${c.festivo ? '<i>festivo</i>' : ''}${c.eventos.map(e => `<i class="ev">${esc(e.nombre || 'evento')}</i>`).join('')}</td>${pxCasilla(c, l, 'M')}${pxCasilla(c, l, 'T')}</tr>`;
+    // la línea del partido se reserva TODOS los días aunque esté vacía: si solo la llevara
+    // el día que hay fútbol, esa fila crecería y la rejilla dejaría de ser regular
+    // (Diego, 18/09: «las celdas con un espacio similar entre todos»)
+    const evs = c.eventos.map(e => `<i class="ev">${esc(e.nombre || 'evento')}</i>`).join('');
+    h += `<tr${wk ? ' class="wk"' : ''}><td class="lbld"><b>${DIAS_L[c.dow]}</b><span>${c.d} de ${MESES[c.mes - 1].toLowerCase()}</span>${c.festivo ? '<i>festivo</i>' : ''}${evs || (PX.soloNombres ? '<i class="ev">&nbsp;</i>' : '')}</td>${pxCasilla(c, l, 'M')}${pxCasilla(c, l, 'T')}</tr>`;
   }
   h += '</tbody></table>';
   const { porDia, bajaToda } = pxDescansos(cols, gente);

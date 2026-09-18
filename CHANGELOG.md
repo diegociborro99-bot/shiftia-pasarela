@@ -2,6 +2,9 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Y la hoja de la semana, más visual** (Diego, 18/09): todas las casillas miden lo mismo
+  —se reserva sitio para la más llena de esa semana, calculado de los datos— y el hueco
+  entre nombres es idéntico en toda la hoja. Antes las filas bailaban entre 42 y 55 px.
 - **Al imprimir, solo los nombres** (José, 18/09, repetido siete veces en la reunión). La
   hoja que Aroa recorta para dejar en cada bar ya no lleva horas, ni «Mañana/Tarde», ni el
   número de posición, ni las marcas ▸ □ P C, ni «por», ni «forzado», ni el mínimo supuesto,

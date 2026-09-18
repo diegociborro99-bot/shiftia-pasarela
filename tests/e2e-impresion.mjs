@@ -104,6 +104,23 @@ try {
   const libV = await pg.evaluate(() => { const td = document.querySelector('#printRoot .pxpage tr.pxdesc [data-libran="2026-09-18"]'); return td ? td.textContent.replace(/\s+/g, ' ').trim() : null; });
   ok('«Quién libra» del viernes 18 dice nadie (0 libran)', !!libV && /nadie/.test(libV) && /0 libran/.test(libV), libV);
   ok('la hoja sigue llevando los 4 locales y los 7 días: eso sí hace falta en el bar', await pg.evaluate(() => document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc').length === 4 && document.querySelectorAll('#printRoot table.pxsem thead th.pxd').length === 7));
+  // 18/09 (Diego): «que quede más visual, las celdas con un espacio similar entre todos en
+  // la variante semanas». Ahora que en la casilla solo van nombres, la rejilla tiene que
+  // leerse de un vistazo: todas las filas de turno miden lo mismo, tenga la casilla dos
+  // nombres o cuatro, y el hueco entre nombres es el mismo en todas.
+  const rejilla = await pg.evaluate(() => {
+    const filas = [...document.querySelectorAll('#printRoot table.pxsem tbody tr')].filter(tr => tr.querySelector('td[data-cas]'));
+    const alturas = filas.map(tr => Math.round(tr.getBoundingClientRect().height));
+    const huecos = [];
+    for (const td of document.querySelectorAll('#printRoot table.pxsem td[data-cas]')) {
+      const ns = [...td.querySelectorAll('.pxg-s')];
+      for (let i = 1; i < ns.length; i++) huecos.push(Math.round((ns[i].getBoundingClientRect().top - ns[i - 1].getBoundingClientRect().bottom) * 10) / 10);
+    }
+    return { alturas, min: Math.min(...alturas), max: Math.max(...alturas), huecos: [...new Set(huecos)].sort((a, b) => a - b) };
+  });
+  ok(`todas las filas de turno miden lo mismo (${rejilla.min}px)`, rejilla.max - rejilla.min <= 1, JSON.stringify(rejilla.alturas));
+  ok(`el hueco entre nombres es el mismo en toda la hoja (${rejilla.huecos.join(', ')}px)`, rejilla.huecos.length <= 1, JSON.stringify(rejilla.huecos));
+
   const altoSem = await pg.evaluate(() => { const p = document.querySelector('#printRoot .pxpage'); return { alto: p.scrollHeight, hoja: Math.round(210 * 96 / 25.4), cls: p.className }; });
   ok(`la hoja semanal cabe en un A4 apaisado (${altoSem.alto}px ≤ ${altoSem.hoja}px · ${altoSem.cls})`, altoSem.alto <= altoSem.hoja + 2, JSON.stringify(altoSem));
   if (CAPTURAS) { await pg.setViewportSize({ width: 1400, height: Math.max(1000, altoSem.alto + 80) }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-semana.png'), fullPage: true }); await pg.setViewportSize({ width: 1400, height: 1000 }); }
@@ -173,6 +190,13 @@ try {
   // ── (4) la hoja de un local sigue funcionando con la casilla nueva ──
   await pg.evaluate(() => abrirImpresionLocal('PASARELA'));
   ok('abrirImpresionLocal(PASARELA) monta la hoja vertical con las casillas nuevas', await llega(pg, () => !!document.querySelector('#printRoot .pxpage:not(.apaisado) table.pxlocal') && document.querySelectorAll('#printRoot table.pxlocal .pxg-s').length > 10, null, 4000) >= 0);
+  // se miden las CASILLAS, no las filas: el día del partido la fila crece porque la columna
+  // del día lleva «Juega el Barcelona», y eso sí interesa en el bar
+  const rejillaLocal = await pg.evaluate(() => {
+    const alturas = [...document.querySelectorAll('#printRoot table.pxlocal td[data-cas]')].map(td => Math.round(td.getBoundingClientRect().height));
+    return { alturas, min: Math.min(...alturas), max: Math.max(...alturas) };
+  });
+  ok(`la hoja del local también lleva todas las casillas iguales (${rejillaLocal.min}px)`, rejillaLocal.max - rejillaLocal.min <= 1, JSON.stringify(rejillaLocal.alturas));
   const pl = await cas('2026-09-14', 'PASARELA_T');
   ok('hoja del local: Pasarela lunes tarde con Mari Luz la primera, sin hueco', !!pl && pl.slots[0] && !pl.slots[0].hueco && /Mari Luz/.test(pl.slots[0].nombre) && !/hueco/.test(pl.cls), JSON.stringify(pl));
   if (CAPTURAS) { const alto = await pg.evaluate(() => document.querySelector('#printRoot .pxpage').scrollHeight); await pg.setViewportSize({ width: 1400, height: alto + 80 }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-local.png'), fullPage: true }); }
