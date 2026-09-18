@@ -29,12 +29,17 @@
 // que el propio grupo escribió a mano al final de cada hoja («ni de coña», «me gusta»,
 // «un impresentable que nos dejó tirados»). Son 117 valoradas: 44 bien, 25 en espera,
 // 39 mal y 9 vetadas. El resto siguen sin valorar. Ver DISEÑO.md.
-// Versión de este volcado. Al subirla, una app que ya estaba en marcha funde la semilla
-// en sus fichas (ver `fundirSemillaEntrevistas`): 1 = la exportación de Notion del 17/09,
-// 2 = las 150 hojas escaneadas leídas a mano.
-const SEMILLA_ENT_V = 2;
 const C = o => Object.assign({ nombre: '', tel: '', puesto: null, val: null, motivo: null, nota: '', fecha: null, hab: {} }, o);
 /*ENTREVISTAS_START*/
+// Versión de este volcado. Al subirla, una app que ya estaba en marcha funde la semilla en
+// sus fichas (ver `fundirSemillaEntrevistas`): 1 = la exportación de Notion del 17/09, 2 =
+// las 150 hojas escaneadas leídas a mano.
+// Va DENTRO del bloque recortable a propósito: a quien no puede ver las entrevistas se le
+// sirve la app sin ellas, y si además llevara la versión puesta, al crear una planilla
+// nueva marcaría la base como «ya sembrada» sin haber sembrado nada — y el jefe no las
+// recibiría nunca. Recortada, la versión es 0 y la siembra sigue pendiente para quien sí
+// las tenga.
+const SEMILLA_ENT_V = 2;
 const ENTREVISTAS_SEMILLA = [
   C({"id": "ainohacamarera", "nombre": "Ainoha camarera", "tel": "616664691", "lista": "alerta", "puesto": "sala"}),
   C({"id": "tel659740222", "tel": "659740222", "lista": "alerta"}),

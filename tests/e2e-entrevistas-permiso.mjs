@@ -129,6 +129,53 @@ try {
   await llega(pg, () => !!document.querySelector('#entrevistasRoot .entrow'), null, 6000);
   ok('y ahora la fila sí se puede abrir', await pg.$eval('#entrevistasRoot .entrow', e => e.tagName.toLowerCase() === 'button'));
 
+  // ── 7) servidor VACÍO y Aroa es la primera en abrir la app (el caso de Railway al
+  //    montar el volumen nuevo). Su app va recortada: si además marcara la base como «ya
+  //    sembrada», el jefe no recibiría nunca las 275 entrevistas.
+  {
+    const dir2 = mkdtempSync(join(tmpdir(), 'shiftia-perm2-'));
+    const PORT2 = PORT + 1, BASE2 = `http://127.0.0.1:${PORT2}`;
+    const srv2 = spawn('node', [join(RAIZ, 'server.js')], {
+      env: { ...process.env, PORT: String(PORT2), DATA_DIR: dir2, TRUST_PROXY: '0', ADMIN_PASSWORD: 'clave12345', JEFE_PASSWORD: 'jefeclave12345', PROGRAMADOR_PASSWORD: 'progclave12345' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let log2 = ''; srv2.stdout.on('data', d => { log2 += d; }); srv2.stderr.on('data', d => { log2 += d; });
+    const vivo = await hasta(async () => (await fetch(BASE2 + '/api/salud')).ok, 20000, 150);
+    ok('arranca un segundo servidor, con la base vacía', !!vivo.v, log2.slice(-300));
+    const ctxA = await br.newContext({ viewport: { width: 1280, height: 900 } });
+    const pgA = await ctxA.newPage();
+    await prepararPagina(pgA, errores, 'Aroa-vacio');
+    await pgA.goto(BASE2 + '/');
+    await pgA.waitForSelector('#loginForm', { timeout: 10000 });
+    await pgA.fill('#loginUser', 'oficina'); await pgA.fill('#loginPass', 'clave12345');
+    await pgA.click('#loginBtn');
+    ok('Aroa entra la primera en el servidor vacío', await llega(pgA, () => typeof SRV !== 'undefined' && SRV.on && !!SRV.rol, null, 15000) >= 0);
+    // la app le ofrece crear la planilla: se acepta y se espera a que llegue al servidor
+    await pgA.waitForTimeout(1200);
+    const btnCero = await pgA.$('#migraOvl [data-cero], #migraOvl .btn-cta');
+    if (btnCero) await btnCero.click();
+    const creada = await hasta(async () => {
+      const j = jar(); await api(j, 'POST', '/api/login', { usuario: 'admin', password: 'jefeclave12345' });
+      const e = (await api(j, 'GET', '/api/estado')).datos;
+      return e && e.version > 0 ? e : null;
+    }, 15000, 400);
+    ok('la planilla queda creada en el servidor', !!creada.v, log2.slice(-300));
+    ok('y Aroa NO la marcó como sembrada', !creada.v || !creada.v.estado.semillaEnt,
+      JSON.stringify({ semillaEnt: creada.v && creada.v.estado.semillaEnt, entrevistas: creada.v && (creada.v.estado.entrevistas || []).length }));
+    // ahora entra el jefe: sus 275 entrevistas tienen que aparecer
+    const ctxJ3 = await br.newContext({ viewport: { width: 1280, height: 900 } });
+    const pgJ3 = await ctxJ3.newPage();
+    await prepararPagina(pgJ3, errores, 'jefe-vacio');
+    await pgJ3.goto(BASE2 + '/');
+    await pgJ3.waitForSelector('#loginForm', { timeout: 10000 });
+    await pgJ3.fill('#loginUser', 'admin'); await pgJ3.fill('#loginPass', 'jefeclave12345');
+    await pgJ3.click('#loginBtn');
+    ok('el jefe entra después', await llega(pgJ3, () => typeof SRV !== 'undefined' && SRV.on && !!SRV.rol, null, 15000) >= 0);
+    const n = await llega(pgJ3, () => (S.entrevistas || []).filter(c => c.exp).length > 150, null, 12000);
+    ok('y recibe la base de entrevistas entera', n >= 0, await pgJ3.evaluate(() => JSON.stringify({ total: (S.entrevistas || []).length, conExp: (S.entrevistas || []).filter(c => c.exp).length, v: S.semillaEnt })));
+    srv2.kill(); rmSync(dir2, { recursive: true, force: true });
+  }
+
   ok('sin errores de página', errores.length === 0, errores.join(' | '));
 } finally {
   await br.close();

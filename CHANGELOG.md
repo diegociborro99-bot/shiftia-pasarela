@@ -7,6 +7,11 @@
   por qué se le descartó y si ya se le entrevistó—, pero no lo que se habló dentro:
   condiciones, sueldo, horarios y observaciones no salen del servidor. El permiso va por
   cuenta, lo da y lo quita José desde Cuenta → Usuarios, y nadie se lo puede dar a sí mismo.
+- **Corregido antes de que mordiera**: al recortar la app se dejaba puesta la *versión* de
+  la semilla. Si la primera persona en abrir un servidor recién creado era alguien sin
+  permiso (la oficina), su navegador marcaba la base como «ya sembrada» sin haber sembrado
+  nada, y el jefe no habría recibido nunca las 275 entrevistas. La versión pasa a ir dentro
+  del bloque recortable: recortada vale 0 y la siembra sigue pendiente para quien sí las ve.
 - **Corregido, y era grave**: la base de entrevistas viajaba dentro de `index.html` —es la
   semilla del primer arranque— y el servidor sirve ese fichero entero a cualquiera con
   sesión. Los 275 teléfonos y las observaciones del grupo estaban en el navegador de **todos

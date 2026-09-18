@@ -41,6 +41,19 @@ test('se le explica por qué, en vez de dejarle una sección medio rota', () => 
   assert.match(html, /entaviso/, 'con su propio estilo');
 });
 
+test('la app recortada NO puede decir que la base ya está sembrada', () => {
+  // Si Aroa es la primera en abrir un servidor vacío, su navegador crea la planilla. Con
+  // la semilla vacía pero la VERSIÓN puesta, marcaría el estado como «ya sembrado» sin
+  // sembrar nada, y José no recibiría nunca las 275 entrevistas. La versión va dentro del
+  // bloque recortable justo por esto.
+  const i = html.indexOf('/*ENTREVISTAS_START*/'), j = html.indexOf('/*ENTREVISTAS_END*/');
+  assert.ok(i > 0 && j > i, 'el bloque está marcado');
+  const recortada = html.slice(0, i) + 'const ENTREVISTAS_SEMILLA = []; const SEMILLA_ENT_V = 0;' + html.slice(j + '/*ENTREVISTAS_END*/'.length);
+  const versiones = [...recortada.matchAll(/const SEMILLA_ENT_V = (\d+)/g)].map(m => +m[1]);
+  assert.deepEqual(versiones, [0], `la app recortada declara la versión ${JSON.stringify(versiones)}: con algo distinto de [0] se pierde la siembra`);
+  assert.match(srv, /const ENTREVISTAS_SEMILLA = \[\]; const SEMILLA_ENT_V = 0;/, 'y el servidor recorta exactamente eso');
+});
+
 test('la proyección del servidor deja pasar lo que ella necesita y nada más', () => {
   assert.match(proy, /function entrevistaSinContenido\(c\)/);
   // lo que sí: quién es, a qué opta, cómo se valoró, por qué se descartó, y si hay entrevista

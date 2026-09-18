@@ -430,7 +430,7 @@ function indexSinEntrevistas(abs) {
   const i = txt.indexOf(ENT_INI), j = txt.indexOf(ENT_FIN);
   const fuera = (i < 0 || j < 0 || j < i)
     ? txt   // sin las marcas no se puede recortar: se sirve tal cual (y se avisa)
-    : txt.slice(0, i) + 'const ENTREVISTAS_SEMILLA = [];' + txt.slice(j + ENT_FIN.length);
+    : txt.slice(0, i) + 'const ENTREVISTAS_SEMILLA = []; const SEMILLA_ENT_V = 0;' + txt.slice(j + ENT_FIN.length);
   if (fuera === txt) console.error('[shiftia] AVISO: no encuentro las marcas ENTREVISTAS_START/END en index.html: la base de entrevistas viaja a todo el mundo');
   SIN_ENTREVISTAS = { clave, buf: Buffer.from(fuera, 'utf8') };
   return SIN_ENTREVISTAS.buf;
