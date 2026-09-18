@@ -121,6 +121,70 @@ try {
   ok(`todas las filas de turno miden lo mismo (${rejilla.min}px)`, rejilla.max - rejilla.min <= 1, JSON.stringify(rejilla.alturas));
   ok(`el hueco entre nombres es el mismo en toda la hoja (${rejilla.huecos.join(', ')}px)`, rejilla.huecos.length <= 1, JSON.stringify(rejilla.huecos));
 
+  // 18/09 (Diego, segunda pasada): «de la tabla de semana en imprimir sigue quedando muy
+  // apretado algunas casillas como el viernes». La tabla repartía el ancho por contenido,
+  // así que los días con nombres largos se quedaban estrechos y el viernes salía apretado
+  // contra el borde. Los siete días tienen que medir lo mismo y el nombre más largo del día
+  // no puede tocar el borde de su casilla.
+  const anchos = await pg.evaluate(() => {
+    const dias = [...document.querySelectorAll('#printRoot table.pxsem thead th.pxd')].map(th => Math.round(th.getBoundingClientRect().width));
+    let holgura = 999, quien = '';
+    for (const td of document.querySelectorAll('#printRoot table.pxsem td[data-cas]')) {
+      const caja = td.getBoundingClientRect();
+      const pd = parseFloat(getComputedStyle(td).paddingRight);
+      for (const nm of td.querySelectorAll('.pxg-nm')) {
+        const h = Math.round((caja.right - pd - nm.getBoundingClientRect().right) * 10) / 10;
+        if (h < holgura) { holgura = h; quien = nm.textContent.trim(); }
+      }
+    }
+    return { dias, min: Math.min(...dias), max: Math.max(...dias), holgura, quien };
+  });
+  ok(`los siete días miden lo mismo (${anchos.min}px)`, anchos.max - anchos.min <= 1, JSON.stringify(anchos.dias));
+  ok(`ningún nombre roza el borde de su casilla (el más justo, ${anchos.quien}, deja ${anchos.holgura}px)`, anchos.holgura >= 3, JSON.stringify(anchos));
+  // y la columna de la izquierda tiene que seguir cabiendo: «sin turno ese día» o
+  // «vacaciones · permisos · libres» no pueden salirse del rótulo y montarse sobre el lunes
+  const rotulos = await pg.evaluate(() => {
+    const r = document.createRange();
+    let peor = 0, texto = '';
+    for (const td of document.querySelectorAll('#printRoot table.pxsem td.lblp')) {
+      const dentro = td.clientWidth - parseFloat(getComputedStyle(td).paddingLeft) - parseFloat(getComputedStyle(td).paddingRight);
+      for (const n of td.childNodes.length ? [td, ...td.querySelectorAll('*')] : []) {
+        if (!n.textContent.trim()) continue;
+        r.selectNodeContents(n);
+        const sobra = Math.round((r.getBoundingClientRect().width - dentro) * 10) / 10;
+        if (sobra > peor) { peor = sobra; texto = n.textContent.trim(); }
+      }
+    }
+    return { peor, texto };
+  });
+  ok(`los rótulos de la izquierda caben en su columna${rotulos.texto ? ` (el peor, «${rotulos.texto}», se sale ${rotulos.peor}px)` : ''}`, rotulos.peor <= 0.5, JSON.stringify(rotulos));
+  // con el ancho ya fijo, un nombre larguísimo no puede pisar el día de al lado: se corta
+  // en su casilla. (Antes la tabla ensanchaba la columna y se llevaba por delante al resto.)
+  const largo = await pg.evaluate(() => {
+    const p = S.staff.find(x => x.nombre === 'Adrián');
+    const antes = p.nombre;
+    p.nombre = 'Adrián Fernández de la Torre y Quesada';
+    cerrarImpresion(); abrirImpresion();
+    // lo que de verdad se ve: el rectángulo del nombre recortado por los ancestros que
+    // recortan (getBoundingClientRect por sí solo ignora el overflow:hidden de arriba)
+    const pintado = el => {
+      let der = el.getBoundingClientRect().right;
+      for (let a = el.parentElement; a; a = a.parentElement) {
+        if (getComputedStyle(a).overflow !== 'visible') der = Math.min(der, a.getBoundingClientRect().right);
+      }
+      return der;
+    };
+    let peor = 0;
+    for (const td of document.querySelectorAll('#printRoot table.pxsem td[data-cas]')) {
+      const caja = td.getBoundingClientRect();
+      for (const nm of td.querySelectorAll('.pxg-nm')) peor = Math.max(peor, Math.round((pintado(nm) - caja.right) * 10) / 10);
+    }
+    const salio = [...document.querySelectorAll('#printRoot table.pxsem td[data-cas]')].some(td => /Adrián/.test(td.textContent));
+    p.nombre = antes; cerrarImpresion(); abrirImpresion();
+    return { peor, salio };
+  });
+  ok(`un nombre larguísimo se queda dentro de su casilla (se sale ${largo.peor}px) y sigue leyéndose`, largo.peor <= 0 && largo.salio, JSON.stringify(largo));
+
   const altoSem = await pg.evaluate(() => { const p = document.querySelector('#printRoot .pxpage'); return { alto: p.scrollHeight, hoja: Math.round(210 * 96 / 25.4), cls: p.className }; });
   ok(`la hoja semanal cabe en un A4 apaisado (${altoSem.alto}px ≤ ${altoSem.hoja}px · ${altoSem.cls})`, altoSem.alto <= altoSem.hoja + 2, JSON.stringify(altoSem));
   if (CAPTURAS) { await pg.setViewportSize({ width: 1400, height: Math.max(1000, altoSem.alto + 80) }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-semana.png'), fullPage: true }); await pg.setViewportSize({ width: 1400, height: 1000 }); }

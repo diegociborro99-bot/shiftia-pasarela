@@ -5,6 +5,10 @@
 - **Y la hoja de la semana, más visual** (Diego, 18/09): todas las casillas miden lo mismo
   —se reserva sitio para la más llena de esa semana, calculado de los datos— y el hueco
   entre nombres es idéntico en toda la hoja. Antes las filas bailaban entre 42 y 55 px.
+  En una segunda pasada, también los siete días miden lo mismo: el ancho se repartía por
+  contenido y mandaban los chips del pie de descansos, así que el lunes se llevaba 192 px y
+  el viernes se quedaba en 73, con los nombres largos pegados al borde. Ahora son 132 px
+  cada día, y un nombre kilométrico se recorta en su casilla en vez de invadir la de al lado.
 - **Al imprimir, solo los nombres** (José, 18/09, repetido siete veces en la reunión). La
   hoja que Aroa recorta para dejar en cada bar ya no lleva horas, ni «Mañana/Tarde», ni el
   número de posición, ni las marcas ▸ □ P C, ni «por», ni «forzado», ni el mínimo supuesto,

@@ -31,6 +31,16 @@
 .pxw[style*="--pxn"] .pxg-s{margin:0;height:1.38em;line-height:1.38}
 .pxw[style*="--pxn"] .pxg-nm{font-size:1.04em;letter-spacing:.005em}
 .pxsem[style*="--pxn"] tr.pxloc td.sec{padding-top:1.5px;padding-bottom:1.5px;line-height:1.2}
+/* 18/09 (Diego, segunda pasada): «sigue quedando muy apretado algunas casillas como el
+   viernes». El ancho se repartía por el contenido —mandaban los chips del pie de descansos—
+   y el lunes se llevaba 192 px mientras el viernes se quedaba en 73, con los nombres largos
+   pegados al borde. Con table-layout fijo los siete días miden lo mismo pase lo que pase
+   debajo. La columna del rótulo se queda en sus 128 px: es la única que lleva texto largo
+   («vacaciones · permisos · libres»). */
+.pxsem[style*="--pxn"]{table-layout:fixed}
+/* al fijar el ancho, un nombre kilométrico ya no ensancha su columna: se corta en su
+   casilla con puntos suspensivos en vez de meterse en el día siguiente. */
+.pxsem[style*="--pxn"] .pxg-b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pxw th.pxd span small{font-size:7.5px;font-weight:600;color:#c8d3da;margin-left:2px;letter-spacing:0}
 .pxw th.pxd i.ev{display:block;font-style:normal;font-size:6.5px;font-weight:700;letter-spacing:.02em;text-transform:none;color:#ffd48a;white-space:normal;line-height:1.1;margin-top:1px}
 .pxw td .nm+.nm{margin-top:1px}

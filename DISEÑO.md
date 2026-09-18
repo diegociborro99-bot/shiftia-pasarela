@@ -107,6 +107,8 @@ Desaparecen del papel: las horas del local (`horarioTxt` se calla en origen), la
 
 Dos detalles que costaron una vuelta: en la hoja de un local, la línea del partido (*«Juega el Barcelona»*) se reserva **todos** los días aunque esté vacía, porque si solo la llevara el día que hay fútbol esa fila crecería y rompería la rejilla; y la banda de color de cada bar adelgaza, que ahora solo lleva el nombre. Con eso la hoja general queda en 764 px de los 794 que caben en un A4 apaisado, sin que salte el compactado automático.
 
+**Y los siete días, del mismo ancho** (Diego, 18/09, segunda pasada: *«de la tabla de semana en imprimir sigue quedando muy apretado algunas casillas como el viernes»*). Las filas ya medían lo mismo, pero el **ancho** seguía repartiéndose por contenido, y quien mandaba no eran los turnos sino los chips del pie de descansos: el lunes, con seis personas librando, se llevaba 192 px; el viernes, con ninguna, se quedaba en 73, y ahí «Susana Capón» llegaba a 1 px del borde. La tabla de la semana pasa a `table-layout:fixed`, así que los siete días miden 132 px pase lo que pase debajo. La columna del rótulo se queda en sus 128 px: es la única con texto largo (*«vacaciones · permisos · libres»*), y estrecharla lo sacaba encima del lunes. Como al fijar el ancho una columna ya no puede ensancharse, un nombre kilométrico se recorta dentro de su casilla en vez de meterse en el día siguiente. La hoja queda en 778 px de los 794.
+
 Las etiquetas `Mañana`/`Tarde` se van **al pie de la letra** (decisión de Diego, 18/09): en la hoja de un local quedan dos columnas sin título, la de la izquierda es la mañana y la de la derecha la tarde. En la general, dos filas por bar en el mismo orden.
 
 ## La lupa del selector de personas (18/09)
