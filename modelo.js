@@ -250,7 +250,12 @@ function resumenCandidatos(cands, lista) {
 }
 // ¿esta persona tiene la entrevista contestada? La fecha no cuenta: se pone sola al
 // registrarla (Aroa, 17/09), así que por sí sola no dice que se le haya preguntado nada.
-function tieneEntrevista(c) { return !!(c && (CAMPOS_ENTREVISTA.some(x => !x.meta && c[x.k]) || Object.keys(c.hab || {}).length || (c.busca || []).length)); }
+// 18/09: a quien no puede ver el contenido, el servidor le manda la ficha sin ningún campo
+// y con `entrevistado` puesto: es lo que necesita para «no volverles a llamar».
+function tieneEntrevista(c) {
+  if (c && c.sinContenido) return !!c.entrevistado;
+  return !!(c && (CAMPOS_ENTREVISTA.some(x => !x.meta && c[x.k]) || Object.keys(c.hab || {}).length || (c.busca || []).length));
+}
 
 function turnoId(localId, franja) { return `${localId}_${franja}`; }
 function partirTurno(tid) { const i = tid.lastIndexOf('_'); return { localId: tid.slice(0, i), franja: tid.slice(i + 1) }; }

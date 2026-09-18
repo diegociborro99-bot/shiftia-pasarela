@@ -56,11 +56,13 @@ test('la app recortada NO puede decir que la base ya está sembrada', () => {
 
 test('la proyección del servidor deja pasar lo que ella necesita y nada más', () => {
   assert.match(proy, /function entrevistaSinContenido\(c\)/);
-  // lo que sí: quién es, a qué opta, cómo se valoró, por qué se descartó, y si hay entrevista
-  for (const k of ['nombre', 'tel', 'lista', 'val', 'motivo', 'fecha', 'puestos'])
-    assert.match(proy, new RegExp(`\\b${k}\\b`), `«${k}» viaja`);
-  // lo que no: ni una sola de las claves de dentro
+  // 18/09 (José, por Diego): nombre y teléfono, si ya se la entrevistó y cómo se la valoró.
   const fn = proy.slice(proy.indexOf('function entrevistaSinContenido'), proy.indexOf('function estadoSinContenidoEntrevistas'));
-  for (const k of ['exp', 'sueldo', 'horarios', 'cond', 'obs', 'hab', 'edad', 'zona', 'doc', 'incorp', 'nota', 'busca', 'tipoCocina'])
-    assert.ok(!new RegExp(`c\\.${k}\\b`).test(fn), `«${k}» NO puede salir del servidor`);
+  const obj = fn.slice(fn.indexOf('const fuera = {'), fn.indexOf('  };'));
+  const claves = [...new Set([...obj.matchAll(/(?:^|[{,]\s*|\n\s*)(\w+):/g)].map(m => m[1]))].sort();
+  assert.deepEqual(claves, ['entrevistado', 'id', 'lista', 'motivo', 'nombre', 'sinContenido', 'tel', 'val'],
+    `la proyección arma exactamente estas claves: ${JSON.stringify(claves)}`);
+  // y ninguna de las de dentro, ni el puesto ni la fecha, que también salen de la entrevista
+  for (const k of ['exp', 'sueldo', 'horarios', 'cond', 'obs', 'hab', 'edad', 'zona', 'doc', 'incorp', 'nota', 'busca', 'tipoCocina', 'puestos', 'puesto', 'fecha'])
+    assert.ok(!claves.includes(k), `«${k}» NO puede salir del servidor`);
 });

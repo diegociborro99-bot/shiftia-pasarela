@@ -421,6 +421,12 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 /* ---------- actividad: visor del programador (qué hace el encargado con la app) ---------- */
 /* la pestaña solo se ve con body.rol-programador (30-modo-servidor.js la fija; sin servidor es Diego probando) */
 body:not(.rol-programador) .tab[data-v="actividad"]{display:none!important}
+/* 18/09 (Diego): la lupa del selector de personas. Misma pinta que el buscador de
+   Entrevistas, pero dentro del popover y pegada a la cabecera. */
+.pbusca{display:flex;align-items:center;gap:7px;margin:0 10px 8px;padding:6px 9px;border:1px solid var(--border);
+  border-radius:9px;background:var(--surface2,var(--surface));color:var(--ink3)}
+.pbusca input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font-size:13px;outline:none}
+.pbusca input::-webkit-search-cancel-button{cursor:pointer}
 .modo-empleado #view-actividad{display:none!important}
 .actaviso{background:var(--warn-bg);color:var(--warn);border:1px solid color-mix(in srgb, var(--warn) 40%, transparent);border-radius:12px;padding:10px 14px;font-size:12.5px;margin-bottom:12px}
 .actaviso b{color:inherit}

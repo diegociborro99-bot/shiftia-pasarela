@@ -307,7 +307,7 @@ const CANDIDATO = {
   incorp: 'Ya', sueldo: '1200 €', horarios: 'De mananas', cond: 'Seis dias, ocho horas',
   obs: 'Un poco choni', nota: 'lo que apunto Jose', hab: { cafetera: 'si', pda: 'no' },
 };
-const SECRETOS = ['La Paraeta', '1200 €', 'Seis dias', 'Un poco choni', 'lo que apunto Jose', 'De mananas'];
+const SECRETOS = ['La Paraeta', '1200 €', 'Seis dias', 'Un poco choni', 'lo que apunto Jose', 'De mananas', '13/10/2025'];
 const estadoCon = async c => ((await c('GET', '/api/estado')).datos || {}).estado || {};
 const listaUsuarios = async c => (await c('GET', '/api/usuarios')).datos.usuarios;
 let idAroa = null;
@@ -338,9 +338,12 @@ test('la oficina ve QUIÉN está descartado, pero no una palabra de lo que hay d
   assert.ok(c, 'la ficha sigue apareciendo: para eso la usa');
   assert.equal(c.nombre, 'Fulanita de Tal'); assert.equal(c.tel, '600111222');
   assert.equal(c.val, 'mal', 'la valoración sí: es lo que le dice si ya está descartada');
-  assert.equal(c.fecha, '13/10/2025', 'y si se le entrevistó, y cuándo');
-  assert.deepEqual(c.puestos, ['sala'], 'y a qué puesto opta');
-  for (const k of ['exp', 'obs', 'cond', 'sueldo', 'horarios', 'incorp', 'edad', 'zona', 'doc', 'nota', 'hab'])
+  // 18/09 (José, por Diego): «tiene que saber a quiénes se le ha entrevistado también para
+  // no volverles a llamar, pero no el contenido de la entrevista fuera del nombre y
+  // teléfono». O sea: el HECHO de la entrevista sí, la fecha y el resto no.
+  assert.equal(c.entrevistado, true, 'sabe que a esta persona ya se la entrevistó');
+  assert.equal(c.fecha, undefined, 'pero no cuándo: eso ya es de dentro');
+  for (const k of ['exp', 'obs', 'cond', 'sueldo', 'horarios', 'incorp', 'edad', 'zona', 'doc', 'nota', 'hab', 'puestos', 'puesto', 'busca', 'tipoCocina'])
     assert.equal(c[k], undefined, `«${k}» no viaja a la oficina`);
   const txt = JSON.stringify(deAroa);
   for (const secreto of SECRETOS) assert.ok(!txt.includes(secreto), `«${secreto}» no puede salir del servidor`);

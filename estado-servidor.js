@@ -38,19 +38,23 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
 // 18/09 (José): «Aroa […] comprueba si previamente lo hemos descartado pero no quiero que
 // tenga acceso al contenido de cada entrevista. Si sí le hemos entrevistado, si hemos
 // puesto bien, mal o regular y demás pero no a lo que hay dentro de cada entrevista donde
-// hablo de condiciones». De cada ficha sale lo justo para eso —quién es, a qué puesto
-// opta, cómo se le valoró, por qué se le descartó y si se le entrevistó y cuándo— y NADA
-// de dentro: ni experiencia, ni sueldo, ni horarios, ni condiciones, ni observaciones, ni
-// aptitudes. Se aplica en el servidor: el contenido no llega a su navegador.
+// hablo de condiciones». Y el 18/09, por Diego: «tiene que saber a quiénes se le ha
+// entrevistado también para no volverles a llamar, pero no el contenido de la entrevista
+// fuera del nombre y teléfono». De cada ficha sale eso y solo eso: quién es, su teléfono,
+// si ya se la entrevistó (el hecho, no la fecha), cómo se la valoró y por qué se la
+// descartó. Ni el puesto al que opta, que también sale de la entrevista. Se aplica en el
+// servidor: el contenido no llega a su navegador.
 function entrevistaSinContenido(c) {
   const fuera = {
     id: c.id, nombre: c.nombre, tel: c.tel, lista: c.lista,
-    val: c.val, motivo: c.motivo,          // la valoración y el porqué del descarte: es lo que va a mirar
-    fecha: c.fecha,                        // «si sí le hemos entrevistado», y cuándo
-    sinContenido: true,                    // para que la app no pinte una ficha a medias
+    val: c.val, motivo: c.motivo,   // la valoración y el porqué del descarte: «si hemos puesto bien, mal o regular»
+    // el HECHO de que ya se la entrevistó —«para no volverles a llamar»—, pero no la fecha
+    // ni nada más: la fecha ya es de dentro de la entrevista.
+    entrevistado: !!(c.fecha || c.exp || c.edad || c.zona || c.doc || c.incorp || c.sueldo ||
+      c.horarios || c.cond || c.obs || c.tipoCocina || c.nota ||
+      (c.hab && Object.keys(c.hab).length) || (c.busca && c.busca.length)),
+    sinContenido: true,             // para que la app no pinte una ficha a medias
   };
-  if (Array.isArray(c.puestos)) fuera.puestos = c.puestos.slice();
-  else if (c.puesto) fuera.puesto = c.puesto;
   for (const k of Object.keys(fuera)) if (fuera[k] === undefined) delete fuera[k];
   return fuera;
 }

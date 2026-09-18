@@ -345,6 +345,37 @@ try {
     JSON.stringify({ filas: await pg.$$eval('#entrevistasRoot .entrow', x => x.length), bienEnLista, quienEdita }));
   await pg.click('#entLimpiar'); await pg.waitForTimeout(200);
 
+  // 6a-bis) la lupa del selector en Semana (Diego, 18/09): el ＋ de una casilla abre el
+  //   «blop» con toda la plantilla; escribir un nombre deja solo a quien encaja.
+  await vista(pg, 'semana');
+  await pg.waitForTimeout(250);
+  const hayAdd = await pg.$('#semRoot .wadd, #semRoot .whueco');
+  ok('en Semana, la casilla trae el ＋ para poner a alguien', !!hayAdd);
+  await pg.click('#semRoot .wadd, #semRoot .whueco');
+  ok('el ＋ de Semana abre el selector (#pickerPop)', await llega(pg, () => !!document.querySelector('#pickerPop .plist .prowp'), null, 4000) >= 0);
+  ok('y trae la lupita para buscar por nombre', !!(await pg.$('#pickerPop #pickQ')));
+  const antes = await pg.$$eval('#pickerPop .plist .prowp', x => x.length);
+  const quien = await pg.$eval('#pickerPop .plist .prowp .pn2', e => e.textContent.trim().split('\n')[0]);
+  await pg.fill('#pickerPop #pickQ', quien.slice(0, 4));
+  await pg.waitForTimeout(250);
+  const tras = await pg.$$eval('#pickerPop .plist .prowp', x => x.length);
+  ok(`escribir «${quien.slice(0, 4)}» reduce la lista de ${antes} a ${tras}`, tras > 0 && tras < antes, JSON.stringify({ antes, tras }));
+  ok('y quien queda es quien se buscaba', await pg.$$eval('#pickerPop .plist .prowp .pn2', (x, n) => x.some(y => y.textContent.includes(n)), quien.slice(0, 4)));
+  await pg.fill('#pickerPop #pickQ', 'zzzznadie');
+  await pg.waitForTimeout(250);
+  ok('un nombre que no existe lo dice, en vez de dejar el hueco en blanco',
+    /No hay nadie con ese nombre/.test(await pg.$eval('#pickerPop .plist', e => e.textContent)));
+  await pg.fill('#pickerPop #pickQ', '');
+  await pg.waitForTimeout(250);
+  ok('al vaciar la lupa vuelve la lista entera', await pg.$$eval('#pickerPop .plist .prowp', x => x.length) === antes);
+  // y sigue sirviendo para lo suyo: poner a alguien
+  const pidPick = await pg.$eval('#pickerPop .plist [data-pickpid]', e => e.dataset.pickpid).catch(() => null);
+  if (pidPick) {
+    await pg.click(`#pickerPop [data-pickpid="${pidPick}"]`);
+    ok('y al pulsar en alguien se le pone en la casilla y se cierra el selector',
+      await llega(pg, () => !document.querySelector('#pickerPop'), null, 4000) >= 0);
+  } else { await pg.click('body', { position: { x: 5, y: 5 } }).catch(() => {}); }
+
   // 6b) Gestor de cobertura desde la planilla: en Semana, «Falta estos días…» sobre una persona abre la hoja
   //     con ese día marcado; plan A / plan B como «quién sale → quién entra»; confirmar aplica y vuelve a la semana
   await vista(pg, 'semana');

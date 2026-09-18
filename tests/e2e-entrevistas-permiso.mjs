@@ -41,7 +41,7 @@ const entrar = async (pg, usuario, pass) => {
   await pg.click('#loginBtn');
   return llega(pg, () => typeof SRV !== 'undefined' && SRV.on && !!SRV.rol, null, 15000);
 };
-const SECRETOS = ['La Paraeta', '1200 €', 'Seis dias', 'Un poco choni', 'De mananas'];
+const SECRETOS = ['La Paraeta', '1200 €', 'Seis dias', 'Un poco choni', 'De mananas', '13/10/2025'];
 
 const br = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
 try {
@@ -77,7 +77,8 @@ try {
   const fila = await pg.$eval('#entrevistasRoot .entrow', e => e.textContent);
   ok('ve el nombre y el teléfono: para eso la usa', /Fulanita de Tal/.test(fila) && /600/.test(fila), fila);
   ok('ve que está descartada («Mal»)', /Mal/i.test(fila), fila);
-  ok('ve el puesto al que optaba', /Camarer/i.test(fila), fila);
+  ok('ve que ya se la entrevistó, para no volver a llamarla', /●/.test(fila) || /entrevist/i.test(fila), fila);
+  ok('pero NO el puesto al que optaba: eso sale de la entrevista', !/Camarer/i.test(fila), fila);
 
   // ── 2) lo de dentro NO está en su navegador
   const enMemoria = await pg.evaluate(() => JSON.stringify(S.entrevistas || []));

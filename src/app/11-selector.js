@@ -4,6 +4,11 @@
 // partido no declarado) y quien no puede (con el motivo). El encargado distribuye
 // «de la manera que quiera»: cualquiera se puede FORZAR, y queda constancia.
 function closePicker() { const ex = document.getElementById('pickerPop'); if (ex) ex.remove(); document.querySelectorAll('.popfondo').forEach(f => f.remove()); }
+// 18/09 (Diego): «que aparezca una lupita en el blop para buscarlo por nombre». El selector
+// pinta a la plantilla ENTERA en tres grupos, así que con 21 personas hay que bajar
+// buscando a ojo. Se filtra por nombre, sin tildes ni mayúsculas.
+function pickNorm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+const SVG_LUPA_PICK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>';
 function openPicker(iso, tid, anchor) {
   closePicker();
   const e = estadoDeIso(iso);
@@ -17,16 +22,36 @@ function openPicker(iso, tid, anchor) {
   const fila = (c, cls, sub, extra) => `<button class="prowp ${cls}" data-pickpid="${c.pid}"${extra || ''}><span class="av" style="background:${avColor(c.pid)}">${esc(initials(c.nombre))}</span><span class="pn2">${esc(c.nombre)}<span class="prsub">${esc(sub)}</span></span>${cls === 'rec' ? '<span class="star">★ RECOMENDADO</span>' : ''}</button>`;
   const pop = document.createElement('div');
   pop.className = 'pop picker'; pop.id = 'pickerPop'; pop.setAttribute('role', 'dialog');
+  const filaNo = ({ p, r }) => `<div class="prowp dis"><span class="av" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span><span class="pn2">${esc(p.nombre)}<span class="prsub">${esc(r.motivo)}</span></span>${/no abre|ya en|ya está|de baja|vacaciones|permiso|día libre|ausente/i.test(r.motivo) ? '' : `<button class="forzar" data-forzar="${p.id}" title="Ponerlo de todas formas y dejar constancia">forzar</button>`}</div>`;
+  // las filas ya filtradas por lo que se haya escrito en la lupa. Los grupos que se quedan
+  // sin nadie desaparecen con su cabecera: un «PUEDEN · 0» solo estorba.
+  const filasPicker = q => {
+    const n = pickNorm(q);
+    const pasa = nombre => !n || pickNorm(nombre).includes(n);
+    const vOk = ok.filter(c => pasa(c.nombre));
+    const vAviso = conAviso.filter(c => pasa(c.nombre));
+    const vNo = noPueden.filter(x => pasa(x.p.nombre));
+    if (n && !vOk.length && !vAviso.length && !vNo.length) return `<div class="pgroup">No hay nadie con ese nombre</div>`;
+    return `${vOk.length ? `<div class="pgroup">PUEDEN · ${vOk.length}</div>${vOk.map((c, i) => fila(c, !n && i === 0 ? 'rec' : '', c.razones.join(' · '))).join('')}` : (n ? '' : '<div class="pgroup">NADIE PUEDE SIN ROMPER NADA</div>')}
+      ${vAviso.length ? `<div class="pgroup">CON AVISO · ${vAviso.length}</div>${vAviso.map(c => fila(c, 'aviso', c.razones.join(' · '), ' data-aviso="1"')).join('')}` : ''}
+      ${vNo.length ? `<div class="pgroup">NO PUEDEN · ${vNo.length}</div>${vNo.map(filaNo).join('')}` : ''}`;
+  };
   pop.innerHTML = `<div class="ph">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()}</div>
     <div class="pd">${fmtLargo(iso)} · ${r.n} de ${r.minimo}${r.supuesto ? ' (mínimo supuesto)' : ''}${r.refuerzo ? ' · con refuerzo' : ''}${r.sinCocina ? ' · <b>sin cocina</b>' : ''}</div>
-    <div class="plist">
-      ${ok.length ? `<div class="pgroup">PUEDEN · ${ok.length}</div>${ok.map((c, i) => fila(c, i === 0 ? 'rec' : '', c.razones.join(' · '))).join('')}` : '<div class="pgroup">NADIE PUEDE SIN ROMPER NADA</div>'}
-      ${conAviso.length ? `<div class="pgroup">CON AVISO · ${conAviso.length}</div>${conAviso.map(c => fila(c, 'aviso', c.razones.join(' · '), ' data-aviso="1"')).join('')}` : ''}
-      ${noPueden.length ? `<div class="pgroup">NO PUEDEN · ${noPueden.length}</div>${noPueden.map(({ p, r }) => `<div class="prowp dis"><span class="av" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span><span class="pn2">${esc(p.nombre)}<span class="prsub">${esc(r.motivo)}</span></span>${/no abre|ya en|ya está|de baja|vacaciones|permiso|día libre|ausente/i.test(r.motivo) ? '' : `<button class="forzar" data-forzar="${p.id}" title="Ponerlo de todas formas y dejar constancia">forzar</button>`}</div>`).join('')}` : ''}
-    </div>`;
+    <label class="pbusca">${SVG_LUPA_PICK}<input type="search" id="pickQ" placeholder="Buscar por nombre…" autocomplete="off" aria-label="Buscar a alguien por su nombre"></label>
+    <div class="plist">${filasPicker('')}</div>`;
   document.body.appendChild(pop);
   colocarPop(pop, anchor);
   cierraFuera(pop);
+  // repinta SOLO la lista: si se repintase el popover entero, el <input> se destruiría a
+  // cada tecla y se perdería el cursor (y en el móvil se cerraría el teclado).
+  function pintaListaPicker() {
+    const lista = pop.querySelector('.plist');
+    if (lista) lista.innerHTML = filasPicker($('#pickQ') ? $('#pickQ').value : '');
+  }
+  $('#pickQ').oninput = pintaListaPicker;
+  // en el móvil NO se enfoca solo: el teclado subiría y taparía el propio selector
+  if (matchMedia('(hover:hover)').matches) { const q = $('#pickQ'); if (q) q.focus(); }
   pop.addEventListener('click', ev => {
     const f = ev.target.closest('[data-forzar]');
     if (f) {
