@@ -87,6 +87,19 @@ Reglas: **dos apoyos no pueden quedarse solos** en un turno; **Johan siempre coc
 
 El 33 los martes es día flojo: mínimo 1, se queda Noe y abre él viniendo de la mañana (`partidoAbre.T`), igual que Pasarela. La **cocina no se imprime**.
 
+## La lupa del selector de personas (18/09)
+
+Diego: *«ponemos en el menu semana al aplicar para cambiar un trabajador que aparezca una lupita en el blop para buscarlo por nombre»*.
+
+El «blop» es `#pickerPop` (`11-selector.js`), el popover que abren el `＋` de una casilla y el hueco «1·?». Se abre desde **Semana** y desde **Hoy**: el manejador de `[data-pick]` está en `document`, no en la vista, cosa que no se ve leyendo `13-vista-semana.js` por su cuenta. Lista a la plantilla entera en tres grupos —PUEDEN, CON AVISO, NO PUEDEN— así que con 21 personas hay que bajar buscando a ojo.
+
+Cuatro decisiones que no son obvias:
+
+- **Repinta solo `.plist`**, como hace `pintaListaEnt` en Entrevistas. Repintar el popover entero destruiría el `<input>` en cada tecla: se pierde el cursor y, en el móvil, se cierra el teclado.
+- **No se enfoca solo en el móvil** (`matchMedia('(hover:hover)')`): el teclado subiría y taparía el propio selector, que es lo que se está mirando.
+- **Los grupos vacíos desaparecen con su cabecera.** Un «PUEDEN · 0» solo estorba. Y si no encaja nadie, se dice: «No hay nadie con ese nombre».
+- **La estrella de RECOMENDADO solo sale sin filtro.** Con una búsqueda escrita, el primero de la lista es el que encaja con lo tecleado, no el recomendado del día; marcarlo confundiría.
+
 ## Entrevistas: los iconos y las hojas escaneadas (17/09)
 
 El grupo marca cada ficha de su base con un emoticono, y ahí está toda la clasificación: **cocinero**, **camarero**, **pulgar arriba** (bien valorado), **pulgar abajo** (mal valorado) y **reloj de arena** (pendiente de valorar). La app tiene ese mismo esquema —puesto y valoración por separado— y lo enseña con iconos propios.
@@ -137,7 +150,11 @@ Se impone en **tres sitios**, porque con uno solo no bastaba:
 2. **`PUT /api/estado`** conserva las entrevistas guardadas cuando escribe alguien sin permiso. Sin esto, el primer cambio de turno de Aroa habría devuelto las fichas vacías y **borrado el trabajo de José**: la app manda el estado entero, no un parche.
 3. **`GET /`** sirve `index.html` con la semilla vaciada. Este fue el hallazgo gordo, y lo destapó la batería e2e: la base de entrevistas viaja **dentro del propio fichero de la app** (es la semilla del primer arranque) y el servidor lo sirve entero a cualquiera con sesión. Los 275 teléfonos y lo que el grupo opina por escrito de cada candidato estaban en el navegador de **todos los empleados**, por muy proyectado que estuviera el estado. El bloque va marcado con `/*ENTREVISTAS_START*/…/*ENTREVISTAS_END*/` —el mismo truco que `MODELO_START`— y al servir a quien no puede verlo se sustituye por `const ENTREVISTAS_SEMILLA = [];`. La constante sigue existiendo, así que la app no se rompe; la variante recortada se guarda en memoria.
 
-En la app, `puedeVerEntrevista()` decide: sin permiso no hay botón de «Registrar», la fila deja de ser un `<button>` (no hay nada que abrir) y sale un aviso explicando por qué. Es solo cortesía visual: la verdad la impone el servidor, y `abrirFichaCand` lleva su propia guarda.
+De cada ficha salen **nombre, teléfono, si ya se la entrevistó, la valoración y el motivo del descarte**, y nada más. Ni la fecha de la entrevista ni el puesto al que opta: los dos son de dentro. José lo acotó así el 18/09, por Diego: *«tiene que saber a quiénes se le ha entrevistado también para no volverles a llamar, pero no el contenido de la entrevista fuera del nombre y teléfono»*. Como sin campos `tieneEntrevista()` daría falso y se perdería el punto verde de «ya entrevistado» —que es justo lo que ella necesita—, la proyección manda un booleano `entrevistado` y el modelo lo respeta cuando la ficha viene marcada `sinContenido`.
+
+**Lo único que puede escribir**: dar de alta a alguien en la lista negra. Diego, 18/09: *«el oficinista puede meter a gente en la lista negra (crear registros) si no acude una persona a la entrevista»*. El servidor (`entrevistasTrasEscrituraSinPermiso`) conserva las fichas guardadas tal cual —ni se editan ni se borran— y de lo que llega nuevo acepta solo altas con `id`, `nombre`, `tel` y `motivo`, forzadas a la lista `alerta`. Todo lo demás que venga en ese alta se tira, aunque el cliente lo mande. Queda en la auditoría.
+
+En la app, `puedeVerEntrevista()` decide: sin permiso no hay botón de «Registrar» —sale «+ A la lista negra», que abre el alta reducida—, la fila deja de ser un `<button>` (no hay nada que abrir) y sale un aviso explicando qué sí y qué no. Es solo cortesía visual: la verdad la impone el servidor, y `abrirFichaCand` lleva su propia guarda.
 
 Sin servidor (modo local, demo) no hay cuentas y se ve todo, que es como Diego prueba.
 

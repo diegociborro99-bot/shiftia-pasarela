@@ -62,17 +62,39 @@ function renderEntrevistas() {
     <div class="entacts">
       <label class="entbusca"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
         <input type="search" id="entQ" placeholder="Buscar por nombre o teléfono…" value="${esc(ENT.q)}" aria-label="Buscar candidato"></label>
-      ${puedeVerEntrevista() ? `<button class="btn btn-cta" id="entNuevo">+ Registrar</button>` : ''}
+      ${puedeVerEntrevista()
+        ? `<button class="btn btn-cta" id="entNuevo">+ Registrar</button>`
+        : `<button class="btn btn-cta" id="entAlerta">+ A la lista negra</button>`}
     </div>
   </div>
-  ${puedeVerEntrevista() ? '' : `<div class="entaviso">${SVG_CANDADO}<span><b>El contenido de cada entrevista es del jefe.</b> Aquí ves quién es, a qué puesto opta, cómo se le valoró y si ya se le entrevistó — lo justo para saber si hay que volver a llamarle. Lo que se habló dentro (condiciones, sueldo, observaciones) no sale del servidor.</span></div>`}
+  ${puedeVerEntrevista() ? '' : `<div class="entaviso">${SVG_CANDADO}<span><b>El contenido de cada entrevista es del jefe.</b> Aquí ves quién es, a qué puesto opta, cómo se le valoró y si ya se le entrevistó — lo justo para saber si hay que volver a llamarle. Lo que se habló dentro (condiciones, sueldo, observaciones) no sale del servidor. Sí puedes meter a alguien en la lista negra si no acude a la entrevista.</span></div>`}
   <div class="entfiltros">${puestoChips}${valChips}${motChips}${Object.values(r.hab).some(Boolean) ? habChips : ''}</div>
   <div class="entcount">${vistos.length === r.total ? `${r.total} ${r.total === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${r.total}`}${ENT.q || ENT.puesto || ENT.val || ENT.motivo || ENT.hab ? ' <button class="btn-mini ghost" id="entLimpiar">Quitar filtros</button>' : ''}</div>
   <div class="entlist">${vistos.length ? vistos.map(filaCand).join('') : `<div class="entzero"><b>No hay nadie con esos filtros.</b><span>Prueba a quitarlos o registra a alguien nuevo.</span></div>`}</div>`;
 
   $('#entQ').oninput = e => { ENT.q = e.target.value; pintaListaEnt(); };
   const btnNuevo = $('#entNuevo'); if (btnNuevo) btnNuevo.onclick = () => abrirFichaCand(null);
+  const btnAl = $('#entAlerta'); if (btnAl) btnAl.onclick = altaAlertaRapida;
   const lim = $('#entLimpiar'); if (lim) lim.onclick = () => { ENT.q = ENT.puesto = ENT.val = ENT.motivo = ENT.hab = ''; renderEntrevistas(); };
+}
+// 18/09 (Diego): «el oficinista puede meter a gente en la lista negra (crear registros) si
+// no acude una persona a la entrevista». Quien no ve el contenido de las entrevistas no
+// tiene ficha que rellenar —el servidor no se la manda—, así que da de alta con lo justo:
+// quién es, su teléfono y por qué no hay que volver a llamarle. El servidor solo acepta
+// esos tres campos, aunque desde aquí se mandara algo más.
+function altaAlertaRapida() {
+  const nombre = (prompt('¿A quién metemos en la lista negra? (nombre y apellidos)') || '').trim();
+  if (!nombre) return;
+  const tel = (prompt(`Teléfono de ${nombre} (para no volver a llamarle por error):`) || '').trim();
+  const opciones = MOTIVOS_ALERTA.map((m, i) => `${i + 1}) ${m.label}`).join('\n');
+  const eleccion = (prompt(`¿Por qué?\n${opciones}`, '1') || '').trim();
+  const m = MOTIVOS_ALERTA[(+eleccion || 1) - 1] || MOTIVOS_ALERTA[0];
+  S.entrevistas = (S.entrevistas || []).concat([{ id: nuevoIdCand(), nombre, tel, lista: 'alerta', motivo: m.id }]);
+  registrarCambio(`${nombre} a la lista de alerta: ${m.label.toLowerCase()}`, 'cambio');
+  saveState();
+  ENT.lista = 'alerta';
+  renderEntrevistas();
+  toast(`${nombre} está en la lista de alerta`, 'warn');
 }
 // repinta solo la lista al teclear, para no perder el foco del buscador
 function pintaListaEnt() {

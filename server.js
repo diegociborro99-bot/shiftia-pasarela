@@ -27,7 +27,7 @@ const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const M = require('./modelo.js');   // estado de cada mes, meses visibles, avisos
 const { pushServidor } = require('./push-servidor.js');
-const { estadoParaEmpleado, estadoSinContenidoEntrevistas } = require('./estado-servidor.js');   // el empleado nunca recibe datos de terceros; el encargado sin permiso, el contenido de las entrevistas
+const { estadoParaEmpleado, estadoSinContenidoEntrevistas, entrevistasTrasEscrituraSinPermiso } = require('./estado-servidor.js');   // el empleado nunca recibe datos de terceros; el encargado sin permiso, el contenido de las entrevistas
 // 14/09: sin semilla-notas.js (las notas del Word eran del piloto) y sin iCal:
 // el calendario personal suscribible llega en la fase 3, con generarICS en el modelo.
 const APP_VER = (() => { try { return require('./package.json').version; } catch (e) { return '0'; } })();
@@ -681,10 +681,17 @@ const server = http.createServer(async (req, res) => {
       }
       const actual = leerEstado();
       if (+baseVersion !== actual.version) { json(res, 409, { error: 'conflicto', version: actual.version }); return; }
-      // 18/09 (José): quien no ve el contenido de las entrevistas recibe las fichas
-      // vacías, así que al guardar un cambio de turno las devolvería vacías y borraría lo
-      // de José. Sus entrevistas no se tocan: mandan las que hay guardadas.
-      if (!veEntrevistas) estado.entrevistas = (actual.estado && actual.estado.entrevistas) || [];
+      // 18/09: quien no ve el contenido de las entrevistas recibe las fichas vacías, así
+      // que al guardar un cambio de turno las devolvería vacías y borraría lo de José. Las
+      // guardadas mandan; lo único que se le acepta es dar de alta a alguien en la lista
+      // negra —«si no acude una persona a la entrevista» (Diego, 18/09)—, y de ese alta
+      // solo el nombre, el teléfono y el motivo.
+      if (!veEntrevistas) {
+        const antes = ((actual.estado && actual.estado.entrevistas) || []).length;
+        estado.entrevistas = entrevistasTrasEscrituraSinPermiso(actual.estado && actual.estado.entrevistas, estado.entrevistas);
+        const altas = estado.entrevistas.length - antes;
+        if (altas > 0) auditar(yo, ip, 'entrevistas-alta', `${altas} alta(s) en la lista de alerta`);
+      }
       guardarEstado(estado, actual.version + 1, actual.estado, yo);
       auditar(yo, ip, 'estado', `v${actual.version + 1} · ${estado.staff.length} personas · ${(estado.locales || []).length} locales · ${Object.keys(estado.meses || {}).length} meses`);
       // (en el piloto la versión 1 devolvía el estado completado con las notas de fábrica; aquí no hay nada que completar)

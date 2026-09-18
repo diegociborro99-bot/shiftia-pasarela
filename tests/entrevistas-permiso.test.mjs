@@ -24,11 +24,25 @@ test('el permiso viaja del servidor a la app y no se inventa en el cliente', () 
   assert.match(html, /verEntrevistas: true/, 'sin servidor (local) se ve todo');
 });
 
+test('sin permiso puede dar de alta en la lista negra, y solo eso (Diego, 18/09)', () => {
+  // «el oficinista puede meter a gente en la lista negra (crear registros) si no acude una
+  // persona a la entrevista». El servidor solo le acepta nombre, teléfono y motivo.
+  assert.match(html, /function altaAlertaRapida\(\)/, 'una alta reducida, no la ficha entera');
+  assert.match(html, /id="entAlerta"/, 'su propio botón');
+  assert.match(html, />\+ A la lista negra</, 'y se llama por lo que es');
+  const ini = html.indexOf('function altaAlertaRapida()');
+  const fn = html.slice(ini, html.indexOf('\n}', ini) + 2);   // la función y nada más
+  assert.match(fn, /lista: 'alerta'/, 'entra en alerta');
+  assert.match(fn, /MOTIVOS_ALERTA/, 'con el motivo del catálogo');
+  for (const k of ['exp', 'sueldo', 'cond', 'obs', 'hab'])
+    assert.ok(!new RegExp(`\\b${k}\\b`).test(fn), `«${k}» no entra por aquí`);
+});
+
 test('quien no lo tiene ni ve el botón de registrar ni puede abrir una ficha', () => {
   assert.match(html, /function puedeVerEntrevista\(\)/, 'una sola función lo decide');
   assert.match(html, /id="entNuevo"/);
   // el botón de registrar solo se pinta con permiso
-  assert.match(html, /\$\{puedeVerEntrevista\(\) \? `<button class="btn btn-cta" id="entNuevo">\+ Registrar<\/button>` : ''\}/);
+  assert.match(html, /puedeVerEntrevista\(\)\s*\n?\s*\? `<button class="btn btn-cta" id="entNuevo">\+ Registrar<\/button>`/, 'el botón de registrar solo con permiso');
   // y la fila deja de ser un botón: sin contenido que abrir, no se pulsa
   assert.match(html, /const abre = puedeVerEntrevista\(\);/);
   assert.match(html, /<\$\{abre \? 'button' : 'div'\} class="entrow\$\{abre \? '' : ' entrow-cerrada'\}"/);

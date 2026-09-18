@@ -385,6 +385,48 @@ test('ni inventándose el campo: la oficina no puede escribir el contenido de un
   assert.equal(f.obs, 'Un poco choni');
 });
 
+test('la oficina SÍ puede meter a alguien en la lista negra: no acudió a la entrevista', async () => {
+  // 18/09 (Diego): «el oficinista puede meter a gente en la lista negra (crear registros)
+  // si no acude una persona a la entrevista». Es lo único que puede escribir de esta base.
+  const v = (await admin('GET', '/api/estado')).datos.version;
+  const suyo = await estadoCon(admin);
+  suyo.entrevistas = (suyo.entrevistas || []).concat([{ id: 'nuevo1', nombre: 'Quien No Vino', tel: '600999888', lista: 'alerta', motivo: 'NOACUDE' }]);
+  assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: suyo }, { Origin: BASE })).status, 200);
+  const tras = (await estadoCon(prog)).entrevistas || [];
+  const nuevo = tras.find(c => c.id === 'nuevo1');
+  assert.ok(nuevo, 'el registro nuevo se guarda');
+  assert.equal(nuevo.nombre, 'Quien No Vino');
+  assert.equal(nuevo.tel, '600999888');
+  assert.equal(nuevo.motivo, 'NOACUDE');
+  assert.equal(nuevo.lista, 'alerta');
+  assert.equal(tras.find(c => c.id === 'cand1').cond, 'Seis dias, ocho horas', 'y no se ha llevado por delante la de José');
+});
+
+test('pero por esa rendija no se cuela contenido de entrevista, ni se edita lo que ya existe', async () => {
+  const v = (await admin('GET', '/api/estado')).datos.version;
+  const suyo = await estadoCon(admin);
+  suyo.entrevistas = (suyo.entrevistas || []).map(c => c.id === 'cand1' ? { ...c, obs: 'me lo invento', val: 'bien' } : c)
+    .concat([{ id: 'nuevo2', nombre: 'Otro', tel: '600777666', lista: 'alerta', motivo: 'NOACUDE', obs: 'colado por la rendija', sueldo: '9000 €', exp: 'colada' }]);
+  assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: suyo }, { Origin: BASE })).status, 200);
+  const tras = (await estadoCon(prog)).entrevistas || [];
+  const n2 = tras.find(c => c.id === 'nuevo2');
+  assert.ok(n2, 'el alta sí entra');
+  for (const k of ['obs', 'sueldo', 'exp']) assert.equal(n2[k], undefined, `«${k}» no se cuela en un alta suya`);
+  const c1 = tras.find(c => c.id === 'cand1');
+  assert.equal(c1.obs, 'Un poco choni', 'lo que ya existía no se toca');
+  assert.equal(c1.val, 'mal', 'ni su valoración');
+});
+
+test('y no puede borrar de la lista lo que no ve', async () => {
+  const v = (await admin('GET', '/api/estado')).datos.version;
+  const suyo = await estadoCon(admin);
+  suyo.entrevistas = [];
+  assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: suyo }, { Origin: BASE })).status, 200);
+  const tras = (await estadoCon(prog)).entrevistas || [];
+  assert.ok(tras.find(c => c.id === 'cand1'), 'la de José sigue ahí');
+  assert.ok(tras.find(c => c.id === 'nuevo1'), 'y las que ella misma creó, también');
+});
+
 test('la oficina no puede darse el permiso a sí misma, ni quitárselo al jefe', async () => {
   const usuarios = await listaUsuarios(admin);
   const yo = usuarios.find(u => u.usuario === 'oficina'), elJefe = usuarios.find(u => u.usuario === 'jose');

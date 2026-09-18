@@ -95,6 +95,23 @@ try {
   ok('pulsarla no abre ninguna ficha', !(await pg.$('#candOvl')));
   ok('se le explica por qué', /El contenido de cada entrevista es del jefe/.test(await pg.$eval('#entrevistasRoot', e => e.textContent)));
 
+  // ── 3b) pero SÍ puede meter a alguien en la lista negra (Diego, 18/09)
+  ok('tiene su botón «A la lista negra»', !!(await pg.$('#entAlerta')));
+  // los tres prompts: nombre, teléfono y motivo
+  const respuestas = ['Quien No Vino', '600999888', '1'];
+  await pg.evaluate(r => { let i = 0; window.prompt = () => r[i++]; }, respuestas);
+  await pg.click('#entAlerta');
+  await pg.waitForTimeout(500);
+  ok('el alta entra en su pantalla', await llega(pg, () => (S.entrevistas || []).some(c => c.nombre === 'Quien No Vino' && c.lista === 'alerta' && c.motivo), null, 4000) >= 0,
+    await pg.evaluate(() => JSON.stringify((S.entrevistas || []).filter(c => c.lista === 'alerta').slice(-1))));
+  const llegado = await hasta(async () => {
+    const e = (await api(jJefe, 'GET', '/api/estado')).datos.estado;
+    return e && (e.entrevistas || []).find(c => c.nombre === 'Quien No Vino') || null;
+  }, 9000, 300);
+  ok('y llega al servidor con nombre, teléfono y motivo', !!llegado.v && llegado.v.tel === '600999888' && !!llegado.v.motivo && llegado.v.lista === 'alerta',
+    JSON.stringify(llegado.v));
+  ok('sin colar nada de entrevista en el alta', !!llegado.v && ['exp', 'obs', 'cond', 'sueldo', 'hab'].every(k => llegado.v[k] === undefined), JSON.stringify(llegado.v));
+
   // ── 4) si guarda la planilla, no borra las entrevistas de José
   await pg.evaluate(() => { S.staff[0].nota = 'Aroa toca la planilla'; saveState(); });
   const guardado = await hasta(async () => {

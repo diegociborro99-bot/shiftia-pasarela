@@ -2,6 +2,14 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Lupa en el selector de personas** (Diego, 18/09): el popover que abren el `＋` de una
+  casilla y el hueco «1·?» —en Semana y en Hoy— lista a las 21 personas de golpe. Ahora se
+  busca por nombre, sin tildes ni mayúsculas; los grupos que se quedan sin nadie
+  desaparecen y, si no encaja nadie, lo dice.
+- **La oficina puede meter a alguien en la lista negra** (Diego, 18/09): «si no acude una
+  persona a la entrevista». Es lo único que puede escribir de esa base: el servidor solo le
+  acepta nombre, teléfono y motivo, siempre a la lista de alerta, y nunca tocar ni borrar
+  lo que ya existe.
 - **El contenido de cada entrevista es del jefe** (José, 18/09). Aroa (cuenta `oficina`)
   sigue viendo la lista para lo que la usa —quién es, a qué puesto opta, cómo se le valoró,
   por qué se le descartó y si ya se le entrevistó—, pero no lo que se habló dentro:

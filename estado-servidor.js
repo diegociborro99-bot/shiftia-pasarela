@@ -63,4 +63,27 @@ function estadoSinContenidoEntrevistas(estado) {
   return Object.assign({}, estado, { entrevistas: estado.entrevistas.map(entrevistaSinContenido) });
 }
 
-module.exports = { estadoParaEmpleado, entrevistaSinContenido, estadoSinContenidoEntrevistas };
+// 18/09 (Diego): «el oficinista puede meter a gente en la lista negra (crear registros) si
+// no acude una persona a la entrevista». Es lo ÚNICO que puede escribir de esta base: las
+// fichas que ya existen mandan tal como están guardadas —ni se editan ni se borran, y la
+// app le manda la planilla entera en cada guardado, así que sin esto un cambio de turno
+// suyo se llevaría por delante el trabajo de José— y de lo que llega nuevo solo se acepta
+// un alta de alerta con lo justo: quién es, su teléfono y por qué no hay que llamarle.
+const CAMPOS_ALTA_ALERTA = ['id', 'nombre', 'tel', 'motivo'];
+function entrevistasTrasEscrituraSinPermiso(guardadas, entrantes) {
+  const previas = Array.isArray(guardadas) ? guardadas : [];
+  if (!Array.isArray(entrantes)) return previas;
+  const conocidos = new Set(previas.map(c => c && c.id).filter(Boolean));
+  const altas = [];
+  for (const c of entrantes) {
+    if (!c || typeof c !== 'object' || !c.id || conocidos.has(c.id)) continue;
+    if (!c.nombre && !c.tel) continue;          // un registro sin nombre ni teléfono no sirve de nada
+    conocidos.add(c.id);
+    const alta = { lista: 'alerta' };           // siempre a la lista negra, diga lo que diga el cliente
+    for (const k of CAMPOS_ALTA_ALERTA) if (c[k] !== undefined && c[k] !== null && c[k] !== '') alta[k] = c[k];
+    altas.push(alta);
+  }
+  return previas.concat(altas);
+}
+
+module.exports = { estadoParaEmpleado, entrevistaSinContenido, estadoSinContenidoEntrevistas, entrevistasTrasEscrituraSinPermiso };
