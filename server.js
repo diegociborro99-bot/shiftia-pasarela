@@ -27,7 +27,7 @@ const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const M = require('./modelo.js');   // estado de cada mes, meses visibles, avisos
 const { pushServidor } = require('./push-servidor.js');
-const { estadoParaEmpleado } = require('./estado-servidor.js');   // el empleado nunca recibe datos de terceros
+const { estadoParaEmpleado, estadoSinContenidoEntrevistas } = require('./estado-servidor.js');   // el empleado nunca recibe datos de terceros; el encargado sin permiso, el contenido de las entrevistas
 // 14/09: sin semilla-notas.js (las notas del Word eran del piloto) y sin iCal:
 // el calendario personal suscribible llega en la fase 3, con generarICS en el modelo.
 const APP_VER = (() => { try { return require('./package.json').version; } catch (e) { return '0'; } })();
@@ -109,6 +109,7 @@ const SECRETO = secreto();
 const firmaRescate = txt => crypto.createHmac('sha256', SECRETO).update(txt).digest('hex');
 try { db.exec('ALTER TABLE users ADD COLUMN cambiar INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
 try { db.exec('ALTER TABLE users ADD COLUMN gen INTEGER NOT NULL DEFAULT 0'); } catch (e) {}   // generación de sesión: subirla revoca todas las cookies
+try { db.exec('ALTER TABLE users ADD COLUMN verent INTEGER NOT NULL DEFAULT 0'); } catch (e) {}   // 18/09 (José): ver el contenido de las entrevistas, permiso por cuenta (se siembra más abajo, con USU_JEFE ya declarado)
 // contraseña genérica de alta: todos los usuarios nuevos la comparten hasta
 // que cada uno la cambie desde su Cuenta (la app se lo pide al entrar)
 const PASS_GENERICA = process.env.PASSWORD_GENERICA || 'pasarela2026';
@@ -208,6 +209,17 @@ function asegurarJefe() {
     : `[shiftia] usuario «${usu}» (el jefe, permisos de encargado) creado con la contraseña genérica — la app le pedirá cambiarla al entrar`);
 }
 asegurarJefe();
+
+// ---------- quién ve lo que hay DENTRO de una entrevista (18/09) ----------
+// José: «no quiero que [Aroa] tenga acceso al contenido de cada entrevista […] pero no a
+// lo que hay dentro de cada entrevista donde hablo de condiciones». El permiso va por
+// CUENTA, no por rol: la oficina y el jefe siguen siendo los dos encargados, pero solo
+// quien lo tenga recibe del servidor lo que hay dentro de la ficha. De serie lo traen el
+// programador y el jefe; cualquier otra cuenta nace sin él y se lo da el jefe desde
+// Usuarios. Corre en cada arranque y es idempotente, así que un servidor que ya estaba en
+// marcha queda bien sin tocar nada.
+db.prepare("UPDATE users SET verent=1 WHERE verent=0 AND (rol='programador' OR usuario=?)")
+  .run(String(process.env.JEFE_USUARIO || USU_JEFE).toLowerCase().trim());
 
 // ---------- puerta de rescate: ADMIN_RESET ----------
 // ADMIN_PASSWORD solo actúa la primera vez (tabla de usuarios vacía), así que si el
@@ -309,7 +321,7 @@ function sesionDe(req) {
   if (!/^[0-9a-f]{64}$/.test(mac) || !/^[0-9a-f]{64}$/.test(esperado) ||
       !crypto.timingSafeEqual(Buffer.from(mac, 'hex'), Buffer.from(esperado, 'hex'))) return null;
   if (+exp < Date.now()) return null;
-  const u = db.prepare('SELECT id,usuario,rol,pid,cambiar,gen FROM users WHERE id=?').get(+uid);
+  const u = db.prepare('SELECT id,usuario,rol,pid,cambiar,gen,verent FROM users WHERE id=?').get(+uid);
   if (!u || +gen !== (u.gen || 0)) return null;
   u.recordar = +exp - Date.now() > SESION_CORTA;   // para reemitir la cookie con la misma duración
   return u;
@@ -402,14 +414,36 @@ setInterval(() => {
 // Se comprime una vez por fichero y fecha, y se sirve de memoria.
 const zlib = require('node:zlib');
 const COMPRIMIDOS = new Map();
-function servirFichero(req, res, abs, cabeceras) {
+// 18/09: la base de entrevistas viaja DENTRO de index.html —es la semilla del primer
+// arranque— y este fichero se sirve entero a cualquiera con sesión, empleados incluidos.
+// O sea que los teléfonos y lo que el grupo opina por escrito de cada candidato estaban en
+// el navegador de todos, por mucho que el estado fuera proyectado. A quien no puede verlas
+// se le sirve la app con ese bloque vacío: la constante existe (la app no se rompe) pero
+// no lleva una sola ficha. El resultado se guarda en memoria, que es un fichero de 1 MB.
+const ENT_INI = '/*ENTREVISTAS_START*/', ENT_FIN = '/*ENTREVISTAS_END*/';
+let SIN_ENTREVISTAS = null;   // { clave, buf }
+function indexSinEntrevistas(abs) {
   const st = fs.statSync(abs);
-  const raw = fs.readFileSync(abs);
+  const clave = st.mtimeMs + ':' + st.size;
+  if (SIN_ENTREVISTAS && SIN_ENTREVISTAS.clave === clave) return SIN_ENTREVISTAS.buf;
+  const txt = fs.readFileSync(abs, 'utf8');
+  const i = txt.indexOf(ENT_INI), j = txt.indexOf(ENT_FIN);
+  const fuera = (i < 0 || j < 0 || j < i)
+    ? txt   // sin las marcas no se puede recortar: se sirve tal cual (y se avisa)
+    : txt.slice(0, i) + 'const ENTREVISTAS_SEMILLA = [];' + txt.slice(j + ENT_FIN.length);
+  if (fuera === txt) console.error('[shiftia] AVISO: no encuentro las marcas ENTREVISTAS_START/END en index.html: la base de entrevistas viaja a todo el mundo');
+  SIN_ENTREVISTAS = { clave, buf: Buffer.from(fuera, 'utf8') };
+  return SIN_ENTREVISTAS.buf;
+}
+
+function servirFichero(req, res, abs, cabeceras, cuerpoYa, claveCache) {
+  const st = fs.statSync(abs);
+  const raw = cuerpoYa || fs.readFileSync(abs);
   const texto = /^(text\/|application\/(javascript|json|manifest)|image\/svg)/.test(cabeceras['Content-Type'] || '');
   const ae = String(req.headers['accept-encoding'] || '');
   let cuerpo = raw, enc = null;
   if (texto && raw.length > 1024) {
-    const k = abs + ':' + st.mtimeMs + ':' + st.size;
+    const k = (claveCache || abs) + ':' + st.mtimeMs + ':' + st.size;
     let c = COMPRIMIDOS.get(k);
     if (!c) { c = {}; COMPRIMIDOS.set(k, c); if (COMPRIMIDOS.size > 24) COMPRIMIDOS.delete(COMPRIMIDOS.keys().next().value); }
     if (/\bbr\b/.test(ae)) { c.br = c.br || zlib.brotliCompressSync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 7, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: raw.length } }); cuerpo = c.br; enc = 'br'; }
@@ -530,7 +564,10 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(abs)) { res.writeHead(404); res.end(); return; }
       // X-Shiftia-Doc: el service worker solo guarda como shell la app, nunca la
       // pantalla de acceso (tras cerrar sesión, «/» la devolvía y envenenaba la caché)
-      servirFichero(req, res, abs, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', Vary: 'Cookie', 'X-Shiftia-Doc': fichero === 'index.html' ? 'app' : 'login' });
+      const cabs = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', Vary: 'Cookie', 'X-Shiftia-Doc': fichero === 'index.html' ? 'app' : 'login' };
+      // 18/09 (José): la base de entrevistas no se descarga quien no puede verla
+      if (fichero === 'index.html' && !(quien && quien.verent)) { servirFichero(req, res, abs, cabs, indexSinEntrevistas(abs), 'index-sin-entrevistas'); return; }
+      servirFichero(req, res, abs, cabs);
       return;
     }
     // --- estáticos ---
@@ -596,6 +633,7 @@ const server = http.createServer(async (req, res) => {
     // cualquier rol).
     const esAdmin = ['admin', 'programador'].includes(yo.rol);
     const esProg = yo.rol === 'programador';
+    const veEntrevistas = !!yo.verent;   // 18/09 (José): permiso por cuenta, no por rol
 
     if (ruta === '/api/logout' && req.method === 'POST') {
       try {
@@ -613,14 +651,16 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { app: APP_VER, build: APP_BUILD });
       return;
     }
-    if (ruta === '/api/yo') { json(res, 200, { rol: yo.rol, pid: yo.pid, usuario: yo.usuario, cambiar: !!yo.cambiar }); return; }
+    if (ruta === '/api/yo') { json(res, 200, { rol: yo.rol, pid: yo.pid, usuario: yo.usuario, cambiar: !!yo.cambiar, verEntrevistas: veEntrevistas }); return; }
     // con la contraseña genérica solo se puede: ver quién soy, cambiarla y salir.
     // Lo impone el servidor: el botón «Ahora no» del cliente ya no existe.
     if (yo.cambiar && ruta !== '/api/password') { json(res, 403, { error: 'Crea tu contraseña personal para seguir', cambiar: true }); return; }
 
     if (ruta === '/api/estado' && req.method === 'GET') {
       const e = leerEstado();
-      json(res, 200, esAdmin ? e : { version: e.version, estado: estadoParaEmpleado(e.estado, yo.pid) });
+      if (!esAdmin) { json(res, 200, { version: e.version, estado: estadoParaEmpleado(e.estado, yo.pid) }); return; }
+      // 18/09 (José): el encargado sin permiso recibe las fichas, pero no lo que hay dentro
+      json(res, 200, veEntrevistas ? e : { version: e.version, estado: estadoSinContenidoEntrevistas(e.estado) });
       return;
     }
 
@@ -641,6 +681,10 @@ const server = http.createServer(async (req, res) => {
       }
       const actual = leerEstado();
       if (+baseVersion !== actual.version) { json(res, 409, { error: 'conflicto', version: actual.version }); return; }
+      // 18/09 (José): quien no ve el contenido de las entrevistas recibe las fichas
+      // vacías, así que al guardar un cambio de turno las devolvería vacías y borraría lo
+      // de José. Sus entrevistas no se tocan: mandan las que hay guardadas.
+      if (!veEntrevistas) estado.entrevistas = (actual.estado && actual.estado.entrevistas) || [];
       guardarEstado(estado, actual.version + 1, actual.estado, yo);
       auditar(yo, ip, 'estado', `v${actual.version + 1} · ${estado.staff.length} personas · ${(estado.locales || []).length} locales · ${Object.keys(estado.meses || {}).length} meses`);
       // (en el piloto la versión 1 devolvía el estado completado con las notas de fábrica; aquí no hay nada que completar)
@@ -835,7 +879,7 @@ const server = http.createServer(async (req, res) => {
     // crea, resetea o borra cuentas de programador. Nunca se borra el último de cada uno.
     if (ruta === '/api/usuarios' && req.method === 'GET') {
       if (!esAdmin) { json(res, 403, { error: 'solo el encargado' }); return; }
-      json(res, 200, { usuarios: db.prepare('SELECT id,usuario,rol,pid,creado,cambiar FROM users ORDER BY rol,usuario').all().map(u => Object.assign(u, { cambiar: !!u.cambiar })) });
+      json(res, 200, { usuarios: db.prepare('SELECT id,usuario,rol,pid,creado,cambiar,verent FROM users ORDER BY rol,usuario').all().map(u => Object.assign(u, { cambiar: !!u.cambiar, verEntrevistas: !!u.verent })) });
       return;
     }
     if (ruta === '/api/usuarios' && req.method === 'POST') {
@@ -902,6 +946,24 @@ const server = http.createServer(async (req, res) => {
       PUSH.bajaUsuario(u.id);
       auditar(yo, ip, 'usuario-rol', `${u.usuario}: ${u.rol} → ${rol}${pid ? ', ' + pid : ''}`);
       json(res, 200, { usuario: u.usuario, rol, pid });
+      return;
+    }
+    // 18/09 (José): abrir o cerrar a una cuenta el contenido de las entrevistas. Lo
+    // concede quien YA lo tiene (el jefe) o el programador —no cualquier encargado—, y
+    // nunca a sí mismo: si no, Aroa, que también es `admin`, se lo devolvería sola.
+    if (ruta === '/api/usuarios/entrevistas' && req.method === 'POST') {
+      if (!esAdmin || !veEntrevistas) { json(res, 403, { error: 'solo quien ya ve las entrevistas' }); return; }
+      const b = await leerCuerpo(req);
+      const u = db.prepare('SELECT * FROM users WHERE id=?').get(+b.id);
+      if (!u) { json(res, 404, { error: 'no existe' }); return; }
+      if (u.id === yo.id) { json(res, 400, { error: 'no puedes cambiártelo a ti mismo' }); return; }
+      if (u.rol === 'programador' && !esProg) { json(res, 403, { error: 'solo el programador gestiona cuentas de programador' }); return; }
+      if (u.rol === 'empleado') { json(res, 400, { error: 'un empleado no entra en Entrevistas' }); return; }
+      const ver = b.ver ? 1 : 0;
+      if (ver === (u.verent ? 1 : 0)) { json(res, 200, { usuario: u.usuario, verEntrevistas: !!ver }); return; }
+      db.prepare('UPDATE users SET verent=? WHERE id=?').run(ver, u.id);
+      auditar(yo, ip, 'usuario-entrevistas', `${u.usuario}: ${ver ? 've' : 'NO ve'} el contenido de las entrevistas`);
+      json(res, 200, { usuario: u.usuario, verEntrevistas: !!ver });
       return;
     }
     if (ruta === '/api/usuarios' && req.method === 'DELETE') {

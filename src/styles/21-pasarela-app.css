@@ -550,6 +550,17 @@ table.pvt{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 .entrow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:8px 12px;border:1px solid var(--border);
   border-radius:11px;background:var(--surface);cursor:pointer;transition:border-color .12s,transform .12s}
 .entrow:hover{border-color:var(--accent);transform:translateX(2px)}
+/* 18/09 (José): a quien no ve el contenido de la entrevista, la fila no se le pulsa —el
+   servidor no le manda nada que abrir— y se le dice por qué en vez de dejar la sección
+   medio muerta. */
+.usrent{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3);white-space:nowrap;cursor:pointer}
+.usrent input{accent-color:var(--accent);cursor:pointer}
+.entrow-cerrada{cursor:default}
+.entrow-cerrada:hover{border-color:var(--border);transform:none}
+.entaviso{display:flex;gap:9px;align-items:flex-start;margin-bottom:10px;padding:9px 12px;border-radius:11px;
+  border:1px solid var(--border);background:var(--surface2,var(--surface));color:var(--ink2,var(--ink3));font-size:12px;line-height:1.45}
+.entaviso .ico{width:16px;height:16px;flex:none;margin-top:1px;color:var(--ink3)}
+.entaviso b{color:var(--ink)}
 .entav{width:32px;height:32px;border-radius:50%;background:var(--pc);color:#fff;display:flex;align-items:center;
   justify-content:center;font-size:11px;font-weight:800;flex:none}
 .enttxt{flex:1;min-width:0}

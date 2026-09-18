@@ -2,6 +2,20 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **El contenido de cada entrevista es del jefe** (José, 18/09). Aroa (cuenta `oficina`)
+  sigue viendo la lista para lo que la usa —quién es, a qué puesto opta, cómo se le valoró,
+  por qué se le descartó y si ya se le entrevistó—, pero no lo que se habló dentro:
+  condiciones, sueldo, horarios y observaciones no salen del servidor. El permiso va por
+  cuenta, lo da y lo quita José desde Cuenta → Usuarios, y nadie se lo puede dar a sí mismo.
+- **Corregido, y era grave**: la base de entrevistas viajaba dentro de `index.html` —es la
+  semilla del primer arranque— y el servidor sirve ese fichero entero a cualquiera con
+  sesión. Los 275 teléfonos y las observaciones del grupo estaban en el navegador de **todos
+  los empleados**, aunque el estado que recibían sí iba proyectado. Ahora se sirve con ese
+  bloque vacío a quien no puede verlo. Lo encontró la batería e2e nueva.
+- **Y no se pierde nada**: quien no ve las entrevistas tampoco las sobrescribe. La app manda
+  la planilla entera al guardar, así que el primer cambio de turno de Aroa habría borrado el
+  trabajo de José; el servidor conserva las suyas.
+
 - **Los puestos son tres: sala, cocina y apoyo.** El «comodín» desaparece como puesto
   (sigue existiendo «sin local fijo», que es otra cosa: quien puede ir a cualquier bar).
   Cada persona queda con el puesto que dictó José. Alta de **Dulce** (apoyo), que de

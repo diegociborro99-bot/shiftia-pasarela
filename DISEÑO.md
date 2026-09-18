@@ -125,6 +125,22 @@ Va dentro de `migrarEstado`, que es por donde pasan los tres caminos de carga �
 
 **Privacidad**: estas fichas llevan teléfonos de 275 personas y lo que el grupo opina de cada una por escrito. La proyección del empleado (`estadoParaEmpleado`) es una lista blanca de claves, así que `entrevistas` nunca ha viajado; ahora hay un test en `tests/seguridad.test.mjs` que lo fija, porque el día que alguien añada una clave a esa lista conviene que salte.
 
+### El contenido de la entrevista es del jefe (18/09)
+
+José: *«en la opción de entrevistas, Aroa funciona bien para antes de citar a alguien comprueba si previamente lo hemos descartado pero no quiero que tenga acceso al contenido de cada entrevista. Si sí le hemos entrevistado, si hemos puesto bien, mal o regular y demás pero no a lo que hay dentro de cada entrevista donde hablo de condiciones»*. Aroa es la cuenta `oficina`; José, `admin`.
+
+El permiso va **por cuenta, no por rol** (`users.verent`): las dos siguen siendo `admin`, con el mismo mando sobre la planilla. De serie lo traen el programador y la cuenta del jefe; cualquier otra nace sin él. Lo concede **quien ya lo tiene** —o el programador—, nunca a sí mismo: si fuera «cualquier encargado», Aroa, que también es `admin`, se lo devolvería sola. El interruptor está en Cuenta → Usuarios.
+
+Se impone en **tres sitios**, porque con uno solo no bastaba:
+
+1. **`GET /api/estado`** proyecta cada ficha (`entrevistaSinContenido`): salen nombre, teléfono, lista, puesto, valoración, motivo del descarte y fecha de la entrevista — lo justo para «¿hay que volver a llamar a este?» — y nada de dentro: ni experiencia, ni sueldo, ni horarios, ni condiciones, ni observaciones, ni aptitudes.
+2. **`PUT /api/estado`** conserva las entrevistas guardadas cuando escribe alguien sin permiso. Sin esto, el primer cambio de turno de Aroa habría devuelto las fichas vacías y **borrado el trabajo de José**: la app manda el estado entero, no un parche.
+3. **`GET /`** sirve `index.html` con la semilla vaciada. Este fue el hallazgo gordo, y lo destapó la batería e2e: la base de entrevistas viaja **dentro del propio fichero de la app** (es la semilla del primer arranque) y el servidor lo sirve entero a cualquiera con sesión. Los 275 teléfonos y lo que el grupo opina por escrito de cada candidato estaban en el navegador de **todos los empleados**, por muy proyectado que estuviera el estado. El bloque va marcado con `/*ENTREVISTAS_START*/…/*ENTREVISTAS_END*/` —el mismo truco que `MODELO_START`— y al servir a quien no puede verlo se sustituye por `const ENTREVISTAS_SEMILLA = [];`. La constante sigue existiendo, así que la app no se rompe; la variante recortada se guarda en memoria.
+
+En la app, `puedeVerEntrevista()` decide: sin permiso no hay botón de «Registrar», la fila deja de ser un `<button>` (no hay nada que abrir) y sale un aviso explicando por qué. Es solo cortesía visual: la verdad la impone el servidor, y `abrirFichaCand` lleva su propia guarda.
+
+Sin servidor (modo local, demo) no hay cuentas y se ve todo, que es como Diego prueba.
+
 **Pendiente**: la segunda base, «Alerta interna» (81 fichas), sigue sin duplicar en el espacio de Diego, así que sus escaneos no se han podido leer.
 
 **Lo que pregunta la entrevista** (Aroa, 17/09): a las siete aptitudes de siempre se suma **«Aperturas o cierres»** —«para saber si ha hecho aperturas o cierres en otros locales, que ahí veo yo si tiene experiencia»—, con las mismas tres respuestas y su propio filtro. Y detrás del campo Horarios va **«El entrevistado busca»**: mañanas, tardes, turno partido, fin de semana y «no tiene problemas», varias a la vez; la última es excluyente porque quiere decir justo eso. Se guarda en `busca` (lista de ids) y entra en el buscador por su texto.

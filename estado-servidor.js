@@ -35,4 +35,28 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
   };
 }
 
-module.exports = { estadoParaEmpleado };
+// 18/09 (José): «Aroa […] comprueba si previamente lo hemos descartado pero no quiero que
+// tenga acceso al contenido de cada entrevista. Si sí le hemos entrevistado, si hemos
+// puesto bien, mal o regular y demás pero no a lo que hay dentro de cada entrevista donde
+// hablo de condiciones». De cada ficha sale lo justo para eso —quién es, a qué puesto
+// opta, cómo se le valoró, por qué se le descartó y si se le entrevistó y cuándo— y NADA
+// de dentro: ni experiencia, ni sueldo, ni horarios, ni condiciones, ni observaciones, ni
+// aptitudes. Se aplica en el servidor: el contenido no llega a su navegador.
+function entrevistaSinContenido(c) {
+  const fuera = {
+    id: c.id, nombre: c.nombre, tel: c.tel, lista: c.lista,
+    val: c.val, motivo: c.motivo,          // la valoración y el porqué del descarte: es lo que va a mirar
+    fecha: c.fecha,                        // «si sí le hemos entrevistado», y cuándo
+    sinContenido: true,                    // para que la app no pinte una ficha a medias
+  };
+  if (Array.isArray(c.puestos)) fuera.puestos = c.puestos.slice();
+  else if (c.puesto) fuera.puesto = c.puesto;
+  for (const k of Object.keys(fuera)) if (fuera[k] === undefined) delete fuera[k];
+  return fuera;
+}
+function estadoSinContenidoEntrevistas(estado) {
+  if (!estado || !Array.isArray(estado.entrevistas)) return estado;
+  return Object.assign({}, estado, { entrevistas: estado.entrevistas.map(entrevistaSinContenido) });
+}
+
+module.exports = { estadoParaEmpleado, entrevistaSinContenido, estadoSinContenidoEntrevistas };

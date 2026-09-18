@@ -34,6 +34,7 @@
 // 2 = las 150 hojas escaneadas leídas a mano.
 const SEMILLA_ENT_V = 2;
 const C = o => Object.assign({ nombre: '', tel: '', puesto: null, val: null, motivo: null, nota: '', fecha: null, hab: {} }, o);
+/*ENTREVISTAS_START*/
 const ENTREVISTAS_SEMILLA = [
   C({"id": "ainohacamarera", "nombre": "Ainoha camarera", "tel": "616664691", "lista": "alerta", "puesto": "sala"}),
   C({"id": "tel659740222", "tel": "659740222", "lista": "alerta"}),
@@ -311,3 +312,4 @@ const ENTREVISTAS_SEMILLA = [
   C({"id": "ivanliminana", "nombre": "ivan limiñana", "tel": "695812443", "lista": "ent", "adj": 1, "fecha": "25/3/2025", "edad": "41", "zona": "Elche", "doc": "si", "exp": "Encargado de Burger King en Carrefour, 3 años: repartidor, caducidades, inventarios, horarios, control de embalaje. Ayudante de cocina en Veramar Santa Pola, 2 años: fríos, plancha, freidora, arroces.", "obs": "Minusvalía del 33%. Amigo de Iván. BUENA.", "hab": {"cafetera": "si", "bandeja": "si", "barril": "si", "tpv": "si", "pda": "si"}, "val": "bien"}),
   C({"id": "josemiguel", "nombre": "jose miguel", "tel": "622771657", "lista": "ent", "adj": 1, "fecha": "21/3/2025", "edad": "44", "zona": "Vive en Elche. Tiene coche.", "doc": "si", "exp": "Burgos, 3 meses, en cocina: cafés, comidas, recoger; terraza, salón y barra. Birra, 1 año: cafés, comidas, terraza. Náuticos, el verano: barra y salón. Turno partido.", "cond": "Estabilidad. No tiene problema de horarios.", "obs": "No me gusta. Copas y vinos: sí. Rapidez: sí.", "hab": {"cafetera": "si", "bandeja": "si", "jamon": "si", "barril": "si", "tpv": "si", "pda": "si"}, "val": "mal"}),
 ];
+/*ENTREVISTAS_END*/

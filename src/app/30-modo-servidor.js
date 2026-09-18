@@ -5,7 +5,10 @@
 // La app detecta el backend al arrancar. Sin servidor (file://, artifact,
 // demo) todo funciona igual que siempre en local. Si este origen YA tuvo
 // servidor y ahora no responde, no se cae a modo local: se avisa y se reintenta.
-const SRV = { on: false, version: 0, rol: null, esAdmin: false, pid: null, usuario: null, persistencia: null, baseTxt: null };
+// `verEntrevistas` (18/09, José): quién puede abrir lo que hay DENTRO de una entrevista.
+// Lo decide el servidor por cuenta; aquí solo sirve para no pintar una ficha que no va a
+// llegar. En modo local (sin servidor) no hay cuentas, así que se ve todo.
+const SRV = { on: false, version: 0, rol: null, esAdmin: false, pid: null, usuario: null, persistencia: null, baseTxt: null, verEntrevistas: true };
 const PID_KEY = 'shiftia_pas_pid';
 const SRV_KEY = 'shiftia_pas_srv';          // «este origen tiene servidor»
 const PEND_KEY = 'shiftia_pas_pendiente';   // bandeja de salida: último estado del admin aún no confirmado por el servidor
@@ -401,6 +404,7 @@ function pedirCambioPass(actual) {
 async function entrarServidor(datos, passUsada) {
   SRV.on = true; SRV.rol = datos.rol; SRV.esAdmin = ['admin', 'programador'].includes(datos.rol); SRV.pid = datos.pid; SRV.usuario = datos.usuario;
   marcarRolProgramador();
+  SRV.verEntrevistas = datos.verEntrevistas !== false;   // 18/09 (José): el contenido de las entrevistas es del jefe
   // si este navegador se quedó en Actividad (un programador antes) y ahora entra otro rol, a Hoy
   if (SRV.rol !== 'programador' && document.querySelector('.tab[data-v="actividad"][aria-selected="true"]')) switchTab('hoy');
   // con servidor nada de la planilla vive en localStorage (lo que dejó el arranque local se retira)

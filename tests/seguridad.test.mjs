@@ -58,7 +58,7 @@ function cliente() {
   fn.tomaCookie = c => { cookie = c; };
   return fn;
 }
-const admin = cliente(), prog = cliente(), empleada = cliente(), otra = cliente(), anon = cliente();
+const admin = cliente(), prog = cliente(), empleada = cliente(), otra = cliente(), anon = cliente(), jefe = cliente();
 
 // Fechas RELATIVAS a hoy: con fechas fijas estos tests caducan solos (el
 // servidor rechaza una petición fuera de la ventana de hoy-31..hoy+400), y se
@@ -291,6 +291,146 @@ test('el estado que recibe un empleado va proyectado: de los demás solo lo mín
 });
 
 // (el enlace del calendario personal y su revocación se prueban en la fase 3, con iCal)
+
+// ─────────────────────────────── 4b. el contenido de las entrevistas es del jefe
+// 18/09 (José): «en la opción de entrevistas, Aroa funciona bien para antes de citar a
+// alguien comprueba si previamente lo hemos descartado pero no quiero que tenga acceso al
+// contenido de cada entrevista. Si sí le hemos entrevistado, si hemos puesto bien, mal o
+// regular y demás pero no a lo que hay dentro de cada entrevista donde hablo de
+// condiciones». Aroa es la cuenta «oficina».
+//
+// El permiso NO se ata a un nombre de usuario: lo concede quien ya lo tiene (el jefe) o el
+// programador, y nunca a sí mismo. Así sobrevive a que a José le cambien de cuenta.
+const CANDIDATO = {
+  id: 'cand1', nombre: 'Fulanita de Tal', tel: '600111222', lista: 'ent', puestos: ['sala'], val: 'mal',
+  fecha: '13/10/2025', edad: '41', zona: 'Elche', doc: 'si', exp: 'La Paraeta, 4 meses',
+  incorp: 'Ya', sueldo: '1200 €', horarios: 'De mananas', cond: 'Seis dias, ocho horas',
+  obs: 'Un poco choni', nota: 'lo que apunto Jose', hab: { cafetera: 'si', pda: 'no' },
+};
+const SECRETOS = ['La Paraeta', '1200 €', 'Seis dias', 'Un poco choni', 'lo que apunto Jose', 'De mananas'];
+const estadoCon = async c => ((await c('GET', '/api/estado')).datos || {}).estado || {};
+const listaUsuarios = async c => (await c('GET', '/api/usuarios')).datos.usuarios;
+let idAroa = null;
+
+test('el programador siembra a José: un encargado con acceso al contenido de las entrevistas', async () => {
+  const alta = (await prog('POST', '/api/usuarios', { usuario: 'jose', rol: 'admin' }, { Origin: BASE })).datos;
+  assert.ok(alta && alta.usuario === 'jose', JSON.stringify(alta));
+  await jefe('POST', '/api/login', { usuario: 'jose', password: alta.password });
+  assert.equal((await jefe('POST', '/api/password', { actual: alta.password, nueva: 'JoseClave2026' })).status, 200);
+  await jefe('POST', '/api/login', { usuario: 'jose', password: 'JoseClave2026' });
+  assert.equal((await jefe('GET', '/api/yo')).datos.usuario, 'jose');
+  // nace sin el permiso, como cualquier encargado: se lo da el programador
+  const suId = (await listaUsuarios(prog)).find(u => u.usuario === 'jose').id;
+  assert.equal((await jefe('GET', '/api/yo')).datos.verEntrevistas, false, 'de serie, ningún encargado lo trae');
+  assert.equal((await prog('POST', '/api/usuarios/entrevistas', { id: suId, ver: true }, { Origin: BASE })).status, 200);
+  assert.equal((await jefe('GET', '/api/yo')).datos.verEntrevistas, true);
+  idAroa = (await listaUsuarios(prog)).find(u => u.usuario === 'oficina').id;
+  assert.ok(idAroa, 'la cuenta de la oficina (Aroa)');
+  // y se siembra el candidato de prueba, con José escribiéndolo
+  const v = (await jefe('GET', '/api/estado')).datos.version;
+  const e = await estadoCon(jefe); e.entrevistas = [CANDIDATO];
+  assert.equal((await jefe('PUT', '/api/estado', { baseVersion: v, estado: e }, { Origin: BASE })).status, 200);
+});
+
+test('la oficina ve QUIÉN está descartado, pero no una palabra de lo que hay dentro de la entrevista', async () => {
+  const deAroa = await estadoCon(admin);
+  const c = (deAroa.entrevistas || [])[0];
+  assert.ok(c, 'la ficha sigue apareciendo: para eso la usa');
+  assert.equal(c.nombre, 'Fulanita de Tal'); assert.equal(c.tel, '600111222');
+  assert.equal(c.val, 'mal', 'la valoración sí: es lo que le dice si ya está descartada');
+  assert.equal(c.fecha, '13/10/2025', 'y si se le entrevistó, y cuándo');
+  assert.deepEqual(c.puestos, ['sala'], 'y a qué puesto opta');
+  for (const k of ['exp', 'obs', 'cond', 'sueldo', 'horarios', 'incorp', 'edad', 'zona', 'doc', 'nota', 'hab'])
+    assert.equal(c[k], undefined, `«${k}» no viaja a la oficina`);
+  const txt = JSON.stringify(deAroa);
+  for (const secreto of SECRETOS) assert.ok(!txt.includes(secreto), `«${secreto}» no puede salir del servidor`);
+  assert.equal((await admin('GET', '/api/yo')).datos.verEntrevistas, false, 'y la app lo sabe para no pintar la ficha');
+});
+
+test('el jefe y el programador sí lo ven entero', async () => {
+  for (const [quien, c] of [['el jefe', jefe], ['el programador', prog]]) {
+    const f = ((await estadoCon(c)).entrevistas || [])[0];
+    assert.ok(f, `${quien} recibe la ficha`);
+    assert.equal(f.cond, 'Seis dias, ocho horas', `${quien} ve las condiciones`);
+    assert.equal(f.obs, 'Un poco choni', `${quien} ve las observaciones`);
+    assert.deepEqual(f.hab, { cafetera: 'si', pda: 'no' }, `${quien} ve las aptitudes`);
+  }
+});
+
+test('y si la oficina guarda la planilla, NO se lleva por delante las entrevistas que no ve', async () => {
+  // Aroa recibe las fichas sin contenido; al guardar un cambio de turno enviaría eso
+  // mismo de vuelta y borraría lo de José. El servidor conserva lo suyo.
+  const v = (await admin('GET', '/api/estado')).datos.version;
+  const suyo = await estadoCon(admin);
+  suyo.staff[0].nota = 'tocando la planilla';
+  assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: suyo }, { Origin: BASE })).status, 200);
+  const tras = await estadoCon(prog);
+  assert.equal(tras.staff[0].nota, 'tocando la planilla', 'su cambio sí se guarda');
+  const f = (tras.entrevistas || [])[0];
+  assert.ok(f, 'la entrevista sigue ahí');
+  assert.equal(f.cond, 'Seis dias, ocho horas', 'y entera');
+  assert.equal(f.obs, 'Un poco choni');
+});
+
+test('ni inventándose el campo: la oficina no puede escribir el contenido de una entrevista', async () => {
+  const v = (await admin('GET', '/api/estado')).datos.version;
+  const suyo = await estadoCon(admin);
+  suyo.entrevistas = [{ ...CANDIDATO, cond: 'LO QUE YO DIGA', obs: 'colado' }];
+  assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: suyo }, { Origin: BASE })).status, 200);
+  const f = ((await estadoCon(prog)).entrevistas || [])[0];
+  assert.equal(f.cond, 'Seis dias, ocho horas', 'lo que mandó no entra');
+  assert.equal(f.obs, 'Un poco choni');
+});
+
+test('la oficina no puede darse el permiso a sí misma, ni quitárselo al jefe', async () => {
+  const usuarios = await listaUsuarios(admin);
+  const yo = usuarios.find(u => u.usuario === 'oficina'), elJefe = usuarios.find(u => u.usuario === 'jose');
+  assert.equal((await admin('POST', '/api/usuarios/entrevistas', { id: yo.id, ver: true }, { Origin: BASE })).status, 403);
+  assert.equal((await admin('POST', '/api/usuarios/entrevistas', { id: elJefe.id, ver: false }, { Origin: BASE })).status, 403);
+  assert.equal(((await estadoCon(admin)).entrevistas || [])[0].cond, undefined, 'sigue sin verlo');
+  // y el jefe tampoco se lo quita a sí mismo por error
+  assert.equal((await jefe('POST', '/api/usuarios/entrevistas', { id: elJefe.id, ver: false }, { Origin: BASE })).status, 400);
+});
+
+test('el jefe sí puede abrírselo a la oficina y volver a cerrárselo', async () => {
+  assert.equal((await jefe('POST', '/api/usuarios/entrevistas', { id: idAroa, ver: true }, { Origin: BASE })).status, 200);
+  assert.equal(((await estadoCon(admin)).entrevistas || [])[0].cond, 'Seis dias, ocho horas', 'ahora sí lo ve');
+  assert.equal((await admin('GET', '/api/yo')).datos.verEntrevistas, true);
+  assert.equal((await jefe('POST', '/api/usuarios/entrevistas', { id: idAroa, ver: false }, { Origin: BASE })).status, 200);
+  assert.equal(((await estadoCon(admin)).entrevistas || [])[0].cond, undefined, 'y se le vuelve a cerrar');
+});
+
+test('al empleado no le llega la lista siquiera, con permiso o sin él', async () => {
+  const e = (await empleada('GET', '/api/estado')).datos.estado;
+  assert.equal(e.entrevistas, undefined);
+});
+
+test('quitar y poner el permiso queda en la auditoría', async () => {
+  const filas = (await prog('GET', '/api/auditoria?n=50')).datos.filas || [];
+  assert.ok(filas.some(f => /entrevistas/.test(f.accion || '')), 'la auditoría lo registra');
+});
+
+// 18/09: la base de entrevistas venía DENTRO de index.html (la semilla del primer
+// arranque), y el servidor sirve ese fichero entero a cualquiera que tenga sesión. O sea
+// que los 275 teléfonos y lo que el grupo opina por escrito de cada uno estaban en el
+// navegador de cada empleado, por mucho que el estado fuera proyectado. Lo pilló la
+// batería e2e del permiso. Ahora el bloque se vacía al servir a quien no puede verlo.
+const pagina = async c => {
+  const r = await fetch(BASE + '/', { headers: { Cookie: c.cookie() } });
+  return r.ok ? r.text() : '';
+};
+test('la app que se descarga NO lleva dentro la base de entrevistas, salvo para quien puede verla', async () => {
+  const delJefe = await pagina(jefe);
+  assert.ok(/La Paraeta/.test(delJefe), 'el jefe sí la recibe: es su base');
+  for (const [quien, c] of [['la oficina', admin], ['una empleada', empleada]]) {
+    const html = await pagina(c);
+    assert.ok(html.length > 10000, `${quien} recibe la app`);
+    assert.ok(/ENTREVISTAS_SEMILLA/.test(html), `${quien}: la app sigue funcionando (la constante existe)`);
+    assert.ok(!/La Paraeta/.test(html), `${quien} NO puede descargarse la experiencia de nadie`);
+    assert.ok(!/Un poco choni/.test(html), `${quien} NO puede descargarse las observaciones`);
+    assert.ok(!/662082645/.test(html), `${quien} NO puede descargarse los teléfonos`);
+  }
+});
 
 // ─────────────────────────────── 5. saltarse el CSRF
 test('toda escritura exige origen propio y cuerpo JSON', async () => {

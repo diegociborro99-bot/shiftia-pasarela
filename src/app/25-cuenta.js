@@ -236,6 +236,7 @@ async function openCuenta() {
         return `<div class="festrow f-manual" style="border-left-color:${u.rol === 'programador' ? '#7c5fb8' : u.rol === 'admin' ? 'var(--accent)' : 'var(--teal)'}">
           <span class="festinfo"><b>${esc(u.usuario)}</b>${propio ? ' <small>(tú)</small>' : ''}<small>${ROL_LBL[u.rol] || u.rol}${per ? ' · ' + esc(per.nombre) : u.pid ? ' · ' + esc(u.pid) : ''}</small></span>
           ${tocable ? `<select class="usrrol" data-usrrol="${u.id}" aria-label="Permisos de ${esc(u.usuario)}">${roles.map(r => `<option value="${r}"${u.rol === r ? ' selected' : ''}>${ROL_LBL[r]}</option>`).join('')}</select>` : ''}
+          ${tocable && u.rol !== 'empleado' && puedeVerEntrevista() ? `<label class="usrent" title="Ver lo que hay dentro de cada entrevista (condiciones, sueldo, observaciones)"><input type="checkbox" data-usrent="${u.id}"${u.verEntrevistas ? ' checked' : ''}> entrevistas</label>` : ''}
           ${propio ? '' : `<button class="btn-mini ghost" data-usrreset="${u.id}" title="Generar contraseña nueva">reset</button><button class="festrm" data-usrdel="${u.id}" aria-label="Borrar usuario">✕</button>`}</div>`;
       }).join('') || '<div class="festvacio">Solo existe el administrador.</div>';
       const libres = S.staff.filter(p => !conUsuario.has(p.id));
@@ -246,6 +247,21 @@ async function openCuenta() {
     sel.addEventListener('change', () => { const p = S.staff.find(x => x.id === sel.value); if (p) inp.value = sugerencia(p); });
     selRol.addEventListener('change', () => { if (selRol.value !== 'empleado') { sel.value = ''; inp.value = ''; } else sel.dispatchEvent(new Event('change')); });
     ov.addEventListener('change', async e => {
+      // 18/09 (José): abrir o cerrar a una cuenta el contenido de las entrevistas. Solo
+      // aparece para quien ya lo tiene; el servidor lo vuelve a comprobar de todos modos.
+      const chk = e.target.closest('[data-usrent]');
+      if (chk) {
+        const id = +chk.dataset.usrent, ver = chk.checked;
+        const u = USUARIOS.find(x => x.id === id);
+        if (!u) return;
+        const r = await api('POST', '/api/usuarios/entrevistas', { id, ver });
+        if (!r.ok) { toast((r.datos && r.datos.error) || 'No se pudo cambiar', 'bad'); chk.checked = !ver; return; }
+        u.verEntrevistas = ver;
+        toast(ver ? `«${u.usuario}» ya ve el contenido de las entrevistas` : `«${u.usuario}» deja de ver el contenido de las entrevistas`, ver ? 'ok' : 'warn');
+        registrarCambio(`Entrevistas de ${u.usuario}: ${ver ? 've el contenido' : 'solo la lista'}`, 'cambio');
+        saveState();
+        return;
+      }
       const selr = e.target.closest('[data-usrrol]');
       if (!selr) return;
       const id = +selr.dataset.usrrol, rol = selr.value;

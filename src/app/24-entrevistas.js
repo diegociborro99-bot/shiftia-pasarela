@@ -62,15 +62,16 @@ function renderEntrevistas() {
     <div class="entacts">
       <label class="entbusca"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
         <input type="search" id="entQ" placeholder="Buscar por nombre o teléfono…" value="${esc(ENT.q)}" aria-label="Buscar candidato"></label>
-      <button class="btn btn-cta" id="entNuevo">+ Registrar</button>
+      ${puedeVerEntrevista() ? `<button class="btn btn-cta" id="entNuevo">+ Registrar</button>` : ''}
     </div>
   </div>
+  ${puedeVerEntrevista() ? '' : `<div class="entaviso">${SVG_CANDADO}<span><b>El contenido de cada entrevista es del jefe.</b> Aquí ves quién es, a qué puesto opta, cómo se le valoró y si ya se le entrevistó — lo justo para saber si hay que volver a llamarle. Lo que se habló dentro (condiciones, sueldo, observaciones) no sale del servidor.</span></div>`}
   <div class="entfiltros">${puestoChips}${valChips}${motChips}${Object.values(r.hab).some(Boolean) ? habChips : ''}</div>
   <div class="entcount">${vistos.length === r.total ? `${r.total} ${r.total === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${r.total}`}${ENT.q || ENT.puesto || ENT.val || ENT.motivo || ENT.hab ? ' <button class="btn-mini ghost" id="entLimpiar">Quitar filtros</button>' : ''}</div>
   <div class="entlist">${vistos.length ? vistos.map(filaCand).join('') : `<div class="entzero"><b>No hay nadie con esos filtros.</b><span>Prueba a quitarlos o registra a alguien nuevo.</span></div>`}</div>`;
 
   $('#entQ').oninput = e => { ENT.q = e.target.value; pintaListaEnt(); };
-  $('#entNuevo').onclick = () => abrirFichaCand(null);
+  const btnNuevo = $('#entNuevo'); if (btnNuevo) btnNuevo.onclick = () => abrirFichaCand(null);
   const lim = $('#entLimpiar'); if (lim) lim.onclick = () => { ENT.q = ENT.puesto = ENT.val = ENT.motivo = ENT.hab = ''; renderEntrevistas(); };
 }
 // repinta solo la lista al teclear, para no perder el foco del buscador
@@ -80,11 +81,21 @@ function pintaListaEnt() {
   $('#entrevistasRoot .entlist').innerHTML = vistos.length ? vistos.map(filaCand).join('') : `<div class="entzero"><b>No hay nadie con esos filtros.</b><span>Prueba a quitarlos o registra a alguien nuevo.</span></div>`;
   $('#entrevistasRoot .entcount').firstChild.textContent = vistos.length === tot ? `${tot} ${tot === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${tot}`;
 }
+// 18/09 (José): «no quiero que [Aroa] tenga acceso al contenido de cada entrevista […]
+// pero no a lo que hay dentro de cada entrevista donde hablo de condiciones». Lo impone el
+// servidor —a quien no lo tiene le llegan las fichas sin nada dentro—; esto es solo para
+// no pintarle una ficha vacía ni botones que le van a dar un 403. Sin servidor (modo
+// local, demo) no hay cuentas y se ve todo.
+function puedeVerEntrevista() { return !SRV.on || SRV.verEntrevistas !== false; }
+// el candado del aviso
+const SVG_CANDADO = ICO('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>');
+
 function filaCand(c) {
   const v = VAL_LBL[c.val];
   const mot = c.motivo && MOTIVOS_ALERTA.find(m => m.id === c.motivo);
   const habs = HABILIDADES.filter(h => (c.hab || {})[h.id] === 'si');
-  return `<button class="entrow" data-entficha="${esc(c.id)}">
+  const abre = puedeVerEntrevista();
+  return `<${abre ? 'button' : 'div'} class="entrow${abre ? '' : ' entrow-cerrada'}"${abre ? ` data-entficha="${esc(c.id)}"` : ''}>
     <span class="entav" style="--pc:${avColor(c.id)}">${esc(initials(nombreCand(c)))}</span>
     <span class="enttxt"><b>${esc(nombreCand(c))}${tieneEntrevista(c) ? '<i class="entok" title="Entrevista contestada">●</i>' : ''}</b><small>${c.tel ? esc(telBonito(c.tel)) : 'sin teléfono'}${c.edad ? ' · ' + esc(c.edad) + ' años' : ''}${c.zona ? ' · ' + esc(c.zona.split(/[,.]/)[0].slice(0, 22)) : ''}</small></span>
     <span class="entetq">
@@ -93,7 +104,7 @@ function filaCand(c) {
       ${mot ? `<em class="entm">${esc(mot.label)}</em>` : ''}
     </span>
     ${habs.length ? `<span class="enthab" title="${esc(habs.map(h => h.label).join(', '))}">${habs.map(h => icoCand(h.ico)).join('')}</span>` : ''}
-    </button>`;
+    </${abre ? 'button' : 'div'}>`;
 }
 
 // ---------- perfil del candidato: la entrevista entera, de un vistazo ----------
@@ -159,6 +170,8 @@ function abrirPerfilCand(c) {
 
 // ---------- ficha de un candidato (cajetines) ----------
 function abrirFichaCand(id, editar) {
+  // el servidor no le manda el contenido: abrir la ficha solo enseñaría huecos
+  if (!puedeVerEntrevista()) { toast('El contenido de las entrevistas es del jefe', 'warn'); return; }
   const nuevo = !id;
   const c = nuevo ? { id: nuevoIdCand(), nombre: '', tel: '', puestos: [], val: null, motivo: null, nota: '', hab: {}, lista: ENT.lista, fecha: fmtLargo(isoHoy()) } : candidatoDe(id);
   if (!c) return;

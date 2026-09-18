@@ -60,6 +60,13 @@ dependencias npm** (Node ≥ 22.13 estándar; `nixpacks.toml` fija Node 22).
 
 ## Primer arranque
 
+- **Quién ve el contenido de las entrevistas** (18/09): va por cuenta, no por rol. De serie
+  lo traen el programador y la cuenta del jefe (`admin`); la oficina y cualquier cuenta nueva
+  nacen sin él y ven la lista —nombre, teléfono, puesto, valoración, motivo y fecha— pero no
+  lo que hay dentro de la ficha. Se abre y se cierra desde **Cuenta → Usuarios**, y solo lo
+  puede hacer quien ya lo tiene (o el programador); nadie se lo da a sí mismo. A quien no lo
+  tiene, el servidor le sirve `index.html` sin la base de entrevistas dentro.
+
 - **Programador**: usuario `diego`, contraseña `12345678` (provisional hasta que la cambie desde Cuenta → Seguridad). **Encargado (la oficina)**: usuario `oficina` con `ADMIN_PASSWORD` o, si no se definió, la genérica `pasarela2026` con cambio obligatorio al entrar.
 - **Jefe**: usuario `admin` con `JEFE_PASSWORD` o la genérica `pasarela2026` con cambio obligatorio. Tiene los permisos de la oficina y no ve Actividad. Es la única cuenta que se crea también en servidores que ya existían: al arrancar, si falta, nace.
 - **Renombrado del 17/09**: en un servidor que ya estaba en marcha, al arrancar el `admin` de siempre pasa a llamarse `oficina` y `joseadmin` pasa a `admin`, conservando contraseña, rol y ficha. Se hace una sola vez y queda en la auditoría.
