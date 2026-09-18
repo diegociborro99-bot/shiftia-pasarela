@@ -87,6 +87,24 @@ Reglas: **dos apoyos no pueden quedarse solos** en un turno; **Johan siempre coc
 
 El 33 los martes es día flojo: mínimo 1, se queda Noe y abre él viniendo de la mañana (`partidoAbre.T`), igual que Pasarela. La **cocina no se imprime**.
 
+## Al imprimir, solo los nombres (18/09)
+
+José lo repitió siete veces en la reunión: *«al imprimir que no aparezcan nunca horas»*, *«sin las horas y sin mañana y tarde»*, *«todo eso de forzado a mano, por Jenny, de partido, todo eso debería al imprimir quitarse»*, *«solo los nombres, ni los números ni nada, 12123»*, *«ni forzado»*, *«ni estimado ni por, solo nombres»*.
+
+La clave es para quién es el papel. Aroa imprime **una** hoja, la recorta en cuatro y deja un trozo en cada bar. El papel es para el equipo, y al equipo solo le hace falta saber quién trabaja. Lo demás —posiciones, huecos, turnos cortos, forzados, mínimos supuestos— son señales de oficina, y la oficina mira la app.
+
+**Un solo interruptor**, `PX.soloNombres`, que encienden las hojas del equipo con `pxHojaDelEquipo(...)` y que leen las piezas que arman la hoja. Sin eso, la condición habría que repetirla en veinte plantillas y la primera que se olvidara sería la que José viera impresa.
+
+Desaparecen del papel: las horas del local (`horarioTxt` se calla en origen), la etiqueta `Mañana`/`Tarde` de la fila, el número de posición, las marcas ▸ □ P C, «por X», la nota, «forzado a mano», la cuenta `n/min*`, «+1 hueco», «faltan n», «corregido», el hueco sin cubrir entero, la leyenda, el rojo y el ámbar de las casillas, la regla de cocina del local, el «· tarde» del partido y el pie que explicaba las posiciones.
+
+**Lo que NO cambia**, y es deliberado:
+
+- **La hoja de HORAS** (`abrirImpresionHoras`): es la de la nómina y vive de las horas.
+- **La del generador** (`abrirImpresionSemanaGenerada`): no se recorta ni se cuelga; es con la que Aroa repasa antes de volcar, y ahí el número de posición, el hueco y el «forzado» son justo lo que hay que mirar.
+- **El tablón del MES**: es personas × días y su vocabulario entero es la píldora M/T/P. Quitarle la letra deja píldoras de color vacías, o sea una hoja que no dice nada. No es la hoja que se recorta para el bar, así que se queda como está hasta que el cliente diga lo contrario.
+
+Las etiquetas `Mañana`/`Tarde` se van **al pie de la letra** (decisión de Diego, 18/09): en la hoja de un local quedan dos columnas sin título, la de la izquierda es la mañana y la de la derecha la tarde. En la general, dos filas por bar en el mismo orden.
+
 ## La lupa del selector de personas (18/09)
 
 Diego: *«ponemos en el menu semana al aplicar para cambiar un trabajador que aparezca una lupita en el blop para buscarlo por nombre»*.

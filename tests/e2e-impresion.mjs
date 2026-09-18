@@ -73,21 +73,37 @@ try {
   }, [iso, tid]);
   const el33mt = await cas('2026-09-15', 'EL33_T');
   ok('El 33 martes tarde: día flojo, se queda Noe solo y sin hueco (José, 17/09)', !!el33mt && !/Hueco disponible/.test(el33mt.txt) && el33mt.slots.length === 1 && /Noe/.test(el33mt.slots[0].nombre), JSON.stringify(el33mt));
-  ok('El 33 martes tarde: Noe en la 1.ª con «por Jenny» debajo y sin marca de cocina en el papel', !!el33mt && el33mt.slots[0] && el33mt.slots[0].n === '1' && !el33mt.slots[0].coc && el33mt.slots[0].sub.some(x => /por Jenny/.test(x)), JSON.stringify(el33mt && el33mt.slots[0]));
-  ok('El 33 martes tarde: la cuenta dice 1/1* y la casilla ya no va en rojo', !!el33mt && /1\/1\*/.test(el33mt.cuenta) && !/hueco/.test(el33mt.cls), el33mt && el33mt.cuenta + ' · ' + el33mt.cls);
+  // 18/09, José, siete veces: «al imprimir que no aparezcan nunca horas», «sin mañana y
+  // tarde», «solo los nombres, ni los números ni nada», «ni forzado», «ni estimado ni por».
+  // Aroa recorta esta hoja y deja un trozo en cada bar: al equipo solo le hace falta saber
+  // quién trabaja. Lo de la oficina se mira en la app.
+  ok('El 33 martes tarde: en el papel, Noe y nada más — ni número, ni «por Jenny», ni cocina',
+    !!el33mt && el33mt.slots[0] && /Noe/.test(el33mt.slots[0].nombre) && !el33mt.slots[0].n
+    && !el33mt.slots[0].sub.length && !el33mt.slots[0].coc, JSON.stringify(el33mt && el33mt.slots[0]));
+  ok('El 33 martes tarde: tampoco la cuenta «1/1*»', !!el33mt && !/\d\/\d/.test(el33mt.cuenta || ''), JSON.stringify(el33mt && el33mt.cuenta));
   const pasLt = await cas('2026-09-14', 'PASARELA_T');
-  ok('Pasarela lunes tarde: Mari Luz la 1.ª y sin hueco; turno entero, no partido (Aroa, 17/09)', !!pasLt && pasLt.slots[0] && !pasLt.slots[0].hueco && /Mari Luz/.test(pasLt.slots[0].nombre) && !pasLt.slots[0].P && !pasLt.slots.some(s => s.hueco), JSON.stringify(pasLt));
-  ok('Pasarela lunes tarde: la casilla lo explica — «la tarde entera, de 16:00 a cierre»', !!pasLt && pasLt.slots[0] && pasLt.slots[0].sub.some(x => /16:00 a cierre/.test(x)), JSON.stringify(pasLt && pasLt.slots[0]));
+  ok('Pasarela lunes tarde: Mari Luz, sin la explicación de «la tarde entera, de 16:00 a cierre»',
+    !!pasLt && pasLt.slots[0] && /Mari Luz/.test(pasLt.slots[0].nombre) && !pasLt.slots[0].sub.length, JSON.stringify(pasLt && pasLt.slots[0]));
   const pasLm = await cas('2026-09-14', 'PASARELA_M');
-  ok('Pasarela lunes mañana: Lola lleva ▸ (sale la primera, fijo) en la 1.ª', !!pasLm && pasLm.slots[0] && /Lola/.test(pasLm.slots[0].nombre) && pasLm.slots[0].abre, JSON.stringify(pasLm && pasLm.slots[0]));
+  ok('Pasarela lunes mañana: Lola sin el ▸ de «sale la primera»', !!pasLm && pasLm.slots[0] && /Lola/.test(pasLm.slots[0].nombre) && !pasLm.slots[0].abre, JSON.stringify(pasLm && pasLm.slots[0]));
   ok('Pasarela lunes mañana: Mari Luz no está (esa tarde la hace entera) y quedan Lola y Tere', !!pasLm && !pasLm.slots.some(s => /Mari Luz/.test(s.nombre)) && pasLm.slots.some(s => /Tere/.test(s.nombre)), JSON.stringify(pasLm && pasLm.slots));
   const el33xm = await cas('2026-09-16', 'EL33_M');
-  ok('El 33 miércoles mañana: Noe con C (turno continuo) y «por Victoria»; Jenny con P y sin marca de cocina', !!el33xm && el33xm.slots[0] && /Noe/.test(el33xm.slots[0].nombre) && el33xm.slots[0].C && el33xm.slots[0].sub.some(x => /por Victoria/.test(x)) && el33xm.slots[1] && /Jenny/.test(el33xm.slots[1].nombre) && !el33xm.slots[1].coc && el33xm.slots[1].P, JSON.stringify(el33xm && el33xm.slots));
+  ok('El 33 miércoles mañana: Noe y Jenny, sin la C, sin la P y sin «por Victoria»',
+    !!el33xm && /Noe/.test(el33xm.slots[0].nombre) && /Jenny/.test(el33xm.slots[1].nombre)
+    && !el33xm.slots.some(s => s.C || s.P || s.sub.length), JSON.stringify(el33xm && el33xm.slots));
   const monLm = await cas('2026-09-14', 'MONACO_M');
-  ok('Bar Mónaco lunes mañana: Cristian con □ (comodín) en 3.ª', !!monLm && monLm.slots[2] && /Cristian/.test(monLm.slots[2].nombre) && monLm.slots[2].com, JSON.stringify(monLm && monLm.slots));
+  ok('Bar Mónaco lunes mañana: Cristian sin el □ de comodín', !!monLm && monLm.slots[2] && /Cristian/.test(monLm.slots[2].nombre) && !monLm.slots[2].com, JSON.stringify(monLm && monLm.slots));
+  const limpio = await pg.evaluate(() => {
+    const t = document.querySelector('#printRoot table.pxsem');
+    return { txt: t ? t.textContent : '', ley: !!document.querySelector('#printRoot .pxg-ley'), horas: (t ? t.textContent : '').match(/\d{1,2}:\d{2}/g) || [] };
+  });
+  ok('en toda la hoja no queda ni una hora', limpio.horas.length === 0, JSON.stringify(limpio.horas.slice(0, 6)));
+  ok('ni «Mañana»/«Tarde» de etiqueta de fila', !/Mañana|Tarde/.test(limpio.txt), (limpio.txt.match(/Mañana|Tarde/g) || []).join(','));
+  ok('ni «forzado», ni «Hueco disponible», ni «faltan»', !/forzado|Hueco disponible|faltan/i.test(limpio.txt));
+  ok('ni leyenda explicando símbolos que ya no salen', !limpio.ley);
   const libV = await pg.evaluate(() => { const td = document.querySelector('#printRoot .pxpage tr.pxdesc [data-libran="2026-09-18"]'); return td ? td.textContent.replace(/\s+/g, ' ').trim() : null; });
   ok('«Quién libra» del viernes 18 dice nadie (0 libran)', !!libV && /nadie/.test(libV) && /0 libran/.test(libV), libV);
-  ok('la hoja lleva los 4 locales con su regla de cocina, 7 días y la leyenda con ▸ ◆ P C □', await pg.evaluate(() => document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc').length === 4 && [...document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc td.sec small')].every(x => /cocina/.test(x.textContent)) && document.querySelectorAll('#printRoot table.pxsem thead th.pxd').length === 7 && /▸/.test(document.querySelector('#printRoot .pxg-ley').textContent) && /□/.test(document.querySelector('#printRoot .pxg-ley').textContent)));
+  ok('la hoja sigue llevando los 4 locales y los 7 días: eso sí hace falta en el bar', await pg.evaluate(() => document.querySelectorAll('#printRoot table.pxsem tr.secrow.pxloc').length === 4 && document.querySelectorAll('#printRoot table.pxsem thead th.pxd').length === 7));
   const altoSem = await pg.evaluate(() => { const p = document.querySelector('#printRoot .pxpage'); return { alto: p.scrollHeight, hoja: Math.round(210 * 96 / 25.4), cls: p.className }; });
   ok(`la hoja semanal cabe en un A4 apaisado (${altoSem.alto}px ≤ ${altoSem.hoja}px · ${altoSem.cls})`, altoSem.alto <= altoSem.hoja + 2, JSON.stringify(altoSem));
   if (CAPTURAS) { await pg.setViewportSize({ width: 1400, height: Math.max(1000, altoSem.alto + 80) }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-semana.png'), fullPage: true }); await pg.setViewportSize({ width: 1400, height: 1000 }); }

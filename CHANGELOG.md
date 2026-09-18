@@ -2,6 +2,13 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Al imprimir, solo los nombres** (José, 18/09, repetido siete veces en la reunión). La
+  hoja que Aroa recorta para dejar en cada bar ya no lleva horas, ni «Mañana/Tarde», ni el
+  número de posición, ni las marcas ▸ □ P C, ni «por», ni «forzado», ni el mínimo supuesto,
+  ni los huecos, ni los turnos cortos en ámbar, ni la leyenda. Solo el local, el día y los
+  nombres. Un único interruptor lo decide, para que no se quede ninguna plantilla sin él.
+  **No cambian** la hoja de horas (es la de la nómina), la del generador (es con la que se
+  repasa antes de volcar) ni el tablón del mes, cuyo contenido entero es la píldora M/T/P.
 - **Lupa en el selector de personas** (Diego, 18/09): el popover que abren el `＋` de una
   casilla y el hueco «1·?» —en Semana y en Hoy— lista a las 21 personas de golpe. Ahora se
   busca por nombre, sin tildes ni mayúsculas; los grupos que se quedan sin nadie

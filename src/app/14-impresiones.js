@@ -69,6 +69,22 @@ function pxPie(centro) {
   return `<div class="pxfoot"><span>Grupo Pasarela · ${locales}</span><span>${centro || ''}</span><span>Generado con Shiftia · ${new Date().toLocaleDateString('es-ES')}</span></div>`;
 }
 // nombre con el color de la persona y, si toca, las marcas de la casilla o el tipo de ausencia
+// 18/09, reunión con José, repetido siete veces: «al imprimir que no aparezcan nunca
+// horas», «sin mañana y tarde», «solo los nombres, ni los números ni nada», «ni forzado»,
+// «ni estimado ni por». El papel no es para la oficina: Aroa imprime UNA hoja, la recorta
+// en cuatro y deja un trozo en cada bar; al equipo solo le hace falta saber quién trabaja.
+// Lo de la oficina —huecos, casillas cortas, forzados, posiciones— se mira en la app.
+//
+// Un solo interruptor, leído por las piezas que arman la hoja, en vez de la condición
+// repetida por veinte plantillas. Lo encienden las hojas del equipo (semana, semana por
+// local, mes) y NO las de la oficina: la del generador, con la que Aroa repasa antes de
+// volcar, y la de horas, que es la de la nómina.
+const PX = { soloNombres: false };
+function pxHojaDelEquipo(construir) {
+  PX.soloNombres = true;
+  try { return construir(); } finally { PX.soloNombres = false; }
+}
+
 function pxNombre(pid, marcas) {
   const mk = marcas || {};
   const tipo = mk.tipo ? (AUS_LBL[mk.tipo] ? AUS_LBL[mk.tipo].label : mk.tipo) : '';
@@ -84,6 +100,7 @@ function tramoTxt(tr) {
 }
 // «09:00–16:00», o «16:00–23:00 · V S 16:00–00:00» cuando algún día de la semana cambia
 function horarioTxt(l, franja) {
+  if (PX.soloNombres) return '';   // «al imprimir que no aparezcan nunca horas»
   const base = l && l.horario && l.horario[franja];
   if (!base) return '';
   const txt = h => `${h.ini}–${h.fin}`;
@@ -143,6 +160,9 @@ function pxFilasDescansos(cols, personas, colspan) {
 // imprime (José, 17/09): es variable interna, en el papel sobra.
 // El hueco de la 1.ª posición va en rojo: «Hueco disponible · abre la tarde · turno completo».
 function pxSlot(s, franja) {
+  // en la hoja del equipo, una posición es un nombre y nada más. El hueco sin cubrir no se
+  // imprime: no es cosa del bar, es de la oficina, y en el papel solo confundiría.
+  if (PX.soloNombres) return s.hueco ? '' : `<div class="pxg-s"><div class="pxg-b"><span class="pxg-nm">${esc(s.nombre)}</span></div></div>`;
   if (s.hueco) return `<div class="pxg-s hueco" title="${esc(s.motivo || '')}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-hb">Hueco disponible</span><small class="pxg-sub bad">abre la ${franja === 'M' ? 'mañana' : 'tarde'} · turno completo</small></div></div>`;
   const mk = (s.abreFijo ? '<b class="pxg-mk abre" title="Sale el primero (fijo)">▸</b>' : '') + (s.comodin ? '<b class="pxg-mk com" title="Sin local fijo">□</b>' : '');
   const tags = (s.continuo ? '<em class="pxg-tag c" title="Turno continuo: sale el primero de mañana y de tarde">C</em>' : s.partido ? '<em class="pxg-tag p" title="Turno partido: mañana y tarde">P</em>' : '');
@@ -152,6 +172,7 @@ function pxSlot(s, franja) {
 // la cuenta «n/min*» de arriba a la izquierda: * = mínimo supuesto; «+1 hueco» si la
 // 1.ª posición está vacante; «faltan n» si no llega al mínimo; «corregido» si cambió
 function pxCuenta(d) {
+  if (PX.soloNombres) return '';   // «ni los números ni nada. 12123»
   return `<div class="pxg-cnt">${d.n}/${d.min}${d.supuesto ? '<b>*</b>' : ''}${d.hueco ? '<em class="hue">+1 hueco</em>' : ''}${d.faltan ? `<em class="fal">falta${d.faltan > 1 ? 'n' : ''} ${d.faltan}${d.refuerzo ? ' · refuerzo' : ''}</em>` : ''}${d.cambiado ? '<em class="cor">corregido</em>' : ''}</div>`;
 }
 // una casilla (local × franja × día) de las hojas semanales: cerrado «—»; si no, la
@@ -162,51 +183,58 @@ function pxCasilla(c, l, franja) {
   const r = revisarTurno(S, S.staff, c.est, c.iso, tid);
   const slots = posicionesDe(S, S.staff, c.est, c.iso, tid);
   const hueco = slots.some(s => s.hueco);
-  const cls = [hueco ? 'hueco' : '', r.faltan ? 'corta' : ''].filter(Boolean).join(' ');
+  // el rojo del hueco y el ámbar del turno corto son avisos para la oficina: en el papel
+  // del bar solo confunden (José, 18/09: «solo los nombres»)
+  const cls = PX.soloNombres ? '' : [hueco ? 'hueco' : '', r.faltan ? 'corta' : ''].filter(Boolean).join(' ');
   return `<td${cls ? ` class="${cls}"` : ''} data-cas="${c.iso}|${tid}">${pxCuenta({ n: r.n, min: r.minimo, supuesto: r.supuesto, faltan: r.faltan, refuerzo: r.refuerzo, hueco })}${slots.map(s => pxSlot(s, franja)).join('')}</td>`;
 }
 function pxThDia(c) {
-  return `<th class="pxd${c.dow >= 6 || c.festivo ? ' wk' : ''}"><b>${DIAS_L[c.dow].toUpperCase()}</b><span>${c.d}<small>${MES3[c.mes - 1]}</small></span>${c.festivo ? '<i>festivo</i>' : ''}${c.eventos.map(e => `<i class="ev">${esc(e.nombre || 'evento')}${e.franja && e.franja !== 'MT' && FRANJA_LBL[e.franja] ? ' · ' + FRANJA_LBL[e.franja].toLowerCase() : ''}</i>`).join('')}</th>`;
+  return `<th class="pxd${c.dow >= 6 || c.festivo ? ' wk' : ''}"><b>${DIAS_L[c.dow].toUpperCase()}</b><span>${c.d}<small>${MES3[c.mes - 1]}</small></span>${c.festivo ? '<i>festivo</i>' : ''}${c.eventos.map(e => `<i class="ev">${esc(e.nombre || 'evento')}${!PX.soloNombres && e.franja && e.franja !== 'MT' && FRANJA_LBL[e.franja] ? ' · ' + FRANJA_LBL[e.franja].toLowerCase() : ''}</i>`).join('')}</th>`;
 }
 // leyenda de las casillas (la misma en las tres hojas semanales); extra = chips propios de la hoja
 function pxLeyendaCasilla(extra) {
+  if (PX.soloNombres) return '';   // una leyenda que explica marcas que ya no salen sobra tanto como las marcas
   return `<div class="pxg-ley"><span><i class="pxg-n">1</i>orden en la casilla: el primero abre y hace turno completo</span><span><b class="pxg-mk abre">▸</b>sale el primero (fijo)</span><span><em class="pxg-tag p">P</em>turno partido</span><span><em class="pxg-tag c">C</em>turno continuo</span><span><b class="pxg-mk com">□</b>sin local fijo</span><span><b class="ast">*</b>mínimo no fijado por el cliente</span>${extra || ''}<span class="hue"><b>rojo</b>· hueco disponible: nadie de la plantilla puede ocupar esa posición</span><span class="fal"><b>ámbar</b>· turno corto: faltan personas para el mínimo</span><span><b>—</b>cerrado</span></div>`;
 }
 const PX_LEYENDA_SEMANA = () => pxLeyendaCasilla('');
 
 // ---------- semana general: los cuatro locales, mañana y tarde ----------
 function abrirImpresion() {
+  pxHojaDelEquipo(() => {
   const lunes = S.semLunes || mondayOf(isoHoy());
   const cols = pxColsSemana(lunes);
   const supuesto = S.locales.some(l => l.horarioSupuesto);
-  let h = pxCabecera('Planilla semanal', 'Grupo Pasarela · los cuatro locales · mañana y tarde · posiciones de la casilla: el 1.º abre y hace turno completo',
-    `Semana ${rangoSemanaTxt(lunes)}`, supuesto ? 'Horarios de apertura aún sin confirmar por el grupo' : `${S.locales.length} locales`);
-  h += `<table class="pxw pxsem"><thead><tr><th class="act">Local · franja</th>${cols.map(pxThDia).join('')}</tr></thead><tbody>`;
+  let h = pxCabecera('Planilla semanal', 'Grupo Pasarela · los cuatro locales',
+    `Semana ${rangoSemanaTxt(lunes)}`, `${S.locales.length} locales`);
+  h += `<table class="pxw pxsem"><thead><tr><th class="act">${PX.soloNombres ? 'Local' : 'Local · franja'}</th>${cols.map(pxThDia).join('')}</tr></thead><tbody>`;
   for (const l of S.locales) {
-    h += `<tr class="secrow pxloc" style="--lc:${esc(l.color)}"><td class="sec" colspan="8"><span>${esc(l.nombre)}</span><small>${esc(descripcionCocina(S, l))}</small></td></tr>`;
+    h += `<tr class="secrow pxloc" style="--lc:${esc(l.color)}"><td class="sec" colspan="8"><span>${esc(l.nombre)}</span><small>${PX.soloNombres ? '' : esc(descripcionCocina(S, l))}</small></td></tr>`;
     for (const f of FRANJAS) {
-      h += `<tr class="pxloc" style="--lc:${esc(l.color)}"><td class="lblp">${FRANJA_LBL[f]}<small>${esc(horarioTxt(l, f)) || '&nbsp;'}</small></td>${cols.map(c => pxCasilla(c, l, f)).join('')}</tr>`;
+      h += `<tr class="pxloc" style="--lc:${esc(l.color)}"><td class="lblp">${PX.soloNombres ? '' : FRANJA_LBL[f]}<small>${esc(horarioTxt(l, f)) || '&nbsp;'}</small></td>${cols.map(c => pxCasilla(c, l, f)).join('')}</tr>`;
     }
   }
   h += pxFilasDescansos(cols, S.staff, 8);
   h += '</tbody></table>';
   h += PX_LEYENDA_SEMANA();
-  h += pxPie('El 1.º de cada casilla abre y hace turno completo. El pie de descansos dice quién libra cada día y quién está ausente.');
+  h += pxPie('El pie de descansos dice quién libra cada día y quién está ausente.');
   montarImpresion(h, true, `Planilla_semana_${lunes}`);
+  });
 }
 
 // ---------- hoja de un solo local: para colgar en el bar ----------
 // vertical y con letra grande: se lee de pie, desde la barra. Solo su plantilla en el
 // pie de descansos (quien tiene ese local entre los suyos).
 function abrirImpresionLocal(localId) {
+  pxHojaDelEquipo(() => {
   const l = localDe(S, localId);
   if (!l) { toast('Local desconocido', 'warn'); return; }
   const lunes = S.semLunes || mondayOf(isoHoy());
   const cols = pxColsSemana(lunes);
   const gente = S.staff.filter(p => (p.locales || []).includes(l.id));
-  let h = pxCabecera(esc(l.nombre), `Grupo Pasarela · planilla de la semana para colgar en el local · ${esc(descripcionCocina(S, l))}`, `Semana ${rangoSemanaTxt(lunes)}`,
-    `Mañana ${esc(horarioTxt(l, 'M')) || '—'} · Tarde ${esc(horarioTxt(l, 'T')) || '—'}${l.horarioSupuesto ? ' (horario por confirmar)' : ''}`);
-  h += `<table class="pxw pxlocal" style="--lc:${esc(l.color)}"><thead><tr><th class="act">Día</th><th class="pxd">Mañana<span>${esc(horarioTxt(l, 'M'))}</span></th><th class="pxd">Tarde<span>${esc(horarioTxt(l, 'T'))}</span></th></tr></thead><tbody>`;
+  let h = pxCabecera(esc(l.nombre), 'Grupo Pasarela · planilla de la semana para colgar en el local', `Semana ${rangoSemanaTxt(lunes)}`, '');
+  // las dos columnas siguen siendo la de mañana y la de tarde, pero sin decirlo ni poner
+  // horas: José, 18/09, «sin las horas y sin mañana y tarde»
+  h += `<table class="pxw pxlocal" style="--lc:${esc(l.color)}"><thead><tr><th class="act">Día</th><th class="pxd">&nbsp;</th><th class="pxd">&nbsp;</th></tr></thead><tbody>`;
   for (const c of cols) {
     const wk = c.dow >= 6 || c.festivo;
     h += `<tr${wk ? ' class="wk"' : ''}><td class="lbld"><b>${DIAS_L[c.dow]}</b><span>${c.d} de ${MESES[c.mes - 1].toLowerCase()}</span>${c.festivo ? '<i>festivo</i>' : ''}${c.eventos.map(e => `<i class="ev">${esc(e.nombre || 'evento')}</i>`).join('')}</td>${pxCasilla(c, l, 'M')}${pxCasilla(c, l, 'T')}</tr>`;
@@ -220,8 +248,9 @@ function abrirImpresionLocal(localId) {
   if (bajaToda.length) h += `<tr><td class="lbld"><b>De baja</b></td><td colspan="2">${bajaToda.map(p => pxNombre(p.id, { tipo: 'BAJ' })).join('')}</td></tr>`;
   h += '</tbody></table>';
   h += PX_LEYENDA_SEMANA();
-  h += pxPie(`${esc(l.nombre)} · quien está en la posición 1 abre y hace turno completo`);
+  h += pxPie(esc(l.nombre));
   montarImpresion(h, false, `Planilla_${l.corto || l.nombre}_semana_${lunes}`);
+  });
 }
 
 // ---------- planilla generada: las dos páginas del prototipo del 11/09 ----------
