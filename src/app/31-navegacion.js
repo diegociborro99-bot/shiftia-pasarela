@@ -1,5 +1,5 @@
 // ================= NAVEGACIÓN =================
-const VISTAS = ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'cobertura', 'actividad', 'entrevistas'];
+const VISTAS = ['hoy', 'semana', 'mes', 'equipo', 'horas', 'generador', 'cobertura', 'actividad', 'entrevistas'].filter(moduloActivo);   // los módulos apagados en CONFIG_CLIENTE no existen para la navegación
 function switchTab(v) {
   if (!VISTAS.includes(v)) v = 'hoy';
   if (v === 'actividad' && SRV.on && SRV.rol && SRV.rol !== 'programador') v = 'hoy';   // el visor de Actividad es solo del programador
@@ -25,6 +25,9 @@ function switchTab(v) {
   if (v === 'entrevistas') renderEntrevistas();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.v)));
+// módulos apagados por configuración: ni pestaña ni botones que lleven a ellos
+document.querySelectorAll('.tab').forEach(t => { if (!moduloActivo(t.dataset.v)) t.hidden = true; });
+if (!moduloActivo('generador')) for (const id of ['dGenerar', 'wGenerar', 'mGenerar']) { const b = document.getElementById(id); if (b) b.hidden = true; }
 // ir a un día concreto (desde el mes, la revisión, el generador…)
 function irAIso(iso) {
   const k = iso.slice(0, 7);
@@ -222,11 +225,11 @@ function openMas() {
     <span class="micro">MÁS OPCIONES</span>
     <div class="masgrid">
       ${fila('equipo', I('<circle cx="9" cy="8.2" r="3.4"/><path d="M3.5 19.5c.9-3.4 3-5.2 5.5-5.2s4.6 1.8 5.5 5.2"/><circle cx="17" cy="9.5" r="2.6"/><path d="M15.6 14.6c2.3.2 4 1.8 4.8 4.9"/>'), 'Equipo', 'personas, condiciones y locales')}
-      ${fila('horas', I('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/>'), 'Contador de horas', 'horas del mes para la nómina')}
-      ${fila('generador', I('<path d="M12 3.5l1.8 4.6 4.7.4-3.6 3.1 1.1 4.6-4-2.5-4 2.5 1.1-4.6-3.6-3.1 4.7-.4Z"/>'), 'Generador de planillas', 'semana tipo + relleno inteligente')}
+      ${moduloActivo('horas') ? fila('horas', I('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/>'), 'Contador de horas', 'horas del mes para la nómina') : ''}
+      ${moduloActivo('generador') ? fila('generador', I('<path d="M12 3.5l1.8 4.6 4.7.4-3.6 3.1 1.1 4.6-4-2.5-4 2.5 1.1-4.6-3.6-3.1 4.7-.4Z"/>'), 'Generador de planillas', 'semana tipo + relleno inteligente') : ''}
       ${fila('cobertura', I('<path d="M12 3.5 5 6v5.5c0 4.2 3 7.6 7 9 4-1.4 7-4.8 7-9V6Z"/><path d="m9.3 12.2 1.9 1.9 3.6-3.8"/>'), 'Gestor de cobertura', 'baja, día libre o cambio: plan A y plan B')}
-      ${!SRV.on || SRV.rol === 'programador' ? fila('actividad', I('<path d="M4 6h9M4 10.5h6M4 15h5"/><circle cx="15.5" cy="13.5" r="4"/><path d="m18.5 16.5 2.5 2.5"/>'), 'Actividad', 'qué hace el encargado en la app') : ''}
-      ${fila('entrevistas', I('<path d="M4 5.5h16v10H9l-4 3.5v-3.5H4Z"/><path d="M8 9h8M8 12h5"/>'), 'Entrevistas', 'en construcción')}
+      ${moduloActivo('actividad') && (!SRV.on || SRV.rol === 'programador') ? fila('actividad', I('<path d="M4 6h9M4 10.5h6M4 15h5"/><circle cx="15.5" cy="13.5" r="4"/><path d="m18.5 16.5 2.5 2.5"/>'), 'Actividad', 'qué hace el encargado en la app') : ''}
+      ${moduloActivo('entrevistas') ? fila('entrevistas', I('<path d="M4 5.5h16v10H9l-4 3.5v-3.5H4Z"/><path d="M8 9h8M8 12h5"/>'), 'Entrevistas', 'en construcción') : ''}
       ${fila('evento', I('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17M3.5 12h17"/>'), 'Partido u evento', 'refuerzo por local')}
       ${fila('revisar', I('<circle cx="10.7" cy="10.7" r="6.7"/><path d="m15.7 15.7 4.8 4.8"/>'), 'Revisar el mes', 'casillas cortas, sin cocina, forzados')}
       ${fila('deshacer', I('<path d="M8 5 3.5 9.5 8 14"/><path d="M3.5 9.5H15a5.5 5.5 0 1 1 0 11h-3"/>'), 'Deshacer', 'última acción de planilla')}

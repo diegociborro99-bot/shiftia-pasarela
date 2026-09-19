@@ -22,8 +22,6 @@ jobs:
         run: node tools/check-parity.mjs
       - name: Tests del servidor
         run: node --test tests/*.test.mjs
-      - name: Motor de creación (genera el cliente de ejemplo y pasa sus tests)
-        run: npm run test:motor
       - name: Chromium para la batería e2e
         run: npx --yes playwright-core@1.47.0 install chromium || true
       - name: Batería e2e (se salta sola sin Chromium)

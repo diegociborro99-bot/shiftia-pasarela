@@ -114,6 +114,14 @@ creado la primera planilla nace igual de generada. Despliegue:
 `assets/pasarela-logo.png`, el build lo usará en su lugar: basta con subir el
 fichero y ejecutar `npm run build`.
 
+## Motor de creación de clientes
+
+Esta app es el **arquetipo «hostelería multilocal»** del motor de creación de Shiftia
+(`motor/`): con un manifiesto del cliente nuevo (`motor/clientes/<slug>.json`),
+`npm run cliente:nuevo -- motor/clientes/<slug>.json --git` levanta una burbuja completa
+al lado de este repositorio, con la marca, el estilo, el servidor, los tests y la
+documentación, y las peculiaridades del cliente como datos. Ver `motor/README.md`.
+
 ## Documentos
 
 - `DISEÑO.md` — decisiones tomadas, supuestos y preguntas abiertas para el grupo.

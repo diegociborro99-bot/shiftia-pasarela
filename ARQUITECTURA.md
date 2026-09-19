@@ -30,6 +30,7 @@ tests/                     tests del servidor y de seguridad (node:test) y bater
                            e2e-*.mjs (Playwright; se saltan sin Chromium)
 tools/comprobar-despliegue.mjs  verifica un despliegue desde fuera (salud, volumen, acceso, versión)
 assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
+motor/                     el motor de creación de clientes: esta app es su arquetipo (ver motor/README.md)
 ```
 
 ## Módulos de la app (`src/app`, en orden)

@@ -2,6 +2,11 @@
 // Lo que usan todas las vistas: selector, escape, avatares, fechas en castellano,
 // toasts, tooltip, popovers y overlays. Sin nada de dominio.
 const $ = s => document.querySelector(s);
+// Módulos activos de esta burbuja. CONFIG_CLIENTE la escribe el motor de creación
+// (motor/) en src/app/00-config.js a partir del manifiesto del cliente; sin ella —el
+// arquetipo tal cual— todo está activo. Solo se apagan pestañas enteras (horas,
+// generador, actividad, entrevistas): Hoy, Semana, Mes, Equipo y Cobertura son el núcleo.
+function moduloActivo(k) { return typeof CONFIG_CLIENTE === 'undefined' || !CONFIG_CLIENTE.modulos || CONFIG_CLIENTE.modulos[k] !== false; }
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const MES3 = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const DIAS_L = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];

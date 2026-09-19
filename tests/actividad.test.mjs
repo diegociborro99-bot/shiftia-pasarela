@@ -23,7 +23,7 @@ test('la navegación conoce la vista, el repintado la mapea y el móvil la lista
   assert.match(html, /const BNAV_EN_MAS = \[[^\]]*'actividad'/);
   assert.match(html, /if \(v === 'actividad'\) renderActividad\(\);/);
   assert.match(html, /actividad: \(\) => renderActividad\(\)/);
-  assert.match(html, /!SRV\.on \|\| SRV\.rol === 'programador' \? fila\('actividad', /);
+  assert.match(html, /moduloActivo\('actividad'\) && \(!SRV\.on \|\| SRV\.rol === 'programador'\) \? fila\('actividad', /);   // y solo si el módulo está activo en la configuración de la burbuja
 });
 test('solo la ve el programador: clase en <body> al saber el rol (y en modo local) y CSS que oculta la pestaña', () => {
   assert.match(html, /function marcarRolProgramador\(\) \{ document\.body\.classList\.toggle\('rol-programador', !SRV\.on \|\| SRV\.rol === 'programador'\); \}/);

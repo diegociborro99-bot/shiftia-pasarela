@@ -6,3 +6,6 @@ data/
 
 # worktrees de agentes
 .claude/worktrees/
+
+# burbujas generadas a mano dentro del repo (mejor fuera, con --destino)
+motor/salida/

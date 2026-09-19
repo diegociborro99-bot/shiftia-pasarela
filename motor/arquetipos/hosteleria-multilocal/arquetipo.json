@@ -1,0 +1,464 @@
+{
+  "id": "hosteleria-multilocal",
+  "nombre": "Hostelería multilocal",
+  "descripcion": "Varios locales (o tiendas, o centros) con dos franjas al día, mañana y tarde; casillas ordenadas donde el primero abre y la cocina tiene su posición; partidos y dobles; mínimos por local, franja y día; «nunca con», «cubre a», vetos, días que libra; contador de horas para la nómina; generador semanal y mensual (local o núcleo CP-SAT); gestor de cobertura con plan A y plan B; tres roles (programador, encargado, empleado) y sincronización en tiempo real.",
+  "origen": {
+    "ruta": "../../..",
+    "repo": "diegociborro99-bot/shiftia-pasarela",
+    "commitProbado": ""
+  },
+  "capacidades": {
+    "franjas": [
+      "M",
+      "T"
+    ],
+    "roles": [
+      "programador",
+      "admin",
+      "empleado"
+    ],
+    "vistas": [
+      "hoy",
+      "semana",
+      "mes",
+      "equipo",
+      "horas",
+      "generador",
+      "cobertura",
+      "actividad",
+      "entrevistas"
+    ]
+  },
+  "modulos": {
+    "hoy": {
+      "nucleo": true,
+      "titulo": "Hoy",
+      "descripcion": "las casillas del día por local y franja, con quién abre, cocina, refuerzo y forzados",
+      "ficheros": [
+        "src/app/10-vista-hoy.js",
+        "src/app/11-selector.js"
+      ]
+    },
+    "semana": {
+      "nucleo": true,
+      "titulo": "Semana",
+      "descripcion": "el cuadrante local × franja × día, editable, imprimible, exportable y compartible como imagen; «fijar como semana tipo»",
+      "ficheros": [
+        "src/app/13-vista-semana.js",
+        "src/app/14-impresiones.js",
+        "src/app/15-export-xlsx.js",
+        "src/app/15-export-pdf.js",
+        "src/app/16-compartir.js"
+      ]
+    },
+    "mes": {
+      "nucleo": true,
+      "titulo": "Mes",
+      "descripcion": "personas × días con una píldora por día, ausencias, fila de control y eventos con refuerzo",
+      "ficheros": [
+        "src/app/17-vista-mes.js",
+        "src/app/18-eventos.js",
+        "src/app/23-revision.js"
+      ]
+    },
+    "equipo": {
+      "nucleo": true,
+      "titulo": "Equipo",
+      "descripcion": "fichas con todas las condiciones (activables), altas y bajas, reglas con interruptor y ajustes de cada local",
+      "ficheros": [
+        "src/app/19-vista-equipo.js",
+        "src/app/20-ficha-persona.js"
+      ]
+    },
+    "cobertura": {
+      "nucleo": true,
+      "titulo": "Cobertura",
+      "descripcion": "quién cubre a quien falta: plan A y plan B día a día, confirmar con deshacer",
+      "ficheros": [
+        "src/app/26-cobertura.js"
+      ]
+    },
+    "horas": {
+      "defecto": true,
+      "titulo": "Horas",
+      "descripcion": "contador mensual por persona y local para la nómina, horas extra, cierre de mes, Excel e impresión",
+      "ficheros": [
+        "src/app/21-vista-horas.js"
+      ]
+    },
+    "generador": {
+      "defecto": true,
+      "titulo": "Generador",
+      "descripcion": "semana tipo + relleno inteligente con razones y huecos explicados; motor local o núcleo Shiftia (CP-SAT)",
+      "ficheros": [
+        "src/app/22-generador.js"
+      ]
+    },
+    "actividad": {
+      "defecto": true,
+      "titulo": "Actividad",
+      "descripcion": "visor del programador: qué hace el encargado con la app, con la auditoría del servidor",
+      "ficheros": [
+        "src/app/27-actividad.js"
+      ]
+    },
+    "entrevistas": {
+      "defecto": false,
+      "titulo": "Entrevistas",
+      "descripcion": "base de candidatos y lista de alerta con permiso por cuenta (nació para un cliente concreto; apagado de serie)",
+      "ficheros": [
+        "src/app/24-entrevistas.js",
+        "src/app/23-entrevistas-datos.js"
+      ]
+    }
+  },
+  "reglas": [
+    "minimos",
+    "cocina",
+    "nuncaCon",
+    "libra",
+    "vetos",
+    "partido",
+    "noPrimero",
+    "primeroCompleto",
+    "cubreA",
+    "abre"
+  ],
+  "incluir": [
+    "src",
+    "tools",
+    "tests",
+    "assets/shiftia-logo.svg",
+    "icons",
+    "vendor",
+    "modelo.js",
+    "server.js",
+    "estado-servidor.js",
+    "push.js",
+    "push-servicio.js",
+    "push-servidor.js",
+    "sw.js",
+    "nixpacks.toml",
+    "railway.json",
+    ".gitignore"
+  ],
+  "excluir": [
+    "tests/e2e-*.mjs",
+    "tests/server.test.mjs",
+    "tests/seguridad.test.mjs",
+    "tests/entrevistas*.test.mjs",
+    "tests/horarios.test.mjs",
+    "src/app/23-entrevistas-datos.js",
+    "tools/__pycache__/**",
+    "**/*.pyc",
+    "**/.DS_Store"
+  ],
+  "conservar": [
+    "tests/e2e-util.mjs"
+  ],
+  "renombrar": [
+    {
+      "de": "src/styles/(2[0-9])-pasarela-(.*)\\.css",
+      "a": "src/styles/$1-{{slug}}-$2.css",
+      "regex": true
+    }
+  ],
+  "sustituciones": [
+    {
+      "de": "(2[0-9])-pasarela-",
+      "a": "$1-{{slug}}-",
+      "regex": true
+    },
+    {
+      "de": "Grupo Pasarela · El 33 · Zapatillera · Bar Mónaco · Pasarela",
+      "a": "{{nombre}} · {{unidadesTexto}}"
+    },
+    {
+      "de": "Shiftia · Grupo Pasarela — planificación de turnos de los cuatro locales: planilla, equipo, horas y generador.",
+      "a": "Shiftia · {{nombre}} — {{descripcion}}."
+    },
+    {
+      "de": "Grupo Pasarela · 4 locales",
+      "a": "{{nombre}} · {{nUnidades}} {{unidadesPlural}}"
+    },
+    {
+      "de": "Grupo Pasarela · los cuatro locales",
+      "a": "{{nombre}} · {{nUnidadesTexto}}"
+    },
+    {
+      "de": "Grupo <b>Pasarela</b>",
+      "a": "{{marca.textoLogoHtml}}"
+    },
+    {
+      "de": "Shiftia Pasarela instalada",
+      "a": "Shiftia {{nombreCorto}} instalada"
+    },
+    {
+      "de": "Shiftia · Pasarela",
+      "a": "Shiftia · {{nombre}}"
+    },
+    {
+      "de": "Shiftia · Urología",
+      "a": "Shiftia · {{nombreCorto}}"
+    },
+    {
+      "de": "GRUPO PASARELA",
+      "a": "{{NOMBRE_MAYUS}}"
+    },
+    {
+      "de": "Grupo Pasarela",
+      "a": "{{nombre}}"
+    },
+    {
+      "de": "shiftia-pasarela",
+      "a": "shiftia-{{slug}}"
+    },
+    {
+      "de": "shiftia_pasarela_v01",
+      "a": "shiftia_{{slug_}}_v01"
+    },
+    {
+      "de": "shiftia_pas_",
+      "a": "shiftia_{{slugCorto}}_"
+    },
+    {
+      "de": "pasarela-logo",
+      "a": "{{slug}}-logo"
+    },
+    {
+      "de": "LOGO_PASARELA",
+      "a": "LOGO_CLIENTE"
+    },
+    {
+      "de": "semillaPasarela",
+      "a": "semillaCliente"
+    },
+    {
+      "de": "pasarela2026",
+      "a": "{{cuentas.passwordGenerica}}"
+    },
+    {
+      "de": "d39940c6f173a149e89f5aecac073c0d086ba3db808dcd118847749b609773c8",
+      "a": "{{hashPasswordLocal}}"
+    },
+    {
+      "de": "turnos.grupopasarela.es",
+      "a": "{{dominioOEjemplo}}"
+    },
+    {
+      "de": "'oficina'",
+      "a": "'{{cuentas.encargado}}'"
+    },
+    {
+      "de": "«oficina»",
+      "a": "«{{cuentas.encargado}}»"
+    },
+    {
+      "de": "'diego'",
+      "a": "'{{cuentas.programador}}'"
+    },
+    {
+      "de": "«diego»",
+      "a": "«{{cuentas.programador}}»"
+    },
+    {
+      "de": "USU_JEFE = 'admin'",
+      "a": "USU_JEFE = '{{cuentas.jefe}}'"
+    },
+    {
+      "de": "JEFE_USUARIO || 'admin'",
+      "a": "JEFE_USUARIO || '{{cuentas.jefe}}'"
+    },
+    {
+      "de": "ADMIN_RESET_USUARIO || 'admin'",
+      "a": "ADMIN_RESET_USUARIO || '{{cuentas.jefe}}'"
+    },
+    {
+      "de": "joseadmin",
+      "a": "jefe-anterior"
+    },
+    {
+      "de": "const ALTAS_1709 = ['dulce', 'susi'];",
+      "a": "const ALTAS_1709 = [];   // (altas posteriores al primer arranque: en esta burbuja no hay)"
+    },
+    {
+      "de": "Quien no sale nunca el primero (Leo; Cristian por la tarde)",
+      "a": "Quien no sale nunca el primero"
+    },
+    {
+      "de": "\"00-pre.js\",\n  \"01-core-utils.js\",",
+      "a": "\"00-pre.js\",\n  \"01-core-utils.js\",\n  \"01-config-cliente.js\",",
+      "soloEn": "src/app/_orden.json"
+    },
+    {
+      "de": "los cambios de Pasarela",
+      "a": "los cambios de esta app"
+    },
+    {
+      "de": "la planilla de Pasarela",
+      "a": "la planilla de esta app"
+    },
+    {
+      "de": "en Pasarela no hay categorías",
+      "a": "aquí no hay categorías"
+    },
+    {
+      "de": "(José)",
+      "a": "(el jefe)"
+    },
+    {
+      "de": "(Aroa)",
+      "a": "(la encargada)"
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])José(?![\\p{L}\\p{N}_])",
+      "a": "el jefe",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])Aroa(?![\\p{L}\\p{N}_])",
+      "a": "la encargada",
+      "regex": true
+    },
+    {
+      "de": "Bar Mónaco",
+      "a": "el local C"
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])Mónaco(?![\\p{L}\\p{N}_])",
+      "a": "el local C",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])Zapatillera(?![\\p{L}\\p{N}_])",
+      "a": "el local B",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])El 33(?![\\p{L}\\p{N}_])",
+      "a": "el local A",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])EL33(?![\\p{L}\\p{N}_])",
+      "a": "LOCAL_A",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])ZAPA(?![\\p{L}\\p{N}_])",
+      "a": "LOCAL_B",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])MONACO(?![\\p{L}\\p{N}_])",
+      "a": "LOCAL_C",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])PASARELA(?![\\p{L}\\p{N}])",
+      "a": "LOCAL_D",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])Pasarela(?![\\p{L}\\p{N}_])",
+      "a": "el local D",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])(Mari Luz|Cris Parreño|Susana Capón|Susana Luna|Cristian|Jacquelin|Esmeralda|Lavinia|Victoria|Maydeth|Roberto|Yilian|Adrián|Adrian|Jenny|Hojan|Dulce|Juani|Laura|Susi|Tere|Lola|Iván|Ivan|Leo|Noe|Cris)(?![\\p{L}\\p{N}_])",
+      "a": "[persona]",
+      "regex": true
+    },
+    {
+      "de": "(?<![\\p{L}\\p{N}_])(mariluz|scapon|sluna|jacquelin|esmeralda|lavinia|victoria|maydeth|roberto|yilian|adrian|jenny|hojan|dulce|juani|laura|susi|tere|lola|ivan|leo|noe|cris|cristian)(?![\\p{L}\\p{N}_])",
+      "a": "[persona]",
+      "regex": true
+    }
+  ],
+  "bloques": [
+    {
+      "fichero": "modelo.js",
+      "desde": "function semillaPasarela() {",
+      "hasta": "\n}\n",
+      "con": "@semilla"
+    },
+    {
+      "fichero": "modelo.js",
+      "desde": "const PUESTOS = [",
+      "hasta": "];\n",
+      "con": "@puestos"
+    }
+  ],
+  "prohibidos": [
+    "Pasarela",
+    "PASARELA",
+    {
+      "token": "grupopasarela",
+      "palabra": false
+    },
+    {
+      "token": "shiftia-pasarela",
+      "palabra": false
+    },
+    {
+      "token": "shiftia_pas",
+      "palabra": false
+    },
+    {
+      "token": "pasarela2026",
+      "palabra": false
+    },
+    {
+      "token": "pasarela-logo",
+      "palabra": false
+    },
+    "semillaPasarela",
+    "LOGO_PASARELA",
+    "Zapatillera",
+    "Mónaco",
+    "El 33",
+    "EL33",
+    "ZAPA",
+    "MONACO",
+    "José",
+    "Aroa",
+    "joseadmin",
+    "Mari Luz",
+    "Cris Parreño",
+    "Susana Capón",
+    "Susana Luna",
+    "Cristian",
+    "Jacquelin",
+    "Esmeralda",
+    "Lavinia",
+    "Maydeth",
+    "Yilian",
+    "Hojan",
+    "Dulce",
+    "Juani",
+    "Susi",
+    "Tere",
+    "Lola",
+    "Iván",
+    "Noe",
+    "mariluz",
+    "scapon",
+    "sluna",
+    "jacquelin",
+    "esmeralda",
+    "lavinia",
+    "maydeth",
+    "yilian",
+    "hojan",
+    "dulce",
+    "juani",
+    "susi",
+    "tere",
+    "lola",
+    "cristian"
+  ],
+  "prohibidosPermitidosEn": [
+    "motor.lock.json"
+  ],
+  "linaje": "Nace de la app del Grupo Pasarela (diegociborro99-bot/shiftia-pasarela), que a su vez se construyó sobre el piloto de Urología (diegociborro99-bot/shiftia-urologia-pilot)."
+}

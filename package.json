@@ -1,6 +1,6 @@
 {
   "name": "shiftia-pasarela",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Shiftia · Grupo Pasarela — planificación de turnos de los cuatro locales (app + servidor sin dependencias)",
   "engines": {
@@ -11,6 +11,9 @@
     "build": "node tools/build.mjs",
     "build:check": "node tools/build.mjs --check",
     "test": "node modelo.test.js && node --test tests/*.test.mjs && node tools/check-parity.mjs",
-    "test:e2e": "for f in tests/e2e-*.mjs; do node \"$f\" || exit 1; done"
+    "test:e2e": "for f in tests/e2e-*.mjs; do node \"$f\" || exit 1; done",
+    "cliente:nuevo": "node motor/bin/crear-cliente.mjs",
+    "cliente:validar": "node motor/bin/validar-cliente.mjs",
+    "test:motor": "node --test motor/test/motor.test.mjs"
   }
 }

@@ -1,0 +1,76 @@
+{
+  "slug": "cafeterias-norte",
+  "slugCorto": "norte",
+  "nombre": "Cafeterías Norte",
+  "nombreCorto": "Norte",
+  "sector": "hosteleria",
+  "arquetipo": "hosteleria-multilocal",
+  "descripcion": "planificación de turnos de las tres cafeterías: planilla, equipo, horas y generador",
+  "dominio": "turnos.cafeteriasnorte.es",
+  "marca": { "logo": "./logos/cafeterias-norte.svg", "textoLogo": "Cafeterías <b>Norte</b>" },
+  "contacto": { "encargado": "Marta (oficina)", "jefe": "Javier", "programador": "Diego" },
+  "cuentas": { "programador": "diego", "encargado": "oficina", "jefe": "admin", "passwordGenerica": "norte2026" },
+  "franjas": ["M", "T"],
+  "puestos": [
+    { "id": "sala", "label": "Sala" },
+    { "id": "cocina", "label": "Cocina" },
+    { "id": "apoyo", "label": "Apoyo" }
+  ],
+  "unidades": [
+    {
+      "id": "CENTRO", "nombre": "Cafetería Centro", "corto": "CEN", "color": "#b8741a",
+      "abre": { "M": [1, 2, 3, 4, 5, 6, 7], "T": [1, 2, 3, 4, 5, 6] },
+      "minimos": { "M": [2, 2, 2, 2, 2, 3, 3], "T": [1, 1, 1, 2, 2, 2, 0] },
+      "supuestos": { "M": [false, false, false, false, false, true, true], "T": [false, false, false, true, true, true, false] },
+      "cocina": { "obligatoria": { "M": true, "T": false }, "titulares": { "M": ["luis"], "T": ["luis"] }, "reservas": ["sara"], "posicion": { "M": 2, "T": 2 } },
+      "primero": { "M": "ana", "T": null },
+      "horario": { "M": { "ini": "07:30", "fin": "16:00" }, "T": { "ini": "16:00", "fin": "23:00" }, "porDow": { "6": { "M": { "ini": "08:30", "fin": "16:00" } }, "7": { "M": { "ini": "08:30", "fin": "15:00" } } } },
+      "duracion": { "M": 480, "T": 420 }
+    },
+    {
+      "id": "PLAYA", "nombre": "Cafetería Playa", "corto": "PLA", "color": "#2f6db5",
+      "abre": { "M": [1, 2, 3, 4, 5, 6, 7], "T": [1, 2, 3, 4, 5, 6, 7] },
+      "minimos": { "M": 2, "T": 2 },
+      "cocina": false,
+      "partidoAbre": { "M": false, "T": true }
+    },
+    {
+      "id": "ESTACION", "nombre": "Cafetería Estación", "corto": "EST", "color": "#1f9a6e",
+      "abre": { "M": [1, 2, 3, 4, 5], "T": [1, 2, 3, 4, 5] }
+    }
+  ],
+  "equipo": [
+    { "nombre": "Ana Pérez", "id": "ana", "puesto": "sala", "unidades": ["CENTRO"], "franjas": ["M"], "libra": [7], "abre": { "CENTRO": ["M"] }, "nota": "abre el Centro" },
+    { "nombre": "Luis Martín", "id": "luis", "puesto": "cocina", "unidades": ["CENTRO"], "franjas": ["M", "T"], "libra": [1], "partido": { "dias": [5, 6] }, "cocina": { "titular": ["CENTRO"], "reserva": [], "soloDias": [] } },
+    { "nombre": "Sara Gómez", "id": "sara", "puesto": "sala", "unidades": ["CENTRO", "PLAYA"], "franjas": ["M", "T"], "libra": [3], "cocina": { "titular": [], "reserva": ["CENTRO"], "soloDias": [] }, "cubreA": [{ "pid": "luis", "dow": 1 }] },
+    { "nombre": "Pablo Ruiz", "id": "pablo", "puesto": "sala", "unidades": ["PLAYA"], "franjas": ["T"], "libra": [2], "nuncaCon": ["marcos"], "contrato": { "horasSemana": 30 } },
+    { "nombre": "Marcos León", "id": "marcos", "puesto": "sala", "unidades": ["PLAYA"], "franjas": ["M", "T"], "libra": [4], "partido": { "dias": [6, 7] } },
+    { "nombre": "Elena Díaz", "id": "elena", "puesto": "apoyo", "unidades": [], "franjas": ["M", "T"], "libra": [6, 7], "comodin": true, "nota": "apoyo entre semana; va donde falte" },
+    { "nombre": "Rocío Vidal", "id": "rocio", "puesto": "sala", "unidades": ["ESTACION"], "franjas": ["M", "T"], "libra": [6, 7], "vetos": [{ "localId": "ESTACION", "franja": "T", "dow": 5 }] },
+    { "nombre": "Tomás Sanz", "id": "tomas", "puesto": "sala", "unidades": ["ESTACION"], "franjas": ["M"], "libra": [6, 7], "ausencias": [{ "tipo": "BAJ", "desde": "2026-09-01", "detalle": "la cubre Elena" }] }
+  ],
+  "semanaTipo": {
+    "1": [ { "t": "CENTRO_M", "p": "ana", "a": 1 }, { "t": "CENTRO_M", "p": "sara", "c": 1, "por": "luis" }, { "t": "CENTRO_T", "p": "sara" }, { "t": "PLAYA_M", "p": "marcos" }, { "t": "PLAYA_M", "p": "elena", "s": 1 }, { "t": "PLAYA_T", "p": "pablo" }, { "t": "PLAYA_T", "p": "marcos" }, { "t": "ESTACION_M", "p": "rocio" }, { "t": "ESTACION_T", "p": "rocio" } ],
+    "2": [ { "t": "CENTRO_M", "p": "ana", "a": 1 }, { "t": "CENTRO_M", "p": "luis", "c": 1 }, { "t": "CENTRO_T", "p": "luis", "c": 1 }, { "t": "PLAYA_M", "p": "marcos" }, { "t": "PLAYA_M", "p": "sara" }, { "t": "PLAYA_T", "p": "marcos" }, { "t": "PLAYA_T", "p": "elena" }, { "t": "ESTACION_M", "p": "rocio" }, { "t": "ESTACION_T", "p": "rocio" } ]
+  },
+  "eventos": {
+    "equipos": [
+      { "id": "athletic", "nombre": "Athletic", "corto": "Athletic", "color": "#ee2523", "refuerzo": { "CENTRO": 1, "PLAYA": 1 }, "franja": "T" }
+    ]
+  },
+  "festivos": ["2026-10-12", "2026-11-01", "2026-12-06", "2026-12-08", "2026-12-25", "2027-01-01", "2027-01-06"],
+  "reglas": { "noPrimero": false },
+  "modulos": { "horas": true, "generador": true, "actividad": true, "entrevistas": false },
+  "particularidades": [
+    "En la Estación no se abre los fines de semana; si un festivo cae entre semana, ese día tampoco.",
+    "Luis solo hace partido los viernes y sábados; el resto de días, o mañana o tarde.",
+    "Los sábados por la mañana el Centro necesita tres personas (mínimo supuesto, pendiente de confirmar).",
+    "Quieren cerrar el mes de horas el día 28 para pasar la nómina."
+  ],
+  "preguntas": [
+    "¿Los horarios de apertura de Playa y Estación son los mismos que en el Centro?",
+    "¿Hay cocina en Playa o solo barra?",
+    "¿Se quiere el módulo de Entrevistas más adelante?"
+  ],
+  "despliegue": { "plataforma": "railway", "nucleo": false }
+}

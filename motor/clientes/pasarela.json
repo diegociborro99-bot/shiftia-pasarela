@@ -1,0 +1,2375 @@
+{
+  "slug": "pasarela",
+  "nombre": "Grupo Pasarela",
+  "sector": "hosteleria",
+  "arquetipo": "hosteleria-multilocal",
+  "unidades": [
+    {
+      "id": "EL33",
+      "nombre": "El 33",
+      "corto": "33",
+      "color": "#b8741a",
+      "partidoAbre": {
+        "M": false,
+        "T": true
+      },
+      "abre": {
+        "M": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "T": [
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "minimos": {
+        "M": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "T": [
+          0,
+          1,
+          2,
+          2,
+          2,
+          2,
+          0
+        ]
+      },
+      "supuestos": {
+        "M": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false
+        ],
+        "T": [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ]
+      },
+      "cocina": {
+        "obligatoria": {
+          "M": false,
+          "T": false
+        },
+        "titulares": {
+          "M": [
+            "jenny",
+            "noe",
+            "hojan"
+          ],
+          "T": [
+            "jenny",
+            "noe",
+            "hojan"
+          ]
+        },
+        "reservas": [
+          "hojan"
+        ],
+        "posicion": {
+          "M": 2,
+          "T": 2
+        },
+        "posicionSiDesde": {}
+      },
+      "primero": {
+        "M": null,
+        "T": null
+      },
+      "horario": {
+        "M": {
+          "ini": "07:00",
+          "fin": "16:00"
+        },
+        "T": {
+          "ini": "16:00",
+          "fin": "00:00"
+        },
+        "porDow": {
+          "6": {
+            "M": {
+              "ini": "08:00",
+              "fin": "16:00"
+            }
+          },
+          "7": {
+            "M": {
+              "ini": "08:00",
+              "fin": "16:00"
+            }
+          }
+        }
+      },
+      "horarioSupuesto": false,
+      "cierreAprox": true,
+      "horarioPartido": {
+        "M": {
+          "ini": "11:00",
+          "fin": "16:00"
+        },
+        "T": {
+          "ini": "21:00",
+          "fin": "00:00"
+        },
+        "porDow": {
+          "6": {
+            "M": {
+              "ini": "12:00",
+              "fin": "16:00"
+            },
+            "T": {
+              "ini": "20:00",
+              "fin": "00:00"
+            }
+          },
+          "7": {
+            "M": {
+              "ini": "12:00",
+              "fin": "16:00"
+            },
+            "T": {
+              "ini": "20:00",
+              "fin": "00:00"
+            }
+          }
+        }
+      },
+      "horarioPartidoSupuesto": true,
+      "duracion": {
+        "M": 480,
+        "T": 480
+      },
+      "duracionSupuesta": true,
+      "descansoMin": 0
+    },
+    {
+      "id": "ZAPA",
+      "nombre": "Zapatillera",
+      "corto": "ZAP",
+      "color": "#c2378f",
+      "abre": {
+        "M": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "T": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "minimos": {
+        "M": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "T": [
+          2,
+          2,
+          2,
+          2,
+          4,
+          4,
+          2
+        ]
+      },
+      "supuestos": {
+        "M": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "T": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true
+        ]
+      },
+      "cocina": {
+        "obligatoria": {
+          "M": false,
+          "T": false
+        },
+        "titulares": {
+          "M": [
+            "adrian",
+            "roberto",
+            "hojan"
+          ],
+          "T": [
+            "adrian",
+            "roberto",
+            "hojan"
+          ]
+        },
+        "reservas": [
+          "roberto",
+          "hojan"
+        ],
+        "posicion": {
+          "M": 3,
+          "T": 2
+        },
+        "posicionSiDesde": {
+          "M": 3
+        }
+      },
+      "primero": {
+        "M": null,
+        "T": null
+      },
+      "horario": {
+        "M": {
+          "ini": "07:00",
+          "fin": "16:00"
+        },
+        "T": {
+          "ini": "16:00",
+          "fin": "00:00"
+        },
+        "porDow": {
+          "6": {
+            "M": {
+              "ini": "08:00",
+              "fin": "16:00"
+            }
+          },
+          "7": {
+            "M": {
+              "ini": "08:00",
+              "fin": "16:00"
+            }
+          }
+        }
+      },
+      "horarioSupuesto": false,
+      "cierreAprox": true,
+      "horarioPartido": {
+        "M": {
+          "ini": "11:00",
+          "fin": "16:00"
+        },
+        "T": {
+          "ini": "21:00",
+          "fin": "00:00"
+        },
+        "porDow": {
+          "6": {
+            "M": {
+              "ini": "12:00",
+              "fin": "16:00"
+            },
+            "T": {
+              "ini": "20:00",
+              "fin": "00:00"
+            }
+          },
+          "7": {
+            "M": {
+              "ini": "12:00",
+              "fin": "16:00"
+            },
+            "T": {
+              "ini": "20:00",
+              "fin": "00:00"
+            }
+          }
+        }
+      },
+      "horarioPartidoSupuesto": true,
+      "duracion": {
+        "M": 480,
+        "T": 480
+      },
+      "duracionSupuesta": true,
+      "descansoMin": 0
+    },
+    {
+      "id": "MONACO",
+      "nombre": "Bar Mónaco",
+      "corto": "MON",
+      "color": "#2f6db5",
+      "abre": {
+        "M": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "T": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "minimos": {
+        "M": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "T": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          2
+        ]
+      },
+      "supuestos": {
+        "M": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "T": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true
+        ]
+      },
+      "cocina": {
+        "obligatoria": {
+          "M": true,
+          "T": true
+        },
+        "titulares": {
+          "M": [
+            "esmeralda",
+            "jenny",
+            "hojan"
+          ],
+          "T": [
+            "hojan",
+            "jenny",
+            "scapon"
+          ]
+        },
+        "reservas": [
+          "hojan"
+        ],
+        "posicion": {
+          "M": 2,
+          "T": 2
+        },
+        "posicionSiDesde": {}
+      },
+      "primero": {
+        "M": null,
+        "T": "scapon"
+      },
+      "horario": {
+        "M": {
+          "ini": "07:00",
+          "fin": "16:00"
+        },
+        "T": {
+          "ini": "16:00",
+          "fin": "00:00"
+        },
+        "porDow": {
+          "6": {
+            "M": {
+              "ini": "08:00",
+              "fin": "16:00"
+            }
+          },
+          "7": {
+            "M": {
+              "ini": "08:00",
+              "fin": "16:00"
+            }
+          }
+        }
+      },
+      "horarioSupuesto": false,
+      "cierreAprox": true,
+      "horarioPartido": {
+        "M": {
+          "ini": "11:00",
+          "fin": "16:00"
+        },
+        "T": {
+          "ini": "21:00",
+          "fin": "00:00"
+        },
+        "porDow": {
+          "6": {
+            "M": {
+              "ini": "12:00",
+              "fin": "16:00"
+            },
+            "T": {
+              "ini": "20:00",
+              "fin": "00:00"
+            }
+          },
+          "7": {
+            "M": {
+              "ini": "12:00",
+              "fin": "16:00"
+            },
+            "T": {
+              "ini": "20:00",
+              "fin": "00:00"
+            }
+          }
+        }
+      },
+      "horarioPartidoSupuesto": true,
+      "duracion": {
+        "M": 480,
+        "T": 480
+      },
+      "duracionSupuesta": true,
+      "descansoMin": 0
+    },
+    {
+      "id": "PASARELA",
+      "nombre": "Pasarela",
+      "corto": "PAS",
+      "color": "#1f9a6e",
+      "abre": {
+        "M": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "T": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "minimos": {
+        "M": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          2,
+          2
+        ],
+        "T": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          2
+        ]
+      },
+      "supuestos": {
+        "M": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "T": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      "cocina": {
+        "obligatoria": {
+          "M": false,
+          "T": false
+        },
+        "titulares": {
+          "M": [],
+          "T": []
+        },
+        "reservas": [],
+        "posicion": {
+          "M": 2,
+          "T": 2
+        },
+        "posicionSiDesde": {}
+      },
+      "primero": {
+        "M": "lola",
+        "T": "ivan"
+      },
+      "partidoAbre": {
+        "M": false,
+        "T": true
+      },
+      "horario": {
+        "M": {
+          "ini": "07:00",
+          "fin": "16:00"
+        },
+        "T": {
+          "ini": "16:00",
+          "fin": "00:00"
+        },
+        "porDow": {
+          "6": {
+            "M": {
+              "ini": "08:00",
+              "fin": "16:00"
+            }
+          },
+          "7": {
+            "M": {
+              "ini": "08:00",
+              "fin": "16:00"
+            }
+          }
+        }
+      },
+      "horarioSupuesto": false,
+      "cierreAprox": true,
+      "horarioPartido": {
+        "M": {
+          "ini": "11:00",
+          "fin": "16:00"
+        },
+        "T": {
+          "ini": "21:00",
+          "fin": "00:00"
+        },
+        "porDow": {
+          "6": {
+            "M": {
+              "ini": "12:00",
+              "fin": "16:00"
+            },
+            "T": {
+              "ini": "20:00",
+              "fin": "00:00"
+            }
+          },
+          "7": {
+            "M": {
+              "ini": "12:00",
+              "fin": "16:00"
+            },
+            "T": {
+              "ini": "20:00",
+              "fin": "00:00"
+            }
+          }
+        }
+      },
+      "horarioPartidoSupuesto": true,
+      "duracion": {
+        "M": 480,
+        "T": 480
+      },
+      "duracionSupuesta": true,
+      "descansoMin": 0
+    }
+  ],
+  "equipo": [
+    {
+      "id": "jacquelin",
+      "nombre": "Jacquelin",
+      "puesto": "sala",
+      "franjas": [
+        "M"
+      ],
+      "libra": [
+        7
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "",
+      "supuestos": [],
+      "unidades": [
+        "ZAPA"
+      ]
+    },
+    {
+      "id": "cris",
+      "nombre": "Cris Parreño",
+      "puesto": "sala",
+      "franjas": [
+        "M"
+      ],
+      "libra": [
+        7
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "Yilian le hace el día libre",
+      "supuestos": [],
+      "unidades": [
+        "MONACO"
+      ]
+    },
+    {
+      "id": "esmeralda",
+      "nombre": "Esmeralda",
+      "puesto": "cocina",
+      "franjas": [
+        "M"
+      ],
+      "libra": [
+        1
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [
+          "MONACO"
+        ],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "la sustituye Jenny los lunes",
+      "supuestos": [],
+      "unidades": [
+        "MONACO"
+      ]
+    },
+    {
+      "id": "mariluz",
+      "nombre": "Mari Luz",
+      "puesto": "sala",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        3
+      ],
+      "partido": {
+        "dias": [
+          2,
+          4,
+          5,
+          6
+        ]
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [
+        "lavinia"
+      ],
+      "cubreA": [],
+      "vetos": [
+        {
+          "localId": "PASARELA",
+          "franja": "M",
+          "dow": 1
+        }
+      ],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "casi siempre partido; el lunes hace la tarde entera, de 16:00 a cierre, y por eso no puede la mañana (Aroa, 17/09); el domingo hace la mañana",
+      "supuestos": [],
+      "nuncaConFlexible": true,
+      "unidades": [
+        "PASARELA"
+      ]
+    },
+    {
+      "id": "noe",
+      "nombre": "Noe",
+      "puesto": "sala",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        1
+      ],
+      "partido": {
+        "dias": [
+          2,
+          3
+        ]
+      },
+      "cocina": {
+        "titular": [
+          "EL33"
+        ],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [
+        {
+          "pid": "jenny",
+          "dow": 2
+        },
+        {
+          "pid": "victoria",
+          "dow": 3
+        }
+      ],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "siempre de tarde; cocina cuando cubre; el domingo estira el turno en El 33",
+      "supuestos": [],
+      "unidades": [
+        "EL33"
+      ]
+    },
+    {
+      "id": "scapon",
+      "nombre": "Susana Capón",
+      "puesto": "sala",
+      "franjas": [
+        "T"
+      ],
+      "libra": [
+        1
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [
+          "MONACO"
+        ],
+        "reserva": [],
+        "soloDias": [
+          2
+        ]
+      },
+      "abre": {
+        "MONACO": [
+          "T"
+        ]
+      },
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "sale la primera; camarera, no cocinera salvo el martes (día flojo) para que libre Hojan",
+      "supuestos": [],
+      "nuncaConFlexible": true,
+      "unidades": [
+        "MONACO"
+      ]
+    },
+    {
+      "id": "ivan",
+      "nombre": "Iván",
+      "puesto": "sala",
+      "franjas": [
+        "T"
+      ],
+      "libra": [
+        1
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {
+        "PASARELA": [
+          "T"
+        ]
+      },
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "sale el primero",
+      "supuestos": [],
+      "unidades": [
+        "PASARELA"
+      ]
+    },
+    {
+      "id": "juani",
+      "nombre": "Juani",
+      "puesto": "sala",
+      "franjas": [
+        "M"
+      ],
+      "libra": [
+        6
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "",
+      "supuestos": [],
+      "unidades": [
+        "ZAPA"
+      ]
+    },
+    {
+      "id": "sluna",
+      "nombre": "Susana Luna",
+      "puesto": "sala",
+      "franjas": [
+        "T"
+      ],
+      "libra": [
+        4
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "la cubre Roberto los jueves",
+      "supuestos": [],
+      "unidades": [
+        "ZAPA"
+      ]
+    },
+    {
+      "id": "roberto",
+      "nombre": "Roberto",
+      "puesto": "sala",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        1
+      ],
+      "partido": {
+        "dias": [
+          3,
+          5,
+          6
+        ]
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [
+          "ZAPA"
+        ],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [
+        {
+          "pid": "sluna"
+        },
+        {
+          "pid": "adrian"
+        }
+      ],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "tercero de apoyo por las mañanas en Zapatillera; los jueves abre la tarde por Susana Luna; el domingo, Pasarela con Mari Luz",
+      "supuestos": [],
+      "unidades": [
+        "ZAPA",
+        "PASARELA"
+      ]
+    },
+    {
+      "id": "lavinia",
+      "nombre": "Lavinia",
+      "puesto": "apoyo",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        1,
+        2,
+        4
+      ],
+      "partido": {
+        "dias": [
+          3,
+          7
+        ]
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [
+        "mariluz"
+      ],
+      "cubreA": [
+        {
+          "pid": "mariluz",
+          "dow": 3
+        }
+      ],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "el miércoles (libre de Mari Luz) hace partido en Pasarela; viernes y sábado, tarde en Zapatillera; el domingo dobla",
+      "supuestos": [],
+      "nuncaConFlexible": true,
+      "comodin": true,
+      "unidades": [
+        "PASARELA",
+        "ZAPA"
+      ]
+    },
+    {
+      "id": "tere",
+      "nombre": "Tere",
+      "puesto": "apoyo",
+      "franjas": [
+        "M"
+      ],
+      "libra": [
+        6,
+        7
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "apoyo de mañanas; no trabaja fines de semana",
+      "supuestos": [],
+      "comodin": true,
+      "unidades": [
+        "PASARELA",
+        "MONACO"
+      ]
+    },
+    {
+      "id": "leo",
+      "nombre": "Leo",
+      "puesto": "apoyo",
+      "franjas": [
+        "T"
+      ],
+      "libra": [
+        3,
+        4,
+        7
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [
+        "scapon"
+      ],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "apoyo de tardes en cualquier local; entra siempre a partir del segundo puesto",
+      "supuestos": [
+        "en la semana tipo solo le salen dos días (viernes y sábado): falta saber dónde hace los demás"
+      ],
+      "nuncaConFlexible": true,
+      "noPrimero": [
+        "M",
+        "T"
+      ],
+      "comodin": true,
+      "unidades": []
+    },
+    {
+      "id": "jenny",
+      "nombre": "Jenny",
+      "puesto": "cocina",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        2
+      ],
+      "partido": {
+        "dias": [
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "cocina": {
+        "titular": [
+          "EL33",
+          "MONACO"
+        ],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [
+        {
+          "pid": "esmeralda",
+          "dow": 1
+        }
+      ],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "cocina de El 33 en partido; los lunes cocina del Mónaco por Esmeralda; el domingo dobla (mañana El 33, tarde Mónaco)",
+      "supuestos": [],
+      "unidades": [
+        "EL33",
+        "MONACO"
+      ]
+    },
+    {
+      "id": "cristian",
+      "nombre": "Cristian",
+      "puesto": "apoyo",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        3
+      ],
+      "partido": {
+        "dias": [
+          6
+        ]
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": [],
+        "nunca": true
+      },
+      "abre": {},
+      "noAbre": [
+        "EL33"
+      ],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [
+        {
+          "localId": "PASARELA",
+          "franja": "M"
+        }
+      ],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "apoyo de sala; no hace la tarde completa (nunca el primero de la tarde); el martes tarde fijo en el Mónaco",
+      "supuestos": [
+        "seis días (la plantilla dice cinco): pendiente del cliente"
+      ],
+      "noPrimero": [
+        "T"
+      ],
+      "comodin": true,
+      "unidades": []
+    },
+    {
+      "id": "yilian",
+      "nombre": "Yilian",
+      "puesto": "apoyo",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        4
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [
+        {
+          "pid": "cris",
+          "dow": 7
+        },
+        {
+          "pid": "scapon",
+          "dow": 1,
+          "turnoId": "MONACO_T"
+        }
+      ],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "apoyo de Cris Parreño de mañana; le hace el domingo; el lunes abre la tarde por Susana Capón",
+      "supuestos": [],
+      "libreVariable": true,
+      "unidades": [
+        "MONACO"
+      ]
+    },
+    {
+      "id": "lola",
+      "nombre": "Lola",
+      "puesto": "sala",
+      "franjas": [
+        "M"
+      ],
+      "libra": [
+        7
+      ],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {
+        "PASARELA": [
+          "M"
+        ]
+      },
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [
+        {
+          "pid": "laura"
+        }
+      ],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "abre el local; cubre la baja de Laura",
+      "supuestos": [],
+      "unidades": [
+        "PASARELA"
+      ]
+    },
+    {
+      "id": "adrian",
+      "nombre": "Adrián",
+      "puesto": "cocina",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        3
+      ],
+      "partido": {
+        "siempre": true,
+        "dias": [
+          1,
+          2,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "cocina": {
+        "titular": [
+          "ZAPA"
+        ],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [
+        {
+          "pid": "susi"
+        }
+      ],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "cocina de Zapatillera, siempre partido; cubre la baja de Susi",
+      "supuestos": [],
+      "unidades": [
+        "ZAPA"
+      ]
+    },
+    {
+      "id": "victoria",
+      "nombre": "Victoria",
+      "puesto": "sala",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        3
+      ],
+      "partido": {
+        "dias": [
+          5,
+          6
+        ]
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "de mañana; viernes y sábado partido; Noe la cubre el miércoles",
+      "supuestos": [],
+      "unidades": [
+        "EL33"
+      ]
+    },
+    {
+      "id": "hojan",
+      "nombre": "Hojan",
+      "puesto": "cocina",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [
+        2,
+        7
+      ],
+      "partido": {
+        "dias": [
+          1
+        ]
+      },
+      "cocina": {
+        "titular": [
+          "EL33",
+          "MONACO"
+        ],
+        "reserva": [
+          "ZAPA"
+        ],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [
+        {
+          "pid": "maydeth"
+        }
+      ],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "cubre la baja de Maydeth; el lunes partido: cocina de El 33 y del Mónaco",
+      "supuestos": [],
+      "soloCocina": true,
+      "unidades": [
+        "EL33",
+        "MONACO"
+      ]
+    },
+    {
+      "id": "dulce",
+      "nombre": "Dulce",
+      "puesto": "apoyo",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [],
+      "prefs": {},
+      "nota": "apoyo; alta del 17/09, de prueba el fin de semana. En standby: no entra en la planilla hasta que el grupo confirme sus días y sus locales",
+      "supuestos": [
+        "en standby hasta confirmar días libres y locales",
+        "no sale la primera mientras sea nueva",
+        "quizá el partido del lunes en Pasarela, que taparía los dos huecos; a ver cómo entra (Aroa, 17/09)"
+      ],
+      "standby": true,
+      "noPrimero": [
+        "M",
+        "T"
+      ],
+      "unidades": [
+        "PASARELA",
+        "MONACO"
+      ]
+    },
+    {
+      "id": "laura",
+      "nombre": "Laura",
+      "puesto": "sala",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [
+        {
+          "tipo": "BAJ",
+          "desde": "2026-09-01",
+          "detalle": "la cubre Lola"
+        }
+      ],
+      "prefs": {},
+      "nota": "",
+      "supuestos": [],
+      "unidades": [
+        "PASARELA"
+      ]
+    },
+    {
+      "id": "maydeth",
+      "nombre": "Maydeth",
+      "puesto": "cocina",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [
+          "MONACO"
+        ],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [
+        {
+          "tipo": "BAJ",
+          "desde": "2026-09-01",
+          "detalle": "la cubre Hojan"
+        }
+      ],
+      "prefs": {},
+      "nota": "",
+      "supuestos": [],
+      "unidades": [
+        "MONACO"
+      ]
+    },
+    {
+      "id": "susi",
+      "nombre": "Susi",
+      "puesto": "cocina",
+      "franjas": [
+        "M",
+        "T"
+      ],
+      "libra": [],
+      "partido": {
+        "dias": []
+      },
+      "cocina": {
+        "titular": [
+          "ZAPA"
+        ],
+        "reserva": [],
+        "soloDias": []
+      },
+      "abre": {},
+      "noAbre": [],
+      "nuncaCon": [],
+      "cubreA": [],
+      "vetos": [],
+      "contrato": {
+        "horasSemana": null
+      },
+      "ausencias": [
+        {
+          "tipo": "BAJ",
+          "desde": "2026-09-01",
+          "detalle": "la cubre Adrián"
+        }
+      ],
+      "prefs": {},
+      "nota": "cocina; de baja, la cubre Adrián",
+      "supuestos": [
+        "Zapatillera, porque la cubre Adrián: falta confirmarlo",
+        "la baja se apunta desde el 1/09 porque en la planilla del cliente ya no salía: falta la fecha real"
+      ],
+      "unidades": [
+        "ZAPA"
+      ]
+    }
+  ],
+  "semanaTipo": {
+    "1": [
+      {
+        "t": "EL33_M",
+        "p": "victoria"
+      },
+      {
+        "t": "EL33_M",
+        "p": "hojan",
+        "c": 1,
+        "n": "cocina de El 33"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "jacquelin"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "juani"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "sluna"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "cris"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "jenny",
+        "c": 1,
+        "por": "esmeralda"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "cristian",
+        "s": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "yilian",
+        "a": 1,
+        "por": "scapon"
+      },
+      {
+        "t": "MONACO_T",
+        "p": "hojan",
+        "c": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "lola",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "tere"
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "mariluz",
+        "n": "la tarde entera, de 16:00 a cierre"
+      }
+    ],
+    "2": [
+      {
+        "t": "EL33_M",
+        "p": "victoria"
+      },
+      {
+        "t": "EL33_M",
+        "p": "noe",
+        "c": 1,
+        "por": "jenny"
+      },
+      {
+        "t": "EL33_T",
+        "p": "noe",
+        "c": 1,
+        "por": "jenny"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "jacquelin"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "juani"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "roberto"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "sluna"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "cris"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "esmeralda",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "yilian"
+      },
+      {
+        "t": "MONACO_T",
+        "p": "scapon",
+        "c": 1,
+        "a": 1,
+        "n": "excepción del martes"
+      },
+      {
+        "t": "MONACO_T",
+        "p": "cristian"
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "lola",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "mariluz"
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "tere",
+        "s": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "ivan",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "mariluz"
+      }
+    ],
+    "3": [
+      {
+        "t": "EL33_M",
+        "p": "noe",
+        "por": "victoria"
+      },
+      {
+        "t": "EL33_M",
+        "p": "jenny",
+        "c": 1
+      },
+      {
+        "t": "EL33_T",
+        "p": "noe",
+        "por": "victoria"
+      },
+      {
+        "t": "EL33_T",
+        "p": "jenny",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "jacquelin"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "juani"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "roberto",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "sluna"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "roberto",
+        "c": 1,
+        "n": "reserva"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "cris"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "esmeralda",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "yilian"
+      },
+      {
+        "t": "MONACO_T",
+        "p": "scapon",
+        "a": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "hojan",
+        "c": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "lola",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "lavinia",
+        "por": "mariluz"
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "tere",
+        "s": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "ivan",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "lavinia",
+        "por": "mariluz"
+      }
+    ],
+    "4": [
+      {
+        "t": "EL33_M",
+        "p": "victoria"
+      },
+      {
+        "t": "EL33_M",
+        "p": "jenny",
+        "c": 1
+      },
+      {
+        "t": "EL33_T",
+        "p": "noe"
+      },
+      {
+        "t": "EL33_T",
+        "p": "jenny",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "jacquelin"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "juani"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "roberto",
+        "por": "sluna"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "cris"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "esmeralda",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "cristian",
+        "s": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "scapon",
+        "a": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "hojan",
+        "c": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "lola",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "mariluz"
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "tere",
+        "s": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "ivan",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "mariluz"
+      }
+    ],
+    "5": [
+      {
+        "t": "EL33_M",
+        "p": "victoria"
+      },
+      {
+        "t": "EL33_M",
+        "p": "jenny",
+        "c": 1
+      },
+      {
+        "t": "EL33_T",
+        "p": "noe"
+      },
+      {
+        "t": "EL33_T",
+        "p": "jenny",
+        "c": 1
+      },
+      {
+        "t": "EL33_T",
+        "p": "victoria"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "jacquelin"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "juani"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "roberto"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "sluna"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "roberto"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "lavinia"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "cris"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "esmeralda",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "yilian"
+      },
+      {
+        "t": "MONACO_T",
+        "p": "scapon",
+        "a": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "hojan",
+        "c": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "cristian",
+        "s": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "lola",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "mariluz"
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "tere",
+        "s": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "ivan",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "mariluz"
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "leo",
+        "s": 1
+      }
+    ],
+    "6": [
+      {
+        "t": "EL33_M",
+        "p": "victoria"
+      },
+      {
+        "t": "EL33_M",
+        "p": "jenny",
+        "c": 1
+      },
+      {
+        "t": "EL33_M",
+        "p": "cristian",
+        "s": 1
+      },
+      {
+        "t": "EL33_T",
+        "p": "noe"
+      },
+      {
+        "t": "EL33_T",
+        "p": "jenny",
+        "c": 1
+      },
+      {
+        "t": "EL33_T",
+        "p": "victoria"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "jacquelin"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "roberto"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "sluna"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "roberto"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "lavinia"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "cris"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "esmeralda",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "yilian"
+      },
+      {
+        "t": "MONACO_T",
+        "p": "scapon",
+        "a": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "hojan",
+        "c": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "cristian",
+        "s": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "lola",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "mariluz"
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "ivan",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "mariluz"
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "leo",
+        "s": 1
+      }
+    ],
+    "7": [
+      {
+        "t": "EL33_M",
+        "p": "victoria"
+      },
+      {
+        "t": "EL33_M",
+        "p": "jenny",
+        "c": 1
+      },
+      {
+        "t": "EL33_M",
+        "p": "noe",
+        "n": "turno estirado"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "juani"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "lavinia"
+      },
+      {
+        "t": "ZAPA_M",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "sluna"
+      },
+      {
+        "t": "ZAPA_T",
+        "p": "adrian",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "yilian",
+        "por": "cris"
+      },
+      {
+        "t": "MONACO_M",
+        "p": "esmeralda",
+        "c": 1
+      },
+      {
+        "t": "MONACO_M",
+        "p": "cristian",
+        "s": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "scapon",
+        "a": 1
+      },
+      {
+        "t": "MONACO_T",
+        "p": "jenny",
+        "c": 1,
+        "por": "hojan"
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "mariluz"
+      },
+      {
+        "t": "PASARELA_M",
+        "p": "roberto",
+        "n": "con Mari Luz"
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "ivan",
+        "a": 1
+      },
+      {
+        "t": "PASARELA_T",
+        "p": "lavinia"
+      }
+    ]
+  },
+  "eventos": {
+    "equipos": [
+      {
+        "id": "barcelona",
+        "nombre": "Barcelona",
+        "corto": "Barça",
+        "color": "#a50044",
+        "refuerzo": {
+          "EL33": 1,
+          "ZAPA": 1,
+          "MONACO": 1,
+          "PASARELA": 1
+        },
+        "franja": "T"
+      },
+      {
+        "id": "madrid",
+        "nombre": "Madrid",
+        "corto": "Madrid",
+        "color": "#3b3b3b",
+        "refuerzo": {
+          "EL33": 1,
+          "ZAPA": 1,
+          "MONACO": 1,
+          "PASARELA": 1
+        },
+        "franja": "T"
+      },
+      {
+        "id": "elche",
+        "nombre": "Elche",
+        "corto": "Elche",
+        "color": "#0a7a3c",
+        "refuerzo": {
+          "EL33": 1,
+          "ZAPA": 1,
+          "MONACO": 1,
+          "PASARELA": 1
+        },
+        "franja": "T"
+      }
+    ]
+  },
+  "festivos": [],
+  "reglas": {}
+}
