@@ -2,6 +2,14 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Entrevistas: el orden se elige** (Diego, 21/09: «los filtros son orden alfabético, bien
+  mal, fecha, etc, tal como pidió el cliente»). Debajo de los filtros hay cuatro botones:
+  **Las últimas primero** (el que manda de partida, el que pidió José), **Por fecha** (la
+  entrevista más reciente arriba, las que no tienen fecha al final), **Por valoración** (Bien,
+  En espera, Mal, Vetado y los sin valorar al final) y **Alfabético** (sin que la mayúscula
+  ni el acento cambien el sitio: «Élia» va entre «Dani» y «fran»). El pie de la lista dice
+  siempre por cuál va. Poner o quitar un filtro no cambia el orden elegido, y «Quitar
+  filtros» tampoco.
 - **Entrevistas: las últimas primero** (José, 21/09: «los que pongo BIEN o descarte me
   aparezcan primero cuando filtre. Si sale en orden alfabético me vuelvo loco. Para que las
   últimas por fecha me aparezcan antes»). La lista salía en el orden en que llegó de Notion,

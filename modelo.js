@@ -258,19 +258,41 @@ function fechaCandidato(c, hoy) {
 }
 // 21/09 (José, por WhatsApp): «Intenta que las entrevistas los que pongo BIEN o descarte me
 // aparezcan primero cuando filtre. Si sale en orden alfabético me vuelvo loco. Para que las
-// últimas por fecha me aparezcan antes». Manda lo último que se ha tocado —`ts`, el sello
-// que pone la app al registrar o al guardar una ficha con cambios—; después la fecha de la
-// entrevista (`fechaCandidato`), la más reciente antes; y quien no tiene ni una cosa ni otra
-// se queda en el orden en que estaba. Devuelve una copia: la base no se reordena.
-function ordenarCandidatos(cands, hoy) {
+// últimas por fecha me aparezcan antes». Ese es el orden de partida, «reciente»: manda lo
+// último que se ha tocado —`ts`, el sello que pone la app al registrar o al guardar una ficha
+// con cambios—, después la fecha de la entrevista, y quien no tiene ni una cosa ni otra se
+// queda en el orden en que estaba. Los otros tres son para cuando busca de otra manera, y se
+// eligen desde la lista. Ninguno toca la base: siempre se devuelve una copia.
+const ORDENES_CAND = [
+  { id: 'reciente', label: 'Las últimas primero', corto: 'las últimas primero' },
+  { id: 'fecha', label: 'Por fecha', corto: 'por fecha de entrevista' },
+  { id: 'valoracion', label: 'Por valoración', corto: 'por valoración' },
+  { id: 'alfabetico', label: 'Alfabético', corto: 'por orden alfabético' },
+];
+// para el alfabético: sin mayúsculas ni acentos, que si no «Élia» se va detrás de «Zoe»
+function claveAlfabetica(c) {
+  return String((c && c.nombre) || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+function ordenarCandidatos(cands, hoy, modo) {
   const h = hoy || fechaMadrid();
-  const lista = (cands || []).map((c, i) => ({ c, i, f: fechaCandidato(c, h) || '' }));
-  lista.sort((a, b) => {
+  const vals = VALORACIONES.map(v => v.id);
+  const lista = (cands || []).map((c, i) => ({ c, i, f: fechaCandidato(c, h) || '', n: claveAlfabetica(c) }));
+  // sin fecha va al final, no al principio: '' es menor que cualquier fecha, así que se mira aparte
+  const porFecha = (a, b) => (a.f === b.f ? a.i - b.i : !a.f || !b.f ? (a.f ? -1 : 1) : a.f < b.f ? 1 : -1);
+  const reciente = (a, b) => {
     const ta = +a.c.ts || 0, tb = +b.c.ts || 0;
-    if (ta !== tb) return tb - ta;
-    if (a.f !== b.f) return b.f < a.f ? -1 : 1;
-    return a.i - b.i;
-  });
+    return ta !== tb ? tb - ta : porFecha(a, b);
+  };
+  const COMPARA = {
+    fecha: porFecha,
+    valoracion: (a, b) => {
+      const ia = vals.indexOf(a.c.val), ib = vals.indexOf(b.c.val);
+      const pa = ia < 0 ? vals.length : ia, pb = ib < 0 ? vals.length : ib;
+      return pa !== pb ? pa - pb : reciente(a, b);
+    },
+    alfabetico: (a, b) => (a.n === b.n ? a.i - b.i : !a.n || !b.n ? (a.n ? -1 : 1) : a.n < b.n ? -1 : 1),
+  };
+  lista.sort(COMPARA[modo] || reciente);
   return lista.map(x => x.c);
 }
 function resumenCandidatos(cands, lista) {
@@ -1974,7 +1996,7 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, migrarAltas, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
-    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, fechaCandidato, ordenarCandidatos, resumenCandidatos,
+    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, fechaCandidato, ORDENES_CAND, ordenarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos, fundirSemillaEntrevistas, textoCampo,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes, cierreDe, tramoDe, registroApoyos,
     toProblem, desdeSolucion,

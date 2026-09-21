@@ -1422,4 +1422,31 @@ ok('las entrevistas salen las últimas primero, nunca en orden alfabético (Jos�
   assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'p' }, { id: 'q', fecha: 'cuando pueda' }, { id: 'r', fecha: '1/1/2024' }]).map(c => c.id), ['r', 'p', 'q']);
 });
 
+ok('la lista se ordena de cuatro maneras: alfabético, por valoración, por fecha y las últimas primero', () => {
+  // Diego, 21/09: «los filtros son orden alfabético, bien mal, fecha, etc, tal como pidió el
+  // cliente». El orden que pidió José por WhatsApp («las últimas primero») se queda de
+  // partida; las otras tres son para cuando busca de otra manera.
+  const base = [
+    { id: 'ana', nombre: 'Ana', val: 'mal' },
+    { id: 'bea', nombre: 'Bea', val: 'bien', fecha: '10 de marzo de 2025' },
+    { id: 'carla', nombre: 'Carla', val: null, fecha: '1/6/2025' },
+    { id: 'dani', nombre: 'Dani', val: 'veto', fecha: '20/11/2024', ts: 1700000000000 },
+    { id: 'eva', nombre: 'Élia', val: 'regular' },                                  // con acento y sin fecha
+    { id: 'fran', nombre: 'fran', val: 'bien', fecha: '5/1/2025', ts: 1800000000000 },   // en minúscula
+  ];
+  const ids = modo => M.ordenarCandidatos(base, '2026-09-21', modo).map(c => c.id);
+  assert.deepStrictEqual(ids(), ['fran', 'dani', 'carla', 'bea', 'ana', 'eva'], 'de partida, lo de José');
+  assert.deepStrictEqual(ids('reciente'), ids());
+  assert.deepStrictEqual(ids('alfabetico'), ['ana', 'bea', 'carla', 'dani', 'eva', 'fran'], 'ni la mayúscula ni el acento cambian el sitio');
+  assert.deepStrictEqual(ids('valoracion'), ['fran', 'bea', 'eva', 'ana', 'dani', 'carla'], 'bien, en espera, mal, vetado, y sin valorar al final');
+  assert.deepStrictEqual(ids('fecha'), ['carla', 'bea', 'fran', 'dani', 'ana', 'eva'], 'la entrevista más reciente antes, sin fecha al final');
+  assert.deepStrictEqual(ids('loquesea'), ids(), 'un orden que no existe no rompe la lista');
+  assert.deepStrictEqual(base.map(c => c.id), ['ana', 'bea', 'carla', 'dani', 'eva', 'fran'], 'ningún orden toca la base');
+  // quien no tiene nombre no se cuela el primero en el alfabético
+  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'x' }, { id: 'y', nombre: 'Zoe' }], '2026-09-21', 'alfabetico').map(c => c.id), ['y', 'x']);
+  // los cuatro órdenes tienen nombre para el botón
+  assert.deepStrictEqual(M.ORDENES_CAND.map(o => o.id), ['reciente', 'fecha', 'valoracion', 'alfabetico']);
+  assert.ok(M.ORDENES_CAND.every(o => o.label && o.corto));
+});
+
 console.log(`\n${n} tests OK`);

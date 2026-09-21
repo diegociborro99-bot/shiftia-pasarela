@@ -4,7 +4,7 @@
 // candidato lleva dos etiquetas —el puesto al que opta y la valoración— y se filtra por
 // las dos a la vez («cocinero bien», «camarera en espera»…), con buscador por nombre o
 // teléfono y una ficha por cajetines para registrar y editar.
-const ENT = { lista: 'ent', q: '', puesto: '', val: '', motivo: '', hab: '', abierta: null };
+const ENT = { lista: 'ent', q: '', puesto: '', val: '', motivo: '', hab: '', orden: 'reciente', abierta: null };
 
 // El icono de cada etiqueta, los mismos que el grupo usa en su base de Notion
 const ICO_CAND = { cocina: () => SVG_COCINA, camarero: () => SVG_CAMARERO, bien: () => SVG_BIEN, mal: () => SVG_MAL, espera: () => SVG_ESPERA, veto: () => SVG_VETO,
@@ -46,8 +46,8 @@ function fechaCortaCand(c) {
 function renderEntrevistas() {
   const todos = candidatos();
   const res = LISTAS_CAND.map(l => ({ l, r: resumenCandidatos(todos, l.id) }));
-  // las últimas primero (José, 21/09): lo recién registrado o valorado arriba, luego por fecha de alta
-  const vistos = filtrarCandidatos(ordenarCandidatos(todos), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
+  // el orden lo elige quien mira (de partida, el que pidió José: las últimas primero)
+  const vistos = filtrarCandidatos(ordenarCandidatos(todos, null, ENT.orden), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
   const r = res.find(x => x.l.id === ENT.lista).r;
   const alerta = ENT.lista === 'alerta';
 
@@ -58,6 +58,8 @@ function renderEntrevistas() {
     ${chip('val', '', 'Todas')}${VALORACIONES.map(v => chip('val', v.id, v.label, r[v.id], icoCand(v.ico))).join('')}${chip('val', 'ninguna', 'Sin valorar', r.sinValorar)}</div>`;
   const habChips = `<div class="entchips" role="group" aria-label="Filtrar por aptitud">
     ${chip('hab', '', 'Cualquier aptitud')}${HABILIDADES.filter(x => r.hab[x.id]).map(x => chip('hab', x.id, x.label, r.hab[x.id], icoCand(x.ico))).join('')}</div>`;
+  const ordChips = `<div class="entchips entord" role="group" aria-label="Ordenar la lista">
+    <span class="entordlbl">Ordenar</span>${ORDENES_CAND.map(o => `<button class="entchip${ENT.orden === o.id ? ' on' : ''}" data-entord="${esc(o.id)}" aria-pressed="${ENT.orden === o.id}">${esc(o.label)}</button>`).join('')}</div>`;
   const motChips = alerta ? `<div class="entchips" role="group" aria-label="Filtrar por motivo">
     ${chip('motivo', '', 'Todos los motivos')}${MOTIVOS_ALERTA.map(m => chip('motivo', m.id, m.label)).join('')}</div>` : '';
 
@@ -76,8 +78,8 @@ function renderEntrevistas() {
     </div>
   </div>
   ${puedeVerEntrevista() ? '' : `<div class="entaviso">${SVG_CANDADO}<span><b>El contenido de cada entrevista es del jefe.</b> Aquí ves quién es, a qué puesto opta, cómo se le valoró y si ya se le entrevistó — lo justo para saber si hay que volver a llamarle. Lo que se habló dentro (condiciones, sueldo, observaciones) no sale del servidor. Sí puedes meter a alguien en la lista negra si no acude a la entrevista.</span></div>`}
-  <div class="entfiltros">${puestoChips}${valChips}${motChips}${Object.values(r.hab).some(Boolean) ? habChips : ''}</div>
-  <div class="entcount">${vistos.length === r.total ? `${r.total} ${r.total === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${r.total}`}<span class="entorden">· las últimas primero</span>${ENT.q || ENT.puesto || ENT.val || ENT.motivo || ENT.hab ? ' <button class="btn-mini ghost" id="entLimpiar">Quitar filtros</button>' : ''}</div>
+  <div class="entfiltros">${puestoChips}${valChips}${motChips}${Object.values(r.hab).some(Boolean) ? habChips : ''}${ordChips}</div>
+  <div class="entcount">${vistos.length === r.total ? `${r.total} ${r.total === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${r.total}`}<span class="entorden">· ${esc((ORDENES_CAND.find(o => o.id === ENT.orden) || ORDENES_CAND[0]).corto)}</span>${ENT.q || ENT.puesto || ENT.val || ENT.motivo || ENT.hab ? ' <button class="btn-mini ghost" id="entLimpiar">Quitar filtros</button>' : ''}</div>
   <div class="entlist">${vistos.length ? vistos.map(filaCand).join('') : `<div class="entzero"><b>No hay nadie con esos filtros.</b><span>Prueba a quitarlos o registra a alguien nuevo.</span></div>`}</div>`;
 
   $('#entQ').oninput = e => { ENT.q = e.target.value; pintaListaEnt(); };
@@ -106,7 +108,7 @@ function altaAlertaRapida() {
 }
 // repinta solo la lista al teclear, para no perder el foco del buscador
 function pintaListaEnt() {
-  const vistos = filtrarCandidatos(ordenarCandidatos(candidatos()), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
+  const vistos = filtrarCandidatos(ordenarCandidatos(candidatos(), null, ENT.orden), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
   const tot = resumenCandidatos(candidatos(), ENT.lista).total;
   $('#entrevistasRoot .entlist').innerHTML = vistos.length ? vistos.map(filaCand).join('') : `<div class="entzero"><b>No hay nadie con esos filtros.</b><span>Prueba a quitarlos o registra a alguien nuevo.</span></div>`;
   $('#entrevistasRoot .entcount').firstChild.textContent = vistos.length === tot ? `${tot} ${tot === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${tot}`;
@@ -321,9 +323,10 @@ function abrirFichaCand(id, editar) {
 
 // ---------- eventos de la vista ----------
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-entlista],[data-entf],[data-entficha]');
+  const t = e.target.closest('[data-entlista],[data-entf],[data-entord],[data-entficha]');
   if (!t || !t.closest('#entrevistasRoot')) return;
   if (t.dataset.entlista) { ENT.lista = t.dataset.entlista; ENT.motivo = ''; renderEntrevistas(); return; }
+  if (t.dataset.entord) { ENT.orden = t.dataset.entord; renderEntrevistas(); return; }
   if (t.dataset.entf) { const [k, v] = t.dataset.entf.split('|'); ENT[k] = ENT[k] === v ? '' : v; renderEntrevistas(); return; }
   if (t.dataset.entficha) abrirFichaCand(t.dataset.entficha);
 });

@@ -330,6 +330,39 @@ try {
   ok('y con el filtro «Bien» puesto sigue el primero', await pg.$eval('#entrevistasRoot .entrow b', e => e.firstChild.textContent.trim()) === valorado);
   ok('la lista dice que van las últimas primero', await pg.$eval('#entrevistasRoot .entcount', e => /últimas primero/.test(e.textContent)));
   await pg.click('#entrevistasRoot [data-entf="val|"]'); await pg.waitForTimeout(250);
+  // Diego, 21/09: «los filtros son orden alfabético, bien mal, fecha, etc, tal como pidió el
+  // cliente». Cuatro botones de orden, y el de partida sigue siendo el que pidió José.
+  ok('Entrevistas: hay cuatro botones de orden y manda «Las últimas primero»',
+    await pg.$$eval('#entrevistasRoot [data-entord]', b => b.length) === 4
+    && await pg.$eval('#entrevistasRoot [data-entord].on', e => e.textContent.trim()) === 'Las últimas primero',
+    await pg.$$eval('#entrevistasRoot [data-entord]', b => b.map(x => x.textContent.trim()).join(' · ')));
+  const pintado = () => pg.$$eval('#entrevistasRoot .entrow b', x => x.map(y => y.firstChild.textContent.trim()));
+  const llave = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  await pg.click('#entrevistasRoot [data-entord="alfabetico"]'); await pg.waitForTimeout(300);
+  const abc = await pintado();
+  ok(`Entrevistas: en alfabético empieza por ${abc[0]} y ninguno se sale de la A a la Z`,
+    abc.length === 194 && abc.every((v, i) => !i || llave(abc[i - 1]) <= llave(v)), JSON.stringify(abc.slice(0, 3)));
+  ok('y el pie de la lista dice por qué orden va', await pg.$eval('#entrevistasRoot .entorden', e => /alfab/.test(e.textContent)));
+  await pg.click('#entrevistasRoot [data-entord="valoracion"]'); await pg.waitForTimeout(300);
+  const vals = await pg.$$eval('#entrevistasRoot .entrow .entv', x => x.map(e => e.className.replace(/.*v-/, '')));
+  const rangoVal = { bien: 0, regular: 1, mal: 2, veto: 3, no: 4 };
+  ok('Entrevistas: por valoración los BIEN van primero y los sin valorar al final',
+    vals[0] === 'bien' && vals[vals.length - 1] === 'no' && vals.every((v, i) => !i || rangoVal[vals[i - 1]] <= rangoVal[v]),
+    JSON.stringify({ primeros: vals.slice(0, 3), ultimo: vals[vals.length - 1] }));
+  await pg.click('#entrevistasRoot [data-entord="fecha"]'); await pg.waitForTimeout(300);
+  const casaFecha = await pg.evaluate(() => {
+    const esperado = filtrarCandidatos(ordenarCandidatos(candidatos(), null, 'fecha'), { lista: 'ent' }).map(nombreCand);
+    const filas = [...document.querySelectorAll('#entrevistasRoot .entrow b')].map(e => e.firstChild.textContent.trim());
+    return { igual: esperado.length === filas.length && esperado.every((v, i) => v === filas[i]), primera: filas[0] };
+  });
+  ok(`Entrevistas: por fecha la lista pintada es la del modelo, la más reciente arriba (${casaFecha.primera})`, casaFecha.igual, JSON.stringify(casaFecha));
+  await pg.click('#entrevistasRoot [data-entf="val|bien"]'); await pg.waitForTimeout(300);
+  const abcFiltrado = await pg.evaluate(() => [...document.querySelectorAll('#entrevistasRoot [data-entord].on')].map(e => e.dataset.entord)[0]);
+  ok('Entrevistas: poner un filtro no cambia el orden elegido', abcFiltrado === 'fecha', abcFiltrado);
+  await pg.click('#entrevistasRoot [data-entf="val|"]'); await pg.waitForTimeout(250);
+  await pg.click('#entrevistasRoot [data-entord="reciente"]'); await pg.waitForTimeout(300);
+  const vuelta = await pintado();
+  ok(`Entrevistas: al volver a «Las últimas primero» manda otra vez el último valorado (${valorado})`, vuelta[0] === valorado, JSON.stringify(vuelta.slice(0, 3)));
   await pg.click('#entrevistasRoot [data-entf="hab|cafetera"]'); await pg.waitForTimeout(250);
   const nCaf = await pg.$$eval('#entrevistasRoot .entrow', x => x.length);
   ok(`Entrevistas: el filtro «cafetera» deja ${nCaf}`, nCaf > 10 && nCaf < 194, nCaf);
