@@ -257,3 +257,13 @@ José: *«podemos poner que, dentro de la propia planilla semanal… al tocar en
 - **Dos tramos el mismo día** (Dulce, 11:30–15 y 20:30–01) son la casilla de la mañana y la de la tarde, cada una con su tramo; el de la noche cruza la medianoche y `minutosEntre` ya lo entendía. El test lo reproduce con el correo de Aroa tal cual: 8 h el sábado, 8 el domingo.
 
 Lo que no se ha hecho, a propósito: el Excel de Horas no lleva aún el día a día de los apoyos (lleva los totales, que sí cuadran), y *«que se quede un registro desde el lunes 14, todo lo demás borrado para atrás»* es una operación sobre los datos de producción —«Vaciar la semana» sobre las anteriores—, no una pieza de la app.
+
+## Entrevistas: las últimas primero (21/09)
+
+José, por WhatsApp: *«Intenta que las entrevistas los que pongo BIEN o descarte me aparezcan primero cuando filtre. Si sale en orden alfabético me vuelvo loco. Para que las últimas por fecha me aparezcan antes»*.
+
+La lista no ordenaba: pintaba `S.entrevistas` tal cual, y tal cual llegó de Notion era alfabético. `ordenarCandidatos(cands)` devuelve una copia ordenada por tres llaves: **`ts`** (el sello de «última vez tocada», descendente), después **`alta`** (una fecha ISO de alta, si la hay), y si no hay ni una ni otra, el orden en que estaba. `filtrarCandidatos` se aplica sobre esa copia, así que el filtro «Bien» conserva el orden.
+
+`ts` lo pone la app en tres sitios: al registrar a alguien, al meter a alguien en la lista negra desde la oficina (el servidor lo deja pasar en la lista blanca del alta, `CAMPOS_ALTA_ALERTA`), y al guardar una ficha **solo si cambió algo** —se compara el JSON antes y después—, para que abrir una ficha y darle a Guardar no la suba.
+
+**Lo que no se ha podido hacer:** ordenar las 275 fichas históricas por la fecha de la entrevista. Ni la exportación ni las hojas escaneadas traían fecha en un campo, y la `createdTime` de Notion es la misma para todas (17/09 a las 22:26: el minuto en que José duplicó la base para compartirla). La llave `alta` queda preparada por si algún día hay de dónde sacarla; mientras tanto, las fichas que nadie toca se quedan en su orden, y cada una que José valore sube arriba.

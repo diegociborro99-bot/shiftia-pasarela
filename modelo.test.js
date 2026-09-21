@@ -1370,4 +1370,29 @@ ok('registro de apoyos: el tramo de cada día y sus horas, para pagarles (José 
   for (const pid of ['dulce', 'leo', 'yilian', 'cristian']) assert.strictEqual(de(pid).minutos, M.horasPersonaMes(cfg, st, { '2026-10': e }, pid, 2026, 10).minutos, pid);
 });
 
+ok('las entrevistas salen las últimas primero, nunca en orden alfabético (José, 21/09)', () => {
+  // «Intenta que las entrevistas los que pongo BIEN o descarte me aparezcan primero cuando
+  // filtre. Si sale en orden alfabético me vuelvo loco. Para que las últimas por fecha me
+  // aparezcan antes». Manda lo último que se ha tocado (ts, el sello de registrar o valorar);
+  // después la fecha de alta (alta, la de Notion); y quien no tiene ni una cosa ni otra se
+  // queda como estaba, sin reordenar por nombre.
+  const base = [
+    { id: 'ana', nombre: 'Ana' },                                   // sin nada: se queda donde estaba
+    { id: 'bea', nombre: 'Bea', alta: '2025-03-10' },
+    { id: 'carla', nombre: 'Carla', alta: '2025-06-01' },
+    { id: 'dani', nombre: 'Dani', alta: '2024-11-20', ts: 1700000000000 },   // valorado hace tiempo
+    { id: 'eva', nombre: 'Eva' },
+    { id: 'fran', nombre: 'Fran', alta: '2025-01-05', ts: 1800000000000 },   // valorado hoy: el primero
+  ];
+  const orden = M.ordenarCandidatos(base).map(c => c.id);
+  assert.deepStrictEqual(orden, ['fran', 'dani', 'carla', 'bea', 'ana', 'eva']);
+  assert.notStrictEqual(M.ordenarCandidatos(base), base, 'devuelve una copia: la base no se toca');
+  assert.deepStrictEqual(base.map(c => c.id), ['ana', 'bea', 'carla', 'dani', 'eva', 'fran']);
+  // el filtro respeta ese orden
+  const bien = M.filtrarCandidatos(M.ordenarCandidatos(base.map(c => Object.assign({}, c, { val: c.id === 'ana' || c.id === 'fran' || c.id === 'bea' ? 'bien' : null }))), { val: 'bien' }).map(c => c.id);
+  assert.deepStrictEqual(bien, ['fran', 'bea', 'ana']);
+  // y un ts sin alta gana a cualquier alta: acabar de valorar a alguien lo sube arriba
+  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'x', alta: '2026-09-01' }, { id: 'y', ts: 1 }]).map(c => c.id), ['y', 'x']);
+});
+
 console.log(`\n${n} tests OK`);

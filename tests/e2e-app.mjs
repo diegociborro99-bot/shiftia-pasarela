@@ -305,6 +305,22 @@ try {
   ok('Entrevistas: la base de José está dentro y se reparte en dos listas', await pg.evaluate(() => (S.entrevistas || []).length) === 275, await pg.evaluate(() => (S.entrevistas || []).length));
   ok('Entrevistas: la lista arranca en «Entrevistas» con sus 194 personas', await pg.$$eval('#entrevistasRoot .entrow', x => x.length) === 194, await pg.$$eval('#entrevistasRoot .entrow', x => x.length));
   ok('Entrevistas: 35 traen la entrevista contestada, con sus aptitudes', await pg.evaluate(() => (S.entrevistas || []).filter(tieneEntrevista).length) >= 35, await pg.evaluate(() => (S.entrevistas || []).filter(tieneEntrevista).length));
+  // 21/09 (José): «Si sale en orden alfabético me vuelvo loco. Para que las últimas por fecha
+  // me aparezcan antes». Valorar a alguien lo sube arriba, y registrar a alguien también.
+  const ordenAntes = await pg.$$eval('#entrevistasRoot .entrow b', x => x.slice(0, 3).map(y => y.firstChild.textContent.trim()));
+  const valorado = await pg.evaluate(() => {
+    const lista = ordenarCandidatos(candidatos()).filter(c => c.lista === 'ent');
+    const c = lista[lista.length - 1];                          // el último de la lista de hoy
+    c.val = 'bien'; c.ts = Date.now();                          // lo que hace Guardar en la ficha
+    renderEntrevistas();
+    return nombreCand(c);
+  });
+  const ordenDespues = await pg.$$eval('#entrevistasRoot .entrow b', x => x.slice(0, 3).map(y => y.firstChild.textContent.trim()));
+  ok(`valorar al último (${valorado}) lo pone el primero de la lista`, ordenDespues[0] === valorado && ordenAntes[0] !== valorado, JSON.stringify({ ordenAntes, ordenDespues }));
+  await pg.click('#entrevistasRoot [data-entf="val|bien"]'); await pg.waitForTimeout(250);
+  ok('y con el filtro «Bien» puesto sigue el primero', await pg.$eval('#entrevistasRoot .entrow b', e => e.firstChild.textContent.trim()) === valorado);
+  ok('la lista dice que van las últimas primero', await pg.$eval('#entrevistasRoot .entcount', e => /últimas primero/.test(e.textContent)));
+  await pg.click('#entrevistasRoot [data-entf="val|"]'); await pg.waitForTimeout(250);
   await pg.click('#entrevistasRoot [data-entf="hab|cafetera"]'); await pg.waitForTimeout(250);
   const nCaf = await pg.$$eval('#entrevistasRoot .entrow', x => x.length);
   ok(`Entrevistas: el filtro «cafetera» deja ${nCaf}`, nCaf > 10 && nCaf < 194, nCaf);

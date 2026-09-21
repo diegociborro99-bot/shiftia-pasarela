@@ -231,6 +231,23 @@ function filtrarCandidatos(cands, f) {
     return textoCandidato(c).includes(q) || (!!qTel && String(c.tel || '').includes(qTel));
   });
 }
+// 21/09 (José, por WhatsApp): «Intenta que las entrevistas los que pongo BIEN o descarte me
+// aparezcan primero cuando filtre. Si sale en orden alfabético me vuelvo loco. Para que las
+// últimas por fecha me aparezcan antes». Manda lo último que se ha tocado —`ts`, el sello
+// que pone la app al registrar o al guardar una ficha con cambios—; después la fecha de
+// alta (`alta`, la que traía Notion); y quien no tiene ni una cosa ni otra se queda en el
+// orden en que estaba. Devuelve una copia: la base no se reordena.
+function ordenarCandidatos(cands) {
+  const lista = (cands || []).map((c, i) => ({ c, i }));
+  lista.sort((a, b) => {
+    const ta = +a.c.ts || 0, tb = +b.c.ts || 0;
+    if (ta !== tb) return tb - ta;
+    const fa = String(a.c.alta || ''), fb = String(b.c.alta || '');
+    if (fa !== fb) return fb < fa ? -1 : 1;
+    return a.i - b.i;
+  });
+  return lista.map(x => x.c);
+}
 function resumenCandidatos(cands, lista) {
   const out = { total: 0, sinPuesto: 0, sinValorar: 0, conEntrevista: 0, hab: {}, puesto: {} };
   for (const v of VALORACIONES) out[v.id] = 0;
@@ -1932,7 +1949,7 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, migrarAltas, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
-    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, resumenCandidatos,
+    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, ordenarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos, fundirSemillaEntrevistas, textoCampo,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes, cierreDe, tramoDe, registroApoyos,
     toProblem, desdeSolucion,

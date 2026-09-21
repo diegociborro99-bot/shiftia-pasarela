@@ -69,7 +69,7 @@ function estadoSinContenidoEntrevistas(estado) {
 // app le manda la planilla entera en cada guardado, así que sin esto un cambio de turno
 // suyo se llevaría por delante el trabajo de José— y de lo que llega nuevo solo se acepta
 // un alta de alerta con lo justo: quién es, su teléfono y por qué no hay que llamarle.
-const CAMPOS_ALTA_ALERTA = ['id', 'nombre', 'tel', 'motivo'];
+const CAMPOS_ALTA_ALERTA = ['id', 'nombre', 'tel', 'motivo', 'ts'];   // ts: el sello de cuándo se dio de alta, para que salga la primera
 function entrevistasTrasEscrituraSinPermiso(guardadas, entrantes) {
   const previas = Array.isArray(guardadas) ? guardadas : [];
   if (!Array.isArray(entrantes)) return previas;

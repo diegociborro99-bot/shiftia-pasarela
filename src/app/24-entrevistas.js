@@ -39,7 +39,8 @@ function irAEntrevistas(lista) { ENT.lista = lista || 'ent'; switchTab('entrevis
 function renderEntrevistas() {
   const todos = candidatos();
   const res = LISTAS_CAND.map(l => ({ l, r: resumenCandidatos(todos, l.id) }));
-  const vistos = filtrarCandidatos(todos, { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
+  // las últimas primero (José, 21/09): lo recién registrado o valorado arriba, luego por fecha de alta
+  const vistos = filtrarCandidatos(ordenarCandidatos(todos), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
   const r = res.find(x => x.l.id === ENT.lista).r;
   const alerta = ENT.lista === 'alerta';
 
@@ -69,7 +70,7 @@ function renderEntrevistas() {
   </div>
   ${puedeVerEntrevista() ? '' : `<div class="entaviso">${SVG_CANDADO}<span><b>El contenido de cada entrevista es del jefe.</b> Aquí ves quién es, a qué puesto opta, cómo se le valoró y si ya se le entrevistó — lo justo para saber si hay que volver a llamarle. Lo que se habló dentro (condiciones, sueldo, observaciones) no sale del servidor. Sí puedes meter a alguien en la lista negra si no acude a la entrevista.</span></div>`}
   <div class="entfiltros">${puestoChips}${valChips}${motChips}${Object.values(r.hab).some(Boolean) ? habChips : ''}</div>
-  <div class="entcount">${vistos.length === r.total ? `${r.total} ${r.total === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${r.total}`}${ENT.q || ENT.puesto || ENT.val || ENT.motivo || ENT.hab ? ' <button class="btn-mini ghost" id="entLimpiar">Quitar filtros</button>' : ''}</div>
+  <div class="entcount">${vistos.length === r.total ? `${r.total} ${r.total === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${r.total}`}<span class="entorden">· las últimas primero</span>${ENT.q || ENT.puesto || ENT.val || ENT.motivo || ENT.hab ? ' <button class="btn-mini ghost" id="entLimpiar">Quitar filtros</button>' : ''}</div>
   <div class="entlist">${vistos.length ? vistos.map(filaCand).join('') : `<div class="entzero"><b>No hay nadie con esos filtros.</b><span>Prueba a quitarlos o registra a alguien nuevo.</span></div>`}</div>`;
 
   $('#entQ').oninput = e => { ENT.q = e.target.value; pintaListaEnt(); };
@@ -89,7 +90,7 @@ function altaAlertaRapida() {
   const opciones = MOTIVOS_ALERTA.map((m, i) => `${i + 1}) ${m.label}`).join('\n');
   const eleccion = (prompt(`¿Por qué?\n${opciones}`, '1') || '').trim();
   const m = MOTIVOS_ALERTA[(+eleccion || 1) - 1] || MOTIVOS_ALERTA[0];
-  S.entrevistas = (S.entrevistas || []).concat([{ id: nuevoIdCand(), nombre, tel, lista: 'alerta', motivo: m.id }]);
+  S.entrevistas = (S.entrevistas || []).concat([{ id: nuevoIdCand(), nombre, tel, lista: 'alerta', motivo: m.id, ts: Date.now() }]);
   registrarCambio(`${nombre} a la lista de alerta: ${m.label.toLowerCase()}`, 'cambio');
   saveState();
   ENT.lista = 'alerta';
@@ -98,7 +99,7 @@ function altaAlertaRapida() {
 }
 // repinta solo la lista al teclear, para no perder el foco del buscador
 function pintaListaEnt() {
-  const vistos = filtrarCandidatos(candidatos(), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
+  const vistos = filtrarCandidatos(ordenarCandidatos(candidatos()), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
   const tot = resumenCandidatos(candidatos(), ENT.lista).total;
   $('#entrevistasRoot .entlist').innerHTML = vistos.length ? vistos.map(filaCand).join('') : `<div class="entzero"><b>No hay nadie con esos filtros.</b><span>Prueba a quitarlos o registra a alguien nuevo.</span></div>`;
   $('#entrevistasRoot .entcount').firstChild.textContent = vistos.length === tot ? `${tot} ${tot === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${tot}`;
@@ -300,8 +301,10 @@ function abrirFichaCand(id, editar) {
     tmp.tel = telLimpio(tmp.tel);
     if (!tmp.nombre && !tmp.tel) { alert('Pon al menos un nombre o un teléfono.'); return; }
     if (tmp.lista !== 'alerta') tmp.motivo = null;
-    if (nuevo) { tmp.fecha = tmp.fecha || fmtLargo(isoHoy()); candidatos().push(tmp); }   // por si la borró
-    else Object.assign(c, tmp);
+    // el sello de «última vez tocada» (José, 21/09: las últimas primero): al registrar, y al
+    // guardar solo si cambió algo, para que abrir una ficha y darle a Guardar no la suba
+    if (nuevo) { tmp.fecha = tmp.fecha || fmtLargo(isoHoy()); tmp.ts = Date.now(); candidatos().push(tmp); }   // por si la borró
+    else { const antes = JSON.stringify(c); Object.assign(c, tmp); if (JSON.stringify(c) !== antes) c.ts = Date.now(); }
     ENT.lista = tmp.lista;
     ov.remove();
     guardarCand(`${nuevo ? 'Candidato registrado' : 'Candidato actualizado'}: ${nombreCand(tmp)} (${etiquetaCandidato(tmp)})`);

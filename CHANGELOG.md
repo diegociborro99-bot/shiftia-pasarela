@@ -2,6 +2,14 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Entrevistas: las últimas primero** (José, 21/09: «los que pongo BIEN o descarte me
+  aparezcan primero cuando filtre. Si sale en orden alfabético me vuelvo loco»). La lista
+  salía en el orden en que llegó de Notion, que era alfabético. Ahora manda lo último que
+  se ha tocado: registrar a alguien o guardar su ficha con un cambio (una valoración, por
+  ejemplo) lo pone el primero, con o sin filtros. Abrir una ficha y darle a Guardar sin
+  cambiar nada no la mueve. Las fichas que nadie ha tocado se quedan como estaban: Notion no
+  guardaba la fecha de cada entrevista (las 275 se «crearon» el mismo minuto, el del
+  volcado), así que ahí no hay fecha por la que ordenar.
 - **Registro de apoyos** (José, 18/09: «a partir del 1 de octubre… un registro, que los
   apoyos son los extras que hay que pagarle»). Tocando a un apoyo en Hoy o en Semana, lo
   primero del menú es **«Ajustar apoyo»**: a qué hora entra y a qué hora sale ese día, con
