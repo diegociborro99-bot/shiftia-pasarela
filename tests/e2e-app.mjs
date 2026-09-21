@@ -308,6 +308,15 @@ try {
   // 21/09 (José): «Si sale en orden alfabético me vuelvo loco. Para que las últimas por fecha
   // me aparezcan antes». Valorar a alguien lo sube arriba, y registrar a alguien también.
   const ordenAntes = await pg.$$eval('#entrevistasRoot .entrow b', x => x.slice(0, 3).map(y => y.firstChild.textContent.trim()));
+  // las que nadie ha tocado van por la fecha de la entrevista (la que leyó el OCR de las
+  // hojas), la más reciente antes; las que no la tienen, al final; y nunca por nombre
+  const fechasOrden = await pg.evaluate(() => ordenarCandidatos(candidatos()).filter(c => c.lista === 'ent').map(c => fechaCandidato(c)));
+  const conFecha = fechasOrden.filter(Boolean);
+  ok(`Entrevistas: ${conFecha.length} de 194 tienen fecha legible y salen de la más reciente a la más antigua`, conFecha.length >= 160 && conFecha.every((f, i) => !i || f <= conFecha[i - 1]), JSON.stringify(fechasOrden.slice(0, 6)));
+  ok('Entrevistas: las que no tienen fecha van al final, no mezcladas', fechasOrden.slice(conFecha.length).every(f => !f), JSON.stringify(fechasOrden.slice(conFecha.length, conFecha.length + 3)));
+  ok(`Entrevistas: la primera fila (${ordenAntes[0]}) no es la primera del abecedario`, ordenAntes[0] !== 'Abril Agostra Sanchez', ordenAntes);
+  const fechaFila = await pg.$eval('#entrevistasRoot .entrow small', e => e.textContent);
+  ok(`Entrevistas: cada fila enseña la fecha de la entrevista («${fechaFila.slice(0, 14)}»)`, /^\d{1,2} [a-z]{3} 20\d\d/.test(fechaFila), fechaFila);
   const valorado = await pg.evaluate(() => {
     const lista = ordenarCandidatos(candidatos()).filter(c => c.lista === 'ent');
     const c = lista[lista.length - 1];                          // el último de la lista de hoy
@@ -335,7 +344,7 @@ try {
   await pg.fill('#entQ', '625828119'); await pg.waitForTimeout(250);
   ok('Entrevistas: el buscador encuentra por teléfono', await pg.$$eval('#entrevistasRoot .entrow b', x => x.map(y => y.textContent).join('|')).then(t => /Janira/.test(t)));
   await pg.click('#entLimpiar').catch(() => {}); await pg.waitForTimeout(200);
-  const quienEdita = await pg.$eval('#entrevistasRoot .entrow b', e => e.textContent.trim());
+  const quienEdita = await pg.$eval('#entrevistasRoot .entrow b', e => e.firstChild.textContent.trim());   // sin el «●» de entrevista contestada
   await pg.click('#entrevistasRoot .entrow'); await pg.waitForTimeout(300);
   ok('Entrevistas: pulsar en alguien abre su perfil (siete tarjetas de dato y las ocho aptitudes)',
     !!(await pg.$('#candOvl .cperf')) && await pg.$$eval('#candOvl .cperfk', x => x.length) === 7 && await pg.$$eval('#candOvl .habchip', x => x.length) === 8,

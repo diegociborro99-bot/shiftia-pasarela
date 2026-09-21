@@ -231,19 +231,44 @@ function filtrarCandidatos(cands, f) {
     return textoCandidato(c).includes(q) || (!!qTel && String(c.tel || '').includes(qTel));
   });
 }
+// La fecha de la entrevista, tal y como está escrita en la ficha, pasada a ISO para poder
+// ordenar. Las antiguas la traen como la leyó el OCR de las hojas —«23/2/2026», «22 de Julio
+// de 2026», «14 de Septiembre» sin año, a veces con el texto de al lado colado debajo— y las
+// nuevas como la pone la app al registrar («lunes 21 de septiembre», sin año). Sin año se toma
+// la última vez que cayó esa fecha: este año si ya ha pasado, si no el anterior. Lo que no se
+// entiende devuelve null y no manda a nadie a ningún sitio.
+const MES_PREF = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+function fechaCandidato(c, hoy) {
+  const s = String((c && c.fecha) || '').split('\n')[0].trim().toLowerCase();
+  if (!s) return null;
+  let y = 0, m = 0, d = 0, r;
+  if ((r = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) { y = +r[1]; m = +r[2]; d = +r[3]; }
+  else if ((r = s.match(/(\d{1,2})\s*\/\D{0,2}(\d{1,2})\s*\/\D{0,2}(\d{2,4})/))) { d = +r[1]; m = +r[2]; y = +r[3]; if (y < 100) y += 2000; }
+  else if ((r = s.match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)(?:\s+(?:de|del)\s+(\d{4}))?/))) {
+    const pref = r[2].normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 3);
+    d = +r[1]; m = MES_PREF.indexOf(pref === 'set' ? 'sep' : pref) + 1; y = r[3] ? +r[3] : 0;
+  } else return null;
+  if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+  if (!y) {
+    const h = hoy || fechaMadrid();
+    y = +h.slice(0, 4);
+    if (isoDe(y, m, d) > h) y--;
+  }
+  return isoDe(y, m, d);
+}
 // 21/09 (José, por WhatsApp): «Intenta que las entrevistas los que pongo BIEN o descarte me
 // aparezcan primero cuando filtre. Si sale en orden alfabético me vuelvo loco. Para que las
 // últimas por fecha me aparezcan antes». Manda lo último que se ha tocado —`ts`, el sello
-// que pone la app al registrar o al guardar una ficha con cambios—; después la fecha de
-// alta (`alta`, la que traía Notion); y quien no tiene ni una cosa ni otra se queda en el
-// orden en que estaba. Devuelve una copia: la base no se reordena.
-function ordenarCandidatos(cands) {
-  const lista = (cands || []).map((c, i) => ({ c, i }));
+// que pone la app al registrar o al guardar una ficha con cambios—; después la fecha de la
+// entrevista (`fechaCandidato`), la más reciente antes; y quien no tiene ni una cosa ni otra
+// se queda en el orden en que estaba. Devuelve una copia: la base no se reordena.
+function ordenarCandidatos(cands, hoy) {
+  const h = hoy || fechaMadrid();
+  const lista = (cands || []).map((c, i) => ({ c, i, f: fechaCandidato(c, h) || '' }));
   lista.sort((a, b) => {
     const ta = +a.c.ts || 0, tb = +b.c.ts || 0;
     if (ta !== tb) return tb - ta;
-    const fa = String(a.c.alta || ''), fb = String(b.c.alta || '');
-    if (fa !== fb) return fb < fa ? -1 : 1;
+    if (a.f !== b.f) return b.f < a.f ? -1 : 1;
     return a.i - b.i;
   });
   return lista.map(x => x.c);
@@ -1949,7 +1974,7 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, migrarAltas, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
-    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, ordenarCandidatos, resumenCandidatos,
+    LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, fechaCandidato, ordenarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos, fundirSemillaEntrevistas, textoCampo,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes, cierreDe, tramoDe, registroApoyos,
     toProblem, desdeSolucion,

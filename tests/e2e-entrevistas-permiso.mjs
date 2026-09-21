@@ -132,7 +132,7 @@ try {
   await llega(pgJ, () => !!document.querySelector('#entrevistasRoot .entrow'), null, 6000);
   ok('para él la fila sí es un botón', await pgJ.$eval('#entrevistasRoot .entrow', e => e.tagName.toLowerCase() === 'button'));
   ok('y tiene el botón de registrar', !!(await pgJ.$('#entNuevo')));
-  await pgJ.click('#entrevistasRoot .entrow'); await pgJ.waitForTimeout(400);
+  await pgJ.click('#entrevistasRoot .entrow[data-entficha="c1"]'); await pgJ.waitForTimeout(400);   // la suya: con la lista por fecha ya no es la primera fila
   const ficha = await pgJ.$eval('#candOvl', e => e.textContent).catch(() => '');
   ok('su ficha enseña las condiciones y las observaciones', /Seis dias/.test(ficha) && /Un poco choni/.test(ficha), ficha.slice(0, 200));
 

@@ -3,13 +3,16 @@
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
 - **Entrevistas: las últimas primero** (José, 21/09: «los que pongo BIEN o descarte me
-  aparezcan primero cuando filtre. Si sale en orden alfabético me vuelvo loco»). La lista
-  salía en el orden en que llegó de Notion, que era alfabético. Ahora manda lo último que
-  se ha tocado: registrar a alguien o guardar su ficha con un cambio (una valoración, por
-  ejemplo) lo pone el primero, con o sin filtros. Abrir una ficha y darle a Guardar sin
-  cambiar nada no la mueve. Las fichas que nadie ha tocado se quedan como estaban: Notion no
-  guardaba la fecha de cada entrevista (las 275 se «crearon» el mismo minuto, el del
-  volcado), así que ahí no hay fecha por la que ordenar.
+  aparezcan primero cuando filtre. Si sale en orden alfabético me vuelvo loco. Para que las
+  últimas por fecha me aparezcan antes»). La lista salía en el orden en que llegó de Notion,
+  que era alfabético. Ahora manda lo último que se ha tocado: registrar a alguien o guardar
+  su ficha con un cambio (una valoración, por ejemplo) lo pone el primero, con o sin filtros.
+  Abrir una ficha y darle a Guardar sin cambiar nada no la mueve. Las fichas que nadie ha
+  tocado van por la **fecha de la entrevista**, la más reciente antes: 165 de las 194
+  antiguas la traen tal y como la leyó el OCR de las hojas («23/2/2026», «22 de Julio de
+  2026», «14 de Septiembre» sin año…) y la app la entiende en todas esas formas; las 29 que
+  no la tienen van al final, en el orden en que estaban. Cada fila enseña ahora esa fecha
+  («14 sep 2026») delante del teléfono, para que se vea por qué va donde va.
 - **Registro de apoyos** (José, 18/09: «a partir del 1 de octubre… un registro, que los
   apoyos son los extras que hay que pagarle»). Tocando a un apoyo en Hoy o en Semana, lo
   primero del menú es **«Ajustar apoyo»**: a qué hora entra y a qué hora sale ese día, con

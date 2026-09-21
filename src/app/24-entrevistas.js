@@ -36,6 +36,13 @@ function telBonito(t) { const n = telLimpio(t); return n.length === 9 ? `${n.sli
 
 function irAEntrevistas(lista) { ENT.lista = lista || 'ent'; switchTab('entrevistas'); }
 
+// la fecha de la entrevista, corta («14 sep 2026»), delante de cada fila: es la llave por la que
+// va ordenada la lista cuando nadie ha tocado la ficha. Si no se entiende, no se enseña nada.
+function fechaCortaCand(c) {
+  const iso = fechaCandidato(c);
+  return iso ? `<span class="entfecha">${+iso.slice(8, 10)} ${MESES[+iso.slice(5, 7) - 1].slice(0, 3).toLowerCase()} ${iso.slice(0, 4)}</span> · ` : '';
+}
+
 function renderEntrevistas() {
   const todos = candidatos();
   const res = LISTAS_CAND.map(l => ({ l, r: resumenCandidatos(todos, l.id) }));
@@ -120,7 +127,7 @@ function filaCand(c) {
   const abre = puedeVerEntrevista();
   return `<${abre ? 'button' : 'div'} class="entrow${abre ? '' : ' entrow-cerrada'}"${abre ? ` data-entficha="${esc(c.id)}"` : ''}>
     <span class="entav" style="--pc:${avColor(c.id)}">${esc(initials(nombreCand(c)))}</span>
-    <span class="enttxt"><b>${esc(nombreCand(c))}${tieneEntrevista(c) ? '<i class="entok" title="Entrevista contestada">●</i>' : ''}</b><small>${c.tel ? esc(telBonito(c.tel)) : 'sin teléfono'}${c.edad ? ' · ' + esc(c.edad) + ' años' : ''}${c.zona ? ' · ' + esc(c.zona.split(/[,.]/)[0].slice(0, 22)) : ''}</small></span>
+    <span class="enttxt"><b>${esc(nombreCand(c))}${tieneEntrevista(c) ? '<i class="entok" title="Entrevista contestada">●</i>' : ''}</b><small>${fechaCortaCand(c)}${c.tel ? esc(telBonito(c.tel)) : 'sin teléfono'}${c.edad ? ' · ' + esc(c.edad) + ' años' : ''}${c.zona ? ' · ' + esc(c.zona.split(/[,.]/)[0].slice(0, 22)) : ''}</small></span>
     <span class="entetq">
       ${chipsPuesto(c)}
       ${v ? `<em class="entv v-${esc(v.id)}">${icoVal(v.id)}${esc(v.label)}</em>` : '<em class="entv v-no">Sin valorar</em>'}

@@ -1370,29 +1370,56 @@ ok('registro de apoyos: el tramo de cada día y sus horas, para pagarles (José 
   for (const pid of ['dulce', 'leo', 'yilian', 'cristian']) assert.strictEqual(de(pid).minutos, M.horasPersonaMes(cfg, st, { '2026-10': e }, pid, 2026, 10).minutos, pid);
 });
 
+ok('la fecha de la entrevista se entiende tal y como está escrita en la ficha', () => {
+  // las fichas antiguas traen la fecha como la escribió el OCR (23/2/2026, «22 de Julio de 2026»,
+  // «14 de Septiembre» sin año, con texto detrás…) y las nuevas como la pone la app
+  // («lunes 21 de septiembre»). Para ordenar hace falta leerlas todas.
+  const f = (fecha, hoy) => M.fechaCandidato({ fecha }, hoy || '2026-09-21');
+  assert.strictEqual(f('23/2/2026'), '2026-02-23');
+  assert.strictEqual(f('6/1/2024'), '2024-01-06');
+  assert.strictEqual(f('13/10/2025'), '2025-10-13');
+  assert.strictEqual(f('26/’9/2025'), '2025-09-26', 'un apóstrofo colado por el OCR no la rompe');
+  assert.strictEqual(f('22 de Julio de 2026'), '2026-07-22');
+  assert.strictEqual(f('29 de julio del 2026\n\nHelike Padel Club en la cafetería'), '2026-07-29', 'el texto que se coló debajo no cuenta');
+  assert.strictEqual(f('29 de Julio.'), '2026-07-29', 'sin año: el más reciente que no sea futuro');
+  assert.strictEqual(f('14 de Septiembre'), '2026-09-14');
+  assert.strictEqual(f('30 de septiembre'), '2025-09-30', 'sin año y aún no ha llegado: fue el año pasado');
+  assert.strictEqual(f('lunes 21 de septiembre'), '2026-09-21', 'la que pone la app al registrar');
+  assert.strictEqual(f('2026-09-21'), '2026-09-21');
+  assert.strictEqual(f('7/9/26'), '2026-09-07');
+  assert.strictEqual(f(''), null);
+  assert.strictEqual(f('cuando pueda'), null);
+  assert.strictEqual(f('45/13/2026'), null);
+  assert.strictEqual(M.fechaCandidato({}), null);
+  assert.strictEqual(M.fechaCandidato(null), null);
+});
+
 ok('las entrevistas salen las últimas primero, nunca en orden alfabético (José, 21/09)', () => {
   // «Intenta que las entrevistas los que pongo BIEN o descarte me aparezcan primero cuando
   // filtre. Si sale en orden alfabético me vuelvo loco. Para que las últimas por fecha me
   // aparezcan antes». Manda lo último que se ha tocado (ts, el sello de registrar o valorar);
-  // después la fecha de alta (alta, la de Notion); y quien no tiene ni una cosa ni otra se
-  // queda como estaba, sin reordenar por nombre.
+  // después la fecha de la entrevista, la más reciente antes; y quien no tiene ni una cosa
+  // ni otra se queda como estaba, sin reordenar por nombre.
   const base = [
-    { id: 'ana', nombre: 'Ana' },                                   // sin nada: se queda donde estaba
-    { id: 'bea', nombre: 'Bea', alta: '2025-03-10' },
-    { id: 'carla', nombre: 'Carla', alta: '2025-06-01' },
-    { id: 'dani', nombre: 'Dani', alta: '2024-11-20', ts: 1700000000000 },   // valorado hace tiempo
+    { id: 'ana', nombre: 'Ana' },                                                  // sin nada: se queda donde estaba
+    { id: 'bea', nombre: 'Bea', fecha: '10 de marzo de 2025' },
+    { id: 'carla', nombre: 'Carla', fecha: '1/6/2025' },
+    { id: 'dani', nombre: 'Dani', fecha: '20/11/2024', ts: 1700000000000 },        // valorado hace tiempo
     { id: 'eva', nombre: 'Eva' },
-    { id: 'fran', nombre: 'Fran', alta: '2025-01-05', ts: 1800000000000 },   // valorado hoy: el primero
+    { id: 'fran', nombre: 'Fran', fecha: '5/1/2025', ts: 1800000000000 },          // valorado hoy: el primero
+    { id: 'gala', nombre: 'Gala', fecha: '14 de septiembre' },                     // la entrevista más reciente sin tocar
   ];
-  const orden = M.ordenarCandidatos(base).map(c => c.id);
-  assert.deepStrictEqual(orden, ['fran', 'dani', 'carla', 'bea', 'ana', 'eva']);
+  const orden = M.ordenarCandidatos(base, '2026-09-21').map(c => c.id);
+  assert.deepStrictEqual(orden, ['fran', 'dani', 'gala', 'carla', 'bea', 'ana', 'eva']);
   assert.notStrictEqual(M.ordenarCandidatos(base), base, 'devuelve una copia: la base no se toca');
-  assert.deepStrictEqual(base.map(c => c.id), ['ana', 'bea', 'carla', 'dani', 'eva', 'fran']);
+  assert.deepStrictEqual(base.map(c => c.id), ['ana', 'bea', 'carla', 'dani', 'eva', 'fran', 'gala']);
   // el filtro respeta ese orden
   const bien = M.filtrarCandidatos(M.ordenarCandidatos(base.map(c => Object.assign({}, c, { val: c.id === 'ana' || c.id === 'fran' || c.id === 'bea' ? 'bien' : null }))), { val: 'bien' }).map(c => c.id);
   assert.deepStrictEqual(bien, ['fran', 'bea', 'ana']);
-  // y un ts sin alta gana a cualquier alta: acabar de valorar a alguien lo sube arriba
-  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'x', alta: '2026-09-01' }, { id: 'y', ts: 1 }]).map(c => c.id), ['y', 'x']);
+  // y un ts sin fecha gana a cualquier fecha: acabar de valorar a alguien lo sube arriba
+  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'x', fecha: '20/9/2026' }, { id: 'y', ts: 1 }]).map(c => c.id), ['y', 'x']);
+  // una fecha que no se entiende no manda a nadie al fondo por delante de quien no tiene ninguna
+  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'p' }, { id: 'q', fecha: 'cuando pueda' }, { id: 'r', fecha: '1/1/2024' }]).map(c => c.id), ['r', 'p', 'q']);
 });
 
 console.log(`\n${n} tests OK`);
