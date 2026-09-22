@@ -1,0 +1,888 @@
+<title>Fichajes Grupo Pasarela</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-d:'DM Sans','Inter',-apple-system,sans-serif;
+  --mono:ui-monospace,Menlo,Consolas,monospace;
+  --bg:#f8f6f3; --surface:#ffffff; --surface2:#f2f0ed; --surface3:#faf9f7;
+  --border:#e8e5e1; --border2:#f0ede9;
+  --ink:#2c2c2c; --ink2:#5a5a5a; --ink3:#6e6e6e;
+  --accent:#1a5a96; --accent-h:#154a7c; --accent-l:rgba(26,90,150,.08);
+  --ok:#1c7c43; --ok-bg:rgba(39,174,96,.10);
+  --warn:#96580a; --warn-bg:rgba(212,136,58,.12);
+  --bad:#b03333; --bad-bg:rgba(204,68,68,.10);
+  --sh-sm:0 1px 3px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.02);
+  --sh-md:0 2px 8px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.05);
+  --sh-lg:0 15px 40px rgba(0,0,0,.14);
+  --fantasma:rgba(0,0,0,.04);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1117; --surface:#181b22; --surface2:#1f242e; --surface3:#151820;
+    --border:#2a2e3a; --border2:#232733;
+    --ink:#e8eaf0; --ink2:#a8b3c4; --ink3:#8a95a5;
+    --accent:#3d8fd4; --accent-h:#5aa4de; --accent-l:rgba(61,143,212,.12);
+    --ok:#4ec07f; --ok-bg:rgba(78,192,127,.13);
+    --warn:#d9a441; --warn-bg:rgba(217,164,65,.14);
+    --bad:#e06b6b; --bad-bg:rgba(224,107,107,.13);
+    --fantasma:rgba(255,255,255,.05);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1117; --surface:#181b22; --surface2:#1f242e; --surface3:#151820;
+  --border:#2a2e3a; --border2:#232733;
+  --ink:#e8eaf0; --ink2:#a8b3c4; --ink3:#8a95a5;
+  --accent:#3d8fd4; --accent-h:#5aa4de; --accent-l:rgba(61,143,212,.12);
+  --ok:#4ec07f; --ok-bg:rgba(78,192,127,.13);
+  --warn:#d9a441; --warn-bg:rgba(217,164,65,.14);
+  --bad:#e06b6b; --bad-bg:rgba(224,107,107,.13);
+  --fantasma:rgba(255,255,255,.05);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+h1,h2,h3{font-family:var(--font-d);margin:0;text-wrap:balance}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ====== marco general ====== */
+.marco{max-width:1500px;margin:0 auto;padding-inline:16px;padding-block:0 40px}
+
+/* ====== cabecera de la demo ====== */
+.intro{padding-block:26px 18px;display:flex;gap:22px;align-items:flex-end;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.intro h1{font-size:clamp(21px,2.6vw,29px);font-weight:800;letter-spacing:-.02em}
+.intro p{margin:6px 0 0;color:var(--ink2);max-width:62ch;font-size:13.5px}
+.intro .sello{margin-left:auto;display:flex;gap:8px;align-items:center;flex:none}
+.pill{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:11.5px;font-weight:600;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
+.pill b{color:var(--ink);font-weight:700}
+
+/* ====== rail de pasos ====== */
+.pasos{display:flex;gap:8px;overflow-x:auto;padding-block:16px;scrollbar-width:none}
+.pasos::-webkit-scrollbar{display:none}
+.paso{flex:1 1 0;min-width:152px;text-align:left;border:1px solid var(--border);background:var(--surface);border-radius:13px;padding:10px 13px;display:flex;flex-direction:column;gap:2px;transition:border-color .15s,box-shadow .15s,transform .15s}
+.paso:hover{border-color:var(--accent);transform:translateY(-1px)}
+.paso .n{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.1em;color:var(--ink3)}
+.paso .t{font-family:var(--font-d);font-weight:700;font-size:13.5px;line-height:1.25}
+.paso.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-l)}
+.paso.on .n{color:var(--accent)}
+.paso.hecho .n::after{content:' ✓';color:var(--ok)}
+
+/* ====== instrucción viva ====== */
+.batuta{display:flex;gap:11px;align-items:flex-start;background:var(--accent-l);border:1px solid color-mix(in srgb, var(--accent) 28%, transparent);border-radius:13px;padding:11px 15px;margin-bottom:16px}
+.batuta .ico{width:23px;height:23px;border-radius:7px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px;flex:none;font-family:var(--mono)}
+.batuta p{margin:0;font-size:13.5px;color:var(--ink)}
+.batuta b{font-weight:700}
+
+/* ====== escenario ====== */
+.escenario{display:grid;grid-template-columns:minmax(0,1fr) 392px;gap:22px;align-items:start}
+@media(max-width:1080px){.escenario{grid-template-columns:minmax(0,1fr);}}
+
+/* ====== la web ====== */
+.web{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--sh-md)}
+.topbar{display:flex;align-items:center;gap:11px;padding:11px 15px;background:var(--surface);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:9px;flex:none}
+.logo .marca{font-family:var(--font-d);font-size:17px;font-weight:800;letter-spacing:-.02em}
+.logo .marca i{font-style:normal;color:var(--accent)}
+.sellopas{width:29px;height:29px;border-radius:7px;border:1px solid var(--border);display:grid;place-items:center;font-family:var(--font-d);font-size:7px;font-weight:700;line-height:1.05;text-align:center;color:var(--ink2);background:var(--surface2);letter-spacing:.02em}
+.nav{display:flex;gap:1px;margin-left:12px;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav button{border:0;background:none;padding:7px 10px;font-size:12.5px;font-weight:600;color:var(--ink3);border-bottom:2px solid transparent;white-space:nowrap;border-radius:6px 6px 0 0}
+.nav button:hover{color:var(--ink)}
+.nav button.on{color:var(--accent);border-bottom-color:var(--accent)}
+.nav button.nuevo::after{content:'nuevo';margin-left:6px;font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:var(--ok);color:#fff;border-radius:999px;padding:2px 5px;vertical-align:1px}
+.relojtop{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
+.relojtop .h{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.02em}
+.relojtop .d{font-size:10.5px;color:var(--ink3);font-weight:600}
+.cuerpo{padding:17px 17px 20px;min-height:474px;background:var(--surface3)}
+.cuerpo h2{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.sub{color:var(--ink3);font-size:12.5px;margin:3px 0 15px}
+.eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+
+/* tarjetas de local */
+.locales{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px;align-items:start}
+.local{border:1px solid var(--border);border-radius:13px;background:var(--surface);overflow:hidden}
+.local>header{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--border2);background:var(--surface)}
+.punto{width:10px;height:10px;border-radius:3px;flex:none}
+.local>header b{font-family:var(--font-d);font-size:14px;font-weight:700;flex:1}
+.local>header .cuenta{font-size:11px;color:var(--ink3);font-weight:600}
+.fichas{display:flex;flex-direction:column}
+.ficha{display:flex;align-items:center;gap:9px;padding:8px 13px;border-top:1px solid var(--border2);background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left;transition:background .12s}
+.ficha:first-child{border-top:0}
+.ficha:hover{background:var(--fantasma)}
+.av{width:27px;height:27px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px;flex:none;font-family:var(--font-d)}
+.quien{flex:1;min-width:0}
+.quien b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.quien small{display:block;font-size:11px;color:var(--ink3)}
+.estado{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap;flex:none;display:inline-flex;align-items:center;gap:5px}
+.e-dentro{background:var(--ok-bg);color:var(--ok)}
+.e-hecho{background:var(--surface2);color:var(--ink2)}
+.e-espera{background:var(--surface2);color:var(--ink3)}
+.e-entrando{background:var(--accent-l);color:var(--accent)}
+.e-sin{background:var(--warn-bg);color:var(--warn)}
+.e-tarde{background:var(--bad-bg);color:var(--bad)}
+.latido{width:6px;height:6px;border-radius:50%;background:currentColor;animation:latir 1.6s ease-in-out infinite}
+@keyframes latir{0%,100%{opacity:1}50%{opacity:.25}}
+@media(prefers-reduced-motion:reduce){.latido{animation:none}}
+.der{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+.horas{font-family:var(--mono);font-size:11px;color:var(--ink2);white-space:nowrap}
+.quien small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* avisos */
+.avisos{margin-top:15px;border:1px solid var(--border);border-radius:13px;background:var(--surface);padding:13px 15px}
+.avisos ul{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+.avisos li{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--ink2)}
+.avisos li .bola{width:7px;height:7px;border-radius:50%;margin-top:6px;flex:none}
+.avisos li b{color:var(--ink);font-weight:600}
+
+/* ====== pestaña Horas: calendario ====== */
+.horaswrap{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:15px;align-items:start}
+@media(max-width:900px){.horaswrap{grid-template-columns:minmax(0,1fr)}}
+.tarjeta{border:1px solid var(--border);border-radius:13px;background:var(--surface);padding:14px 15px}
+.tarjeta>h3{font-size:14px;font-weight:700;margin-bottom:3px}
+.tarjeta>p.pie{margin:2px 0 12px;font-size:11.5px;color:var(--ink3)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .dow{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);text-align:center;padding-bottom:3px}
+.dia{aspect-ratio:1/.92;border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:4px 5px;display:flex;flex-direction:column;gap:1px;align-items:flex-start;justify-content:flex-start;transition:border-color .12s,background .12s;position:relative;overflow:hidden}
+.dia:hover:not(:disabled){border-color:var(--accent)}
+.dia:disabled{background:var(--surface3);border-color:var(--border2);cursor:default}
+.dia .d{font-size:10.5px;font-weight:700;color:var(--ink3);font-family:var(--mono)}
+.dia .hh{font-size:12px;font-weight:700;font-family:var(--mono);color:var(--ink);letter-spacing:-.02em}
+.dia .bar{position:absolute;left:0;right:0;bottom:0;height:3px}
+.dia.libra .hh{color:var(--ink3);font-weight:600;font-size:10.5px}
+.dia.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-l)}
+.dia .mas{font-size:9.5px;font-weight:700;color:var(--ok)}
+.dia .falta{font-size:9.5px;font-weight:700;color:var(--warn)}
+.dia.hoy .d{color:var(--accent)}
+.dia.hoy{border-color:var(--accent)}
+
+/* los dos libros */
+.libros{display:flex;flex-direction:column;gap:11px}
+.libro{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--surface)}
+.libro.oficial{border-left:3px solid var(--ink2)}
+.libro.contador{border-left:3px solid var(--ok)}
+.libro .cab{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+.libro .cab .eyebrow{flex:1}
+.libro .tot{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:-.02em}
+.libro p{margin:0;font-size:11.5px;color:var(--ink3);line-height:1.4}
+.lineas{display:flex;flex-direction:column;gap:5px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--border)}
+.linea{display:flex;gap:8px;font-size:12px;align-items:baseline}
+.linea .f{font-family:var(--mono);font-size:11px;color:var(--ink3);width:46px;flex:none}
+.linea .q{flex:1;color:var(--ink2);min-width:0}
+.linea .v{font-family:var(--mono);font-weight:700;flex:none}
+.linea .v.mas{color:var(--ok)}
+.linea .v.menos{color:var(--bad)}
+
+/* botones */
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:600;transition:border-color .12s,background .12s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.cta{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.cta:hover{background:var(--accent-h);border-color:var(--accent-h);color:#fff}
+.btn.mini{padding:4px 9px;font-size:11.5px;border-radius:7px}
+.btnfila{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+/* ====== el móvil ====== */
+.movil{position:sticky;top:16px}
+@media(max-width:1080px){.movil{position:static;max-width:392px;margin-inline:auto}}
+.tel{border-radius:34px;border:1px solid var(--border);background:#12141a;padding:9px;box-shadow:var(--sh-lg)}
+.pantalla{border-radius:26px;overflow:hidden;background:var(--bg);height:686px;display:flex;flex-direction:column;position:relative}
+.telcab{background:var(--surface);border-bottom:1px solid var(--border);padding:13px 16px 10px;display:flex;align-items:center;gap:9px;flex:none}
+.telcab .hora{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink3);margin-left:auto}
+.telcuerpo{flex:1;overflow-y:auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.telpie{flex:none;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border);background:var(--surface);padding:7px 0 9px}
+.telpie button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink3);padding:3px 0}
+.telpie button.on{color:var(--accent);font-weight:700}
+.telpie svg{width:21px;height:21px}
+.mcard{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:13px 15px}
+.mcard h4{margin:0 0 7px;font-family:var(--font-d);font-size:13px;font-weight:700}
+.turnohoy{display:flex;align-items:center;gap:9px}
+.turnohoy .nom{font-family:var(--font-d);font-size:19px;font-weight:800;letter-spacing:-.01em}
+.turnohoy .rango{margin-left:auto;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ink2)}
+.btnfichar{width:100%;border:0;border-radius:16px;padding:17px;font-family:var(--font-d);font-size:18px;font-weight:800;color:#fff;background:var(--accent);display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 5px 16px rgba(26,90,150,.26);transition:transform .12s,background .12s}
+.btnfichar:hover{background:var(--accent-h)}
+.btnfichar:active{transform:scale(.985)}
+.btnfichar.salir{background:var(--bad);box-shadow:0 5px 16px rgba(176,51,51,.24)}
+.btnfichar.salir:hover{background:#933}
+.btnfichar:disabled{background:var(--surface2);color:var(--ink3);box-shadow:none;cursor:default}
+.dentrocaja{border-radius:16px;background:var(--ink);color:#fff;padding:15px 17px;display:flex;flex-direction:column;gap:3px}
+:root[data-theme="dark"] .dentrocaja,
+:root:not([data-theme="light"]) .dentrocaja{background:#202632}
+.dentrocaja .et{font-size:10px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;opacity:.72}
+.dentrocaja .cron{font-family:var(--mono);font-size:37px;font-weight:700;line-height:1.05;letter-spacing:-.02em}
+.dentrocaja .sub2{font-size:12px;opacity:.78}
+.milinea{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:5px 0;border-top:1px solid var(--border2)}
+.milinea:first-of-type{border-top:0}
+.milinea .dd{font-weight:700;color:var(--ink3);width:46px;flex:none;font-size:11.5px}
+.milinea .ll{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.milinea .tt{font-family:var(--mono);font-size:11.5px;color:var(--ink2);flex:none}
+.aviso{border-radius:12px;padding:11px 13px;font-size:12.5px;display:flex;gap:9px;align-items:flex-start}
+.aviso.warn{background:var(--warn-bg);color:var(--warn)}
+.aviso.ok{background:var(--ok-bg);color:var(--ok)}
+.aviso b{font-weight:700}
+
+/* escáner QR */
+.escaner{position:absolute;inset:0;background:#0d0f13;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:17px;padding:26px;z-index:5}
+.visor{width:198px;height:198px;border-radius:20px;position:relative;background:#1a1d24;display:grid;place-items:center;overflow:hidden}
+.visor .esq{position:absolute;width:30px;height:30px;border:3px solid #fff;border-radius:5px}
+.visor .e1{top:11px;left:11px;border-right:0;border-bottom:0}
+.visor .e2{top:11px;right:11px;border-left:0;border-bottom:0}
+.visor .e3{bottom:11px;left:11px;border-right:0;border-top:0}
+.visor .e4{bottom:11px;right:11px;border-left:0;border-top:0}
+.rayo{position:absolute;left:11px;right:11px;height:2px;background:#4ecdc4;box-shadow:0 0 11px #4ecdc4;animation:escanear 1.5s ease-in-out infinite}
+@keyframes escanear{0%,100%{top:22px}50%{bottom:22px;top:auto}}
+@media(prefers-reduced-motion:reduce){.rayo{animation:none;top:50%}}
+.qr{display:grid;gap:1px;background:#fff;padding:7px;border-radius:5px}
+.qr i{display:block;border-radius:1px}
+.escaner .txt{color:#fff;text-align:center;font-size:13px;line-height:1.45;opacity:.9}
+.escaner .txt b{display:block;font-family:var(--font-d);font-size:16px;font-weight:700;margin-bottom:3px}
+
+/* cartel QR del bar */
+.cartel{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:19px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:9px}
+.cartel .barra{width:100%;height:5px;border-radius:999px}
+.cartel h3{font-size:19px;font-weight:800}
+.cartel p{margin:0;font-size:12px;color:var(--ink3);max-width:30ch}
+
+/* ====== modal ====== */
+.velo{position:fixed;inset:0;background:rgba(15,17,23,.5);display:grid;place-items:center;padding:16px;z-index:40;backdrop-filter:blur(2px)}
+.hoja{background:var(--surface);border:1px solid var(--border);border-radius:17px;box-shadow:var(--sh-lg);max-width:760px;width:100%;max-height:88vh;overflow-y:auto}
+.hoja>header{display:flex;align-items:center;gap:11px;padding:15px 19px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);border-radius:17px 17px 0 0}
+.hoja>header h3{flex:1;font-size:16px;font-weight:700}
+.hoja .interior{padding:17px 19px 21px;display:flex;flex-direction:column;gap:14px}
+.cerrar{border:1px solid var(--border);background:var(--surface);border-radius:8px;width:29px;height:29px;display:grid;place-items:center;font-size:16px;color:var(--ink2);line-height:1}
+.cerrar:hover{border-color:var(--bad);color:var(--bad)}
+
+/* informe */
+.informe{border:1px solid var(--border);border-radius:10px;padding:19px;background:var(--surface3);font-size:12px}
+.informe table{width:100%;border-collapse:collapse}
+.informe th{text-align:left;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);padding-bottom:5px;border-bottom:1px solid var(--border);font-weight:700}
+.informe td{padding:5px 0;border-bottom:1px solid var(--border2);font-size:12px}
+.informe td.n{font-family:var(--mono);text-align:right;white-space:nowrap}
+.informe .cabinf{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:13px;gap:12px;flex-wrap:wrap}
+.informe .cabinf b{font-family:var(--font-d);font-size:15px;font-weight:800;display:block}
+.informe .cabinf small{color:var(--ink3);font-size:11px}
+
+/* formulario de ajuste */
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:10px}
+.campo{display:flex;flex-direction:column;gap:4px}
+.campo label{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.campo input,.campo select{border:1px solid var(--border);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--ink);font:inherit;font-size:13px}
+.campo input:focus,.campo select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+
+/* notas del final */
+.notas{margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:13px}
+.nota{border:1px solid var(--border);border-radius:13px;background:var(--surface);padding:14px 16px}
+.nota h4{margin:0 0 6px;font-family:var(--font-d);font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:7px}
+.nota h4 .mk{width:8px;height:8px;border-radius:2px;flex:none}
+.nota ul{margin:0;padding-left:17px;font-size:12.5px;color:var(--ink2);display:flex;flex-direction:column;gap:5px}
+.nota p{margin:0;font-size:12.5px;color:var(--ink2)}
+
+.pieweb{margin-top:26px;padding-top:15px;border-top:1px solid var(--border);color:var(--ink3);font-size:11.5px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:5px}
+</style>
+
+<div class="marco">
+
+  <div class="intro">
+    <div>
+      <h1>Fichajes y horas · Grupo Pasarela</h1>
+      <p>Así quedaría dentro de Shiftia. A la izquierda lo que ve la oficina en la web; a la derecha, el móvil del trabajador. Lo que pulses en el móvil aparece en la web al instante, igual que pasará de verdad.</p>
+    </div>
+    <div class="sello">
+      <span class="pill">Prototipo · <b>datos de ejemplo</b></span>
+      <button class="btn mini" id="tema" type="button">Tema</button>
+    </div>
+  </div>
+
+  <div class="pasos" id="pasos"></div>
+
+  <div class="batuta">
+    <span class="ico">›</span>
+    <p id="batuta"></p>
+  </div>
+
+  <div class="escenario">
+    <section class="web" aria-label="La web de Shiftia">
+      <header class="topbar">
+        <span class="logo">
+          <span class="sellopas">Grupo<br>Pasarela</span>
+          <span class="marca">Sh<i>iftia</i></span>
+        </span>
+        <nav class="nav" id="nav"></nav>
+        <span class="relojtop">
+          <span class="d" id="fechatop"></span>
+          <span class="h num" id="relojtop">--:--</span>
+        </span>
+      </header>
+      <div class="cuerpo" id="cuerpo"></div>
+    </section>
+
+    <aside class="movil" aria-label="El móvil del trabajador">
+      <div class="tel">
+        <div class="pantalla">
+          <div class="telcab">
+            <span class="sellopas" style="width:25px;height:25px;font-size:6px">Grupo<br>Pasarela</span>
+            <span>
+              <span style="display:block;font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)">Mi perfil</span>
+              <span style="display:block;font-family:var(--font-d);font-size:15px;font-weight:800;line-height:1.1" id="telnombre">Cristian</span>
+            </span>
+            <span class="hora num" id="telhora">--:--</span>
+          </div>
+          <div class="telcuerpo" id="telcuerpo"></div>
+          <div class="telpie" id="telpie"></div>
+          <div id="escaner"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="notas" id="notas"></div>
+
+  <div class="pieweb">
+    <span>Prototipo para la reunión del 22 de septiembre de 2026.</span>
+    <span>Los nombres y los turnos son los reales de la planilla; las horas son inventadas para la demo.</span>
+  </div>
+</div>
+
+<div id="modal"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════ los cuatro bares, con el color que ya tienen en la planilla ══════════ */
+  var BARES = {
+    EL33:     { nom: 'El 33',       color: '#b8741a' },
+    ZAPA:     { nom: 'Zapatillera', color: '#c2378f' },
+    MONACO:   { nom: 'Bar Mónaco',  color: '#2f6db5' },
+    PASARELA: { nom: 'Pasarela',    color: '#1f9a6e' }
+  };
+
+  /* ══════════ la jornada de hoy, martes 22 de septiembre ══════════
+     Sale de la planilla real: quién trabaja, dónde y en qué franja.        */
+  var TURNOS = [
+    { id: 'cris',      nom: 'Cris Parreño', bar: 'MONACO',   fr: 'Mañana', ini: 7 * 60,      fin: 16 * 60,      fichado: [7 * 60 - 2, 16 * 60 + 2] },
+    { id: 'esmeralda', nom: 'Esmeralda',    bar: 'MONACO',   fr: 'Mañana', ini: 8 * 60,      fin: 16 * 60,      fichado: [8 * 60 + 1, 16 * 60 + 4], cocina: true },
+    { id: 'cristian',  nom: 'Cristian',     bar: 'MONACO',   fr: 'Tarde',  ini: 16 * 60,     fin: 24 * 60,      fichado: null, apoyo: true, yo: true },
+    { id: 'scapon',    nom: 'Susana Capón', bar: 'MONACO',   fr: 'Tarde',  ini: 16 * 60,     fin: 24 * 60,      fichado: [15 * 60 + 58, null] },
+    { id: 'hojan',     nom: 'Hojan',        bar: 'MONACO',   fr: 'Tarde',  ini: 16 * 60,     fin: 24 * 60,      fichado: [16 * 60 + 2, null], cocina: true },
+    { id: 'noe',       nom: 'Noe',          bar: 'EL33',     fr: 'Mañana', ini: 7 * 60,      fin: 16 * 60,      fichado: [6 * 60 + 57, 16 * 60 + 6] },
+    { id: 'victoria',  nom: 'Victoria',     bar: 'EL33',     fr: 'Tarde',  ini: 16 * 60,     fin: 24 * 60,      fichado: [15 * 60 + 52, null] },
+    { id: 'jenny',     nom: 'Jenny',        bar: 'EL33',     fr: 'Tarde',  ini: 16 * 60,     fin: 24 * 60,      fichado: [15 * 60 + 55, null], cocina: true },
+    { id: 'jacquelin', nom: 'Jacquelin',    bar: 'ZAPA',     fr: 'Mañana', ini: 8 * 60,      fin: 16 * 60,      fichado: [7 * 60 + 56, 16 * 60 + 1] },
+    { id: 'sluna',     nom: 'Susana Luna',  bar: 'ZAPA',     fr: 'Tarde',  ini: 16 * 60,     fin: 24 * 60,      fichado: [15 * 60 + 59, null] },
+    { id: 'adrian',    nom: 'Adrián',       bar: 'ZAPA',     fr: 'Tarde',  ini: 16 * 60,     fin: 24 * 60,      fichado: [15 * 60 + 57, null], cocina: true },
+    { id: 'mariluz',   nom: 'Mari Luz',     bar: 'PASARELA', fr: 'Mañana', ini: 7 * 60,      fin: 16 * 60,      fichado: [6 * 60 + 58, 16 * 60 + 3] },
+    { id: 'lola',      nom: 'Lola',         bar: 'PASARELA', fr: 'Tarde',  ini: 16 * 60,     fin: 24 * 60,      fichado: [15 * 60 + 54, null] },
+    { id: 'laura',     nom: 'Laura',        bar: 'PASARELA', fr: 'Tarde',  ini: 16 * 60,     fin: 24 * 60,      fichado: [16 * 60 + 12, null] }
+  ];
+
+  /* ══════════ el mes de Cristian ══════════
+     Lo fichado (registro oficial) y lo que la oficina le añadió (contador).  */
+  var MES = [];
+  (function armarMes() {
+    // septiembre de 2026: el día 1 cae en martes
+    var patron = [
+      null, 8.1, 8.0, null, 9.1, 5.0,     // 1-6
+      null, 8.0, 8.1, 8.0, 9.0, 5.1, 4.9, // 7-13
+      null, 8.0, 8.1, 9.0, 8.0, null, 5.0,// 14-20
+      null                                 // 21
+    ];
+    for (var d = 1; d <= 30; d++) {
+      var h = d <= patron.length ? patron[d - 1] : undefined;
+      MES.push({ dia: d, horas: h === null ? 0 : (h === undefined ? null : h), libra: h === null, futuro: d > 22 });
+    }
+    // el viernes 18: entró y no fichó la salida
+    MES[17].horas = 0; MES[17].sinSalida = true; MES[17].libra = false;
+  })();
+
+  var AJUSTES = [
+    { dia: 18, horas: 8, motivo: 'Olvidó fichar la salida. Salió a las 00:05, lo confirma el encargado.' },
+    { dia: 12, horas: 2, motivo: 'Se quedó al cierre por el partido del Barcelona.' },
+    { dia: 10, horas: -1, motivo: 'Salió una hora antes.' }
+  ];
+
+  /* ══════════ estado vivo ══════════ */
+  var S = {
+    paso: 0,
+    pestana: 'fichajes',
+    telvista: 'hoy',
+    ahora: 16 * 60 + 15,   // minutos desde medianoche; corre solo
+    escaneando: false,
+    diaSel: null,
+    modal: null,
+    hecho: {}
+  };
+
+  var PASOS = [
+    { t: 'El QR de cada bar', b: 'Cada bar tiene su cartel con un QR pegado en la barra. <b>No hay reloj, ni tarjeta, ni app que instalar</b>: el trabajador usa el móvil que ya lleva encima. Pulsa aquí abajo en el cartel para verlo.' },
+    { t: 'Cristian ficha la entrada', b: 'Cristian entra a las 16:00 en el Bar Mónaco. Abre su perfil, pulsa <b>Fichar entrada</b> y apunta al QR. Hazlo tú en el móvil de la derecha y mira cómo cambia la web sola.' },
+    { t: 'La oficina lo ve al momento', b: 'Su ficha pasa de roja a verde en el tablero de la oficina, con la hora exacta. <b>Nadie tiene que apuntar nada.</b> El aviso de «no ha fichado» desaparece solo, y los turnos de la mañana quedan en gris, ya cerrados.' },
+    { t: 'Ficha la salida', b: 'Al cerrar, vuelve a escanear y pulsa <b>Fichar salida</b>. Las horas caen solas en los dos sitios: en el registro oficial y en su contador. Pruébalo.' },
+    { t: 'El día que se olvida de fichar', b: 'El viernes 18 Cristian entró y no fichó al salir. <b>El registro oficial se queda como está</b>, diciendo la verdad: entró y no fichó. Abre la pestaña <b>Horas</b> y mira el día 18 del calendario.' },
+    { t: 'El encargado le añade las horas', b: 'Esas 8 horas se le pagan igual. El encargado se las añade <b>al contador</b>, no al fichaje. Pulsa <b>Añadir horas</b> y verás que el contador sube y el registro oficial no se mueve.' },
+    { t: 'El informe oficial', b: 'Y esto es lo que sale impreso si viene una inspección: <b>solo lo fichado de verdad</b>. Las horas que ha puesto la empresa van aparte, en su propia hoja. Ábrelo.' }
+  ];
+
+  /* ══════════ utilidades ══════════ */
+  function hm(m) {
+    m = ((Math.round(m) % 1440) + 1440) % 1440;
+    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  }
+  function dur(min) {
+    var h = Math.floor(min / 60), r = Math.round(min % 60);
+    return h + ' h ' + String(r).padStart(2, '0');
+  }
+  function durH(horas) {
+    var h = Math.floor(horas), m = Math.round((horas - h) * 60);
+    return h + ' h ' + String(m).padStart(2, '0');
+  }
+  function ini(n) { return n.split(' ').map(function (x) { return x[0]; }).join('').slice(0, 2).toUpperCase(); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+  function color(id) {
+    var p = ['#b8741a', '#c2378f', '#2f6db5', '#1f9a6e', '#7c5fb8', '#c26360', '#2e8b7a'];
+    var s = 0; for (var i = 0; i < id.length; i++) s += id.charCodeAt(i);
+    return p[s % p.length];
+  }
+  function $(s) { return document.querySelector(s); }
+  function yo() { return TURNOS.filter(function (t) { return t.yo; })[0]; }
+
+  /* estado de un turno ahora mismo */
+  function situacion(t) {
+    if (t.fichado && t.fichado[0] != null && t.fichado[1] != null) return 'hecho';
+    if (t.fichado && t.fichado[0] != null) return 'dentro';
+    if (S.ahora >= t.ini + 10) return 'tarde';
+    if (S.ahora >= t.ini) return 'entrando';
+    return 'espera';
+  }
+
+  /* horas del mes de Cristian */
+  function totalFichado() {
+    var s = 0;
+    MES.forEach(function (d) { if (d.horas) s += d.horas; });
+    var y = yo();
+    if (y.fichado && y.fichado[0] != null && y.fichado[1] != null) s += (y.fichado[1] - y.fichado[0]) / 60;
+    return s;
+  }
+  function totalAjustes() {
+    return AJUSTES.reduce(function (a, x) { return a + x.horas; }, 0);
+  }
+
+  /* ══════════ el QR dibujado ══════════ */
+  function qrHtml(semilla, lado) {
+    var n = 21, celda = Math.floor(lado / n), html = '';
+    var s = 0; for (var i = 0; i < semilla.length; i++) s = (s * 31 + semilla.charCodeAt(i)) >>> 0;
+    function rnd() { s = (s * 1103515245 + 12345) >>> 0; return (s >>> 16) / 65536; }
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        var ojo = (x < 7 && y < 7) || (x > n - 8 && y < 7) || (x < 7 && y > n - 8);
+        var on;
+        if (ojo) {
+          var lx = x > n - 8 ? x - (n - 7) : x, ly = y > n - 8 ? y - (n - 7) : y;
+          var b = Math.max(Math.abs(lx - 3), Math.abs(ly - 3));
+          on = b !== 2;
+        } else { on = rnd() > 0.48; }
+        html += '<i style="width:' + celda + 'px;height:' + celda + 'px;background:' + (on ? '#12141a' : '#fff') + '"></i>';
+      }
+    }
+    return '<span class="qr" style="grid-template-columns:repeat(' + n + ',' + celda + 'px)">' + html + '</span>';
+  }
+
+  /* ══════════ pintar: el rail de pasos ══════════ */
+  function pintaPasos() {
+    $('#pasos').innerHTML = PASOS.map(function (p, i) {
+      return '<button class="paso' + (i === S.paso ? ' on' : '') + (S.hecho[i] ? ' hecho' : '') + '" type="button" data-paso="' + i + '">' +
+        '<span class="n">PASO ' + (i + 1) + '</span><span class="t">' + p.t + '</span></button>';
+    }).join('');
+    $('#batuta').innerHTML = PASOS[S.paso].b;
+  }
+
+  /* ══════════ pintar: la barra de pestañas de la web ══════════ */
+  function pintaNav() {
+    var tabs = ['Hoy', 'Semana', 'Mes', 'Equipo', 'Horas', 'Cobertura', 'Entrevistas'];
+    var html = tabs.map(function (t) {
+      var esHoras = t === 'Horas';
+      var on = (esHoras && S.pestana === 'horas');
+      return '<button type="button" class="' + (on ? 'on' : '') + '" data-tab="' + (esHoras ? 'horas' : '') + '">' + t + '</button>';
+    }).join('');
+    html += '<button type="button" class="nuevo ' + (S.pestana === 'fichajes' ? 'on' : '') + '" data-tab="fichajes">Fichajes</button>';
+    $('#nav').innerHTML = html;
+    $('#fechatop').textContent = 'martes 22 sep';
+    $('#relojtop').textContent = hm(S.ahora);
+    $('#telhora').textContent = hm(S.ahora);
+  }
+
+  /* ══════════ pintar: pestaña Fichajes (la oficina) ══════════ */
+  function panelFichajes() {
+    var dentro = TURNOS.filter(function (t) { return situacion(t) === 'dentro'; }).length;
+    var tarde = TURNOS.filter(function (t) { return situacion(t) === 'tarde'; });
+
+    var porBar = Object.keys(BARES).map(function (b) {
+      var gente = TURNOS.filter(function (t) { return t.bar === b; });
+      var d = gente.filter(function (t) { return situacion(t) === 'dentro'; }).length;
+      var filas = gente.map(function (t) {
+        var st = situacion(t);
+        var etq = { dentro: '<span class="latido"></span>Dentro', hecho: 'Turno hecho', espera: 'Aún no entra', entrando: 'Entrando', tarde: 'Sin fichar' }[st];
+        var cl = { dentro: 'e-dentro', hecho: 'e-hecho', espera: 'e-espera', entrando: 'e-entrando', tarde: 'e-tarde' }[st];
+        var horas = '—';
+        if (t.fichado && t.fichado[0] != null) {
+          horas = hm(t.fichado[0]) + ' → ' + (t.fichado[1] != null ? hm(t.fichado[1]) : '·····');
+        }
+        return '<button class="ficha" type="button" data-ficha="' + t.id + '">' +
+          '<span class="av" style="background:' + color(t.id) + '">' + ini(t.nom) + '</span>' +
+          '<span class="quien"><b>' + esc(t.nom) + (t.yo ? ' ·' : '') + '</b><small>' + t.fr + (t.cocina ? ' · cocina' : t.apoyo ? ' · apoyo' : '') + ' · ' + hm(t.ini) + '–' + hm(t.fin) + '</small></span>' +
+          '<span class="der"><span class="estado ' + cl + '">' + etq + '</span>' +
+          '<span class="horas num">' + horas + '</span></span></button>';
+      }).join('');
+      return '<div class="local"><header><span class="punto" style="background:' + BARES[b].color + '"></span><b>' + BARES[b].nom + '</b>' +
+        '<span class="cuenta">' + d + ' dentro · ' + gente.length + ' hoy</span></header>' +
+        '<div class="fichas">' + filas + '</div></div>';
+    }).join('');
+
+    var lista = tarde.map(function (t) {
+      return '<li><span class="bola" style="background:var(--bad)"></span><span><b>' + esc(t.nom) + '</b> entraba a las ' + hm(t.ini) + ' en ' + BARES[t.bar].nom + ' y aún no ha fichado.</span></li>';
+    }).join('');
+    lista += '<li><span class="bola" style="background:var(--warn)"></span><span><b>Cristian</b> no fichó la salida el viernes 18. El encargado ya le ajustó el contador.</span></li>';
+
+    return '<h2>Fichajes de hoy</h2>' +
+      '<p class="sub">Martes 22 de septiembre · ' + dentro + ' personas dentro ahora mismo en los cuatro bares</p>' +
+      '<div class="locales">' + porBar + '</div>' +
+      '<div class="avisos"><span class="eyebrow">Lo que hay que mirar</span><ul>' + lista + '</ul></div>' +
+      '<div class="btnfila">' +
+      '<button class="btn" type="button" data-modal="cartel">Ver el cartel del bar</button>' +
+      '<button class="btn" type="button" data-modal="informe">Informe oficial del mes</button>' +
+      '<button class="btn" type="button" data-tab="horas">Ir al calendario de horas</button></div>';
+  }
+
+  /* ══════════ pintar: pestaña Horas (el calendario) ══════════ */
+  function panelHoras() {
+    var DOW = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    var cab = DOW.map(function (d) { return '<span class="dow">' + d + '</span>'; }).join('');
+    // el 1 de septiembre de 2026 cae en martes → un hueco delante
+    var huecos = '<span></span>';
+    var dias = MES.map(function (d) {
+      var aj = AJUSTES.filter(function (a) { return a.dia === d.dia; });
+      var bar = d.horas ? '<span class="bar" style="background:var(--accent);opacity:' + Math.min(1, d.horas / 9) + '"></span>' : '';
+      var cuerpo;
+      if (d.futuro) cuerpo = '<span class="hh" style="color:var(--ink3);font-weight:600">·</span>';
+      else if (d.dia === 22) {
+        var yy = yo();
+        cuerpo = yy.fichado && yy.fichado[0] != null
+          ? '<span class="hh" style="color:var(--accent)">' + (yy.fichado[1] != null ? durH((yy.fichado[1] - yy.fichado[0]) / 60) : dur(S.ahora - yy.fichado[0])).replace(' h ', 'h') + '</span>'
+          : '<span class="hh" style="color:var(--accent);font-size:10.5px">hoy</span>';
+      }
+      else if (d.sinSalida) cuerpo = '<span class="falta">sin fichar</span>';
+      else if (d.libra) cuerpo = '<span class="hh" style="color:var(--ink3);font-weight:600;font-size:10.5px">libra</span>';
+      else cuerpo = '<span class="hh">' + durH(d.horas).replace(' h ', 'h') + '</span>';
+      var extra = aj.length ? '<span class="mas">' + (aj[0].horas > 0 ? '+' : '') + aj[0].horas + 'h</span>' : '';
+      return '<button class="dia' + (d.libra ? ' libra' : '') + (S.diaSel === d.dia ? ' sel' : '') + (d.dia === 22 ? ' hoy' : '') + '" type="button" data-dia="' + d.dia + '"' + (d.futuro ? ' disabled' : '') + '>' +
+        '<span class="d">' + d.dia + '</span>' + cuerpo + extra + bar + '</button>';
+    }).join('');
+
+    var lineasOf = MES.filter(function (d) { return d.horas || d.sinSalida; }).slice(-5).reverse().map(function (d) {
+      return '<div class="linea"><span class="f">' + d.dia + ' sep</span><span class="q">' + (d.sinSalida ? 'Entró y no fichó la salida' : 'Bar Mónaco') + '</span>' +
+        '<span class="v">' + (d.sinSalida ? '—' : durH(d.horas)) + '</span></div>';
+    }).join('');
+    var lineasAj = AJUSTES.map(function (a) {
+      return '<div class="linea"><span class="f">' + a.dia + ' sep</span><span class="q">' + esc(a.motivo) + '</span>' +
+        '<span class="v ' + (a.horas > 0 ? 'mas' : 'menos') + '">' + (a.horas > 0 ? '+' : '') + a.horas + ' h</span></div>';
+    }).join('');
+
+    var sel = S.diaSel ? MES[S.diaSel - 1] : null;
+    var selAj = S.diaSel ? AJUSTES.filter(function (a) { return a.dia === S.diaSel; }) : [];
+    var detalle = sel
+      ? '<div class="tarjeta" style="border-color:var(--accent)"><h3>Día ' + sel.dia + ' de septiembre</h3>' +
+        '<p class="pie">' + (sel.sinSalida ? 'Entró a las 15:57 y no fichó la salida.' : sel.libra ? 'Libraba.' : 'Fichó ' + durH(sel.horas) + ' en el Bar Mónaco.') + '</p>' +
+        (selAj.length ? '<div class="linea"><span class="f">Ajuste</span><span class="q">' + esc(selAj[0].motivo) + '</span><span class="v ' + (selAj[0].horas > 0 ? 'mas' : 'menos') + '">' + (selAj[0].horas > 0 ? '+' : '') + selAj[0].horas + ' h</span></div>' : '') +
+        '<div class="btnfila"><button class="btn cta mini" type="button" data-modal="ajuste">Añadir horas a este día</button>' +
+        '<button class="btn mini" type="button" data-dia="0">Cerrar</button></div></div>'
+      : '';
+
+    return '<h2>Horas de Cristian</h2>' +
+      '<p class="sub">Septiembre de 2026 · apoyo de sala · Bar Mónaco y El 33</p>' +
+      '<div class="horaswrap">' +
+      '<div class="tarjeta"><h3>Calendario de horas</h3><p class="pie">Cada día, lo que fichó. Pulsa un día para ver o ajustar lo que lleva.</p>' +
+      '<div class="cal">' + cab + huecos + dias + '</div></div>' +
+      '<div class="libros">' +
+      '<div class="libro oficial"><div class="cab"><span class="eyebrow">Registro oficial · lo fichado</span><span class="tot num">' + durH(totalFichado()) + '</span></div>' +
+      '<p>Lo que marcó el QR, tal cual. No lo toca nadie, ni la oficina ni el trabajador. Es lo que sale en el informe.</p>' +
+      '<div class="lineas">' + lineasOf + '</div></div>' +
+      '<div class="libro contador"><div class="cab"><span class="eyebrow">Contador · lo que se le paga</span><span class="tot num">' + durH(totalFichado() + totalAjustes()) + '</span></div>' +
+      '<p>Lo fichado más lo que añade el encargado a mano: olvidos, cierres del partido, apoyos. Esto es lo que va a la nómina.</p>' +
+      '<div class="lineas">' + lineasAj + '</div>' +
+      '<div class="btnfila"><button class="btn cta mini" type="button" data-modal="ajuste">Añadir horas</button>' +
+      '<button class="btn mini" type="button" data-modal="informe">Ver el informe oficial</button></div></div>' +
+      detalle +
+      '</div></div>';
+  }
+
+  /* ══════════ pintar: el móvil ══════════ */
+  function pintaMovil() {
+    var y = yo(), st = situacion(y), c = '';
+
+    if (S.telvista === 'horas') {
+      c += '<div class="dentrocaja"><span class="et">Contador · lo que cobras</span>' +
+        '<span class="cron">' + durH(totalFichado() + totalAjustes()) + '</span>' +
+        '<span class="sub2">Fichadas ' + durH(totalFichado()) + ' · de la oficina ' + (totalAjustes() > 0 ? '+' : '') + totalAjustes() + ' h</span></div>';
+      c += '<div class="mcard"><h4>Lo que te ha añadido la oficina</h4>' +
+        AJUSTES.map(function (a) {
+          return '<div class="milinea"><span class="dd">' + a.dia + ' sep</span><span class="ll">' + esc(a.motivo.split('.')[0]) + '</span>' +
+            '<span class="tt" style="color:' + (a.horas > 0 ? 'var(--ok)' : 'var(--bad)') + ';font-weight:700">' + (a.horas > 0 ? '+' : '') + a.horas + ' h</span></div>';
+        }).join('') + '</div>';
+      c += '<div class="mcard"><h4>Mis fichajes</h4>' +
+        MES.filter(function (d) { return d.horas || d.sinSalida; }).slice(-5).reverse().map(function (d) {
+          return '<div class="milinea"><span class="dd">' + d.dia + ' sep</span><span class="ll">Bar Mónaco</span>' +
+            '<span class="tt"' + (d.sinSalida ? ' style="color:var(--warn)"' : '') + '>' + (d.sinSalida ? 'sin fichar' : durH(d.horas)) + '</span></div>';
+        }).join('') + '</div>';
+      c += '<p style="font-size:11.5px;color:var(--ink3);text-align:center;margin:0;line-height:1.45">Lo fichado no se cambia. Si algo no cuadra, se lo dices a la oficina y te lo ajustan en el contador.</p>';
+    } else {
+      c += '<div class="mcard"><span class="eyebrow">Hoy · martes 22 de septiembre</span>' +
+        '<div class="turnohoy" style="margin-top:7px"><span class="punto" style="background:' + BARES[y.bar].color + ';width:12px;height:12px"></span>' +
+        '<span class="nom">' + BARES[y.bar].nom + '</span><span class="rango num">' + hm(y.ini) + '–' + hm(y.fin) + '</span></div>' +
+        '<p style="margin:7px 0 0;font-size:12.5px;color:var(--ink2)">Tarde · con Susana Capón y Hojan</p></div>';
+
+      if (st === 'dentro') {
+        var llevas = S.ahora - y.fichado[0];
+        c += '<div class="dentrocaja"><span class="et">Dentro del turno</span>' +
+          '<span class="cron">' + dur(llevas) + '</span>' +
+          '<span class="sub2">Entraste a las ' + hm(y.fichado[0]) + ' en ' + BARES[y.bar].nom + '</span></div>';
+        c += '<button class="btnfichar salir" type="button" data-fichar="salida">Fichar salida</button>';
+      } else if (st === 'hecho') {
+        c += '<div class="aviso ok"><span>✓</span><span><b>Turno fichado.</b> ' + hm(y.fichado[0]) + ' → ' + hm(y.fichado[1]) + ' · ' + dur(y.fichado[1] - y.fichado[0]) + '. Ya está en tu contador.</span></div>';
+        c += '<button class="btnfichar" type="button" disabled>Turno terminado</button>';
+      } else {
+        c += '<button class="btnfichar" type="button" data-fichar="entrada">' +
+          '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">' +
+          '<path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M7 12h10"></path></svg>' +
+          'Fichar entrada</button>';
+        c += '<p style="text-align:center;font-size:12px;color:var(--ink3);margin:-4px 0 0">Escanea el QR que hay en la barra</p>';
+      }
+
+      c += '<div class="mcard"><h4>Mi semana</h4>' +
+        [['Lun 21', 'Descansa', '', true], ['Mar 22', 'Bar Mónaco · tarde', '16–00', false],
+         ['Mié 23', 'Bar Mónaco · mañana', '07–16', false], ['Jue 24', 'El 33 · tarde', '16–00', false],
+         ['Vie 25', 'Bar Mónaco · tarde', '16–00', false]].map(function (r) {
+          return '<div class="milinea"><span class="dd">' + r[0] + '</span><span class="ll"' + (r[3] ? ' style="color:var(--ink3)"' : '') + '>' + r[1] + '</span><span class="tt">' + r[2] + '</span></div>';
+        }).join('') + '</div>';
+
+      c += '<div class="mcard"><h4>Mi contador este mes</h4>' +
+        '<div class="milinea"><span class="ll">Fichadas con el QR</span><span class="tt">' + durH(totalFichado()) + '</span></div>' +
+        '<div class="milinea"><span class="ll">Ajustes de la oficina</span><span class="tt" style="color:var(--ok);font-weight:700">' + (totalAjustes() > 0 ? '+' : '') + totalAjustes() + ' h</span></div>' +
+        '<div class="milinea"><span class="ll"><b>Total</b></span><span class="tt" style="font-weight:700">' + durH(totalFichado() + totalAjustes()) + '</span></div></div>';
+    }
+
+    $('#telcuerpo').innerHTML = c;
+    $('#telpie').innerHTML =
+      '<button type="button" class="' + (S.telvista === 'hoy' ? 'on' : '') + '" data-tel="hoy">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>Mi semana</button>' +
+      '<button type="button" data-fichar="' + (st === 'dentro' ? 'salida' : 'entrada') + '"' + (st === 'hecho' ? ' disabled' : '') + '>' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M7 12h10"></path></svg>Fichar</button>' +
+      '<button type="button" class="' + (S.telvista === 'horas' ? 'on' : '') + '" data-tel="horas">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5l3 2"></path></svg>Mis horas</button>';
+  }
+
+  /* ══════════ el escáner ══════════ */
+  function pintaEscaner() {
+    var e = $('#escaner');
+    if (!S.escaneando) { e.innerHTML = ''; e.hidden = true; return; }
+    e.hidden = false;
+    var y = yo();
+    e.innerHTML = '<div class="escaner"><div class="visor">' + qrHtml('MONACO', 150) +
+      '<span class="esq e1"></span><span class="esq e2"></span><span class="esq e3"></span><span class="esq e4"></span><span class="rayo"></span></div>' +
+      '<p class="txt"><b>' + BARES[y.bar].nom + '</b>QR reconocido · ' + hm(S.ahora) + '</p>' +
+      '<p class="txt" style="font-size:11.5px;opacity:.6">Apunta al cartel de la barra</p></div>';
+  }
+
+  /* ══════════ modales ══════════ */
+  function pintaModal() {
+    var m = $('#modal');
+    if (!S.modal) { m.innerHTML = ''; return; }
+    var dentro = '';
+
+    if (S.modal === 'cartel') {
+      dentro = '<div class="interior"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px">' +
+        Object.keys(BARES).map(function (b) {
+          return '<div class="cartel"><span class="barra" style="background:' + BARES[b].color + '"></span>' +
+            qrHtml(b, 118) + '<h3>' + BARES[b].nom + '</h3>' +
+            '<p>Escanea al entrar y al salir desde tu perfil de Shiftia.</p></div>';
+        }).join('') + '</div>' +
+        '<p style="margin:0;font-size:12.5px;color:var(--ink2)">Un cartel por bar, plastificado y pegado en la barra. El QR lleva el código del bar, así que <b>nadie puede fichar en un bar en el que no está</b>. Si alguien lo fotografía, no le sirve: la app solo acepta el fichaje si la persona tiene turno ese día en ese bar.</p></div>';
+    }
+
+    if (S.modal === 'informe') {
+      var filas = MES.filter(function (d) { return d.horas || d.sinSalida; }).map(function (d) {
+        var ent = 15 * 60 + 55 + (d.dia % 5);
+        var e1 = hm(ent);
+        var s1 = d.sinSalida ? '—' : hm(ent + d.horas * 60);
+        return '<tr><td>' + d.dia + '/09/2026</td><td>Bar Mónaco</td><td class="n">' + e1 + '</td><td class="n">' + s1 + '</td>' +
+          '<td class="n">' + (d.sinSalida ? 'sin fichar' : durH(d.horas)) + '</td></tr>';
+      }).join('');
+      dentro = '<div class="interior">' +
+        '<div class="informe"><div class="cabinf"><span><b>Registro de jornada</b><small>Cristian · apoyo de sala · septiembre de 2026</small></span>' +
+        '<span style="text-align:right"><b class="num">' + durH(totalFichado()) + '</b><small>total fichado</small></span></div>' +
+        '<table><thead><tr><th>Fecha</th><th>Centro</th><th>Entrada</th><th>Salida</th><th style="text-align:right">Horas</th></tr></thead>' +
+        '<tbody>' + filas + '</tbody></table>' +
+        '<p style="margin:13px 0 0;font-size:11px;color:var(--ink3)">Emitido por Shiftia · Grupo Pasarela. Recoge únicamente los fichajes registrados por el trabajador.</p></div>' +
+        '<div class="aviso warn" style="border-radius:11px"><span>!</span><span><b>Las horas que añade la empresa no salen aquí.</b> Van en su propia hoja, la de horas extra y apoyos, que es la que usa la nómina. Esto de arriba es solo lo que se fichó de verdad.</span></div></div>';
+    }
+
+    if (S.modal === 'ajuste') {
+      dentro = '<div class="interior">' +
+        '<p style="margin:0;font-size:13px;color:var(--ink2)">Esto suma al <b>contador</b> de Cristian. El registro oficial de fichajes no se toca.</p>' +
+        '<div class="form">' +
+        '<div class="campo"><label for="ajDia">Día</label><input id="ajDia" type="number" min="1" max="30" value="' + (S.diaSel || 21) + '"></div>' +
+        '<div class="campo"><label for="ajHoras">Horas</label><input id="ajHoras" type="number" step="0.5" value="2"></div>' +
+        '<div class="campo" style="grid-column:1/-1"><label for="ajMotivo">Por qué</label><select id="ajMotivo">' +
+        '<option>Se quedó al cierre por el partido</option>' +
+        '<option>Olvidó fichar la salida</option>' +
+        '<option>Apoyo en otro bar, fuera de su turno</option>' +
+        '<option>Cubrió unas horas de un compañero</option>' +
+        '<option>Hora extra pactada</option></select></div></div>' +
+        '<div class="btnfila"><button class="btn cta" type="button" id="ajOk">Añadir al contador</button>' +
+        '<button class="btn" type="button" data-cerrar="1">Cancelar</button></div></div>';
+    }
+
+    if (S.modal === 'ficha') {
+      var t = TURNOS.filter(function (x) { return x.id === S.fichaId; })[0];
+      var st = situacion(t);
+      dentro = '<div class="interior">' +
+        '<div style="display:flex;align-items:center;gap:12px">' +
+        '<span class="av" style="background:' + color(t.id) + ';width:46px;height:46px;font-size:16px">' + ini(t.nom) + '</span>' +
+        '<span><b style="font-family:var(--font-d);font-size:18px;font-weight:800;display:block">' + esc(t.nom) + '</b>' +
+        '<small style="color:var(--ink3)">' + BARES[t.bar].nom + ' · ' + t.fr.toLowerCase() + ' · ' + hm(t.ini) + '–' + hm(t.fin) + '</small></span></div>' +
+        '<div class="libros">' +
+        '<div class="libro oficial"><div class="cab"><span class="eyebrow">Hoy · registro oficial</span></div>' +
+        '<p>' + (t.fichado && t.fichado[0] != null
+          ? 'Entrada a las <b>' + hm(t.fichado[0]) + '</b>' + (t.fichado[1] != null ? ', salida a las <b>' + hm(t.fichado[1]) + '</b>.' : '. Aún dentro.')
+          : st === 'tarde' ? 'Su turno empezó a las ' + hm(t.ini) + ' y <b>no ha fichado</b>.' : 'Aún no le toca entrar.') + '</p></div>' +
+        '<div class="libro contador"><div class="cab"><span class="eyebrow">Este mes · contador</span><span class="tot num">' + (t.yo ? durH(totalFichado() + totalAjustes()) : (118 + (t.nom.length * 3)) + ' h 00') + '</span></div>' +
+        '<p>Lo fichado más los ajustes del encargado. Es lo que va a la nómina.</p></div></div>' +
+        '<div class="btnfila"><button class="btn cta" type="button" data-modal="ajuste">Añadir horas al contador</button>' +
+        '<button class="btn" type="button" data-modal="informe">Su informe oficial</button></div></div>';
+    }
+
+    var titulos = { cartel: 'El cartel de cada bar', informe: 'Informe oficial de fichajes', ajuste: 'Añadir horas al contador', ficha: 'Ficha del trabajador' };
+    m.innerHTML = '<div class="velo" data-cerrar="1"><div class="hoja" role="dialog" aria-modal="true" aria-label="' + titulos[S.modal] + '">' +
+      '<header><h3>' + titulos[S.modal] + '</h3><button class="cerrar" type="button" data-cerrar="1" aria-label="Cerrar">×</button></header>' +
+      dentro + '</div></div>';
+  }
+
+  /* ══════════ notas del final ══════════ */
+  function pintaNotas() {
+    $('#notas').innerHTML =
+      '<div class="nota"><h4><span class="mk" style="background:var(--ok)"></span>Lo que se lleva de las reuniones</h4><ul>' +
+      '<li>Un QR por bar, y el trabajador lo escanea <b>desde su perfil</b>: sin reloj ni tarjetas.</li>' +
+      '<li>Cada fichaje cae en la ficha del trabajador y suma a su <b>contador de horas</b>.</li>' +
+      '<li>El encargado puede <b>añadir horas a mano</b> al contador: olvidos, cierres, apoyos.</li>' +
+      '<li>El <b>informe oficial lleva solo lo fichado</b>. Las extras van aparte y no salen ahí.</li>' +
+      '<li>Los <b>apoyos</b> siguen contándose por tramos, como ya está en la pestaña Horas.</li>' +
+      '</ul></div>' +
+      '<div class="nota"><h4><span class="mk" style="background:var(--accent)"></span>Cómo encaja con lo que ya hay</h4>' +
+      '<p>La pestaña <b>Fichajes</b> es nueva. Todo lo demás ya existe: los turnos salen de la planilla, los nombres del Equipo, y las horas caen en la pestaña <b>Horas</b> que ya usáis para la nómina. El trabajador entra con su cuenta, ve su semana y ficha. No hay que montar nada aparte.</p></div>' +
+      '<div class="nota"><h4><span class="mk" style="background:var(--warn)"></span>Lo que hay que decidir con José</h4><ul>' +
+      '<li>¿El QR queda fijo en la barra o cambia cada día? Fijo es más cómodo; que cambie evita que alguien fiche desde casa.</li>' +
+      '<li>Si alguien no ficha la salida, ¿se avisa al encargado en el momento o se revisa al cerrar la semana?</li>' +
+      '<li>Las horas que añade la empresa no van al registro oficial. <b>Conviene confirmarlo con la gestoría</b>: el registro de jornada tiene que reflejar lo trabajado.</li>' +
+      '</ul></div>';
+  }
+
+  /* ══════════ pintar todo ══════════ */
+  function pinta() {
+    pintaPasos();
+    pintaNav();
+    $('#cuerpo').innerHTML = S.pestana === 'horas' ? panelHoras() : panelFichajes();
+    pintaMovil();
+    pintaEscaner();
+    pintaModal();
+  }
+
+  /* ══════════ acciones ══════════ */
+  function fichar(tipo) {
+    var y = yo();
+    S.escaneando = true;
+    pintaEscaner();
+    setTimeout(function () {
+      S.escaneando = false;
+      if (tipo === 'entrada') {
+        y.fichado = [Math.round(S.ahora), null];
+        S.hecho[1] = true; if (S.paso < 2) S.paso = 2;
+      } else {
+        if (y.fichado) y.fichado[1] = Math.round(S.ahora);
+        S.hecho[3] = true; if (S.paso < 4) S.paso = 4;
+      }
+      pinta();
+    }, 1250);
+  }
+
+  /* ══════════ el reloj corre ══════════ */
+  setInterval(function () {
+    S.ahora += 0.5;
+    $('#relojtop').textContent = hm(S.ahora);
+    $('#telhora').textContent = hm(S.ahora);
+    var y = yo();
+    if (situacion(y) === 'dentro' && S.telvista === 'hoy' && !S.escaneando) {
+      var cr = document.querySelector('.dentrocaja .cron');
+      if (cr) cr.textContent = dur(S.ahora - y.fichado[0]);
+    }
+  }, 1000);
+
+  /* ══════════ un solo oyente para todo ══════════ */
+  document.addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-paso],[data-tab],[data-tel],[data-fichar],[data-modal],[data-cerrar],[data-dia],[data-ficha],#ajOk,#tema');
+    if (!el) return;
+
+    if (el.id === 'tema') {
+      var d = document.documentElement;
+      var ahora = d.getAttribute('data-theme');
+      var oscuroDeSistema = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      d.setAttribute('data-theme', ahora === 'dark' ? 'light' : ahora === 'light' ? 'dark' : (oscuroDeSistema ? 'light' : 'dark'));
+      return;
+    }
+    if (el.id === 'ajOk') {
+      var dia = Math.max(1, Math.min(30, parseInt($('#ajDia').value, 10) || 21));
+      var hs = parseFloat($('#ajHoras').value) || 0;
+      var mot = $('#ajMotivo').value;
+      if (hs) AJUSTES.unshift({ dia: dia, horas: hs, motivo: mot + '.' });
+      S.modal = null; S.pestana = 'horas'; S.hecho[5] = true; if (S.paso < 6) S.paso = 6;
+      pinta();
+      return;
+    }
+    if (el.hasAttribute('data-cerrar')) {
+      if (ev.target.closest('.hoja') && !ev.target.closest('[data-cerrar]')) return;
+      S.modal = null; pintaModal(); return;
+    }
+    if (el.hasAttribute('data-paso')) {
+      S.paso = +el.getAttribute('data-paso');
+      if (S.paso === 0) { S.modal = 'cartel'; }
+      else if (S.paso >= 4) { S.pestana = 'horas'; if (S.paso === 4) S.diaSel = 18; }
+      else { S.pestana = 'fichajes'; }
+      if (S.paso === 6) S.modal = 'informe';
+      pinta(); return;
+    }
+    if (el.hasAttribute('data-tab')) {
+      var t = el.getAttribute('data-tab');
+      if (!t) return;
+      S.pestana = t; pinta(); return;
+    }
+    if (el.hasAttribute('data-tel')) { S.telvista = el.getAttribute('data-tel'); pintaMovil(); return; }
+    if (el.hasAttribute('data-fichar')) { fichar(el.getAttribute('data-fichar')); return; }
+    if (el.hasAttribute('data-modal')) { S.modal = el.getAttribute('data-modal'); pintaModal(); return; }
+    if (el.hasAttribute('data-dia')) {
+      var d2 = +el.getAttribute('data-dia');
+      S.diaSel = d2 === 0 || S.diaSel === d2 ? null : d2;
+      $('#cuerpo').innerHTML = panelHoras();
+      return;
+    }
+    if (el.hasAttribute('data-ficha')) { S.fichaId = el.getAttribute('data-ficha'); S.modal = 'ficha'; pintaModal(); return; }
+  });
+
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && S.modal) { S.modal = null; pintaModal(); }
+  });
+
+  pintaNotas();
+  pinta();
+})();
+</script>
