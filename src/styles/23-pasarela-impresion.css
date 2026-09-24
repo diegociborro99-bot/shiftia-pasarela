@@ -31,17 +31,36 @@
 .pxw[style*="--pxn"] td[data-cas]{box-sizing:border-box;height:calc(var(--pxn) * var(--pxl) * 1em + 5px);vertical-align:top}
 .pxw[style*="--pxn"] .pxg-s{margin:0;height:calc(var(--pxl) * 1em);line-height:var(--pxl)}
 .pxw[style*="--pxn"] .pxg-nm{font-size:1.04em;letter-spacing:.005em}
-.pxsem[style*="--pxn"] tr.pxloc td.sec{font-size:.95em;padding-top:1.5px;padding-bottom:1.5px;line-height:1.2}
+.pxsem[style*="--pxn"] tr.pxloc td.sec{font-size:.95em;padding-top:0;padding-bottom:0;line-height:1.1}
 /* 18/09 (Diego, segunda pasada): «sigue quedando muy apretado algunas casillas como el
    viernes». El ancho se repartía por el contenido —mandaban los chips del pie de descansos—
    y el lunes se llevaba 192 px mientras el viernes se quedaba en 73, con los nombres largos
    pegados al borde. Con table-layout fijo los siete días miden lo mismo pase lo que pase
    debajo. La columna del rótulo se queda en sus 128 px: es la única que lleva texto largo
    («vacaciones · permisos · libres»). */
-/* y el aire entre nombres: en la hoja del bar la caja de cada nombre es 1,5 veces la letra
-   —no 1,38 como en la del local, que ya va en cuerpo 12,5— para que no salgan apretados.
-   montarImpresion sube el cuerpo de la tabla hasta la última talla que cabe en la hoja. */
-.pxw.pxsem[style*="--pxn"]{table-layout:fixed;--pxl:1.5}
+/* y el aire entre nombres: en la hoja del bar la caja de cada nombre es 1,25 veces la letra.
+   Era 1,5 (18/09), para que no salieran apretados, pero esa reserva era lo que frenaba la
+   letra: con cuatro nombres por casilla, las ocho filas de turno se llevaban 545 de los
+   773 px de la hoja. 24/09 (Diego): «imprimible de semana con letra más grande». Con 1,25
+   y lo de aquí abajo, la letra sube de 10,5 a 13,5 px (13,25 la semana con partido) y el
+   paso entre nombres también crece en píxeles (de 15,8 a 16,9). montarImpresion
+   (crecerHoja) sube el cuerpo de la tabla hasta la última talla que cabe en una página
+   del PDF. */
+.pxw.pxsem[style*="--pxn"]{table-layout:fixed;--pxl:1.25}
+/* 24/09 (Diego): «letra más grande». Lo que no es un nombre se estrecha, solo en esta hoja
+   (la de un bar también lleva --pxn y conserva su reserva de casilla, más abajo): la casilla
+   reserva sus nombres más 3 px —1 de relleno arriba, 1 abajo y el borde—, en vez de 5. El
+   relleno de abajo no sobra: con Inter la caja del texto llena la del nombre y los
+   descendentes («y», «g», «p») llegan a su fondo; sin él, el último nombre se montaba
+   sobre el borde (revisión del 24/09: 0,2 px de aire con cuatro nombres, −0,4 con siete).
+   Cuesta un cuarto de píxel de letra. La cuenta tiene que ser exacta —relleno y borde igual
+   a lo que suma el calc—: con 1 px más, la casilla llena mide 1 px más que las demás y las
+   filas dejan de ser iguales. La banda del local va sin relleno, y el día pasa a em para
+   crecer con los nombres: en px fijos se quedaba más pequeño que ellos, y a 1em también
+   (los nombres van a 1,04em). */
+.pxw.pxsem[style*="--pxn"] td[data-cas]{height:calc(var(--pxn) * var(--pxl) * 1em + 3px);padding-top:1px;padding-bottom:1px}
+.pxsem[style*="--pxn"] th.pxd b{font-size:.62em}
+.pxsem[style*="--pxn"] th.pxd span{font-size:1.15em}
 /* sin el pie de descansos, la columna de la izquierda se queda sin una sola letra: es el
    rail de color del bar (el nombre va en su banda) y nada más, así que se estrecha y esos
    84 px se reparten entre los siete días. */
@@ -49,6 +68,18 @@
 /* al fijar el ancho, un nombre kilométrico ya no ensancha su columna: se corta en su
    casilla con puntos suspensivos en vez de meterse en el día siguiente. */
 .pxsem[style*="--pxn"] .pxg-b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 24/09 (Diego): «letra más grande». Cabecera y pie compactos en la hoja semanal (abrirImpresion
+   le pone .pxsemhoja): los mismos logos, título, semana y pie en 22 px menos de alto (78 →
+   56,5), que van a la rejilla. Las demás hojas conservan su cabecera y su pie. */
+.pxpage.pxsemhoja .pxhead{padding-bottom:3px;margin-bottom:4px}
+.pxpage.pxsemhoja .pxlogos svg{width:24px;height:24px}
+.pxpage.pxsemhoja .pxglogo{height:24px}
+.pxpage.pxsemhoja .pxbar{height:20px}
+.pxpage.pxsemhoja .pxtit b{font-size:15px}
+.pxpage.pxsemhoja .pxtit small{font-size:8.5px;margin-top:0}
+.pxpage.pxsemhoja .pxder b{font-size:13px}
+.pxpage.pxsemhoja .pxder small{margin-top:0}
+.pxpage.pxsemhoja .pxfoot{margin-top:3px;padding-top:2px;font-size:7px}
 .pxw th.pxd span small{font-size:7.5px;font-weight:600;color:#c8d3da;margin-left:2px;letter-spacing:0}
 .pxw th.pxd i.ev{display:block;font-style:normal;font-size:6.5px;font-weight:700;letter-spacing:.02em;text-transform:none;color:#ffd48a;white-space:normal;line-height:1.1;margin-top:1px}
 .pxw td .nm+.nm{margin-top:1px}
@@ -67,7 +98,8 @@
 .pxchip .nm{display:inline-flex}
 
 /* ---- la casilla del prototipo (hojas semanales y planilla generada): tamaños en em
-   para que escalen con la tabla (8.5px en la semana, 12.5px en la hoja del local) ---- */
+   para que escalen con la tabla (8.5px de base en la semana y 12.5px en la hoja del local;
+   en las dos, crecerHoja pone la tabla en la última talla que cabe) ---- */
 .pxg-cnt{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8em;color:#8a97a0;letter-spacing:.02em;line-height:1.25;margin-bottom:.15em;white-space:nowrap}
 .pxg-cnt b{color:#b8741a;font-weight:800}
 .pxg-cnt em{font-style:normal;font-weight:800;margin-left:.6em;font-family:'Inter','DM Sans',Arial,sans-serif;letter-spacing:0}
@@ -92,16 +124,27 @@
 .pxw td .pxvacio{display:block;margin-top:2px}
 
 /* ---- hoja de un local: vertical, letra grande, para leer de pie desde la barra ---- */
-.pxlocal{font-size:12.5px}
+/* 24/09 (Diego): «letra más grande». Con .pxlocal a secas perdía contra table.pxw{8.5px}
+   (13-impresion-formato-del-excel.css) y los nombres salían a 8,8 px. Desde aquí crece,
+   como la semanal, hasta la última talla que cabe en su A4 (crecerHoja), o baja de ella
+   si la semana viene cargada. */
+table.pxw.pxlocal{font-size:12.5px}
+/* 24/09 (revisión): su casilla, como la de la semanal, con la cuenta exacta. Reserva sus
+   nombres más 5 px y llevaba 2 de relleno arriba, 2,5 abajo y el borde: la casilla llena
+   medía medio píxel más que las demás. Y al compactar (.compacto le pone 4 px arriba y 4
+   abajo a todo td de la hoja de un bar) la llena medía 4 px más: con ocho nombres, 93 frente
+   a 97 px. Con 2 y 2, y ganando a la compactación, todas miden lo mismo. */
+.pxw.pxlocal[style*="--pxn"] td[data-cas]{padding-top:2px;padding-bottom:2px}
 .pxlocal th.act{width:120px;font-size:9px}
 .pxlocal th.pxd{font-size:11px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
 .pxlocal th.pxd span{display:block;font-size:9px;font-weight:600;color:#c8d3da;letter-spacing:0;text-transform:none}
 .pxlocal th,.pxlocal td{padding:7px 10px}
 .pxlocal td{vertical-align:middle}
 .pxlocal td.lbld{font-weight:700;background:#fafbfc;border-left:6px solid var(--lc);white-space:nowrap}
-.pxlocal td.lbld b{display:block;font-size:13.5px;line-height:1.1}
-.pxlocal td.lbld span{display:block;font-size:10px;color:#5c6b75;font-weight:600;margin-top:1px}
-.pxlocal td.lbld i{display:block;font-style:normal;font-size:8.5px;font-weight:800;color:var(--warn);letter-spacing:.06em;text-transform:uppercase;margin-top:1px}
+/* el día en em (13,5, 10 y 8,5 px a 12,5): crece con los nombres y no se queda por debajo */
+.pxlocal td.lbld b{display:block;font-size:1.08em;line-height:1.1}
+.pxlocal td.lbld span{display:block;font-size:.8em;color:#5c6b75;font-weight:600;margin-top:1px}
+.pxlocal td.lbld i{display:block;font-style:normal;font-size:.68em;font-weight:800;color:var(--warn);letter-spacing:.06em;text-transform:uppercase;margin-top:1px}
 .pxlocal td.lbld i.ev{color:#2980b9;text-transform:none;letter-spacing:0;font-weight:700}
 .pxlocal tr.wk td{background:#f6f8fa}
 .pxlocal tr.wk td.lbld{background:#f0f3f5}

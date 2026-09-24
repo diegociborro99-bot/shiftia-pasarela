@@ -16,14 +16,16 @@ function lunesEnPantalla() {
 }
 
 // Compone la hoja sin enseñarla: abrirImpresion / abrirImpresionLocal terminan en
-// montarImpresion(h, apaisado, nombre), que es quien abre la vista previa. Se
-// intercepta esa llamada un instante para quedarse con el HTML y el nombre, y se
-// compone para la semana pedida (abrirImpresion lee S.semLunes). Devuelve null si
-// no hay hoja (local desconocido: abrirImpresionLocal ya avisa).
+// montarImpresion(h, apaisado, nombre, opts), que es quien abre la vista previa. Se
+// intercepta esa llamada un instante para quedarse con el HTML, el nombre y las
+// opciones, y se compone para la semana pedida (abrirImpresion lee S.semLunes).
+// Devuelve null si no hay hoja (local desconocido: abrirImpresionLocal ya avisa).
+// 24/09 (Diego): «letra más grande». Las opciones (crecer, tope, clase) viajan con la
+// hoja: sin ellas la imagen salía a la talla de base, 8,5 px, más pequeña que el papel.
 function componerHojaSemana(localId, lunes) {
   const montarOriginal = montarImpresion, lunesAntes = S.semLunes;
   let hoja = null;
-  montarImpresion = (h, apaisado, nombre) => { hoja = { h, apaisado: !!apaisado, nombre }; };
+  montarImpresion = (h, apaisado, nombre, opts) => { hoja = { h, apaisado: !!apaisado, nombre, opts: opts || {} }; };
   S.semLunes = lunes;
   try { if (localId) abrirImpresionLocal(localId); else abrirImpresion(); }
   finally { montarImpresion = montarOriginal; S.semLunes = lunesAntes; }
@@ -32,13 +34,16 @@ function componerHojaSemana(localId, lunes) {
 
 // Monta la hoja en #printRoot fuera de la pantalla (misma cascada de estilos que al
 // imprimir: tokens claros, .pxpage…), la dibuja con html2canvas y devuelve el PNG.
+// Con la misma clase de hoja y la misma talla que el papel (crecerHoja, 24/09).
 async function pngDeHoja(hoja) {
   const pr = $('#printRoot');
+  const o = hoja.opts || {};
   if (!pr.classList.contains('hidden')) cerrarImpresion();   // por si la vista previa estaba abierta
-  pr.innerHTML = `<div class="pxpage${hoja.apaisado ? ' apaisado' : ''}">${hoja.h}</div>`;
+  pr.innerHTML = `<div class="pxpage${hoja.apaisado ? ' apaisado' : ''}${o.clase ? ' ' + o.clase : ''}">${hoja.h}</div>`;
   pr.classList.add('capturando'); pr.classList.remove('hidden'); pr.setAttribute('aria-hidden', 'true');
   try {
     const pg = pr.querySelector('.pxpage');
+    if (o.crecer) crecerHoja(pg, o.crecer, hoja.apaisado, o.tope);
     // windowWidth ancho: el lienzo se maqueta como en un ordenador aunque se pida desde un móvil
     const canvas = await html2canvas(pg, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 1500, windowHeight: 1100, scrollX: 0, scrollY: 0 });
     return await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('el navegador no ha podido crear el PNG')), 'image/png'));

@@ -2,6 +2,22 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **La hoja de la semana, con letra más grande** (Diego, 24/09: «imprimible de semana con
+  letra más grande»). Sigue siendo UNA hoja A4 apaisada con los cuatro bares y solo los
+  nombres, la que Aroa recorta en cuatro, con todas las casillas del mismo alto y los siete
+  días del mismo ancho. Pero los nombres pasan de 10,9 a 14 px, un 29 % más grandes (13,8 px
+  la semana con partido), y el día y la fecha crecen con ellos. Para hacer sitio, cada nombre
+  va algo más junto al de debajo y la cabecera, el pie y la banda de color de cada bar ocupan
+  menos; el último nombre de cada casilla conserva su aire sobre el borde. Si una semana
+  viene cargada, la letra baja sola sin pasar a dos hojas: con cinco nombres en una casilla
+  va a 11,4 px (antes 8,8), con seis a 9,9 px (antes 7,7) y con siete a 8,3 px en una hoja
+  (antes 7,7 en dos). Un nombre largo que antes salía entero nunca se recorta: la letra se
+  queda en la talla en la que cabe. De paso se arreglan tres cosas: «Descargar PDF» partía
+  la semana con partido en dos páginas (la segunda, una tira de 2 mm) y ahora sale en una;
+  la imagen para WhatsApp («Compartir») sale con la misma letra que el papel, no con la
+  pequeña; y la hoja vertical de un bar, la de letra grande, sacaba los nombres a 8,8 px por
+  un fallo y ahora van a 17-19 px; con la semana cargada baja la letra en vez de compactar
+  (11,7 px con seis nombres en una casilla) y todas sus casillas miden lo mismo.
 - **Entrevistas: el orden se elige** (Diego, 21/09: «los filtros son orden alfabético, bien
   mal, fecha, etc, tal como pidió el cliente»). Debajo de los filtros hay cuatro botones:
   **Las últimas primero** (el que manda de partida, el que pidió José), **Por fecha** (la

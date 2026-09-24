@@ -32,14 +32,28 @@ async function exportarPdfHoja(opts) {
     const anchoUtil = W - 2 * mx, altoUtil = H - 2 * my;
     const escala = anchoUtil / canvas.width;   // mm por píxel del lienzo
     const altoPagPx = Math.max(1, Math.floor(altoUtil / escala));
-    let y = 0, primera = true;
-    while (y < canvas.height) {   // si la hoja fuera más alta que una página, se parte en varias
-      const h = Math.min(altoPagPx, canvas.height - y);
-      const trozo = document.createElement('canvas'); trozo.width = canvas.width; trozo.height = h;
-      trozo.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
-      if (!primera) pdf.addPage();
-      pdf.addImage(trozo.toDataURL('image/jpeg', 0.92), 'JPEG', mx, my, anchoUtil, h * escala);
-      primera = false; y += h;
+    // 24/09 (Diego, «imprimible de semana con letra más grande»): la semana con partido ya
+    // salía partida en dos. crecerHoja mide ahora contra esta página, pero por si acaso: la
+    // hoja semanal (.pxsemhoja) que se pasa por menos de un 3 % no se parte —dejaría en la
+    // segunda página una tira de uno o dos milímetros—; se encoge un poco para que entre
+    // entera. Pasa si la hoja queda entre la página del PDF (780,5 px en apaisado) y el A4
+    // (793,7 px), que es lo que miden la compactación y la vista previa: la semana muy
+    // cargada que compacta. Solo esa hoja (revisión del 24/09): el Mes, Horas y el
+    // generador no entran en este cambio y salen como siempre.
+    const encoger = pg.classList.contains('pxsemhoja') && canvas.height > altoPagPx && canvas.height <= altoPagPx * 1.03;
+    if (encoger) {
+      const ancho = canvas.width * altoUtil / canvas.height;   // centrada, con su proporción
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', mx + (anchoUtil - ancho) / 2, my, ancho, altoUtil);
+    } else {
+      let y = 0, primera = true;
+      while (y < canvas.height) {   // si la hoja fuera más alta que una página, se parte en varias
+        const h = Math.min(altoPagPx, canvas.height - y);
+        const trozo = document.createElement('canvas'); trozo.width = canvas.width; trozo.height = h;
+        trozo.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        if (!primera) pdf.addPage();
+        pdf.addImage(trozo.toDataURL('image/jpeg', 0.92), 'JPEG', mx, my, anchoUtil, h * escala);
+        primera = false; y += h;
+      }
     }
     const nombre = String(PRINT_CTX.nombre || 'Planilla').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '_') + '.pdf';
     const blob = pdf.output('blob');

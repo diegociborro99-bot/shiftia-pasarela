@@ -24,7 +24,7 @@ function montarImpresion(h, apaisado, nombre, opts) {
   const pr = $('#printRoot');
   // desde el generador: la hoja también deja volcar la propuesta a la planilla (reunión del 15/09: «me falta el botón que lo vuelque»)
   const volcar = o.volcar && o.volcar.n ? `<button class="btn btn-cta" id="pVolcar" title="Pasa la planilla propuesta a la semana">Volcar a la planilla (${pl(o.volcar.n, 'plaza nueva', 'plazas nuevas')})</button>` : '';
-  pr.innerHTML = `<div class="pbar2">${volcar}<button class="btn ${volcar ? 'btn-sec' : 'btn-cta'}" id="pGo"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 8.5V3.5h11v5"/><path d="M6.5 17H5a2 2 0 0 1-2-2v-4.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2h-1.5"/><rect x="6.5" y="14" width="11" height="6.5" rx="1"/></svg> Imprimir (o Ctrl+P)</button><button class="btn btn-sec" id="pPdf" title="Descargar la hoja como PDF (también en el móvil, sin diálogo de imprimir)"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar PDF</button><button class="btn btn-sec" id="pClose">Cerrar</button><span class="pbnota">Sale en color: en el diálogo de impresión no hace falta marcar «gráficos de fondo».</span></div><div class="pxpage${apaisado ? ' apaisado' : ''}">` + h + '</div>';
+  pr.innerHTML = `<div class="pbar2">${volcar}<button class="btn ${volcar ? 'btn-sec' : 'btn-cta'}" id="pGo"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 8.5V3.5h11v5"/><path d="M6.5 17H5a2 2 0 0 1-2-2v-4.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2h-1.5"/><rect x="6.5" y="14" width="11" height="6.5" rx="1"/></svg> Imprimir (o Ctrl+P)</button><button class="btn btn-sec" id="pPdf" title="Descargar la hoja como PDF (también en el móvil, sin diálogo de imprimir)"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar PDF</button><button class="btn btn-sec" id="pClose">Cerrar</button><span class="pbnota">Sale en color: en el diálogo de impresión no hace falta marcar «gráficos de fondo».</span></div><div class="pxpage${apaisado ? ' apaisado' : ''}${o.clase ? ' ' + o.clase : ''}">` + h + '</div>';
   pr.classList.remove('hidden');
   pr.scrollTop = 0;
   document.body.classList.add('printing');
@@ -40,25 +40,56 @@ function montarImpresion(h, apaisado, nombre, opts) {
   const paginas = [...pg.querySelectorAll('.pxg-pag')];
   const margen = (apaisado ? 16 : 19) * 96 / 25.4;   // los 2 rellenos verticales de .pxpage
   const altoContenido = b => { const u = b.lastElementChild; return u ? u.getBoundingClientRect().bottom - b.getBoundingClientRect().top : b.scrollHeight; };
+  // la rejilla que sabe cambiar de talla la busca antes (crecerHoja, aquí debajo): así, si la
+  // talla de base no cabe, baja en cuartos antes que compactar, y solo si ni a 9 px cabe
+  // se compacta como siempre. (24/09, revisión: la hoja de un bar con seis nombres en una
+  // casilla ya no cabía a 12,5 px, se compactaba primero y salía a 8 px.)
+  if (o.crecer) crecerHoja(pg, o.crecer, apaisado, o.tope);
   for (const bloque of paginas.length ? paginas : [pg]) {
     const alto = () => paginas.length ? altoContenido(bloque) + margen : pg.scrollHeight;
     for (const cls of ['compacto', 'compacto2', 'compacto3']) { if (alto() <= altoHoja) break; bloque.classList.add(cls); }
-  }
-  // y al revés (18/09): la hoja del bar se lee de pie desde la barra y, desde que no lleva
-  // pie de descansos, le sobraba un tercio de papel. Si cabe, la rejilla crece hasta la
-  // última talla que entra en la hoja. Solo cuando no ha hecho falta compactar.
-  if (o.crecer && !pg.classList.contains('compacto')) {
-    const t = pg.querySelector(o.crecer);
-    if (t) for (const f of [13, 12.5, 12, 11.5, 11, 10.5, 10, 9.5, 9]) {
-      t.style.fontSize = f + 'px';
-      if (pg.scrollHeight <= altoHoja) break;
-      t.style.fontSize = '';
-    }
   }
   $('#pClose').addEventListener('click', cerrarImpresion);
   const pv = $('#pVolcar'); if (pv) pv.addEventListener('click', () => o.volcar.fn());
   $('#pGo').addEventListener('click', () => { try { window.print(); } catch (e) { toast('Usa Ctrl+P para imprimir', 'warn'); } });
   $('#pPdf').addEventListener('click', () => exportarPdfHoja());
+}
+// 18/09: la hoja del bar se lee de pie desde la barra y, desde que no lleva pie de
+// descansos, le sobraba un tercio de papel. Si cabe, la tabla `sel` crece hasta la última
+// talla que entra en la hoja. Si su talla de base ya cabe, nunca baja de ella: crecer no
+// encoge. Si no cabe (24/09, revisión: la hoja de un bar a 12,5 px con seis nombres en una
+// casilla), la escalera sigue bajando hasta 9 px; montarImpresion la llama antes de
+// compactar y solo compacta si ni así entra.
+// 24/09 (Diego): «imprimible de semana con letra más grande». Se quedaba en 10,5 px y, con
+// partido, «Descargar PDF» ya partía la hoja en dos. Tres cosas:
+//  - el límite es el del camino más estricto al papel. «Descargar PDF» (15-export-pdf.js)
+//    encaja la hoja, con su relleno, en los 279 mm útiles del A4 apaisado: en una página
+//    caben 194 × 297 / 279 mm de hoja (780,5 px), no los 210 mm del A4 (793,7 px). Y 3 px
+//    de margen, porque html2canvas pinta uno o dos píxeles más de lo que dice scrollHeight.
+//    En vertical el PDF deja más sitio que el A4, así que ahí manda el A4.
+//  - la escalera empieza en 16 px (el tope lo pone el ancho: a 16 px el nombre más largo
+//    ocupa 116 de los 133 px de su casilla) y baja de cuarto en cuarto; la hoja de un bar,
+//    con dos columnas, empieza más arriba (tope). El suelo sigue en 9 px.
+//  - va aparte para que la imagen de Compartir (16-compartir.js) salga con la misma talla.
+// Y el ancho (24/09, revisión): una talla solo vale si no recorta nada que a la talla de
+// base cabía. Con solo el alto, «Mª Ángeles Rodríguez» salía entera a 10,9 px y recortada
+// con «…» a 14,3; en el bar hay que leer quién trabaja. Se miran los nombres (.pxg-b) y la
+// propia hoja; el nombre kilométrico que ya no cabía a la de base no frena la escalera.
+// Devuelve la talla elegida, o 0 si la tabla se queda como estaba.
+function crecerHoja(pg, sel, apaisado, tope) {
+  const t = pg && sel ? pg.querySelector(sel) : null;
+  if (!t || pg.classList.contains('compacto')) return 0;
+  const lim = Math.min((apaisado ? 210 : 297) * 96 / 25.4, apaisado ? 194 * 297 / 279 * 96 / 25.4 : Infinity) - 3;
+  t.style.fontSize = '';
+  const base = parseFloat(getComputedStyle(t).fontSize) || 0, cabeBase = pg.scrollHeight <= lim;
+  const desborda = el => el.scrollWidth > el.clientWidth;
+  const anchos = [pg, ...t.querySelectorAll('.pxg-b')].filter(el => !desborda(el));
+  for (let f = tope || 16; f >= 9 && (f > base || !cabeBase); f -= 0.25) {
+    t.style.fontSize = f + 'px';
+    if (pg.scrollHeight <= lim && !anchos.some(desborda)) return f;
+  }
+  t.style.fontSize = '';
+  return 0;
 }
 
 // ---------- piezas comunes ----------
@@ -240,7 +271,9 @@ function abrirImpresion() {
   h += '</tbody></table>';
   h += PX_LEYENDA_SEMANA();
   h += pxPie(PX.soloNombres ? 'Quién descansa cada día y quién falta se consulta en la app.' : 'El pie de descansos dice quién libra cada día y quién está ausente.');
-  montarImpresion(h, true, `Planilla_semana_${lunes}`, PX.soloNombres ? { crecer: 'table.pxsem' } : null);
+  // 24/09 (Diego): «letra más grande». .pxsemhoja estrecha la cabecera y el pie de esta hoja
+  // (23-pasarela-impresion.css) y crecerHoja sube la rejilla hasta la última talla que cabe
+  montarImpresion(h, true, `Planilla_semana_${lunes}`, PX.soloNombres ? { crecer: 'table.pxsem', clase: 'pxsemhoja' } : null);
   });
 }
 
@@ -280,7 +313,10 @@ function abrirImpresionLocal(localId) {
   h += '</tbody></table>';
   h += PX_LEYENDA_SEMANA();
   h += pxPie(esc(l.nombre));
-  montarImpresion(h, false, `Planilla_${l.corto || l.nombre}_semana_${lunes}`);
+  // 24/09 (Diego): «letra más grande». La de un bar también va a la última talla que cabe
+  // en su A4 vertical; con dos columnas anchas, la escalera empieza en 18 px. Si la semana
+  // viene cargada y ni a 12,5 cabe, baja antes de compactar (revisión del 24/09)
+  montarImpresion(h, false, `Planilla_${l.corto || l.nombre}_semana_${lunes}`, { crecer: 'table.pxlocal', tope: 18 });
   });
 }
 

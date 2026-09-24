@@ -5,7 +5,9 @@
 //   (1) en escritorio, Compartir → Toda la semana descarga Planilla_semana_….png (> 30 KB);
 //   (2) con navigator.share simulado, Compartir → El 33 llama a share con un PNG «…33…»;
 //   (3) el historial registra «compartida»; (4) en el móvil el popover es hoja inferior;
-//   (5) sin pageerror. Servidor estático propio (nunca server.js): modo local con sesión.
+//   (5) sin pageerror; (6) la imagen sale con la misma talla de letra que la hoja impresa
+//   (24/09), la semana general y la de un bar, también con seis nombres en una casilla.
+//   Servidor estático propio (nunca server.js): modo local con sesión.
 // PNG_OUT=/ruta/fichero.png guarda una copia de la imagen descargada (para mirarla).
 import { createServer } from 'node:http';
 import { readFile, copyFile } from 'node:fs/promises';
@@ -89,6 +91,46 @@ try {
   ok('la semana en pantalla no ha cambiado', await pgA.evaluate(() => S.semLunes === mondayOf(isoDia())));
   const histA = await textoHistorial(pgA);
   ok('el historial registra la semana compartida como imagen (general)', /Semana del .* compartida como imagen \(general\)/.test(histA), histA.slice(0, 200));
+
+  // 24/09 (Diego): «imprimible de semana con letra más grande». La imagen de WhatsApp es la
+  // misma hoja que el papel y tiene que salir con la misma talla, no con la de base (8,5 px).
+  // html2canvas se sustituye por un espía que anota la talla de la tabla que le llega.
+  const tallas = await pgA.evaluate(async () => {
+    const lunes = lunesEnPantalla();
+    const original = window.html2canvas;
+    let vista = null;
+    window.html2canvas = async el => { vista = parseFloat(getComputedStyle(el.querySelector('table.pxsem, table.pxlocal')).fontSize); const c = document.createElement('canvas'); c.width = c.height = 1; return c; };
+    const r = { lunes };
+    // 24/09 (revisión): y con la semana cargada, seis nombres en la mañana del martes de
+    // Zapatillera: la hoja del bar baja la letra en vez de compactar, y la imagen igual
+    const d = new Date(lunes + 'T12:00:00'); d.setDate(d.getDate() + 1);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const e = estadoDeIso(iso, true), puestos = [];
+    try {
+      for (const [clave, localId, cargar] of [['semana', null], ['bar', 'ZAPA'], ['barCargado', 'ZAPA', 6]]) {
+        if (cargar) {
+          const ocupados = new Set(turnosDe(S).flatMap(t => pidsEn(e, iso, t.id)));
+          for (const p of S.staff) {
+            if (asignados(e, iso, 'ZAPA_M').length >= cargar) break;
+            if (ocupados.has(p.id) || ausenciaEn(p, iso) || p.standby) continue;
+            if (asignar(e, S, S.staff, iso, 'ZAPA_M', p.id, { forzar: true }).ok) puestos.push(p.id);
+          }
+        }
+        const antes = S.semLunes; S.semLunes = lunes;
+        try { if (localId) abrirImpresionLocal(localId); else abrirImpresion(); } finally { S.semLunes = antes; }
+        const papel = parseFloat(getComputedStyle(document.querySelector('#printRoot table.pxsem, #printRoot table.pxlocal')).fontSize);
+        const clase = document.querySelector('#printRoot .pxpage').className;
+        cerrarImpresion();
+        vista = null;
+        await pngDeHoja(componerHojaSemana(localId, lunes));
+        r[clave] = { papel, imagen: vista, clase, casilla: cargar ? asignados(e, iso, 'ZAPA_M').length : undefined };
+      }
+    } finally { window.html2canvas = original; for (const pid of puestos) desasignar(e, iso, 'ZAPA_M', pid); }
+    return r;
+  });
+  ok(`la imagen de Compartir sale con la misma talla que la hoja impresa (semana: papel ${tallas.semana && tallas.semana.papel}px, imagen ${tallas.semana && tallas.semana.imagen}px)`, !!tallas.semana && tallas.semana.papel > 8.5 && tallas.semana.imagen === tallas.semana.papel, JSON.stringify(tallas));
+  ok(`y la de un bar también (papel ${tallas.bar && tallas.bar.papel}px, imagen ${tallas.bar && tallas.bar.imagen}px)`, !!tallas.bar && tallas.bar.papel >= 12.5 && tallas.bar.imagen === tallas.bar.papel, JSON.stringify(tallas));
+  ok(`y la de un bar con 6 nombres en una casilla, sin compactar (papel ${tallas.barCargado && tallas.barCargado.papel}px, imagen ${tallas.barCargado && tallas.barCargado.imagen}px)`, !!tallas.barCargado && tallas.barCargado.casilla === 6 && tallas.barCargado.papel >= 11 && !/compacto/.test(tallas.barCargado.clase) && tallas.barCargado.imagen === tallas.barCargado.papel, JSON.stringify(tallas));
 
   // ── (2) CON navigator.share: Compartir de El 33 desde Hoy → share con un PNG «…33…»
   const ctxB = await br.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true });

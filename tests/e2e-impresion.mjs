@@ -11,6 +11,14 @@
 //   (3) con dos casillas vaciadas, la página 2 enseña el cambio (antes tachado /
 //       ahora en negrita, «nueva» si la casilla estaba vacía);
 //   (4) sin pageerror en toda la batería.
+// Y la letra (24/09, Diego: «imprimible de semana con letra más grande»): la hoja semanal
+// va a ≥ 13 px con cuatro nombres por casilla y sigue en UNA hoja y UNA página del PDF,
+// también con partido, con 5 nombres (≥ 11 px) y con 6 (sin compactar); nada recortado;
+// el PDF no parte una hoja semanal que se pasa por muy poco; y la hoja de un bar va a
+// ≥ 12,5 px. Tras la revisión del mismo día: filas iguales sin redondear, aire bajo el último
+// nombre, crecer no recorta un nombre que cabía, la defensa del PDF no toca el Mes, y la
+// hoja de un bar con 6 u 8 nombres en una casilla baja la letra o compacta sin romper la
+// rejilla.
 // Capturas (fullPage) en $CAPTURAS/print-generada-*.png si se pasa la variable.
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync, mkdirSync } from 'node:fs';
@@ -115,9 +123,12 @@ try {
   // la variante semanas». Ahora que en la casilla solo van nombres, la rejilla tiene que
   // leerse de un vistazo: todas las filas de turno miden lo mismo, tenga la casilla dos
   // nombres o cuatro, y el hueco entre nombres es el mismo en todas.
+  // 24/09 (revisión): las alturas se comparan sin redondear y con 0,1 px de tolerancia. Con
+  // Math.round y 1 px de margen pasaba justo la desigualdad que hay que evitar: la casilla
+  // llena 1 px más alta que las demás (70,75 frente a 71,75 px).
   const rejilla = await pg.evaluate(() => {
     const filas = [...document.querySelectorAll('#printRoot table.pxsem tbody tr')].filter(tr => tr.querySelector('td[data-cas]'));
-    const alturas = filas.map(tr => Math.round(tr.getBoundingClientRect().height));
+    const alturas = filas.map(tr => tr.getBoundingClientRect().height);
     const huecos = [];
     for (const td of document.querySelectorAll('#printRoot table.pxsem td[data-cas]')) {
       const ns = [...td.querySelectorAll('.pxg-s')];
@@ -125,8 +136,26 @@ try {
     }
     return { alturas, min: Math.min(...alturas), max: Math.max(...alturas), huecos: [...new Set(huecos)].sort((a, b) => a - b) };
   });
-  ok(`todas las filas de turno miden lo mismo (${rejilla.min}px)`, rejilla.max - rejilla.min <= 1, JSON.stringify(rejilla.alturas));
+  ok(`todas las filas de turno miden lo mismo, sin redondear (${rejilla.min}–${rejilla.max}px)`, rejilla.max - rejilla.min <= 0.1, JSON.stringify(rejilla.alturas));
   ok(`el hueco entre nombres es el mismo en toda la hoja (${rejilla.huecos.join(', ')}px)`, rejilla.huecos.length <= 1, JSON.stringify(rejilla.huecos));
+  // 24/09 (revisión): el último nombre no se apoya en el borde de abajo de la casilla. Con
+  // Inter la caja del texto llena la del nombre, así que los descendentes («y», «g», «p»)
+  // llegan al fondo de esa caja: sin relleno debajo, se montaban sobre el borde. Se mide lo
+  // más bajo entre la caja del nombre y la de su texto, contra el borde (vale para
+  // cualquier fuente).
+  const aire = await pg.evaluate(() => {
+    let peor = 99, quien = '';
+    for (const td of document.querySelectorAll('#printRoot table.pxsem td[data-cas]')) {
+      const ss = td.querySelectorAll('.pxg-s'); if (!ss.length) continue;
+      const s = ss[ss.length - 1], nm = s.querySelector('.pxg-nm'); if (!nm) continue;
+      const r = document.createRange(); r.selectNodeContents(nm);
+      const fondo = Math.max(s.getBoundingClientRect().bottom, r.getBoundingClientRect().bottom);
+      const borde = td.getBoundingClientRect().bottom - parseFloat(getComputedStyle(td).borderBottomWidth);
+      if (borde - fondo < peor) { peor = Math.round((borde - fondo) * 100) / 100; quien = nm.textContent.trim(); }
+    }
+    return { peor, quien };
+  });
+  ok(`el último nombre de cada casilla deja aire sobre el borde de abajo (el más justo, ${aire.quien}, ${aire.peor}px)`, aire.peor >= 0.75, JSON.stringify(aire));
 
   // 18/09 (Diego, segunda pasada): «de la tabla de semana en imprimir sigue quedando muy
   // apretado algunas casillas como el viernes». La tabla repartía el ancho por contenido,
@@ -195,23 +224,153 @@ try {
     return { peor, salio };
   });
   ok(`un nombre larguísimo se queda dentro de su casilla (se sale ${largo.peor}px) y sigue leyéndose`, largo.peor <= 0 && largo.salio, JSON.stringify(largo));
+  // 24/09 (revisión): crecer no puede recortar un nombre que a la talla de base cabía. Un
+  // nombre largo pero real («Mª Ángeles Rodríguez») salía entero a 10,9 px y, con la letra
+  // grande, recortado con «…»: en el bar hay que leer quién trabaja. La escalera se para en
+  // la talla en la que sigue cabiendo; el nombre kilométrico, que ya no cabía, no la frena.
+  const largoReal = await pg.evaluate(() => {
+    const p = S.staff.find(x => x.nombre === 'Adrián'), antes = p.nombre;
+    const cortados = () => [...document.querySelectorAll('#printRoot table.pxsem td[data-cas] .pxg-b')].filter(b => b.scrollWidth > b.clientWidth).map(b => b.textContent.trim());
+    const talla = () => parseFloat(getComputedStyle(document.querySelector('#printRoot table.pxsem')).fontSize);
+    const r = {};
+    try {
+      for (const [clave, nombre] of [['real', 'Mª Ángeles Rodríguez'], ['kilometrico', 'Adrián Fernández de la Torre y Quesada']]) {
+        p.nombre = nombre; cerrarImpresion(); abrirImpresion();
+        r[clave] = { fs: talla(), cortados: cortados(), salio: [...document.querySelectorAll('#printRoot table.pxsem .pxg-nm')].some(n => n.textContent === nombre) };
+      }
+    } finally { p.nombre = antes; cerrarImpresion(); abrirImpresion(); }
+    r.normal = talla();
+    return r;
+  });
+  ok(`un nombre largo que a la talla de base cabía no se recorta al crecer (${largoReal.real.fs}px; recortados: ${largoReal.real.cortados.join(', ') || 'ninguno'})`, largoReal.real.salio && largoReal.real.cortados.length === 0 && largoReal.real.fs >= 9, JSON.stringify(largoReal));
+  ok(`y el kilométrico, que no cabía ni a la de base, se recorta él solo sin frenar la letra (${largoReal.kilometrico.fs}px, como sin él: ${largoReal.normal}px)`, largoReal.kilometrico.salio && largoReal.kilometrico.cortados.length > 0 && largoReal.kilometrico.cortados.every(t => /Quesada/.test(t)) && largoReal.kilometrico.fs === largoReal.normal, JSON.stringify(largoReal));
 
   // sin el pie de descansos sobraba un tercio de hoja. La rejilla del bar crece hasta la
   // última talla que cabe: se lee de pie desde la barra y los nombres dejan de ir apretados.
+  // 24/09: el límite es el del camino más estricto al papel, «Descargar PDF», que encaja la
+  // hoja con su relleno en los 279 mm útiles del A4 apaisado (en una página caben 780,5 px
+  // de hoja, no los 793,7 del A4), con 3 px de margen; y la escalera va de cuarto en cuarto.
+  // Es el mismo límite y el mismo paso que crecerHoja (14-impresiones.js).
   const crece = await pg.evaluate(() => {
     const pag = document.querySelector('#printRoot .pxpage');
     const t = pag.querySelector('table.pxsem');
-    const A4 = 210 * 96 / 25.4;
+    const LIM = Math.min(210 * 96 / 25.4, 194 * 297 / 279 * 96 / 25.4) - 3;
     const f = parseFloat(getComputedStyle(t).fontSize);
-    const cabe = pag.scrollHeight <= A4;
-    t.style.fontSize = (f + 0.5) + 'px';
-    const cabeUnaMas = pag.scrollHeight <= A4;
+    const cabe = pag.scrollHeight <= LIM;
+    t.style.fontSize = (f + 0.25) + 'px';
+    const cabeUnaMas = pag.scrollHeight <= LIM;
     t.style.fontSize = f + 'px';
-    return { f, cabe, cabeUnaMas, alto: pag.scrollHeight, A4: Math.round(A4) };
+    return { f, cabe, cabeUnaMas, alto: pag.scrollHeight, LIM: Math.round(LIM * 10) / 10 };
   });
-  ok(`la rejilla crece hasta la última talla que cabe (${crece.f}px; media más ya no entra)`, crece.f > 8.5 && crece.cabe && !crece.cabeUnaMas, JSON.stringify(crece));
+  ok(`la rejilla crece hasta la última talla que cabe en una página del PDF (${crece.f}px; ${crece.f >= 16 ? 'el tope de la escalera' : 'un cuarto más ya no entra'})`, crece.f >= 13 && crece.cabe && (!crece.cabeUnaMas || crece.f >= 16), JSON.stringify(crece));
   const altoSem = await pg.evaluate(() => { const p = document.querySelector('#printRoot .pxpage'); return { alto: p.scrollHeight, hoja: Math.round(210 * 96 / 25.4), cls: p.className }; });
   ok(`la hoja semanal cabe en un A4 apaisado (${altoSem.alto}px ≤ ${altoSem.hoja}px · ${altoSem.cls})`, altoSem.alto <= altoSem.hoja + 2, JSON.stringify(altoSem));
+
+  // ── 24/09 (Diego): «imprimible de semana con letra más grande» ──
+  // Con cuatro nombres en la casilla más llena la letra se quedaba en 10,5 px (nombres a
+  // 10,9): la reserva vertical de cada nombre (1,5 veces la letra), la cabecera y el pie se
+  // comían el papel. Sigue siendo UNA hoja con los cuatro bares y la rejilla regular.
+  const talla = await pg.evaluate(() => {
+    const t = document.querySelector('#printRoot table.pxsem');
+    const nms = [...t.querySelectorAll('.pxg-nm')].map(n => parseFloat(getComputedStyle(n).fontSize));
+    return { tabla: parseFloat(getComputedStyle(t).fontSize), nombre: Math.round(Math.min(...nms) * 100) / 100, pxn: +t.style.getPropertyValue('--pxn'), cls: t.closest('.pxpage').className };
+  });
+  ok(`la letra de la hoja semanal es ≥ 13 px con ${talla.pxn} nombres en la casilla más llena (tabla ${talla.tabla}px, nombres ${talla.nombre}px)`, talla.pxn === 4 && talla.tabla >= 13 && talla.nombre >= 13.5 && !/compacto/.test(talla.cls), JSON.stringify(talla));
+  // guardas: con la letra grande nada se recorta, el día no se queda por debajo de los
+  // nombres y ningún nombre se sale por abajo de su casilla
+  const guardas = await pg.evaluate(() => {
+    const t = document.querySelector('#printRoot table.pxsem');
+    const cortados = [...t.querySelectorAll('td[data-cas] .pxg-b')].filter(b => b.scrollWidth > b.clientWidth + 0.5).map(b => b.textContent.trim());
+    const dia = Math.min(...[...t.querySelectorAll('thead th.pxd > span')].map(s => parseFloat(getComputedStyle(s).fontSize)));
+    const nombre = Math.max(...[...t.querySelectorAll('.pxg-nm')].map(n => parseFloat(getComputedStyle(n).fontSize)));
+    const bajo = [];
+    for (const td of t.querySelectorAll('td[data-cas]')) { const c = td.getBoundingClientRect(); for (const s of td.querySelectorAll('.pxg-s')) if (s.getBoundingClientRect().bottom > c.bottom + 0.5) bajo.push(s.textContent.trim()); }
+    return { cortados, dia: Math.round(dia * 100) / 100, nombre: Math.round(nombre * 100) / 100, bajo };
+  });
+  ok('a la talla elegida no se corta ningún nombre de la plantilla', guardas.cortados.length === 0, JSON.stringify(guardas.cortados));
+  ok(`el número del día no queda más pequeño que los nombres (${guardas.dia}px frente a ${guardas.nombre}px)`, guardas.dia >= guardas.nombre, JSON.stringify(guardas));
+  ok('ningún nombre se sale por debajo de su casilla', guardas.bajo.length === 0, JSON.stringify(guardas.bajo));
+  // la semana con partido lleva una línea más en la cabecera del día. «Descargar PDF» ya la
+  // partía en dos páginas: el crecer medía contra el A4 y no contra la página del PDF.
+  const pdfPartido = await pg.evaluate(async () => {
+    S.eventos.push({ id: 'ev_prueba', iso: '2026-09-19', tipo: 'partido', equipo: 'barcelona', nombre: 'Juega el Barcelona', franja: 'T', refuerzo: {} });
+    try {
+      cerrarImpresion(); abrirImpresion();
+      const pag = document.querySelector('#printRoot .pxpage'), t = pag.querySelector('table.pxsem');
+      const url = await exportarPdfHoja({ soloCanvas: true });
+      const img = new Image(); await new Promise(r => { img.onload = r; img.src = url; });
+      return { fs: parseFloat(getComputedStyle(t).fontSize), alto: pag.scrollHeight, cls: pag.className, lienzo: `${img.width}×${img.height}`, paginas: Math.ceil(img.height / Math.floor(194 / (279 / img.width))), ev: /Juega el Barcelona/.test(t.querySelector('thead').textContent) };
+    } finally { S.eventos = S.eventos.filter(e => e.id !== 'ev_prueba'); cerrarImpresion(); abrirImpresion(); }
+  });
+  ok(`con un partido en la semana, «Descargar PDF» sale en UNA página (${pdfPartido.paginas}; alto ${pdfPartido.alto}px, lienzo ${pdfPartido.lienzo})`, pdfPartido.ev && pdfPartido.paginas === 1, JSON.stringify(pdfPartido));
+  ok(`y con el partido la letra sigue ≥ 13 px (${pdfPartido.fs}px)`, pdfPartido.fs >= 13 && !/compacto/.test(pdfPartido.cls), JSON.stringify(pdfPartido));
+  // semana cargada: se mete gente libre ese día en la mañana de Zapatillera del martes hasta
+  // tener n nombres en la casilla (con forzar, sin tocar reglas) y se vuelve a abrir la hoja
+  const conNombres = n => pg.evaluate(n => {
+    const iso = '2026-09-15', tid = 'ZAPA_M', e = estadoDeIso(iso, true);
+    window.__puestos = window.__puestos || [];
+    const ocupados = new Set(turnosDe(S).flatMap(t => pidsEn(e, iso, t.id)));
+    for (const p of S.staff) {
+      if (asignados(e, iso, tid).length >= n) break;
+      if (ocupados.has(p.id) || ausenciaEn(p, iso) || p.standby) continue;
+      if (asignar(e, S, S.staff, iso, tid, p.id, { forzar: true }).ok) window.__puestos.push(p.id);
+    }
+    cerrarImpresion(); abrirImpresion();
+    const pag = document.querySelector('#printRoot .pxpage'), t = pag.querySelector('table.pxsem');
+    const cortados = [...t.querySelectorAll('td[data-cas] .pxg-b')].filter(b => b.scrollWidth > b.clientWidth + 0.5).length;
+    const filas = [...t.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('td[data-cas]')).map(tr => tr.getBoundingClientRect().height);
+    return { casilla: asignados(e, iso, tid).length, pxn: +t.style.getPropertyValue('--pxn'), fs: parseFloat(getComputedStyle(t).fontSize), cls: pag.className, alto: pag.scrollHeight, cortados, filas: [Math.min(...filas), Math.max(...filas)] };
+  }, n);
+  const con5 = await conNombres(5);
+  ok(`semana cargada: con 5 nombres en una casilla la letra sigue ≥ 11 px (${con5.fs}px) y cabe en una hoja (${con5.alto}px ≤ 780)`, con5.casilla === 5 && con5.pxn === 5 && con5.fs >= 11 && !/compacto/.test(con5.cls) && con5.alto <= 780 && con5.cortados === 0 && con5.filas[1] - con5.filas[0] <= 0.1, JSON.stringify(con5));
+  const con6 = await conNombres(6);
+  ok(`con 6 nombres en una casilla ya no compacta: ≥ 9 px (${con6.fs}px · ${con6.cls})`, con6.casilla === 6 && con6.pxn === 6 && con6.fs >= 9 && !/compacto/.test(con6.cls) && con6.alto <= 780 && con6.cortados === 0 && con6.filas[1] - con6.filas[0] <= 0.1, JSON.stringify(con6));
+  await pg.evaluate(() => { const e = estadoDeIso('2026-09-15', true); for (const pid of window.__puestos || []) desasignar(e, '2026-09-15', 'ZAPA_M', pid); window.__puestos = []; cerrarImpresion(); abrirImpresion(); });
+  // defensa del PDF: una hoja sin paginado propio que se pasa de la página por menos de un
+  // 3 % sale en UNA página, encogida, en vez de dejar una tira de papel en la segunda. Si se
+  // pasa de verdad, se sigue partiendo como siempre.
+  const pdfJusto = await pg.evaluate(async () => {
+    await exportarPdfHoja({ soloCanvas: true });   // carga html2canvas y jsPDF
+    // espía: jsPDF pone sus métodos en cada documento, así que se envuelve el constructor
+    const lib = window.jspdf, Orig = lib.jsPDF;
+    let paginas = 0, imgs = [];
+    lib.jsPDF = function (...a) {
+      const d = new Orig(...a), addImage = d.addImage.bind(d), output = d.output.bind(d);
+      d.addImage = (...x) => { imgs.push(x.slice(2, 6).map(v => Math.round(v * 100) / 100)); return addImage(...x); };
+      d.output = (...x) => { paginas = d.getNumberOfPages(); return output(...x); };
+      return d;
+    };
+    const pag = document.querySelector('#printRoot .pxpage');
+    const r = {};
+    try {
+      for (const alto of [788, 900]) {   // 788: entre la página del PDF (780,5 px) y el A4 (793,7 px)
+        paginas = 0; imgs = [];
+        pag.style.minHeight = alto + 'px';
+        const nombre = await exportarPdfHoja({ sinCompartir: true });
+        r[alto] = { nombre, paginas, imgs };
+      }
+    } finally { lib.jsPDF = Orig; pag.style.minHeight = ''; }
+    return r;
+  });
+  const j = pdfJusto[788] || {};
+  ok(`una hoja que se pasa de la página del PDF por menos de un 3 % sale en UNA página, entera (${j.paginas} · ${JSON.stringify(j.imgs)})`, !!j.nombre && j.paginas === 1 && j.imgs.length === 1 && j.imgs[0][1] + j.imgs[0][3] <= 202.01 && j.imgs[0][0] >= 9 - 0.01 && j.imgs[0][0] + j.imgs[0][2] <= 288.01, JSON.stringify(pdfJusto));
+  ok(`si se pasa de verdad, se sigue partiendo en dos (${(pdfJusto[900] || {}).paginas})`, (pdfJusto[900] || {}).paginas === 2, JSON.stringify(pdfJusto[900]));
+  // 24/09 (revisión): esa defensa es de la hoja semanal y de nadie más. El tablón del Mes
+  // (y Horas, y el generador) no se tocan en este cambio: en el mismo caso, 788 px, sale
+  // como ha salido siempre.
+  const pdfMes = await pg.evaluate(async () => {
+    const lib = window.jspdf, Orig = lib.jsPDF;
+    let paginas = 0;
+    lib.jsPDF = function (...a) { const d = new Orig(...a), output = d.output.bind(d); d.output = (...x) => { paginas = d.getNumberOfPages(); return output(...x); }; return d; };
+    try {
+      cerrarImpresion(); abrirImpresionMes();
+      const pag = document.querySelector('#printRoot .pxpage');
+      pag.style.minHeight = '788px';
+      const nombre = await exportarPdfHoja({ sinCompartir: true });
+      return { nombre, paginas, cls: pag.className, mes: !!pag.querySelector('table.pxm') };
+    } finally { lib.jsPDF = Orig; cerrarImpresion(); abrirImpresion(); }
+  });
+  ok(`la defensa es solo de la hoja semanal: el Mes, en el mismo caso, se parte como siempre (${pdfMes.paginas} páginas)`, pdfMes.mes && !!pdfMes.nombre && pdfMes.paginas === 2, JSON.stringify(pdfMes));
   if (CAPTURAS) { await pg.setViewportSize({ width: 1400, height: Math.max(1000, altoSem.alto + 80) }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-semana.png'), fullPage: true }); await pg.setViewportSize({ width: 1400, height: 1000 }); }
   await pg.click('#pClose');
   ok('«Cerrar» oculta la vista previa', await pg.$eval('#printRoot', r => r.classList.contains('hidden')));
@@ -281,16 +440,66 @@ try {
   ok('abrirImpresionLocal(PASARELA) monta la hoja vertical con las casillas nuevas', await llega(pg, () => !!document.querySelector('#printRoot .pxpage:not(.apaisado) table.pxlocal') && document.querySelectorAll('#printRoot table.pxlocal .pxg-s').length > 10, null, 4000) >= 0);
   // se miden las CASILLAS, no las filas: el día del partido la fila crece porque la columna
   // del día lleva «Juega el Barcelona», y eso sí interesa en el bar
+  // (24/09, revisión: sin redondear y con 0,1 px de tolerancia, como la semanal)
   const rejillaLocal = await pg.evaluate(() => {
-    const alturas = [...document.querySelectorAll('#printRoot table.pxlocal td[data-cas]')].map(td => Math.round(td.getBoundingClientRect().height));
+    const alturas = [...document.querySelectorAll('#printRoot table.pxlocal td[data-cas]')].map(td => td.getBoundingClientRect().height);
     return { alturas, min: Math.min(...alturas), max: Math.max(...alturas) };
   });
-  ok(`la hoja del local también lleva todas las casillas iguales (${rejillaLocal.min}px)`, rejillaLocal.max - rejillaLocal.min <= 1, JSON.stringify(rejillaLocal.alturas));
+  ok(`la hoja del local también lleva todas las casillas iguales, sin redondear (${rejillaLocal.min}–${rejillaLocal.max}px)`, rejillaLocal.max - rejillaLocal.min <= 0.1, JSON.stringify(rejillaLocal.alturas));
+  // 24/09 (Diego): «letra más grande». La hoja de un bar es la de letra grande, pero los
+  // nombres salían a 8,8 px: table.pxw{8.5px} ganaba a .pxlocal{12.5px} por especificidad.
+  // Ahora va a 12,5 px como poco y crece, como la semanal, hasta la última talla que cabe
+  // en su A4 vertical (con 3 px de margen, en cuartos de píxel).
+  const letraLocal = await pg.evaluate(async () => {
+    const pag = document.querySelector('#printRoot .pxpage'), t = pag.querySelector('table.pxlocal');
+    const LIM = 297 * 96 / 25.4 - 3;
+    const f = parseFloat(getComputedStyle(t).fontSize);
+    const cabe = pag.scrollHeight <= LIM;
+    t.style.fontSize = (f + 0.25) + 'px'; const cabeUnaMas = pag.scrollHeight <= LIM; t.style.fontSize = f + 'px';
+    const nms = [...t.querySelectorAll('.pxg-nm')].map(n => parseFloat(getComputedStyle(n).fontSize));
+    const dias = [...t.querySelectorAll('td.lbld > b')].map(b => parseFloat(getComputedStyle(b).fontSize));
+    const url = await exportarPdfHoja({ soloCanvas: true });
+    const img = new Image(); await new Promise(r => { img.onload = r; img.src = url; });
+    return { tabla: f, nombre: Math.round(Math.min(...nms) * 100) / 100, nombreMax: Math.round(Math.max(...nms) * 100) / 100, dia: Math.round(Math.min(...dias) * 100) / 100, cabe, cabeUnaMas, alto: pag.scrollHeight, A4: Math.round(297 * 96 / 25.4 * 10) / 10, cls: pag.className, paginasPdf: Math.ceil(img.height / Math.floor(279 / (190 / img.width))) };
+  });
+  ok(`la hoja de un bar lleva los nombres a ≥ 12,5 px (${letraLocal.nombre}px)`, letraLocal.nombre >= 12.5, JSON.stringify(letraLocal));
+  ok(`la hoja de un bar crece hasta la última talla que cabe (${letraLocal.tabla}px; ${letraLocal.tabla >= 18 ? 'el tope de su escalera' : 'un cuarto más ya no entra'})`, letraLocal.cabe && (!letraLocal.cabeUnaMas || letraLocal.tabla >= 18), JSON.stringify(letraLocal));
+  ok(`y sigue en una sola página vertical (${letraLocal.alto}px ≤ ${letraLocal.A4}px; «Descargar PDF»: ${letraLocal.paginasPdf} página)`, letraLocal.alto <= letraLocal.A4 && letraLocal.paginasPdf === 1 && !/compacto/.test(letraLocal.cls), JSON.stringify(letraLocal));
+  ok(`en la hoja de un bar el día no queda más pequeño que los nombres (${letraLocal.dia}px frente a ${letraLocal.nombreMax}px)`, letraLocal.dia >= letraLocal.nombreMax, JSON.stringify(letraLocal));
   // la hoja de un bar sí conserva su pie de descansos: Diego pidió quitarlo «del imprimible
   // de la semana», y esta es la que se cuelga en el local con su propia plantilla
   ok('la hoja del local conserva su pie de descansos', await pg.evaluate(() => !!document.querySelector('#printRoot table.pxdesct') && /Libran/.test(document.querySelector('#printRoot .pxpage').textContent)));
   const pl = await cas('2026-09-14', 'PASARELA_T');
   ok('hoja del local: Pasarela lunes tarde con Mari Luz la primera, sin hueco', !!pl && pl.slots[0] && !pl.slots[0].hueco && /Mari Luz/.test(pl.slots[0].nombre) && !/hueco/.test(pl.cls), JSON.stringify(pl));
+  // 24/09 (revisión): la hoja de un bar con la semana cargada. Con seis nombres en una
+  // casilla ya no cabía a 12,5 px, así que se compactaba antes de que la escalera pudiera
+  // bajar: salía a 8 px y con la casilla llena 4 px más alta que las demás. Ahora la
+  // escalera busca su talla antes de compactar, también por debajo de 12,5, y si ni a 9 px
+  // cabe, la compactación conserva la rejilla. Mañana de Zapatillera del martes 15.
+  const localCon = n => pg.evaluate(async n => {
+    const iso = '2026-09-15', tid = 'ZAPA_M', e = estadoDeIso(iso, true), puestos = [];
+    const ocupados = new Set(turnosDe(S).flatMap(t => pidsEn(e, iso, t.id)));
+    for (const p of S.staff) {
+      if (asignados(e, iso, tid).length >= n) break;
+      if (ocupados.has(p.id) || ausenciaEn(p, iso) || p.standby) continue;
+      if (asignar(e, S, S.staff, iso, tid, p.id, { forzar: true }).ok) puestos.push(p.id);
+    }
+    try {
+      cerrarImpresion(); abrirImpresionLocal('ZAPA');
+      const pag = document.querySelector('#printRoot .pxpage'), t = pag.querySelector('table.pxlocal');
+      const cas = [...t.querySelectorAll('td[data-cas]')].map(td => td.getBoundingClientRect().height);
+      const cortados = [...t.querySelectorAll('td[data-cas] .pxg-b')].filter(b => b.scrollWidth > b.clientWidth).length;
+      const url = await exportarPdfHoja({ soloCanvas: true });
+      const img = new Image(); await new Promise(r => { img.onload = r; img.src = url; });
+      return { casilla: asignados(e, iso, tid).length, pxn: +t.style.getPropertyValue('--pxn'), fs: parseFloat(getComputedStyle(t).fontSize), cls: pag.className, alto: pag.scrollHeight, A4: Math.round(297 * 96 / 25.4 * 10) / 10, casillas: [Math.min(...cas), Math.max(...cas)], cortados, paginasPdf: Math.ceil(img.height / Math.floor(279 / (190 / img.width))) };
+    } finally { for (const pid of puestos) desasignar(e, iso, tid, pid); cerrarImpresion(); }
+  }, n);
+  const loc6 = await localCon(6);
+  ok(`hoja de un bar con 6 nombres en una casilla: baja la letra sin compactar (${loc6.fs}px ≥ 11 · ${loc6.cls})`, loc6.casilla === 6 && loc6.pxn === 6 && loc6.fs >= 11 && !/compacto/.test(loc6.cls), JSON.stringify(loc6));
+  ok(`y sigue en una hoja con las casillas iguales (${loc6.alto}px ≤ ${loc6.A4}px · casillas ${loc6.casillas.join('–')}px · PDF ${loc6.paginasPdf})`, loc6.alto <= loc6.A4 && loc6.casillas[1] - loc6.casillas[0] <= 0.1 && loc6.paginasPdf === 1 && loc6.cortados === 0, JSON.stringify(loc6));
+  const loc8 = await localCon(8);
+  ok(`con 8 nombres no cabe ni a 9 px y compacta, pero con la rejilla regular (${loc8.fs}px · casillas ${loc8.casillas.join('–')}px · ${loc8.alto}px · PDF ${loc8.paginasPdf})`, loc8.casilla === 8 && loc8.alto <= loc8.A4 && loc8.casillas[1] - loc8.casillas[0] <= 0.1 && loc8.paginasPdf === 1 && loc8.cortados === 0, JSON.stringify(loc8));
+  await pg.evaluate(() => abrirImpresionLocal('PASARELA'));
   if (CAPTURAS) { const alto = await pg.evaluate(() => document.querySelector('#printRoot .pxpage').scrollHeight); await pg.setViewportSize({ width: 1400, height: alto + 80 }); await pg.screenshot({ path: join(CAPTURAS, 'print-generada-local.png'), fullPage: true }); }
   await pg.click('#pClose');
 
