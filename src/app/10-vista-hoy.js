@@ -85,10 +85,10 @@ function renderDia() {
     (rev.length ? `<div class="warnbanner"><b>${pl(rev.length, 'aviso importante', 'avisos importantes')} hoy</b>${rev.slice(0, 4).map(x => esc(x.msg)).join(' · ')}${rev.length > 4 ? ` · y ${rev.length - 4} más` : ''}</div>` : '');
   $('#diaLocales').innerHTML = S.locales.map(l => htmlLocal(iso, l)).join('');
   // lateral
-  const libres = activos().filter(p => !ausenciaEn(p, iso) && !turnosDe(S).some(t => pidsEn(est, iso, t.id).includes(p.id)));
+  const libres = activos(iso).filter(p => !ausenciaEn(p, iso) && !turnosDe(S).some(t => pidsEn(est, iso, t.id).includes(p.id)));
   $('#diaSide').innerHTML = `
     <div class="scard"><span class="micro">Ausentes hoy · ${ausentes.length}</span><div class="lst">${ausentes.map(p => { const a = ausenciaEn(p, iso); return `<div class="srow"><span class="av" style="background:${avColor(p.id)};width:24px;height:24px;font-size:9px">${esc(initials(p.nombre))}</span><span class="nm">${esc(p.nombre)}</span><span class="abschip a-${esc(a.tipo)}">${esc((AUS_LBL[a.tipo] || {}).label || a.tipo)}</span></div>`; }).join('') || '<div class="szero">Nadie ausente.</div>'}</div></div>
-    <div class="scard"><span class="micro">Libran hoy · ${libres.length}</span><div class="lst">${libres.map(p => `<div class="srow"><span class="av" style="background:${avColor(p.id)};width:24px;height:24px;font-size:9px">${esc(initials(p.nombre))}</span><span class="nm">${esc(p.nombre)}</span><small>${(p.libra || []).includes(d.dow) ? 'libra ' + DOW_PL[d.dow] : 'sin turno'}</small></div>`).join('') || '<div class="szero">Todo el equipo trabaja hoy.</div>'}</div></div>
+    <div class="scard"><span class="micro">Libran hoy · ${libres.length}</span><div class="lst">${libres.map(p => `<div class="srow"><span class="av" style="background:${avColor(p.id)};width:24px;height:24px;font-size:9px">${esc(initials(p.nombre))}</span><span class="nm">${esc(p.nombre)}</span><small>${esc(estadoDia(S, p, iso).texto || 'sin turno')}</small></div>`).join('') || '<div class="szero">Todo el equipo trabaja hoy.</div>'}</div></div>
     <div class="scard"><span class="micro">Semana tipo</span><p class="szero">El generador parte de la semana tipo del grupo y rellena lo que falte. <button class="glink" data-irgen="${iso}">Completar este día</button></p></div>`;
   $('#dSticky').classList.toggle('on', scrollY > 235 && !$('#view-hoy').classList.contains('hidden'));
   pintaRevDot();

@@ -180,7 +180,7 @@ function openExtra(pid) {
     <h2 class="revh2">Apuntar una hora extra</h2>
     <p class="revsub">Se suma a las horas del mes de esa persona: sale en el contador, en el Excel y en la impresión.</p>
     <div class="xform">
-      <label>Persona<select id="xPid">${personas.map(p => `<option value="${esc(p.id)}"${p.id === sel ? ' selected' : ''}>${esc(p.nombre)}${deBaja(p) ? ' (de baja)' : ''}</option>`).join('')}</select></label>
+      <label>Persona<select id="xPid">${personas.map(p => `<option value="${esc(p.id)}"${p.id === sel ? ' selected' : ''}>${esc(p.nombre)}${deBaja(p, fecha) ? ' (de baja)' : ''}</option>`).join('')}</select></label>
       <label>Fecha<input type="date" id="xIso" value="${fecha}"></label>
       <div class="row2">
         <label>Horas<input type="number" id="xH" min="0" max="16" step="1" value="1" inputmode="numeric"></label>

@@ -72,6 +72,10 @@ function chipsCondiciones(p) {
   else if ((pd.dias || []).length) h.push(tc('partido', 'Partido', esc(lblDows(pd.dias))));
   if (p.libreVariable) h.push(tc('libra', 'Libra', 'libre variable', 'warn'));
   else if ((p.libra || []).length) h.push(tc('libra', 'Libra', esc(lblDows(p.libra))));
+  // 24/09 (reunión: «en el equipo te lo pone tal cual»): cada cambio de día libre guardado, con
+  // su semana, para que se vea a qué semana se refiere
+  const lunesHoy = lunesDe(isoHoy());
+  for (const x of librasPuntuales(p).filter(x => x.dias.length && x.semana >= lunesHoy)) h.push(tc('libra', 'Libra', esc(`Semana del ${fmtDDMM(x.semana)}: ${textoCambioLibre(p, x)}`), 'warn'));
   const c = p.cocina || {};
   if (c.nunca) h.push(tc('cocina', 'Cocina', 'nunca', 'warn'));
   else {
@@ -133,8 +137,9 @@ function htmlTarjetaPersona(p, baja) {
 // ---------- la vista ----------
 function renderEquipo() {
   const root = $('#equipoRoot'); if (!root) return;
-  const enActivo = S.staff.filter(p => !deBaja(p));
-  const deBajaHoy = S.staff.filter(p => deBaja(p));
+  const hoy = isoHoy();   // Equipo enseña el equipo de hoy
+  const enActivo = S.staff.filter(p => !deBaja(p, hoy));
+  const deBajaHoy = S.staff.filter(p => deBaja(p, hoy));
   const seccion = (titulo, gente, opts) => {
     const o = opts || {};
     return `<section class="eqsec"${o.color ? ` style="--lc:${esc(o.color)}"` : ''}>
@@ -315,10 +320,10 @@ function openAjustesLocales(localId) {
   const pintaTabs = () => {
     ov.querySelector('#locTabs').innerHTML = S.locales.map(l => `<button type="button" class="segk${l.id === actual ? ' on' : ''}" data-loctab="${esc(l.id)}" style="--lc:${esc(l.color)}"><i class="ldot"></i>${esc(l.nombre)}</button>`).join('');
   };
-  const personasSel = (sel, vacio) => `<option value="">${esc(vacio)}</option>` + activos().map(p => `<option value="${esc(p.id)}"${sel === p.id ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('');
+  const personasSel = (sel, vacio) => `<option value="">${esc(vacio)}</option>` + activos(isoHoy()).map(p => `<option value="${esc(p.id)}"${sel === p.id ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('');
   // candidatos a cocina: primero quien ya cocina en ese local (o es de cocina), luego el resto por si acaso
   const selCocina = (l, excluidos) => {
-    const libres = activos().filter(p => !excluidos.includes(p.id));
+    const libres = activos(isoHoy()).filter(p => !excluidos.includes(p.id));
     const aptos = libres.filter(p => puedeCocina(S, p, l.id, null) || p.puesto === 'cocina');
     const otros = libres.filter(p => !aptos.includes(p));
     return `<option value="">— elegir persona —</option>` +

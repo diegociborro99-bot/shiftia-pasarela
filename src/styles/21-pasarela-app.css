@@ -538,6 +538,20 @@ table.pvt{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 .lpunt{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
 .lpunt .pinlbl small{font-weight:400;color:var(--ink3)}
 .lpuntpie{margin-top:6px;font-size:12px;color:var(--ink3);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* 24/09: la semana del cambio siempre a la vista, con ‹ ›, y los cambios de otras semanas */
+.lpsem{display:flex;align-items:center;gap:4px;margin:4px 0 6px}
+.lpsem .mbtn{width:30px;height:30px;font-size:16px}
+.lpsemlbl{font-size:12.5px;color:var(--ink);min-width:0}
+.lpotras{margin-top:6px;font-size:12px;color:var(--ink2);line-height:1.6}
+.lpotra{white-space:nowrap}
+.lpotra .festrm{width:22px;height:22px;margin-left:2px;vertical-align:middle}
+/* Generador semanal: cambios de día libre de la semana, avisos en la casilla y lo que se retira */
+.gslibras{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink2)}
+.gslibras ul{margin:0;padding:0 0 0 16px}
+.gslibras small{color:var(--ink3)}
+.gslot.gaviso>span{color:var(--warn)}
+.gslot .gm.gav{color:var(--warn);border-color:color-mix(in srgb, var(--warn) 50%, transparent);background:var(--warn-bg);margin:0 4px 0 0}
+.gretlist li{color:var(--ink2)}
 
 /* Semana con nombres en vez de iniciales (José, 17/09) */
 .wav{min-width:0;height:26px;font-size:10.5px;font-weight:700;letter-spacing:0;padding:0 7px;

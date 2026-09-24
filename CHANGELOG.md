@@ -2,6 +2,81 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Cambiar el día libre también funciona en lo generado por meses.** Si la semana se había
+  volcado con «Mes → Generar» (o «Completar este día»), al marcar «libra el martes» Mari Luz
+  se quedaba sin trabajar ni el martes ni el miércoles: la app no sabía que Lavinia la cubría
+  el miércoles. Ahora lo sabe, también en lo ya guardado, y Mari Luz pasa al miércoles como
+  en cualquier otra semana.
+- **Quitar el cambio lo deja todo como estaba.** Si al cambiar el día entró alguien a cubrir
+  el día nuevo (Roberto por Adrián el martes), al quitar el cambio sale; y si quien se va
+  llevaba la cocina, la coge otro de la casilla en vez de quedarse sin cocina. Marcar el
+  martes, luego el jueves y luego quitar el martes da lo mismo que marcar el jueves.
+- **Solo se tocan los días que cambian.** Lo que quitaste a mano otro día de esa semana no
+  vuelve, y los días que aún no están generados no se rellenan: eso lo hace el Generador.
+- **La confirmación lo cuenta todo.** Además de quién sale y quién entra, dice dónde no se
+  la puede poner y por qué («no se puede poner a Mari Luz el miércoles 30 en Pasarela
+  mañana: nunca con Lavinia (plaza puesta a mano)»), y si un día del cambio ya ha pasado:
+  «el miércoles 23 ya ha pasado y no se toca: esta semana trabaja 5 días en vez de 6». El
+  Generador avisa de lo mismo. Las semanas que ya han pasado no se cambian.
+- **Ctrl+Z con la ficha abierta.** La ficha se pone al día al deshacer: deja de enseñar el
+  cambio deshecho, se puede volver a marcar y lo que toques después se guarda.
+- **«Guardar como semana tipo» guarda a cada uno con su día de siempre.** Si esa semana
+  alguien cambió su día libre, la semana tipo lo guarda con su día de siempre (y con quien
+  le cubre ese día), y la confirmación lo dice. Y Ctrl+Z, que devolvía la planilla pero no
+  la semana tipo de antes, ahora también la devuelve.
+- **Textos más claros.** La ficha dice «La semana del 28/09 libra martes…». Marcar su propio
+  día libre no guarda nada. A quien no tiene día fijo ya no le sale el aviso de días «sin
+  emparejar»; cuando hace falta, dice «no se sabe qué día trabaja a cambio». La Revisión y
+  la hoja impresa dicen «libra el martes esta semana», sin añadir «no hace partido los
+  martes». La confirmación dice «falta 1 de 3». En el Generador por periodo, lo que se
+  retira sale una vez por persona y día, con mañana o tarde, y el aviso final lo cuenta. En
+  el móvil se dice «Más → Deshacer» en vez de Ctrl+Z, y «Listo» cierra al primer toque.
+- **La propuesta «con aviso» que aceptas en el Generador es tuya:** queda como puesta a mano
+  y el Generador ya no la retira por su cuenta.
+- **«Esta semana libra otro día» ya lo respeta el generador** (reunión del 24/09: «esta
+  semana libra martes en vez de miércoles… al generar no lo respeta… me salen los 2 días…
+  en el equipo te lo pone tal cual, pero luego no lo quita»). Ahora, si Mari Luz libra el
+  martes en vez del miércoles, al generar la semana libra el martes y el miércoles hace
+  exactamente lo que habría hecho el martes: Pasarela mañana y tarde, con su partido, sin
+  aviso de partido. Lavinia, que la cubre los miércoles, esa semana no va. El martes se
+  cubre como si faltara: entra quien la cubre si puede, y si no lo rellena el generador o
+  queda como hueco explicado. Trabaja los mismos días que cualquier otra semana (si uno de
+  los dos días ya ha pasado, la app lo avisa). Vale para cualquiera que cambie su día libre
+  (Victoria, Adrián…), también en la semana que cruza de mes, en el Generador por semanas y
+  por periodo, y en la hoja impresa.
+- **Si la semana ya está en la planilla, se cambia al momento.** Al marcar el día en la
+  ficha, la app cuenta antes lo que va a pasar («Mari Luz sale del martes 29… entra el
+  miércoles 30… Lavinia deja de cubrirla… queda un hueco el martes 29 en Pasarela
+  mañana») y, al aceptar, lo aplica. Ctrl+Z lo deshace de una vez. Lo que se puso a mano o
+  se forzó no se toca: se queda, con su aviso. Quitar el cambio lo devuelve todo a su sitio
+  (ver arriba).
+- **«Generar la semana» ya quita lo que no vale.** Hasta ahora solo añadía. Ahora retira lo
+  que puso la semana tipo o el propio generador y choca con un día libre (quien libra ese
+  día, y quien cubría a alguien que esta semana sí trabaja), y lo enseña en «Qué ha
+  cambiado» → «Se retira», con el motivo. Nunca quita lo puesto a mano ni lo forzado. El
+  botón de volcar cuenta también lo que se retira.
+- **La ficha dice siempre de qué semana habla.** El bloque «Esta semana libra otro día»
+  enseña la semana («Semana del 28/09 al 04/10») con flechas para cambiarla; de partida,
+  la que tienes en el Generador (si no lo has abierto, la de la vista Semana). Se pueden
+  dejar varias semanas preparadas: las demás salen debajo, con su ✕ para quitarlas, en vez
+  de «Sin cambios».
+- **En el Generador semanal, «Cambiar el día libre de alguien esta semana»**: eliges a la
+  persona y el día, y se guarda para la semana que estás generando. Debajo del botón, la
+  lista de quién cambia su día libre esa semana. En la planilla generada, la casilla de
+  quien está forzado lleva ⚠ con el motivo.
+- **Todas las vistas leen el día libre de esa semana.** La tarjeta de Equipo dice
+  «Semana del 28/09: libra martes (en vez de miércoles)»; la Cobertura pinta «libra» el
+  martes y no el miércoles y su cabecera dice «(semana del 28/09: libra martes)»; el Mes,
+  Hoy («libra el martes esta semana (en vez de los miércoles)») y el perfil del empleado,
+  lo mismo. Las condiciones del Generador dicen «Mari Luz libra el martes esta semana (en
+  vez de los miércoles)» y la comprueban esa semana.
+- **Las bajas se miran con la semana que se mira, no con el día de hoy.** Quien está de
+  baja hoy pero vuelve la semana que se genera sí tiene sus condiciones comprobadas. Una
+  baja de unos días sale como «Tere de baja el lunes», y el sábado Tere sale en «Quién
+  libra». La Cobertura ya no cambia de persona sola cuando la elegida está de baja hoy: la
+  cabecera avisa de los días de baja. El pie «Descansos» de la Semana cuenta a quien vuelve
+  de una baja y ya no cuenta a quien está en standby. En el Mes, el grupo «De baja» es quien
+  lo está el mes entero.
 - **La hoja de la semana, con letra más grande** (Diego, 24/09: «imprimible de semana con
   letra más grande»). Sigue siendo UNA hoja A4 apaisada con los cuatro bares y solo los
   nombres, la que Aroa recorta en cuatro, con todas las casillas del mismo alto y los siete

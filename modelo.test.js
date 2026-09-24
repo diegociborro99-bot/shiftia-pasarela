@@ -1449,4 +1449,508 @@ ok('la lista se ordena de cuatro maneras: alfabético, por valoración, por fech
   assert.ok(M.ORDENES_CAND.every(o => o.label && o.corto));
 });
 
+// ---------- día libre puntual de punta a punta (reunión del 24/09, decisión D9) ----------
+// Diego, 24/09: «Esta semana libra martes en vez de miércoles… al generar no lo respeta… me
+// salen los 2 días… luego no lo quita». Acordado: el miércoles hace exactamente lo que habría
+// hecho el martes (sus plazas de la semana tipo, con su partido); quien la cubría el miércoles
+// («por Mari Luz») se retira; el martes queda libre y se cubre como una ausencia.
+const LP_LUN = '2026-10-05', LP_MAR = '2026-10-06', LP_MIE = '2026-10-07';
+const lpTrabajaEn = (cfg, e, pid, iso) => M.turnosDe(cfg).filter(t => M.pidsEn(e, iso, t.id).includes(pid)).map(t => t.id);
+const lpDias = (cfg, e, pid, lunes) => { let k = 0; for (let i = 0; i < 7; i++) if (lpTrabajaEn(cfg, e, pid, M.addDias(lunes, i)).length) k++; return k; };
+// estado «virtual» de una semana que cruza de mes, como estadoSemana de la app (22-generador.js)
+function lpSemanaVirtual(meses, lunes) {
+  const e = { y: +lunes.slice(0, 4), m: +lunes.slice(5, 7), days: [], asig: {}, apertura: {}, manual: {}, festivos: [], virtual: true };
+  for (let k = 0; k < 7; k++) {
+    const iso = M.addDias(lunes, k), me = meses[iso.slice(0, 7)];
+    e.days.push(me.days.find(x => x.iso === iso));
+    me.asig[iso] = me.asig[iso] || {}; me.apertura[iso] = me.apertura[iso] || {}; me.manual[iso] = me.manual[iso] || {};
+    e.asig[iso] = me.asig[iso]; e.apertura[iso] = me.apertura[iso]; e.manual[iso] = me.manual[iso];
+  }
+  return e;
+}
+
+ok('D9 · libra el martes en vez del miércoles: el generador la pasa al miércoles con su partido y retira a quien la cubría', () => {
+  const base = cfgBase(), eb = estadoOct();
+  M.generarSemana(base, staffDe(base), eb, LP_LUN, {});
+  const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+  M.personaDe(st, 'mariluz').libraPuntual = [{ semana: LP_LUN, dias: [2] }];
+  const r = M.generarSemana(cfg, st, e, LP_LUN, {});
+  assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MAR), [], 'el martes 6 libra');
+  assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MIE), ['PASARELA_M', 'PASARELA_T'], 'el miércoles 7 hace lo del martes: Pasarela mañana y tarde');
+  for (const tid of ['PASARELA_M', 'PASARELA_T']) {
+    const en = M.asignados(e, LP_MIE, tid).find(x => x.pid === 'mariluz');
+    assert.ok(!(en.avisos || []).length, `sin aviso al ponerla en ${tid}: ${JSON.stringify(en.avisos)}`);
+    assert.deepStrictEqual(M.avisosVigentes(cfg, st, e, LP_MIE, tid, 'mariluz'), [], 'ni aviso de partido: el partido del martes pasa al miércoles');
+    assert.strictEqual(en.razon, 'esta semana cambia su día libre');
+  }
+  assert.ok(!M.turnosDe(cfg).some(t => M.asignados(e, LP_MIE, t.id).some(x => x.por === 'mariluz')), 'nadie la cubre el miércoles: Lavinia «por Mari Luz» no se pone');
+  assert.strictEqual(lpDias(cfg, e, 'mariluz', LP_LUN), lpDias(base, eb, 'mariluz', LP_LUN), 'trabaja los mismos días que sin el cambio');
+  assert.strictEqual(lpDias(cfg, e, 'mariluz', LP_LUN), 6);
+  assert.ok(r.libran[LP_MAR].includes('mariluz') && !r.libran[LP_MIE].includes('mariluz'), '«Quién libra»: el martes sí, el miércoles no');
+  assert.ok(!r.rechazados.some(x => x.pid === 'mariluz'), 'sus plazas del martes no son rechazos: se trasladan');
+  for (const tid of ['PASARELA_M', 'PASARELA_T']) {
+    const rev = M.revisarTurno(cfg, st, e, LP_MAR, tid);
+    assert.ok(!rev.faltan || r.huecos.some(h => h.iso === LP_MAR && h.turnoId === tid), `el martes ${tid} queda cubierto o como hueco listado`);
+  }
+  const c = r.condiciones.find(x => x.id === 'p:mariluz:libra');
+  assert.ok(c.ok && /martes/.test(c.texto), `condición: ${c.texto} · ${c.detalle}`);
+  const cp = r.condiciones.find(x => x.id === 'p:mariluz:partido');
+  assert.ok(cp.ok, `partido: ${cp.detalle}`);
+});
+
+ok('D9 · lo mismo para cualquiera que libre el miércoles: Victoria (la cubre Noe) y Adrián (sin cobertura)', () => {
+  for (const pid of ['victoria', 'adrian']) {
+    const base = cfgBase(), eb = estadoOct();
+    M.generarSemana(base, staffDe(base), eb, LP_LUN, {});
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    M.personaDe(st, pid).libraPuntual = [{ semana: LP_LUN, dias: [2] }];
+    M.generarSemana(cfg, st, e, LP_LUN, {});
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, pid, LP_MAR), [], `${pid}: el martes libra`);
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, pid, LP_MIE), lpTrabajaEn(base, eb, pid, LP_MAR), `${pid}: el miércoles hace lo del martes`);
+    assert.ok(!M.turnosDe(cfg).some(t => M.asignados(e, LP_MIE, t.id).some(x => x.por === pid)), `${pid}: nadie la cubre el miércoles`);
+    assert.strictEqual(lpDias(cfg, e, pid, LP_LUN), lpDias(base, eb, pid, LP_LUN), `${pid}: los mismos días de trabajo`);
+  }
+});
+
+ok('D9 · la semana que cruza de mes: libra el jueves 1/10 en vez del miércoles 30/09 (modo Periodo y modo Semana)', () => {
+  const LUN = '2026-09-28';
+  // modo Periodo: un generarPlanilla por mes, como generarSobre (22-generador.js)
+  {
+    const cfg = cfgBase(), st = staffDe(cfg);
+    M.personaDe(st, 'mariluz').libraPuntual = [{ semana: LUN, dias: [4] }];
+    const sep = M.nuevoEstado(2026, 9, { festivos: [] }), oct = estadoOct();
+    M.generarPlanilla(cfg, st, sep, LUN, '2026-09-30', {});
+    M.generarPlanilla(cfg, st, oct, '2026-10-01', '2026-10-04', {});
+    assert.deepStrictEqual(lpTrabajaEn(cfg, sep, 'mariluz', '2026-09-30'), ['PASARELA_M', 'PASARELA_T'], 'el miércoles 30 (septiembre) hace lo del jueves');
+    assert.deepStrictEqual(lpTrabajaEn(cfg, oct, 'mariluz', '2026-10-01'), [], 'el jueves 1 (octubre) libra');
+    assert.ok(!M.asignados(sep, '2026-09-30', 'PASARELA_M').some(x => x.por === 'mariluz'));
+  }
+  // modo Semana: los siete días de dos meses en un estado virtual
+  {
+    const cfg = cfgBase(), st = staffDe(cfg);
+    M.personaDe(st, 'mariluz').libraPuntual = [{ semana: LUN, dias: [4] }];
+    const meses = { '2026-09': M.nuevoEstado(2026, 9, { festivos: [] }), '2026-10': estadoOct() };
+    const r = M.generarSemana(cfg, st, lpSemanaVirtual(meses, LUN), LUN, {});
+    assert.deepStrictEqual(lpTrabajaEn(cfg, meses['2026-09'], 'mariluz', '2026-09-30'), ['PASARELA_M', 'PASARELA_T']);
+    assert.deepStrictEqual(lpTrabajaEn(cfg, meses['2026-10'], 'mariluz', '2026-10-01'), []);
+    assert.ok(r.libran['2026-10-01'].includes('mariluz') && !r.libran['2026-09-30'].includes('mariluz'));
+    assert.ok(r.condiciones.find(c => c.id === 'p:mariluz:libra').ok);
+  }
+});
+
+ok('D9 · semana ya volcada: al regenerar se retira lo automático que rompe el día libre y se lista; lo manual y lo forzado se quedan', () => {
+  // a) todo automático: se retira y sale en «Qué ha cambiado» y en retirados
+  {
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    M.generarSemana(cfg, st, e, LP_LUN, {});
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MAR), ['PASARELA_M', 'PASARELA_T'], 'volcada: el martes trabaja');
+    M.personaDe(st, 'mariluz').libraPuntual = [{ semana: LP_LUN, dias: [2] }];
+    const r = M.generarSemana(cfg, st, e, LP_LUN, {});
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MAR), [], 'regenerar la quita del martes');
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MIE), ['PASARELA_M', 'PASARELA_T'], 'y la pone el miércoles');
+    assert.ok(!M.pidsEn(e, LP_MIE, 'PASARELA_M').includes('lavinia') && !M.pidsEn(e, LP_MIE, 'PASARELA_T').includes('lavinia'), 'Lavinia, que la cubría, se retira');
+    const ret = (pid, iso, tid) => r.retirados.some(x => x.pid === pid && x.iso === iso && x.turnoId === tid && x.motivo);
+    assert.ok(ret('mariluz', LP_MAR, 'PASARELA_M') && ret('mariluz', LP_MAR, 'PASARELA_T') && ret('lavinia', LP_MIE, 'PASARELA_M') && ret('lavinia', LP_MIE, 'PASARELA_T'), JSON.stringify(r.retirados));
+    const cm = r.cambios.find(c => c.iso === LP_MAR && c.turnoId === 'PASARELA_M');
+    assert.ok(cm && cm.antes.includes('mariluz') && !cm.despues.includes('mariluz'), 'el cambio del martes sale con antes y después');
+    assert.ok(r.aplicados > 0);
+  }
+  // b) lo puesto a mano y lo forzado no lo quita nadie
+  {
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    M.generarSemana(cfg, st, e, LP_LUN, {});
+    M.asignados(e, LP_MAR, 'PASARELA_M').find(x => x.pid === 'mariluz').origen = 'manual';      // la puso el encargado
+    M.personaDe(st, 'mariluz').libraPuntual = [{ semana: LP_LUN, dias: [2] }];
+    M.desasignar(e, LP_MAR, 'PASARELA_T', 'mariluz');
+    assert.ok(M.asignar(e, cfg, st, LP_MAR, 'PASARELA_T', 'mariluz', { forzar: true, origen: 'generador' }).entry.forzado, 'forzada el martes aunque libra');
+    const r = M.generarSemana(cfg, st, e, LP_LUN, {});
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MAR), ['PASARELA_M', 'PASARELA_T'], 'lo manual y lo forzado se quedan');
+    assert.ok(!r.retirados.some(x => x.pid === 'mariluz'), 'y no salen como retirados');
+    assert.ok(M.avisosVigentes(cfg, st, e, LP_MAR, 'PASARELA_M', 'mariluz').some(x => /libra/.test(x)), 'con su aviso');
+  }
+});
+
+ok('D9 · moverDiaLibre en una semana ya volcada: la quita del martes, retira su cobertura y la pone el miércoles; quitarlo lo deshace', () => {
+  const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+  M.generarSemana(cfg, st, e, LP_LUN, {});
+  const ml = M.personaDe(st, 'mariluz');
+  M.asignados(e, LP_MAR, 'PASARELA_T').find(x => x.pid === 'mariluz').origen = 'manual';      // la tarde se la puso el encargado a mano
+  const r = M.moverDiaLibre(cfg, st, e, 'mariluz', LP_LUN, [2]);
+  assert.ok(M.libraEn(ml, LP_MAR) && !M.libraEn(ml, LP_MIE), 'guarda el cambio de esa semana');
+  const q = (pid, iso, tid) => r.quitados.some(x => x.pid === pid && x.iso === iso && x.turnoId === tid);
+  assert.ok(q('mariluz', LP_MAR, 'PASARELA_M'), 'la quita de la mañana del martes (automática)');
+  assert.ok(!q('mariluz', LP_MAR, 'PASARELA_T') && M.pidsEn(e, LP_MAR, 'PASARELA_T').includes('mariluz'), 'la tarde puesta a mano se queda');
+  assert.ok(r.quedan.some(x => x.pid === 'mariluz' && x.iso === LP_MAR && x.turnoId === 'PASARELA_T' && x.avisos.some(a => /libra/.test(a))), 'y queda listada con su aviso');
+  assert.ok(q('lavinia', LP_MIE, 'PASARELA_M') && q('lavinia', LP_MIE, 'PASARELA_T'), 'retira a Lavinia «por Mari Luz» del miércoles');
+  assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MIE), ['PASARELA_M', 'PASARELA_T'], 'la pone el miércoles con las plazas del martes');
+  assert.ok(r.puestos.some(x => x.pid === 'mariluz' && x.iso === LP_MIE && x.turnoId === 'PASARELA_T'));
+  assert.deepStrictEqual(M.avisosVigentes(cfg, st, e, LP_MIE, 'PASARELA_T', 'mariluz'), [], 'con el partido trasladado: sin aviso');
+  assert.ok(r.huecos.some(h => h.iso === LP_MAR && h.turnoId === 'PASARELA_M' && h.faltan > 0), `deja listado el hueco del martes: ${JSON.stringify(r.huecos)}`);
+  // quitar el día puntual deshace lo mismo
+  const d = M.moverDiaLibre(cfg, st, e, 'mariluz', LP_LUN, []);
+  assert.ok(!M.libraPuntualVigente(ml, LP_MAR), 'el cambio se quita');
+  assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MIE), [], 'el miércoles vuelve a librar');
+  assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MAR), ['PASARELA_M', 'PASARELA_T'], 'el martes vuelve a trabajar');
+  assert.ok(['PASARELA_M', 'PASARELA_T'].every(t => M.asignados(e, LP_MIE, t).some(x => x.pid === 'lavinia' && x.por === 'mariluz')), 'y Lavinia vuelve a cubrirla el miércoles');
+  assert.ok(d.quitados.some(x => x.pid === 'mariluz' && x.iso === LP_MIE) && d.puestos.some(x => x.pid === 'lavinia' && x.iso === LP_MIE));
+});
+
+ok('D4 · verificarSemana y condicionesDe miran el día libre de ESA semana (también el objeto de antes del 24/09)', () => {
+  const cfg = cfgBase(), st = staffDe(cfg);
+  M.personaDe(st, 'mariluz').libraPuntual = { semana: LP_LUN, dias: [2] };   // forma antigua: se sigue leyendo
+  const a = estadoOct();
+  assert.ok(M.asignar(a, cfg, st, LP_MIE, 'PASARELA_M', 'mariluz', {}).ok);
+  assert.ok(M.asignar(a, cfg, st, LP_MIE, 'PASARELA_T', 'mariluz', {}).ok, 'la tarde del miércoles también: el partido del martes pasa a ese día');
+  const va = M.verificarSemana(cfg, st, a, LP_LUN);
+  assert.strictEqual(va.find(c => c.id === 'p:mariluz:libra').ok, true, 'el miércoles trabaja esta semana: no rompe nada');
+  assert.strictEqual(va.find(c => c.id === 'p:mariluz:partido').ok, true, 'ni el partido');
+  const b = estadoOct();
+  M.asignar(b, cfg, st, LP_MAR, 'PASARELA_M', 'mariluz', { forzar: true });
+  const cb = M.verificarSemana(cfg, st, b, LP_LUN).find(c => c.id === 'p:mariluz:libra');
+  assert.strictEqual(cb.ok, false, 'el martes libra esta semana: forzarla rompe la condición');
+  assert.match(cb.texto, /martes/);
+  assert.match(cb.detalle, /martes 6: trabaja/);
+  assert.strictEqual(M.condicionesDe(cfg, st, LP_LUN).find(c => c.id === 'p:mariluz:libra').texto, 'Mari Luz libra el martes esta semana (en vez de los miércoles)');
+  assert.strictEqual(M.condicionesDe(cfg, st, '2026-10-12').find(c => c.id === 'p:mariluz:libra').texto, 'Mari Luz libra los miércoles', 'la semana siguiente, su día de siempre');
+  // Dulce no tiene días libres fijos: con un día libre puntual, la condición existe igual
+  const d = M.personaDe(st, 'dulce'); delete d.standby; d.libraPuntual = [{ semana: LP_LUN, dias: [5] }];
+  const cd = M.condicionesDe(cfg, st, LP_LUN).find(c => c.id === 'p:dulce:libra');
+  assert.ok(cd && /viernes/.test(cd.texto), JSON.stringify(cd));
+  const x = estadoOct(); M.asignar(x, cfg, st, '2026-10-09', 'PASARELA_T', 'dulce', { forzar: true });
+  assert.strictEqual(M.verificarSemana(cfg, st, x, LP_LUN).find(c => c.id === 'p:dulce:libra').ok, false);
+});
+
+ok('núcleo (toProblem): bloquea el día libre puntual y no el habitual, y fija las plazas con el cambio', () => {
+  const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+  M.personaDe(st, 'mariluz').libraPuntual = [{ semana: LP_LUN, dias: [2] }];
+  const pb = M.toProblem(cfg, st, e, LP_LUN, M.addDias(LP_LUN, 6), {});
+  const i = (iso, f) => pb.meta.indices.findIndex(x => x.iso === iso && x.franja === f);
+  const w = id => pb.workers.find(x => x.id === id);
+  for (const f of ['M', 'T']) {
+    assert.strictEqual(w('mariluz').unavailable[i(LP_MAR, f)], '*', `Mari Luz libra el martes (${f})`);
+    assert.strictEqual(w('mariluz').fixed[i(LP_MAR, f)], undefined, 'y no se le fija la plaza del martes');
+    assert.strictEqual(w('mariluz').unavailable[i(LP_MIE, f)], undefined, 'el miércoles puede');
+    assert.strictEqual(w('mariluz').fixed[i(LP_MIE, f)], 'PASARELA', 'y se le fija lo del martes');
+    assert.strictEqual(w('lavinia').fixed[i(LP_MIE, f)], undefined, 'Lavinia no la cubre esa semana');
+  }
+  const pb2 = M.toProblem(cfg, st, e, '2026-10-12', '2026-10-18', {});
+  const i2 = (iso, f) => pb2.meta.indices.findIndex(x => x.iso === iso && x.franja === f);
+  assert.strictEqual(pb2.workers.find(x => x.id === 'mariluz').unavailable[i2('2026-10-14', 'M')], '*', 'la semana siguiente vuelve a librar el miércoles');
+});
+
+ok('libraPuntual es una lista por semanas: se leen las dos formas, se migra el objeto y caducan las semanas pasadas', () => {
+  const p = { id: 'x', nombre: 'X', libra: [3], libraPuntual: { semana: '2026-10-05', dias: [2] } };
+  assert.strictEqual(M.libraEn(p, '2026-10-06'), true, 'el objeto de antes se lee');
+  assert.strictEqual(M.limpiarLibrePuntual([p], '2026-09-24'), 0, 'no hay semanas pasadas');
+  assert.deepStrictEqual(p.libraPuntual, [{ semana: '2026-10-05', dias: [2] }], 'y pasa a ser una lista');
+  M.ponerLibraPuntual(p, '2026-10-12', [5]);
+  assert.deepStrictEqual(p.libraPuntual, [{ semana: '2026-10-05', dias: [2] }, { semana: '2026-10-12', dias: [5] }], 'varias semanas a la vez');
+  assert.ok(M.libraEn(p, '2026-10-06') && !M.libraEn(p, '2026-10-07') && M.libraEn(p, '2026-10-16') && !M.libraEn(p, '2026-10-14') && M.libraEn(p, '2026-10-21'));
+  M.ponerLibraPuntual(p, '2026-10-05', []);
+  assert.deepStrictEqual(p.libraPuntual, [{ semana: '2026-10-12', dias: [5] }], 'sin días, la semana se quita');
+  assert.strictEqual(M.limpiarLibrePuntual([p], '2026-10-19'), 1, 'la semana pasada se borra al cargar');
+  assert.strictEqual(p.libraPuntual, null);
+  p.libraPuntual = [{ semana: '2026-10-19', dias: [] }];
+  assert.ok(M.libraEn(p, '2026-10-21') && !M.libraPuntualVigente(p, '2026-10-21'), 'una semana sin días no cambia nada');
+});
+
+ok('capa de lectura de la ficha: activa, partidoEn (con el partido trasladado) y estadoDia para las vistas', () => {
+  const cfg = cfgBase(), st = staffDe(cfg), ml = M.personaDe(st, 'mariluz');
+  assert.strictEqual(M.activa(cfg, ml, 'libra'), true);
+  ml.inactivas = ['libra']; assert.strictEqual(M.activa(cfg, ml, 'libra'), false, 'apagada en la ficha'); delete ml.inactivas;
+  cfg.reglas = { partido: false }; assert.strictEqual(M.activa(cfg, ml, 'partido'), false, 'apagada para el grupo');
+  assert.strictEqual(M.partidoEn(cfg, ml, LP_MIE), true, 'con la regla apagada, el partido no se mira'); cfg.reglas = {};
+  assert.strictEqual(M.partidoEn(cfg, ml, LP_MAR), true, 'hace partido los martes');
+  assert.strictEqual(M.partidoEn(cfg, ml, LP_MIE), false, 'y no los miércoles');
+  ml.libraPuntual = [{ semana: LP_LUN, dias: [2] }];
+  assert.strictEqual(M.partidoEn(cfg, ml, LP_MIE), true, 'esa semana el partido del martes pasa al miércoles');
+  assert.strictEqual(M.partidoEn(cfg, ml, LP_MAR), false);
+  assert.strictEqual(M.partidoEn(cfg, ml, '2026-10-13'), true, 'la semana siguiente vuelve');
+  assert.strictEqual(M.partidoAbre(cfg, M.localDe(cfg, 'PASARELA'), ml, LP_MIE, 'T'), true, 'y con él, abrir la tarde de Pasarela en partido');
+  // si el número de días no cuadra, solo se prohíbe: el partido no se mueve
+  const lav = M.personaDe(st, 'lavinia'); lav.libraPuntual = [{ semana: LP_LUN, dias: [5] }];   // libra lunes, martes y jueves
+  assert.ok(M.libraEn(lav, '2026-10-09') && !M.libraEn(lav, LP_LUN), 'esa semana libra solo el viernes');
+  assert.strictEqual(M.partidoEn(cfg, lav, LP_MIE), true, 'su partido del miércoles sigue donde estaba');
+  const d2 = M.estadoDia(cfg, ml, LP_MAR);
+  assert.strictEqual(d2.libra, true); assert.ok(d2.puntual);
+  assert.strictEqual(d2.texto, 'libra el martes esta semana (en vez de los miércoles)');
+  const d3 = M.estadoDia(cfg, ml, LP_MIE);
+  assert.strictEqual(d3.libra, false); assert.match(d3.texto, /trabaja/);
+  const d4 = M.estadoDia(cfg, ml, '2026-10-14');
+  assert.deepStrictEqual([d4.libra, d4.puntual, d4.texto], [true, null, 'libra los miércoles']);
+  assert.strictEqual(M.estadoDia(cfg, M.personaDe(st, 'dulce'), LP_MAR).standby, true);
+  const tere = M.personaDe(st, 'tere'); tere.ausencias = [{ tipo: 'VAC', desde: LP_MAR, hasta: LP_MAR }];
+  const dv = M.estadoDia(cfg, tere, LP_MAR);
+  assert.ok(dv.ausencia && dv.ausencia.tipo === 'VAC' && /vacaciones/i.test(dv.texto), JSON.stringify(dv));
+  ml.inactivas = ['libra'];
+  assert.strictEqual(M.estadoDia(cfg, ml, '2026-10-14').libra, false, '«Días que libra» apagada: las vistas tampoco dicen «libra»');
+});
+
+ok('deBaja pide la fecha: el modelo no mira el reloj', () => {
+  const p = { id: 'x', ausencias: [{ tipo: 'BAJ', desde: '2026-09-01' }] };
+  assert.throws(() => M.deBaja(p), /fecha/);
+  assert.strictEqual(M.deBaja(p, '2026-09-10'), true);
+  assert.strictEqual(M.deBaja(p, '2026-08-31'), false);
+});
+
+ok('D8 · las condiciones de la semana dependen de la semana, no de si hoy está de baja', () => {
+  // con fechas fijas: de baja del 21 al 27/09, vuelve el lunes 28
+  {
+    const cfg = cfgBase(), st = staffDe(cfg);
+    M.anadirAusencia(M.personaDe(st, 'mariluz'), { tipo: 'BAJ', desde: '2026-09-21', hasta: '2026-09-27' });
+    const e = M.nuevoEstado(2026, 9, { festivos: [] });
+    M.asignar(e, cfg, st, '2026-09-30', 'PASARELA_M', 'mariluz', { forzar: true });
+    const c = M.verificarSemana(cfg, st, e, '2026-09-28').find(x => x.id === 'p:mariluz:libra');
+    assert.ok(c && c.ok === false, 'la semana que vuelve se comprueba: forzada el miércoles, que libra');
+    assert.ok(!M.condicionesDe(cfg, st, '2026-09-21').some(x => x.pid === 'mariluz'), 'la semana entera de baja no tiene condiciones');
+  }
+  // y con el reloj de hoy, sea cual sea: de baja hoy, la semana de dentro de dos se comprueba
+  {
+    const cfg = cfgBase(), st = staffDe(cfg);
+    const hoy = M.fechaMadrid(), lunes = M.mondayOf(M.addDias(hoy, 14)), mie = M.addDias(lunes, 2);
+    M.anadirAusencia(M.personaDe(st, 'mariluz'), { tipo: 'BAJ', desde: M.addDias(hoy, -2), hasta: M.addDias(hoy, 2) });
+    const e = M.nuevoEstado(+mie.slice(0, 4), +mie.slice(5, 7), { festivos: [] });
+    M.asignar(e, cfg, st, mie, 'PASARELA_M', 'mariluz', { forzar: true });
+    const c = M.verificarSemana(cfg, st, e, lunes).find(x => x.id === 'p:mariluz:libra');
+    assert.ok(c && c.ok === false);
+  }
+});
+
+ok('S6 · generarSemana mira la baja día a día: de baja toda la semana, o «de baja el lunes»', () => {
+  const LUN = '2026-10-12';
+  {
+    const cfg = cfgBase(), st = staffDe(cfg);
+    M.personaDe(st, 'tere').ausencias = [{ tipo: 'BAJ', desde: '2026-10-05', hasta: '2026-10-12' }];   // solo el lunes de esa semana
+    const r = M.generarSemana(cfg, st, estadoOct(), LUN, {});
+    assert.ok(!r.resumen.deBaja.includes('tere'), 'no está de baja toda la semana');
+    assert.deepStrictEqual(r.resumen.bajasParciales.find(x => x.pid === 'tere'), { pid: 'tere', dias: ['2026-10-12'] });
+    assert.ok(r.libran['2026-10-17'].includes('tere') && r.libran['2026-10-18'].includes('tere'), 'el fin de semana libra y sale en «Quién libra»');
+    assert.ok(!r.libran['2026-10-12'].includes('tere'), 'el lunes está de baja, no libra');
+    assert.ok(r.resumen.deBaja.includes('laura'), 'Laura, de baja sin fin, toda la semana');
+  }
+  {
+    const cfg = cfgBase(), st = staffDe(cfg);
+    M.personaDe(st, 'tere').ausencias = [{ tipo: 'BAJ', desde: '2026-10-14' }];   // desde el miércoles, sin fin
+    const r = M.generarSemana(cfg, st, estadoOct(), LUN, {});
+    assert.ok(!r.resumen.deBaja.includes('tere'));
+    assert.deepStrictEqual(r.resumen.bajasParciales.find(x => x.pid === 'tere').dias, ['2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18']);
+  }
+});
+
+// ---------- revisión de la FASE 1 (24/09): lo que los dos revisores encontraron ----------
+// Foto de una semana: quién está en cada casilla, con su «por» y quién lleva la cocina.
+const lpFoto = (cfg, e, lunes) => {
+  const m = {};
+  for (let k = 0; k < 7; k++) {
+    const iso = M.addDias(lunes, k);
+    for (const t of M.turnosDe(cfg)) { const xs = M.asignados(e, iso, t.id).map(x => x.pid + (x.por ? '/por:' + x.por : '') + (x.cocina ? '(coc)' : '')).sort(); if (xs.length) m[iso + ' ' + t.id] = xs.join(','); }
+  }
+  return m;
+};
+// lo que hacía aplicarPrevia (modo Periodo, «Mes → Generar», «Completar este día») hasta esta
+// revisión: volcaba cada plaza SIN el «por» ni la nota. Así están los datos ya guardados.
+function lpVolcadoSinPor(cfg, st) {
+  const real = estadoOct();
+  const prev = M.generarPlanilla(cfg, st, real, '2026-10-01', '2026-10-31', { simular: true });
+  for (const a of prev.aplicados) {
+    if (M.pidsEn(real, a.iso, a.turnoId).includes(a.pid)) continue;
+    const entry = M.asignados(prev.estado, a.iso, a.turnoId).find(x => x.pid === a.pid) || {};
+    M.asignar(real, cfg, st, a.iso, a.turnoId, a.pid, { origen: a.origen, razon: a.razon, supuesto: !!a.supuesto || !!entry.supuesto, permitirPartido: true, cocina: entry.cocina ? true : undefined, abre: entry.abre ? true : undefined });
+  }
+  return real;
+}
+
+ok('revisión F1 · volcado sin «por» (modo Periodo y datos de antes): «cubre a Mari Luz» se lee como su cobertura, y el cambio de día libre la pasa al miércoles', () => {
+  // el cambio aplicado a la planilla (ficha, con la semana volcada)
+  {
+    const cfg = cfgBase(), st = staffDe(cfg);
+    const e = lpVolcadoSinPor(cfg, st);
+    assert.ok(!M.asignados(e, LP_MIE, 'PASARELA_M').find(x => x.pid === 'lavinia').por, 'el volcado de antes no lleva «por»');
+    const r = M.moverDiaLibre(cfg, st, e, 'mariluz', LP_LUN, [2]);
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MAR), [], 'libra el martes');
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MIE), ['PASARELA_M', 'PASARELA_T'], `y trabaja el miércoles (rechazados: ${JSON.stringify(r.rechazados)})`);
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'lavinia', LP_MIE), [], 'Lavinia deja de cubrirla');
+    assert.ok(r.quitados.some(x => x.pid === 'lavinia' && x.iso === LP_MIE), 'y sale listada');
+  }
+  // el mismo volcado, regenerado con «Generar la semana»
+  {
+    const cfg = cfgBase(), st = staffDe(cfg);
+    const e = lpVolcadoSinPor(cfg, st);
+    M.ponerLibraPuntual(M.personaDe(st, 'mariluz'), LP_LUN, [2]);
+    const r = M.generarSemana(cfg, st, e, LP_LUN, {});
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MIE), ['PASARELA_M', 'PASARELA_T'], JSON.stringify(r.rechazados.filter(x => x.pid === 'mariluz')));
+    assert.ok(!M.pidsEn(e, LP_MIE, 'PASARELA_M').includes('lavinia') && r.retirados.some(x => x.pid === 'lavinia'));
+  }
+  // una sola lectura del «por» (porDe): la usan la planilla, la retirada y el cambio de día libre
+  const st0 = staffDe(cfgBase());
+  assert.strictEqual(M.porDe(st0, { pid: 'lavinia', razon: 'cubre a Mari Luz' }), 'mariluz', 'sin «por», se deduce de la razón');
+  assert.strictEqual(M.porDe(st0, { pid: 'lavinia', por: 'mariluz', razon: 'plaza fija' }), 'mariluz');
+  assert.strictEqual(M.porDe(st0, { pid: 'leo', razon: 'sin local fijo · 3 turnos este mes' }), null);
+});
+
+ok('revisión F1 · núcleo: desdeSolucion copia el «por» y la nota de la plaza fija de la semana tipo', () => {
+  const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+  const pb = M.toProblem(cfg, st, e, LP_LUN, M.addDias(LP_LUN, 6), {});
+  const i = pb.meta.indices.findIndex(x => x.iso === LP_MIE && x.franja === 'M');
+  M.desdeSolucion(cfg, st, e, pb, { schedule: { lavinia: { [i]: 'PASARELA' } } });
+  const en = M.asignados(e, LP_MIE, 'PASARELA_M').find(x => x.pid === 'lavinia');
+  assert.ok(en, 'la pone el núcleo');
+  assert.strictEqual(en.por, 'mariluz', 'con el «por» de su plaza fija: así un cambio de día libre sabe a quién cubría');
+  assert.strictEqual(en.origen, 'nucleo');
+});
+
+ok('revisión F1 · al retirar a quien llevaba la cocina se recalcula quién la lleva (Adrián cambia su día y vuelve)', () => {
+  for (const via of ['ficha', 'generador']) {
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    M.generarSemana(cfg, st, e, LP_LUN, {});
+    assert.ok(M.asignados(e, LP_MAR, 'ZAPA_M').find(x => x.pid === 'adrian').cocina, 'Adrián lleva la cocina del martes');
+    const cambia = dias => { if (via === 'ficha') return M.moverDiaLibre(cfg, st, e, 'adrian', LP_LUN, dias); M.ponerLibraPuntual(M.personaDe(st, 'adrian'), LP_LUN, dias); return M.generarSemana(cfg, st, e, LP_LUN, {}); };
+    const r = cambia([2]);
+    const rev = M.revisarTurno(cfg, st, e, LP_MAR, 'ZAPA_M');
+    assert.strictEqual(rev.sinCocina, false, `${via}: el martes por la mañana la cocina la coge otro (${JSON.stringify(M.asignados(e, LP_MAR, 'ZAPA_M'))})`);
+    if (r.condiciones) assert.ok(r.condiciones.filter(c => c.tipo === 'cocina').every(c => c.ok), JSON.stringify(r.condiciones.filter(c => c.tipo === 'cocina' && !c.ok)));
+    cambia([]);
+    for (const tid of ['ZAPA_M', 'ZAPA_T']) assert.strictEqual(M.revisarTurno(cfg, st, e, LP_MIE, tid).sinCocina, false, `${via}: quitar el cambio deja con cocina el miércoles ${tid} (${JSON.stringify(M.asignados(e, LP_MIE, tid))})`);
+    assert.ok(M.asignados(e, LP_MAR, 'ZAPA_M').find(x => x.pid === 'adrian').cocina, `${via}: y Adrián vuelve a llevar la del martes`);
+  }
+});
+
+ok('revisión F1 · quitar el cambio lo devuelve todo a su sitio, también el «cubre a» del día nuevo (Roberto por Adrián)', () => {
+  for (const pid of ['adrian', 'mariluz', 'victoria']) {
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    M.generarSemana(cfg, st, e, LP_LUN, {});
+    const antes = lpFoto(cfg, e, LP_LUN);
+    M.moverDiaLibre(cfg, st, e, pid, LP_LUN, [2]);
+    M.moverDiaLibre(cfg, st, e, pid, LP_LUN, []);
+    assert.deepStrictEqual(lpFoto(cfg, e, LP_LUN), antes, `${pid}: la semana queda como estaba`);
+  }
+  // por el camino del generador: cambio → generar → quitar el cambio → regenerar
+  {
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    M.ponerLibraPuntual(M.personaDe(st, 'adrian'), LP_LUN, [2]);
+    M.generarSemana(cfg, st, e, LP_LUN, {});
+    assert.ok(M.asignados(e, LP_MAR, 'ZAPA_T').some(x => x.pid === 'roberto' && x.por === 'adrian'), 'con el cambio, Roberto cubre a Adrián el martes');
+    M.ponerLibraPuntual(M.personaDe(st, 'adrian'), LP_LUN, []);
+    const r = M.generarSemana(cfg, st, e, LP_LUN, {});
+    assert.ok(!M.asignados(e, LP_MAR, 'ZAPA_T').some(x => x.por === 'adrian'), 'sin el cambio, nadie le cubre el martes');
+    const ret = r.retirados.find(x => x.pid === 'roberto' && x.iso === LP_MAR);
+    assert.ok(ret && /Adrián trabaja/.test(ret.motivo), JSON.stringify(r.retirados));
+  }
+  // clic a clic en la ficha (martes, jueves, quitar el martes) = marcar directamente el jueves
+  for (const pid of ['adrian', 'mariluz', 'victoria']) {
+    const a = cfgBase(), sa = staffDe(a), ea = estadoOct(); M.generarSemana(a, sa, ea, LP_LUN, {});
+    for (const d of [[2], [2, 4], [4]]) M.moverDiaLibre(a, sa, ea, pid, LP_LUN, d);
+    const b = cfgBase(), sb = staffDe(b), eb = estadoOct(); M.generarSemana(b, sb, eb, LP_LUN, {});
+    M.moverDiaLibre(b, sb, eb, pid, LP_LUN, [4]);
+    assert.deepStrictEqual(lpFoto(a, ea, LP_LUN), lpFoto(b, eb, LP_LUN), `${pid}: el camino no cambia el resultado`);
+  }
+});
+
+ok('revisión F1 · moverDiaLibre solo toca los días que cambian: lo quitado a mano otro día no vuelve, y un día sin planilla no se rellena', () => {
+  {
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    M.generarSemana(cfg, st, e, LP_LUN, {});
+    M.desasignar(e, '2026-10-09', 'PASARELA_T', 'mariluz');   // el encargado la quita a mano del viernes por la tarde
+    const r = M.moverDiaLibre(cfg, st, e, 'mariluz', LP_LUN, [2]);
+    assert.ok(!M.pidsEn(e, '2026-10-09', 'PASARELA_T').includes('mariluz'), 'el viernes por la tarde sigue sin ella');
+    assert.ok(r.puestos.every(x => x.iso === LP_MAR || x.iso === LP_MIE), JSON.stringify(r.puestos));
+  }
+  {
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    assert.ok(M.asignar(e, cfg, st, LP_LUN, 'PASARELA_M', 'lola', {}).ok);   // la semana solo tiene una plaza puesta a mano
+    const r = M.moverDiaLibre(cfg, st, e, 'mariluz', LP_LUN, [2]);
+    assert.deepStrictEqual(r.puestos, [], 'los días sin planilla no se rellenan: eso lo hace el generador');
+    assert.deepStrictEqual(Object.keys(lpFoto(cfg, e, LP_LUN)), [LP_LUN + ' PASARELA_M']);
+    assert.ok(M.libraEn(M.personaDe(st, 'mariluz'), LP_MAR), 'el cambio queda guardado en la ficha');
+  }
+});
+
+ok('revisión F1 · el aviso de días sin emparejar solo sale si hay días de siempre y no se sabe cuál trabaja a cambio', () => {
+  for (const [pid, dias] of [['dulce', [2]], ['susi', [4]], ['maydeth', [2]], ['mariluz', [2, 3]]]) {
+    const cfg = cfgBase(), st = staffDe(cfg);
+    M.ponerLibraPuntual(M.personaDe(st, pid), LP_LUN, dias);
+    const r = M.generarSemana(cfg, st, estadoOct(), LP_LUN, {});
+    assert.ok(!r.avisos.some(a => a.pid === pid), `${pid}: nada que emparejar → ${JSON.stringify(r.avisos)}`);
+  }
+  const cfg = cfgBase(), st = staffDe(cfg);
+  M.ponerLibraPuntual(M.personaDe(st, 'lavinia'), LP_LUN, [5]);   // libra lunes, martes y jueves; esta semana, el viernes
+  const r = M.generarSemana(cfg, st, estadoOct(), LP_LUN, {});
+  const a = r.avisos.find(x => x.pid === 'lavinia');
+  assert.ok(a && /no se sabe qué día trabaja a cambio/.test(a.texto) && !/emparejar/.test(a.texto), JSON.stringify(r.avisos));
+});
+
+ok('revisión F1 · un día del cambio que ya ha pasado no se toca: lo demás se aplica igual que en el generador y se avisa de cuántos días trabaja', () => {
+  const JUE = '2026-10-08', VIE = '2026-10-09';
+  // libra el viernes en vez del miércoles y el miércoles ya ha pasado (hoy es jueves)
+  {
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    M.generarSemana(cfg, st, e, LP_LUN, {});
+    const r = M.moverDiaLibre(cfg, st, e, 'mariluz', LP_LUN, [5], { desdeIso: JUE });
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', VIE), [], 'el viernes libra');
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MIE), [], 'el miércoles (pasado) no se toca');
+    assert.ok(r.avisos.some(a => /miércoles 7 ya ha pasado/.test(a.texto) && /5 días en vez de 6/.test(a.texto)), JSON.stringify(r.avisos));
+    // el generador, con la misma ficha y el mismo «desde hoy», hace lo mismo con Mari Luz y lo avisa
+    const cfg2 = cfgBase(), st2 = staffDe(cfg2), e2 = estadoOct();
+    M.generarSemana(cfg2, st2, e2, LP_LUN, {});
+    M.ponerLibraPuntual(M.personaDe(st2, 'mariluz'), LP_LUN, [5]);
+    const g = M.generarSemana(cfg2, st2, e2, LP_LUN, { desdeIso: JUE });
+    for (let k = 0; k < 7; k++) { const iso = M.addDias(LP_LUN, k); assert.deepStrictEqual(lpTrabajaEn(cfg2, e2, 'mariluz', iso), lpTrabajaEn(cfg, e, 'mariluz', iso), `generador y ficha coinciden el ${iso}`); }
+    assert.ok(g.avisos.some(a => a.pid === 'mariluz' && /miércoles 7 ya ha pasado/.test(a.texto)), JSON.stringify(g.avisos));
+  }
+  // libra el martes en vez del miércoles y el martes ya ha pasado (hoy es miércoles)
+  {
+    const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+    M.generarSemana(cfg, st, e, LP_LUN, {});
+    const r = M.moverDiaLibre(cfg, st, e, 'mariluz', LP_LUN, [2], { desdeIso: LP_MIE });
+    assert.deepStrictEqual(lpTrabajaEn(cfg, e, 'mariluz', LP_MAR), ['PASARELA_M', 'PASARELA_T'], 'el martes (pasado) no se toca');
+    assert.ok(r.avisos.some(a => /martes 6 ya ha pasado/.test(a.texto) && /7 días en vez de 6/.test(a.texto)), JSON.stringify(r.avisos));
+  }
+});
+
+ok('revisión F1 · «Guardar como semana tipo» con un cambio de día libre guarda a cada uno con su día de siempre', () => {
+  const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+  const ml = M.personaDe(st, 'mariluz');
+  M.ponerLibraPuntual(ml, LP_LUN, [2]);
+  M.generarSemana(cfg, st, e, LP_LUN, {});
+  assert.ok(M.patronDesdeSemana(e, LP_LUN)[3].some(pl => pl.p === 'mariluz'), 'sin la ficha, la foto de la semana es literal (como antes)');
+  const pt = M.patronDesdeSemana(e, LP_LUN, cfg, st);
+  assert.deepStrictEqual(pt[2].filter(pl => pl.p === 'mariluz').map(pl => pl.t).sort(), ['PASARELA_M', 'PASARELA_T'], 'el martes vuelve a ser suyo');
+  assert.ok(!pt[2].some(pl => pl.por === 'mariluz'), 'y nadie la cubre el martes');
+  assert.ok(!pt[3].some(pl => pl.p === 'mariluz'), 'el miércoles libra');
+  assert.deepStrictEqual(pt[3].filter(pl => pl.por === 'mariluz').map(pl => pl.p + '@' + pl.t).sort(), ['lavinia@PASARELA_M', 'lavinia@PASARELA_T'], 'y Lavinia vuelve a cubrirla el miércoles');
+  // con esa semana tipo, la semana siguiente (sin cambio) sale como siempre
+  cfg.patron = pt;
+  const e2 = estadoOct();
+  M.generarSemana(cfg, st, e2, '2026-10-12', {});
+  assert.deepStrictEqual(lpTrabajaEn(cfg, e2, 'mariluz', '2026-10-13'), ['PASARELA_M', 'PASARELA_T']);
+  assert.deepStrictEqual(lpTrabajaEn(cfg, e2, 'mariluz', '2026-10-14'), []);
+});
+
+ok('revisión F1 · marcar su propio día libre no guarda un cambio vacío («libra miércoles en vez de miércoles»)', () => {
+  const p = { id: 'x', nombre: 'X', libra: [3], libraPuntual: [{ semana: '2026-10-12', dias: [5] }] };
+  M.ponerLibraPuntual(p, LP_LUN, [3]);
+  assert.deepStrictEqual(p.libraPuntual, [{ semana: '2026-10-12', dias: [5] }], 'no se guarda, y las demás semanas siguen');
+  M.ponerLibraPuntual(p, '2026-10-12', [3]);
+  assert.strictEqual(p.libraPuntual, null, 'marcar su día de siempre quita el cambio de esa semana');
+  const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+  M.generarSemana(cfg, st, e, LP_LUN, {});
+  const antes = lpFoto(cfg, e, LP_LUN);
+  const r = M.moverDiaLibre(cfg, st, e, 'mariluz', LP_LUN, [3]);
+  assert.ok(!r.quitados.length && !r.puestos.length && M.personaDe(st, 'mariluz').libraPuntual === null);
+  assert.deepStrictEqual(lpFoto(cfg, e, LP_LUN), antes);
+});
+
+ok('revisión F1 · con el día cambiado y la semana sin regenerar, el aviso dice «libra el martes esta semana» y no añade el del partido', () => {
+  const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
+  M.generarSemana(cfg, st, e, LP_LUN, {});
+  M.ponerLibraPuntual(M.personaDe(st, 'mariluz'), LP_LUN, [2]);
+  for (const tid of ['PASARELA_M', 'PASARELA_T']) assert.deepStrictEqual(M.avisosVigentes(cfg, st, e, LP_MAR, tid, 'mariluz'), ['libra el martes esta semana'], tid);
+  const rev = M.revisionMes(cfg, st, e, { desde: LP_MAR, hasta: LP_MAR }).filter(x => /Mari Luz/.test(x.msg));
+  assert.ok(rev.length && rev.every(x => !/partido/.test(x.msg)), JSON.stringify(rev));
+  // su día de siempre, sin cambio, se sigue diciendo en plural
+  const e2 = estadoOct();
+  M.asignar(e2, cfg, st, '2026-10-14', 'PASARELA_M', 'mariluz', { forzar: true });
+  assert.deepStrictEqual(M.avisosVigentes(cfg, st, e2, '2026-10-14', 'PASARELA_M', 'mariluz'), ['libra los miércoles']);
+});
+
 console.log(`\n${n} tests OK`);

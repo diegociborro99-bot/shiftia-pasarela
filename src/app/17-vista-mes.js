@@ -37,9 +37,12 @@ function renderMes() {
   for (const d of est.days) h += `<th class="day${d.dow >= 6 ? ' wk' : ''}${evPor[d.iso] ? ' evday' : ''}" data-irdia="${d.iso}" title="Ir al día"><span class="dn">${DOW_C[d.dow]}</span><span class="dd">${d.d}</span>${evPor[d.iso] ? `<span class="evd" role="button" tabindex="0" data-evpop="${d.iso}" title="Ver o quitar el evento">⚽</span>` : ''}</th>`;
   h += '</tr></thead><tbody>';
   const grupos = [];
-  for (const l of S.locales) grupos.push([l.nombre, S.staff.filter(p => !deBaja(p) && (p.locales || [])[0] === l.id), l.color]);
-  grupos.push(['Sin local fijo y varios locales', S.staff.filter(p => !deBaja(p) && !(p.locales || []).length), 'var(--ink3)']);
-  grupos.push(['De baja', S.staff.filter(p => deBaja(p)), 'var(--bad)']);
+  // «De baja» = de baja todo el mes que se mira (24/09: antes, quien lo estaba HOY); una baja de
+  // unos días se ve en su fila, día a día
+  const bajaMes = p => est.days.every(d => deBaja(p, d.iso));
+  for (const l of S.locales) grupos.push([l.nombre, S.staff.filter(p => !bajaMes(p) && (p.locales || [])[0] === l.id), l.color]);
+  grupos.push(['Sin local fijo y varios locales', S.staff.filter(p => !bajaMes(p) && !(p.locales || []).length), 'var(--ink3)']);
+  grupos.push(['De baja', S.staff.filter(bajaMes), 'var(--bad)']);
   // los que tienen varios locales van con su local principal (el primero); se listan ahí
   for (const [nombre, gente, color] of grupos) {
     if (!gente.length) continue;
@@ -53,7 +56,7 @@ function renderMes() {
         const wk = d.dow >= 6 ? ' wk' : '';
         if (!cas.length) {
           if (aus) { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-${esc(aus.tipo)}" data-tipstr="${esc(((AUS_LBL[aus.tipo] || {}).label || aus.tipo) + (aus.detalle ? ' · ' + aus.detalle : ''))}">${esc(aus.tipo)}</span></td>`; continue; }
-          h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill vacio">${(p.libra || []).includes(d.dow) ? 'libra' : ''}</span></td>`;
+          h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill vacio">${estadoDia(S, p, d.iso).libra ? 'libra' : ''}</span></td>`;
           continue;
         }
         const m = cas.find(c => partirTurno(c.tid).franja === 'M'), t = cas.find(c => partirTurno(c.tid).franja === 'T');

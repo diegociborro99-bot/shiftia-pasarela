@@ -447,27 +447,17 @@ function anadirAusencia(persona, aus) {
   persona.ausencias.sort((x, y) => x.desde < y.desde ? -1 : 1);
   return { fusionada: false, ausencia: a };
 }
-function deBaja(persona, iso) { const a = ausenciaEn(persona, iso || fechaMadrid()); return !!(a && a.tipo === 'BAJ'); }
+// 24/09 (reunión, decisiones.md principio 3): la fecha es OBLIGATORIA. Sin ella se miraba el
+// reloj (fechaMadrid()) y el Generador dejaba sin comprobar las condiciones de quien estaba de
+// baja HOY aunque hubiera vuelto la semana que se generaba. tests/debaja-fecha.test.mjs impide
+// volver a llamarla con un solo argumento.
+function deBaja(persona, iso) {
+  if (!iso) throw new TypeError('deBaja(p, iso): falta la fecha (el modelo no mira el reloj)');
+  const a = ausenciaEn(persona, iso);
+  return !!(a && a.tipo === 'BAJ');
+}
 
 // ---------- cocina ----------
-// Día libre puntual (José, 17/09): una semana concreta se libra otro día, y a la semana
-// siguiente se vuelve al de siempre. p.libraPuntual = { semana: <lunes iso>, dias: [dow] }
-function lunesDe(iso) { return addDias(iso, 1 - isoDow(iso)); }
-function libraPuntualVigente(p, iso) {
-  const lp = p && p.libraPuntual;
-  return !!(lp && lp.semana && Array.isArray(lp.dias) && lp.semana === lunesDe(iso));
-}
-function libraEn(p, iso) {
-  if (!p) return false;
-  if (libraPuntualVigente(p, iso)) return p.libraPuntual.dias.includes(isoDow(iso));
-  return (p.libra || []).includes(isoDow(iso));
-}
-// al cargar la planilla se apagan los días libres puntuales de semanas ya pasadas
-function limpiarLibrePuntual(staff, hoyIso) {
-  const lunes = lunesDe(hoyIso); let n = 0;
-  for (const p of staff || []) if (p.libraPuntual && p.libraPuntual.semana && p.libraPuntual.semana < lunes) { p.libraPuntual = null; n++; }
-  return n;
-}
 function localTieneCocina(l, franja) {
   if (!l || !l.cocina) return false;
   if (l.cocina.obligatoria && l.cocina.obligatoria[franja]) return true;
@@ -531,6 +521,130 @@ function nombreRegla(k) { return REGLA_NOMBRE[k] || k || ''; }
 function regla(cfg, k) { return !(cfg && cfg.reglas && cfg.reglas[k] === false); }
 function caracteristicaActiva(p, k) { return !(p && Array.isArray(p.inactivas) && p.inactivas.includes(k)); }
 
+// ---------- capa de lectura de la ficha ----------
+// 24/09 (reunión: «que se hable bien equipo con el generador», «que lea todas las variables»):
+// lo que se configura en la ficha se lee AQUÍ, en un solo sitio, y todos los caminos (selector,
+// semana tipo, relleno, Generador semanal y su verificación, núcleo, hoja impresa y vistas)
+// llaman a estas funciones en vez de mirar p.libra o p.partido por su cuenta. Así «esta semana
+// libra el martes» quiere decir lo mismo al generar que en el Mes, en Hoy o en la Cobertura.
+// Un interruptor (regla del grupo o característica de la ficha) se obedece igual en todos.
+function activa(cfg, p, k) { return regla(cfg, k) && caracteristicaActiva(p, k); }
+function lunesDe(iso) { return addDias(iso, 1 - isoDow(iso)); }
+// Día libre puntual (José, 17/09): una semana concreta se libra otro día y a la siguiente se
+// vuelve al de siempre. Desde el 24/09 es una LISTA por semanas —p.libraPuntual = [{ semana:
+// <lunes iso>, dias: [dow] }, …]— para poder dejar varias semanas preparadas; hasta entonces
+// cabía una sola ({ semana, dias }). Se leen las dos formas y limpiarLibrePuntual (al cargar,
+// desde migrarEstado) deja la lista.
+function librasPuntuales(p) {
+  const lp = p && p.libraPuntual;
+  if (!lp) return [];
+  return (Array.isArray(lp) ? lp : [lp]).filter(x => x && typeof x.semana === 'string' && Array.isArray(x.dias));
+}
+// el cambio de la semana de ese día (una semana sin días no cambia nada)
+function libraPuntualDe(p, iso) { const l = lunesDe(iso); return librasPuntuales(p).find(x => x.semana === l && x.dias.length) || null; }
+function libraPuntualVigente(p, iso) { return !!libraPuntualDe(p, iso); }
+// ¿libra ese día? Con cambio esa semana mandan los días del cambio; si no, los de siempre.
+// (El interruptor «Días que libra» lo mira quien llama, con activa(cfg, p, 'libra').)
+function libraEn(p, iso) {
+  if (!p) return false;
+  const lp = libraPuntualDe(p, iso);
+  return (lp ? lp.dias : (p.libra || [])).includes(isoDow(iso));
+}
+// el motivo «libra» tal como se enseña (selector, avisos de la planilla, retiradas, hoja impresa):
+// «libra los miércoles» o, con un cambio esa semana, «libra el martes esta semana» (24/09,
+// revisión: «libra los martes esta semana» sonaba a todos los martes)
+function motivoLibra(p, iso) {
+  const dow = isoDow(iso);
+  return libraPuntualVigente(p, iso) ? `libra ${textoDiasEl([dow])} esta semana` : `libra ${DOW_PL[dow]}`;
+}
+// guarda el cambio de una semana (o lo quita, con dias = []) sin tocar las demás semanas.
+// Marcar justo sus días de siempre no es un cambio (24/09, revisión: se guardaba «libra miércoles
+// en vez de miércoles»): esa semana se queda sin cambio.
+function ponerLibraPuntual(p, lunes, dias) {
+  const sem = lunesDe(lunes);
+  const resto = librasPuntuales(p).filter(x => x.semana !== sem && x.dias.length).map(x => ({ semana: x.semana, dias: x.dias.slice() }));
+  const ds = [...new Set((dias || []).map(Number))].filter(d => d >= 1 && d <= 7).sort((a, b) => a - b);
+  const hab = [...new Set(((p && p.libra) || []).map(Number))].sort((a, b) => a - b);
+  const igual = ds.length === hab.length && ds.every((d, i) => d === hab[i]);
+  if (ds.length && !igual) resto.push({ semana: sem, dias: ds });
+  resto.sort((a, b) => (a.semana < b.semana ? -1 : a.semana > b.semana ? 1 : 0));
+  p.libraPuntual = resto.length ? resto : null;
+  return p.libraPuntual;
+}
+// al cargar la planilla: la forma de antes del 24/09 pasa a lista y las semanas ya pasadas
+// se borran solas (caducan). Devuelve cuántas semanas pasadas se han borrado.
+function limpiarLibrePuntual(staff, hoyIso) {
+  const lunes = lunesDe(hoyIso); let n = 0;
+  for (const p of staff || []) {
+    if (p.libraPuntual === undefined) continue;
+    const todas = librasPuntuales(p);
+    n += todas.filter(x => x.semana < lunes).length;
+    const vivas = todas.filter(x => x.semana >= lunes && x.dias.length).map(x => ({ semana: x.semana, dias: x.dias.slice() }));
+    p.libraPuntual = vivas.length ? vivas : null;
+  }
+  return n;
+}
+const textoDiasEl = ds => ds.map(d => 'el ' + DOW_LBL[d]).join(' y ');   // «el martes y el jueves»
+const textoDiasPl = ds => ds.map(d => DOW_PL[d]).join(' y ');             // «los miércoles»
+// «libra martes (en vez de miércoles)»: el cambio de una semana tal como lo enseñan la tarjeta
+// de Equipo, la ficha y la Cobertura (corto: sin el «en vez de»)
+function textoCambioLibre(p, lp, corto) {
+  const hab = (p && p.libra) || [];
+  const dias = ((lp && lp.dias) || []).map(d => DOW_LBL[d]).join(' y ');
+  return `libra ${dias}${!corto && hab.length ? ` (en vez de ${hab.map(d => DOW_LBL[d]).join(' y ')})` : ''}`;
+}
+// Qué cambia esa semana: los días que ahora libra y trabajaba (nuevos) y los que libraba y
+// ahora trabaja (liberados), emparejados en orden —«libra martes en vez de miércoles» = el
+// martes con el miércoles—. Si el número no cuadra no se empareja nada: solo se prohíben los
+// días nuevos y se avisa (Lavinia libra lunes, martes y jueves: «esta semana el viernes» no
+// dice cuál de los tres trabaja). null si no hay cambio o «Días que libra» está apagada.
+function cambioDeLibre(cfg, p, iso) {
+  if (!p || !activa(cfg, p, 'libra')) return null;
+  const lp = libraPuntualDe(p, iso);
+  if (!lp) return null;
+  const hab = [...new Set(p.libra || [])].sort((a, b) => a - b), dias = [...new Set(lp.dias)].sort((a, b) => a - b);
+  const nuevos = dias.filter(d => !hab.includes(d)), liberados = hab.filter(d => !dias.includes(d));
+  const cuadra = nuevos.length === liberados.length;
+  return { semana: lp.semana, dias, habituales: hab, nuevos, liberados, cuadra, pares: cuadra ? nuevos.map((d, i) => [d, liberados[i]]) : [] };
+}
+// ¿Puede hacer partido ese día? Los días declarados en la ficha y, la semana de un cambio de
+// día libre, el partido del día que ahora libra pasa al día que ahora trabaja (D9, 24/09: el
+// miércoles hace exactamente lo que habría hecho el martes, partido incluido). Con «Días de
+// partido» apagada (en el grupo o en la ficha) no se mira: vale cualquier día.
+function partidoEn(cfg, p, iso) {
+  if (!p) return false;
+  if (!activa(cfg, p, 'partido')) return true;
+  const pd = p.partido || {};
+  if (pd.siempre) return true;
+  const dow = isoDow(iso), decl = pd.dias || [];
+  const c = cambioDeLibre(cfg, p, iso);
+  if (c) {
+    const par = c.pares.find(x => x[1] === dow);
+    if (par) return decl.includes(par[0]);
+    if (c.pares.some(x => x[0] === dow)) return false;
+  }
+  return decl.includes(dow);
+}
+// Cómo está una persona un día, para las vistas (Mes, Hoy, Cobertura, perfil, Equipo): si libra
+// (con el día libre de ESA semana), si es por un cambio puntual, si está ausente o en standby,
+// y el texto que se enseña. Ninguna vista vuelve a mirar p.libra por su cuenta.
+function estadoDia(cfg, p, iso) {
+  const dow = isoDow(iso);
+  const ausencia = p ? ausenciaEn(p, iso) : null;
+  const standby = !!(p && p.standby);
+  const on = !!p && activa(cfg, p, 'libra');
+  const puntual = on ? libraPuntualDe(p, iso) : null;
+  const libra = on && libraEn(p, iso);
+  const hab = (p && p.libra) || [];
+  let texto = '';
+  if (ausencia) texto = motivoAusencia(ausencia);
+  else if (standby) texto = 'en standby';
+  else if (libra && puntual) texto = `libra ${textoDiasEl([dow])} esta semana${hab.length ? ` (en vez de ${textoDiasPl(hab)})` : ''}`;
+  else if (libra) texto = `libra ${DOW_PL[dow]}`;
+  else if (puntual && hab.includes(dow)) texto = `esta semana trabaja (libra ${textoDiasEl(puntual.dias)})`;
+  return { libra, puntual, ausencia, standby, texto };
+}
+
 // ---------- reglas duras por persona ----------
 function motivoAusencia(a) { return a ? (AUS_LBL[a.tipo] ? AUS_LBL[a.tipo].motivo : 'ausente') : ''; }
 function lblLocales(cfg, ids) { return ids.map(id => (localDe(cfg, id) || { nombre: id }).nombre).join(' o '); }
@@ -557,22 +671,23 @@ function puedeEstar(cfg, staff, est, iso, tid, pid, opts) {
   const aus = ausenciaEn(p, iso);
   if (aus) return { ok: false, motivo: motivoAusencia(aus) + (aus.detalle ? ' · ' + aus.detalle : ''), regla: 'ausencia', avisos };
   for (const t of turnosDe(cfg)) if (t.franja === franja && t.id !== tid && pidsEn(est, iso, t.id).includes(pid)) return { ok: false, motivo: `ya en ${t.local.nombre} esta ${FRANJA_LBL[franja].toLowerCase()}`, regla: 'otraFranja', avisos };
-  const act = k => regla(cfg, k) && caracteristicaActiva(p, k);
+  const act = k => activa(cfg, p, k);
   if (act('locales') && Array.isArray(p.locales) && p.locales.length && !p.locales.includes(localId)) m = forzable('locales', `solo ${lblLocales(cfg, p.locales)}`);
   if (!m && act('franjas') && Array.isArray(p.franjas) && p.franjas.length && !p.franjas.includes(franja)) m = forzable('franjas', p.franjas.length === 1 ? (p.franjas[0] === 'M' ? 'siempre de mañana' : 'solo tardes') : 'franja no permitida');
   if (!m && p.standby) m = forzable('standby', 'en standby: aún no entra en la planilla');
-  if (!m && act('libra') && libraEn(p, iso)) m = forzable('libra', libraPuntualVigente(p, iso) ? `libra ${DOW_PL[dow]} esta semana` : `libra ${DOW_PL[dow]}`);
+  const libraHoy = !m && act('libra') && libraEn(p, iso);
+  if (libraHoy) m = forzable('libra', motivoLibra(p, iso));
   if (!m && act('vetos')) { const v = vetoDe(p, localId, franja, isoDow(iso)); if (v) m = forzable('vetos', textoVeto(v, l.nombre)); }
-  if (!m && act('partido')) {
+  // el partido se lee con partidoEn: días declarados y, la semana de un cambio de día libre,
+  // trasladado al día que ahora trabaja (24/09); con la regla apagada no se mira. Si ese día libra,
+  // el partido no se menciona (24/09, revisión: «libra el martes esta semana, no hace partido los
+  // martes» contradecía su ficha: el aviso que importa es el del día libre)
+  if (!m && !libraHoy) {
     const otra = franja === 'M' ? 'T' : 'M';
     const enOtra = turnosDe(cfg).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(pid));
-    if (enOtra) {
-      const pd = p.partido || {};
-      const permitido = pd.siempre || (pd.dias || []).includes(dow);
-      if (!permitido) {
-        if (o.permitirPartido) avisos.push(`partido no declarado ${DOW_PL[dow]}`);
-        else m = forzable('partido', `no hace partido ${DOW_PL[dow]}`);
-      }
+    if (enOtra && !partidoEn(cfg, p, iso)) {
+      if (o.permitirPartido) avisos.push(`partido no declarado ${DOW_PL[dow]}`);
+      else m = forzable('partido', `no hace partido ${DOW_PL[dow]}`);
     }
   }
   if (!m && regla(cfg, 'nuncaCon')) {
@@ -657,9 +772,7 @@ function puedePrimero(cfg, staff, est, iso, tid, pid) {
 // el martes por insalvable).
 function partidoAbre(cfg, l, p, iso, franja) {
   if (!(l && l.partidoAbre && l.partidoAbre[franja])) return false;
-  if (!(regla(cfg, 'partido') && caracteristicaActiva(p, 'partido'))) return true;
-  const pd = p.partido || {};
-  return !!(pd.siempre || (pd.dias || []).includes(isoDow(iso)));
+  return partidoEn(cfg, p, iso);   // con el partido trasladado la semana de un cambio de día libre
 }
 // quién sale el primero en una casilla: lo marcado a mano; si no, el fijo del local, quien
 // tiene «sale el primero» en su ficha, o el primero de la lista que pueda. null = nadie puede.
@@ -716,6 +829,18 @@ function esContinuo(cfg, staff, est, iso, localId, pid) {
   const tm = turnoId(localId, 'M'), tt = turnoId(localId, 'T');
   return turnoAbierto(cfg, est, iso, tm) && turnoAbierto(cfg, est, iso, tt) && primeroDe(cfg, staff, est, iso, tm) === pid && primeroDe(cfg, staff, est, iso, tt) === pid;
 }
+// ¿A quién cubre esta entrada? Su «por» y, si no lo lleva, la razón «cubre a X» con la que la
+// puso la semana tipo. Hasta el 24/09 el modo Periodo del Generador («Mes → Generar», «Completar
+// este día»), y el núcleo, volcaban sin el «por»: esas semanas ya guardadas solo tienen la razón.
+// Una sola lectura (24/09, revisión): la usan la planilla (posicionesDe), la retirada de lo que
+// ya no vale y el cambio de día libre, que antes no veían a Lavinia «por Mari Luz» y dejaban a
+// Mari Luz sin trabajar ni el martes ni el miércoles.
+function porDe(staff, e) {
+  if (!e) return null;
+  if (e.por) return e.por;
+  const m = /^cubre a (.+)$/.exec(e.razon || '');
+  return m ? ((staff || []).find(q => q.nombre === m[1]) || {}).id || null : null;
+}
 // posiciones tal como se enseñan y se imprimen: [{pos, pid, nombre, abre, abreFijo, cocina,
 // partido, continuo, comodin, por, nota, supuesto, forzado, hueco, motivo}]
 function posicionesDe(cfg, staff, est, iso, tid) {
@@ -729,7 +854,7 @@ function posicionesDe(cfg, staff, est, iso, tid) {
     const p = personaDe(staff, e.pid) || { nombre: e.pid };
     const continuo = e.pid === primero && esContinuo(cfg, staff, est, iso, localId, e.pid);
     const abreFijo = !!(l && l.primero && l.primero[franja] === e.pid) || !!(p.abre && p.abre[localId] && p.abre[localId].includes(franja));
-    const por = e.por || ((e.razon || '').match(/^cubre a (.+)$/) ? (staff.find(q => q.nombre === e.razon.slice(8)) || {}).id || null : null);
+    const por = porDe(staff, e);
     const avisos = avisosVigentes(cfg, staff, est, iso, tid, e.pid);
     return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && abreFijo, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: !(p.locales || []).length, por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null };
   });
@@ -859,26 +984,96 @@ function revisionMes(cfg, staff, est, opts) {
 // ---------- semana patrón ----------
 // cfg.patron[dow] = [{ t: turnoId, p: pid, c?: cocina, a?: abre, s?: supuesto }]
 function plazasDe(cfg, dow) { return (cfg.patron && cfg.patron[dow]) || []; }
+// Las plazas de la semana tipo para una FECHA (no para un día de la semana): las de su día, con
+// los cambios de día libre de esa semana aplicados (D9, reunión del 24/09: «libra martes en vez
+// de miércoles… me salen los 2 días»). La semana tipo lleva dentro el libre de siempre (los
+// miércoles Mari Luz no tiene plazas y Lavinia hace mañana y tarde «por Mari Luz»), así que:
+//  · quien esta semana libra este día no tiene plaza: la suya va a `libres` y se cubre como una
+//    ausencia (entra su «cubre a»; si no, lo rellena el generador);
+//  · el día que ahora trabaja se quitan las plazas de quien la cubría («por X») —antes de ponerla
+//    a ella, o el «nunca con» la dejaría fuera— y se le ponen sus plazas del día que ahora libra
+//    (mismo turno, cocina, abre y nota; sin el «por», que era de aquel día).
+// Si el número de días no cuadra, no se traslada nada (ver cambioDeLibre). Lo leen
+// instanciarPatron y el núcleo (toProblem): una sola lectura de la semana tipo.
+function plazasDelDia(cfg, staff, iso) {
+  const dow = isoDow(iso);
+  const cambios = new Map();
+  for (const p of staff || []) { const c = cambioDeLibre(cfg, p, iso); if (c) cambios.set(p.id, c); }
+  const plazas = [], libres = [];
+  for (const pl of plazasDe(cfg, dow)) {
+    const c = cambios.get(pl.p);
+    if (c && c.nuevos.includes(dow)) { const par = c.pares.find(x => x[0] === dow); libres.push(Object.assign({}, pl, { enVezDe: par ? par[1] : null })); continue; }
+    const cx = pl.por ? cambios.get(pl.por) : null;
+    if (cx && cx.pares.some(x => x[1] === dow)) continue;   // su cobertura de siempre: esta semana trabaja ella
+    plazas.push(pl);
+  }
+  for (const [pid, c] of cambios) {
+    const par = c.pares.find(x => x[1] === dow);
+    if (!par) continue;
+    for (const pl of plazasDe(cfg, par[0])) if (pl.p === pid) { const x = Object.assign({}, pl, { traslado: par[0] }); delete x.por; plazas.push(x); }
+  }
+  return { plazas, libres, cambios };
+}
+// «martes 6»: un día concreto, en los avisos
+const diaYNum = iso => `${DOW_LBL[isoDow(iso)]} ${+iso.slice(8, 10)}`;
+// opts.soloPid: solo las plazas de esa persona y las de quien la cubre; opts.soloDias: solo esas
+// fechas (moverDiaLibre toca los días que cambian, nada más: 24/09, revisión)
 function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
   const o = opts || {};
-  const r = { aplicados: [], rechazados: [], coberturas: [], ausentes: [] };
+  const r = { aplicados: [], rechazados: [], coberturas: [], ausentes: [], avisos: [] };
+  const toca = pl => !o.soloPid || pl.p === o.soloPid || pl.por === o.soloPid;
+  const avisados = new Set();
   for (const iso of rangoIso(desde, hasta)) {
     if (o.desdeIso && iso < o.desdeIso) continue;
+    if (o.soloDias && !o.soloDias.includes(iso)) continue;
     const dow = isoDow(iso);
     const ausentes = [];
-    for (const pl of plazasDe(cfg, dow)) {
+    const { plazas, libres, cambios } = plazasDelDia(cfg, staff, iso);
+    for (const [pid, c] of cambios) {
+      if (o.soloPid && pid !== o.soloPid) continue;
+      const p = personaDe(staff, pid);
+      // días que no se pueden emparejar: solo se avisa si tenía días de siempre y no se sabe cuál
+      // trabaja a cambio (24/09, revisión: a Dulce, Susi o Laura, sin día fijo, o a quien solo
+      // añade un día, no había nada que emparejar y el aviso confundía)
+      if (!c.cuadra && c.liberados.length && !avisados.has(pid + c.semana)) {
+        avisados.add(pid + c.semana);
+        r.avisos.push({ pid, semana: c.semana, tipo: 'emparejar', texto: `${p.nombre} libra ${textoDiasEl(c.dias)} esta semana en vez de ${textoDiasPl(c.habituales)}: no se sabe qué día trabaja a cambio, así que ${c.nuevos.length ? `solo se le quita ${textoDiasEl(c.nuevos)}` : 'no se le pone nada más'} y el resto de su semana tipo no se mueve` });
+      }
+      // un día del cambio ya pasado (con «solo desde hoy») no se toca: el cambio se aplica a medias
+      // y se dice (24/09, revisión)
+      if (o.desdeIso && !avisados.has(pid + c.semana + 'pasado')) {
+        const par = c.pares.find(x => (addDias(c.semana, x[0] - 1) < o.desdeIso) !== (addDias(c.semana, x[1] - 1) < o.desdeIso));
+        if (par) {
+          avisados.add(pid + c.semana + 'pasado');
+          const [ya, queda] = par.map(d => addDias(c.semana, d - 1)).sort();
+          r.avisos.push({ pid, semana: c.semana, tipo: 'pasado', texto: `${p.nombre}: el ${diaYNum(ya)} ya ha pasado y no se toca, así que su cambio de día libre de esta semana solo se aplica al ${diaYNum(queda)}` });
+        }
+      }
+    }
+    // quien esta semana libra este día: su plaza se cubre como la de un ausente
+    for (const pl of libres) {
+      if (!toca(pl)) continue;
+      ausentes.push({ pl, p: personaDe(staff, pl.p) });
+      r.ausentes.push({ iso, turnoId: pl.t, pid: pl.p, tipo: 'libraPuntual' });
+    }
+    for (const pl of plazas) {
+      if (!toca(pl)) continue;
       const p = personaDe(staff, pl.p);
       if (!p) { r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: 'no existe' }); continue; }
       const aus = ausenciaEn(p, iso);
       if (aus) { ausentes.push({ pl, p, aus }); r.ausentes.push({ iso, turnoId: pl.t, pid: pl.p, tipo: aus.tipo }); continue; }
       if (pidsEn(est, iso, pl.t).includes(pl.p)) continue;
-      const a = asignar(est, cfg, staff, iso, pl.t, pl.p, { origen: 'patron', razon: pl.por ? `cubre a ${nombreDe(staff, pl.por)}` : 'plaza fija de la semana tipo', supuesto: !!pl.s, cocina: pl.c ? true : undefined, abre: pl.a ? true : undefined, por: pl.por, nota: pl.n });
+      const razon = pl.traslado ? 'esta semana cambia su día libre' : pl.por ? `cubre a ${nombreDe(staff, pl.por)}` : 'plaza fija de la semana tipo';
+      const a = asignar(est, cfg, staff, iso, pl.t, pl.p, { origen: 'patron', razon, supuesto: !!pl.s, cocina: pl.c ? true : undefined, abre: pl.a ? true : undefined, por: pl.por, nota: pl.n });
       if (a.ok) r.aplicados.push({ iso, turnoId: pl.t, pid: pl.p, origen: 'patron', razon: a.entry.razon, supuesto: !!pl.s });
       else r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: a.motivo });
     }
-    // quien «cubre a» la persona ausente ocupa su sitio (si puede)
+    // quien «cubre a» la persona ausente ocupa su sitio (si puede). La semana de un cambio de
+    // día libre, el «cubre a X los miércoles» vale para el martes que ahora libra X (24/09)
     for (const { pl, p } of ausentes) {
-      const candidatos = staff.filter(q => q.id !== p.id && (q.cubreA || []).some(c => c.pid === p.id && (!c.dow || c.dow === dow) && (!c.turnoId || c.turnoId === pl.t)));
+      if (!p) continue;
+      const diaOk = c => !c.dow || c.dow === dow || (pl.enVezDe && c.dow === pl.enVezDe);
+      const candidatos = staff.filter(q => q.id !== p.id && (q.cubreA || []).some(c => c.pid === p.id && diaOk(c) && (!c.turnoId || c.turnoId === pl.t)));
       for (const q of candidatos) {
         if (pidsEn(est, iso, pl.t).includes(q.id)) break;
         const a = asignar(est, cfg, staff, iso, pl.t, q.id, { origen: 'patron', razon: `cubre a ${p.nombre}`, por: p.id, permitirPartido: true, cocina: pl.c && puedeCocina(cfg, q, partirTurno(pl.t).localId, iso) ? true : undefined });
@@ -888,16 +1083,37 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
   }
   return r;
 }
-// captura una semana real como nueva semana patrón
-function patronDesdeSemana(est, lunesIso) {
+// captura una semana real como nueva semana patrón. Con cfg y staff, la semana tipo es la de
+// SIEMPRE (24/09, revisión: «Guardar como semana tipo» sobre una semana en la que Mari Luz libraba
+// el martes la dejaba sin martes ni miércoles todas las semanas): quien esa semana cambió su día
+// libre vuelve a su día de siempre —sus plazas del día que trabajó pasan al que libró, quien la
+// cubrió ese día no se guarda, y la cobertura de su día de siempre («por X») se recupera de la
+// semana tipo anterior (cfg.patron)—.
+function patronDesdeSemana(est, lunesIso, cfg, staff) {
   const patron = {};
   for (let k = 0; k < 7; k++) {
     const iso = addDias(lunesIso, k);
     const dow = isoDow(iso);
     patron[dow] = [];
     for (const [tid, lista] of Object.entries(est.asig[iso] || {})) for (const e of lista) {
-      const pl = { t: tid, p: e.pid }; if (e.cocina) pl.c = 1; if (e.abre) pl.a = 1; if (e.supuesto) pl.s = 1; if (e.por) pl.por = e.por; if (e.nota) pl.n = e.nota;
+      const pl = { t: tid, p: e.pid }; if (e.cocina) pl.c = 1; if (e.abre) pl.a = 1; if (e.supuesto) pl.s = 1; const por = porDe(staff, e); if (por) pl.por = por; if (e.nota) pl.n = e.nota;
       patron[dow].push(pl);
+    }
+  }
+  if (!cfg || !staff) return patron;
+  const tiene = (xs, pl) => xs.some(x => x.t === pl.t && x.p === pl.p);
+  for (const p of staff) {
+    const c = cambioDeLibre(cfg, p, lunesIso);
+    if (!c) continue;
+    for (const d of c.nuevos) {
+      const par = c.pares.find(x => x[0] === d);
+      patron[d] = patron[d].filter(pl => pl.por !== p.id);
+      const suyas = par ? patron[par[1]].filter(pl => pl.p === p.id) : plazasDe(cfg, d).filter(pl => pl.p === p.id);
+      for (const pl of suyas) if (!tiene(patron[d], pl)) patron[d].push(Object.assign({}, pl));
+    }
+    for (const [, lib] of c.pares) {
+      patron[lib] = patron[lib].filter(pl => pl.p !== p.id);
+      for (const pl of plazasDe(cfg, lib)) if (pl.por === p.id && !tiene(patron[lib], pl)) patron[lib].push(Object.assign({}, pl));
     }
   }
   return patron;
@@ -946,16 +1162,73 @@ function porQueNadie(cfg, staff, est, iso, tid) {
   }
   return out;
 }
-// Genera (o completa) la planilla entre dos fechas: semana tipo + coberturas + relleno
-// de mínimos con razones. Aditivo: nunca quita a nadie. opts.simular trabaja sobre
-// una copia y devuelve el estado propuesto para la vista previa.
+// ---------- lo automático que ya no vale ----------
+// 24/09 (reunión: «pero luego no lo quita»; decisiones.md principio 4): el generador añadía y
+// nunca quitaba, así que un día libre cambiado en Equipo no llegaba a una semana ya volcada.
+// Ahora, antes de generar, se retira lo AUTOMÁTICO (lo que pusieron la semana tipo, el
+// generador, el núcleo, la cobertura o el cierre) y sin forzar que rompe el día libre: quien
+// libra ese día (su día de siempre o el de esa semana) y la cobertura «por X» de un día en que
+// X ya no libra porque esta semana cambió su día. Lo puesto a mano o forzado NO lo quita nadie:
+// se queda con su aviso. Cada retirada sale listada con su motivo («Qué ha cambiado»).
+const ORIGENES_AUTO = ['patron', 'generador', 'nucleo', 'cobertura', 'cierre'];
+function esAutomatica(e) { return !!e && ORIGENES_AUTO.includes(e.origen) && !e.forzado; }
+function motivoRetirada(cfg, staff, iso, tid, e) {
+  const dow = isoDow(iso);
+  const p = personaDe(staff, e.pid);
+  if (p && activa(cfg, p, 'libra') && libraEn(p, iso)) return motivoLibra(p, iso);
+  const x = personaDe(staff, porDe(staff, e));
+  if (!x || ausenciaEn(x, iso)) return null;
+  const c = cambioDeLibre(cfg, x, iso);
+  if (c && c.pares.some(y => y[1] === dow)) return `${x.nombre} trabaja ${textoDiasEl([dow])} esta semana: ya no hay que cubrir su día libre`;
+  // 24/09 (revisión: «quitar el cambio no lo devuelve todo a su sitio»): la cobertura que puso la
+  // semana tipo («cubre a X» el día que X libraba o faltaba) sobra cuando X ya no libra ni falta
+  // ese día y la semana tipo no la tiene como plaza fija. Solo lo de la semana tipo: una cobertura
+  // aplicada desde la Cobertura tiene su propia vuelta atrás (quitar la ausencia).
+  if (e.origen === 'patron' && !(activa(cfg, x, 'libra') && libraEn(x, iso)) && !plazasDelDia(cfg, staff, iso).plazas.some(pl => pl.t === tid && pl.p === e.pid && pl.por === x.id))
+    return `${x.nombre} trabaja ${textoDiasEl([dow])}: ya no hay que cubrir su sitio`;
+  return null;
+}
+// Quita una entrada de su casilla. Si llevaba la cocina o abría, esa marca la había fijado ella
+// (una plaza de la semana tipo con «c» pasa por asignar, que la marca como fijada): al irse, la
+// casilla la recalcula con quien queda en vez de quedarse sin cocina (24/09, revisión: Adrián
+// cambiaba de día y Zapatillera se quedaba sin cocina el martes). Lo usan la retirada automática
+// y el volcado de la vista previa del Generador.
+function retirarEntrada(est, cfg, staff, iso, tid, pid) {
+  const e = asignados(est, iso, tid).find(x => x.pid === pid);
+  if (!e || !desasignar(est, iso, tid, pid)) return false;
+  const man = est.manual && est.manual[iso] && est.manual[iso][tid];
+  if (man) { if (e.cocina) delete man.cocina; if (e.abre) delete man.abre; }
+  if (asignados(est, iso, tid).length) normalizarCasilla(est, cfg, staff, iso, tid);
+  return true;
+}
+// opts: { desdeIso, soloPid, soloDias: [iso] } → [{ iso, turnoId, pid, origen, por, motivo }]
+function retirarQueIncumplen(cfg, staff, est, desde, hasta, opts) {
+  const o = opts || {};
+  const out = [];
+  for (const iso of rangoIso(desde, hasta)) {
+    if (o.desdeIso && iso < o.desdeIso) continue;
+    if (o.soloDias && !o.soloDias.includes(iso)) continue;
+    for (const t of turnosDe(cfg)) {
+      const fuera = asignados(est, iso, t.id)
+        .filter(e => esAutomatica(e) && (!o.soloPid || e.pid === o.soloPid || porDe(staff, e) === o.soloPid))
+        .map(e => ({ e, motivo: motivoRetirada(cfg, staff, iso, t.id, e) })).filter(x => x.motivo);
+      for (const { e, motivo } of fuera) { retirarEntrada(est, cfg, staff, iso, t.id, e.pid); out.push({ iso, turnoId: t.id, pid: e.pid, origen: e.origen, por: porDe(staff, e), motivo }); }
+    }
+  }
+  return out;
+}
+// Genera (o completa) la planilla entre dos fechas: primero retira lo automático que ya no vale
+// (ver arriba), luego semana tipo + coberturas + relleno de mínimos con razones. Lo puesto a
+// mano o forzado no se toca nunca. opts.simular trabaja sobre una copia y devuelve el estado
+// propuesto para la vista previa.
 function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
   const o = opts || {};
   const target = o.simular ? clonarEstado(est) : est;
-  const r = { aplicados: [], huecos: [], coberturas: [], rechazados: [], estado: target };
+  const r = { aplicados: [], huecos: [], coberturas: [], rechazados: [], retirados: [], avisos: [], estado: target };
+  if (!o.sinRetirar) r.retirados = retirarQueIncumplen(cfg, staff, target, desde, hasta, { desdeIso: o.desdeIso });
   if (!o.sinPatron) {
     const p = instanciarPatron(cfg, staff, target, desde, hasta, { desdeIso: o.desdeIso });
-    r.aplicados.push(...p.aplicados); r.coberturas.push(...p.coberturas); r.rechazados.push(...p.rechazados);
+    r.aplicados.push(...p.aplicados); r.coberturas.push(...p.coberturas); r.rechazados.push(...p.rechazados); r.avisos.push(...p.avisos);
   }
   for (const iso of rangoIso(desde, hasta)) {
     if (o.desdeIso && iso < o.desdeIso) continue;
@@ -1029,9 +1302,14 @@ function descripcionCocina(cfg, l) {
   const pos = posTxt('M') === posTxt('T') ? `cocina en ${posTxt('M')} posición` : `cocina ${posTxt('M')} por la mañana · ${posTxt('T')} por la tarde`;
   return (ob.M && ob.T ? 'cocina obligatoria mañana y tarde · ' : '') + pos;
 }
-function condicionesDe(cfg, staff) {
+// lunes: la semana que se genera o se mira (24/09). Con ella, quien está de baja TODA esa semana
+// no tiene condiciones, y el día libre sale como es esa semana («Mari Luz libra el martes esta
+// semana (en vez de los miércoles)»). Sin semana no se descarta a nadie por baja: el modelo no
+// mira el reloj.
+function condicionesDe(cfg, staff, lunes) {
   const st = staff || cfg.staff || [];
   const out = [];
+  const semana = lunes ? [0, 1, 2, 3, 4, 5, 6].map(k => addDias(lunesDe(lunes), k)) : null;
   const add = (id, texto, x) => out.push(Object.assign({ id, num: out.length + 1, texto, ok: true, detalle: '' }, x || {}));
   const nom = pid => (personaDe(st, pid) || { nombre: pid }).nombre;
   const dowsTxt = ds => ds.map(d => DOW_PL[d].replace('los ', '')).join(', ');
@@ -1046,12 +1324,18 @@ function condicionesDe(cfg, staff) {
   }
   const vistos = new Set();
   for (const p of st) {
-    if (deBaja(p)) continue;
+    if (semana && semana.every(iso => deBaja(p, iso))) continue;
     const act = k => regla(cfg, k === 'locales' || k === 'franjas' || k === 'cocina' || k === 'noAbre' ? 'cocina' : k) && caracteristicaActiva(p, k);
     if (caracteristicaActiva(p, 'locales') && (p.locales || []).length) add(`p:${p.id}:locales`, `${p.nombre}: ${p.locales.length === 1 ? 'solo en ' : ''}${lblLocales(cfg, p.locales)}`, { tipo: 'persona', pid: p.id, k: 'locales' });
     if (caracteristicaActiva(p, 'franjas') && (p.franjas || []).length === 1) add(`p:${p.id}:franjas`, `${p.nombre} solo hace ${p.franjas[0] === 'M' ? 'mañanas' : 'tardes'}`, { tipo: 'persona', pid: p.id, k: 'franjas' });
-    if (regla(cfg, 'libra') && caracteristicaActiva(p, 'libra') && (p.libra || []).length) add(`p:${p.id}:libra`, `${p.nombre} libra ${p.libra.map(d => DOW_PL[d]).join(' y ')}${p.libreVariable ? ' (día libre variable)' : ''}`, { tipo: 'persona', pid: p.id, k: 'libra' });
-    if (regla(cfg, 'partido') && caracteristicaActiva(p, 'partido') && ((p.partido || {}).siempre || ((p.partido || {}).dias || []).length)) add(`p:${p.id}:partido`, `${p.nombre} hace partido ${p.partido.siempre ? 'siempre' : 'los ' + dowsTxt(p.partido.dias)}`, { tipo: 'persona', pid: p.id, k: 'partido' });
+    const lp = semana && activa(cfg, p, 'libra') ? libraPuntualDe(p, semana[0]) : null;
+    if (lp) add(`p:${p.id}:libra`, `${p.nombre} libra ${textoDiasEl(lp.dias)} esta semana${(p.libra || []).length ? ` (en vez de ${textoDiasPl(p.libra)})` : ''}`, { tipo: 'persona', pid: p.id, k: 'libra', puntual: true });
+    else if (activa(cfg, p, 'libra') && (p.libra || []).length) add(`p:${p.id}:libra`, `${p.nombre} libra ${textoDiasPl(p.libra)}${p.libreVariable ? ' (día libre variable)' : ''}`, { tipo: 'persona', pid: p.id, k: 'libra' });
+    if (activa(cfg, p, 'partido') && ((p.partido || {}).siempre || ((p.partido || {}).dias || []).length)) {
+      const cl = semana && !p.partido.siempre ? cambioDeLibre(cfg, p, semana[0]) : null;
+      const mov = cl ? cl.pares.filter(x => (p.partido.dias || []).includes(x[0])) : [];
+      add(`p:${p.id}:partido`, `${p.nombre} hace partido ${p.partido.siempre ? 'siempre' : 'los ' + dowsTxt(p.partido.dias)}${mov.length ? ` (esta semana, ${mov.map(x => `el del ${DOW_LBL[x[0]]} pasa al ${DOW_LBL[x[1]]}`).join(' y ')})` : ''}`, { tipo: 'persona', pid: p.id, k: 'partido' });
+    }
     if (regla(cfg, 'vetos') && caracteristicaActiva(p, 'vetos')) for (const v of p.vetos || []) add(`p:${p.id}:veto:${v.localId}:${v.franja}`, `${p.nombre} ${textoVeto(v, (localDe(cfg, v.localId) || {}).nombre || v.localId)}`, { tipo: 'persona', pid: p.id, k: 'vetos' });
     if (regla(cfg, 'nuncaCon') && caracteristicaActiva(p, 'nuncaCon')) for (const q of p.nuncaCon || []) { const key = [p.id, q].sort().join('|'); if (vistos.has(key)) continue; vistos.add(key); add(`p:${p.id}:nuncaCon:${q}`, `${p.nombre} y ${nom(q)} no coinciden`, { tipo: 'persona', pid: p.id, k: 'nuncaCon', otro: q }); }
     if (regla(cfg, 'cubreA') && caracteristicaActiva(p, 'cubreA')) for (const c of p.cubreA || []) add(`p:${p.id}:cubre:${c.pid}:${c.dow || ''}`, `${p.nombre} cubre a ${nom(c.pid)}${c.dow ? ' ' + DOW_PL[c.dow] : ''}${c.turnoId ? ' en ' + (localDe(cfg, partirTurno(c.turnoId).localId) || {}).nombre + ' por la ' + FRANJA_LBL[partirTurno(c.turnoId).franja].toLowerCase() : ''}`, { tipo: 'persona', pid: p.id, k: 'cubreA', informativa: true });
@@ -1069,7 +1353,7 @@ function condicionesDe(cfg, staff) {
 }
 function verificarSemana(cfg, staff, est, lunes) {
   const dias = []; for (let k = 0; k < 7; k++) dias.push(addDias(lunes, k));
-  const conds = condicionesDe(cfg, staff);
+  const conds = condicionesDe(cfg, staff, lunes);
   const dl = iso => `${DOW_LBL[isoDow(iso)]} ${+iso.slice(8, 10)}`;
   const slotsCache = {};
   const slots = (iso, tid) => slotsCache[iso + tid] || (slotsCache[iso + tid] = posicionesDe(cfg, staff, est, iso, tid));
@@ -1092,8 +1376,8 @@ function verificarSemana(cfg, staff, est, lunes) {
         const mis = turnosDe(cfg).filter(t => pidsEn(est, iso, t.id).includes(c.pid));
         if (c.k === 'locales') for (const t of mis) if (!p.locales.includes(t.local.id)) v.push(`${dl(iso)}: en ${t.local.nombre}`);
         if (c.k === 'franjas') for (const t of mis) if (!p.franjas.includes(t.franja)) v.push(`${dl(iso)}: ${FRANJA_LBL[t.franja].toLowerCase()}`);
-        if (c.k === 'libra' && mis.length && p.libra.includes(dow)) v.push(`${dl(iso)}: trabaja`);
-        if (c.k === 'partido' && mis.some(t => t.franja === 'M') && mis.some(t => t.franja === 'T') && !(p.partido.siempre || p.partido.dias.includes(dow))) v.push(`${dl(iso)}: partido no declarado`);
+        if (c.k === 'libra' && mis.length && libraEn(p, iso)) v.push(`${dl(iso)}: trabaja`);   // el día libre de ESA semana
+        if (c.k === 'partido' && mis.some(t => t.franja === 'M') && mis.some(t => t.franja === 'T') && !partidoEn(cfg, p, iso)) v.push(`${dl(iso)}: partido no declarado`);
         if (c.k === 'vetos') for (const t of mis) if (vetoDe(p, t.local.id, t.franja, dow)) v.push(`${dl(iso)}: ${t.local.nombre} ${FRANJA_LBL[t.franja].toLowerCase()}`);
         if (c.k === 'nuncaCon') for (const t of mis) if (pidsEn(est, iso, t.id).includes(c.otro)) v.push(`${dl(iso)}: juntos en ${t.local.nombre}`);
         if (c.k === 'cocina') for (const t of mis) { const e = asignados(est, iso, t.id).find(x => x.pid === c.pid); if (e && e.cocina && !puedeCocina(cfg, p, t.local.id, iso)) v.push(`${dl(iso)}: lleva la cocina en ${t.local.nombre}`); }
@@ -1121,7 +1405,7 @@ function generarSemana(cfg, staff, est, lunes, opts) {
   const dias = []; for (let k = 0; k < 7; k++) dias.push(addDias(lunes, k));
   const foto = e => { const m = {}; for (const iso of dias) for (const t of turnosDe(cfg)) m[iso + '|' + t.id] = pidsEn(e, iso, t.id).slice(); return m; };
   const antes = foto(target);
-  const g = generarPlanilla(cfg, staff, target, lunes, dias[6], { desdeIso: o.desdeIso, permitirPartido: !!o.permitirPartido, sinPatron: !!o.sinPatron });
+  const g = generarPlanilla(cfg, staff, target, lunes, dias[6], { desdeIso: o.desdeIso, permitirPartido: !!o.permitirPartido, sinPatron: !!o.sinPatron, sinRetirar: !!o.sinRetirar });
   const despues = foto(target);
   const cambios = [];
   for (const k of Object.keys(despues)) { const [iso, tid] = k.split('|'); if (JSON.stringify(antes[k]) !== JSON.stringify(despues[k])) cambios.push({ iso, turnoId: tid, antes: antes[k], despues: despues[k] }); }
@@ -1135,21 +1419,81 @@ function generarSemana(cfg, staff, est, lunes, opts) {
       return { iso, tid, abierto: true, n: r.n, min: r.minimo, supuesto: r.supuesto, refuerzo: r.refuerzo, faltan: r.faltan, cambiado: cambiado.has(iso + '|' + tid), slots: posicionesDe(cfg, staff, target, iso, tid) };
     }) })),
   }));
-  const activosSem = staff.filter(p => !deBaja(p, lunes));
+  // la baja se mira día a día (24/09, S6): quien estuvo de baja solo el lunes libra el sábado
   const libran = {}, diasPorPersona = {};
   for (const iso of dias) {
     const trabajan = new Set();
     for (const t of turnosDe(cfg)) for (const pid of pidsEn(target, iso, t.id)) trabajan.add(pid);
-    libran[iso] = activosSem.filter(p => !trabajan.has(p.id) && !ausenciaEn(p, iso) && !p.standby).map(p => p.id);
+    libran[iso] = staff.filter(p => !trabajan.has(p.id) && !ausenciaEn(p, iso) && !p.standby).map(p => p.id);
     for (const pid of trabajan) diasPorPersona[pid] = (diasPorPersona[pid] || 0) + 1;
   }
   const huecos = g.huecos.filter(h => dias.includes(h.iso)).map(h => Object.assign({ pos: null, tipo: 'faltan' }, h));
   const condiciones = verificarSemana(cfg, staff, target, lunes);
   const turnos = dias.reduce((a, iso) => a + turnosDe(cfg).filter(t => turnoAbierto(cfg, target, iso, t.id)).length, 0);
   const plazas = dias.reduce((a, iso) => a + turnosDe(cfg).reduce((b, t) => b + pidsEn(target, iso, t.id).length, 0), 0);
-  return { lunes, dias, locales, libran, huecos, cambios, condiciones, aplicados: g.aplicados.length, rechazados: g.rechazados,
-    resumen: { turnos, plazas, condiciones: condiciones.length, condicionesRotas: condiciones.filter(c => !c.ok).length, huecos: huecos.length, descansos: Object.values(libran).reduce((a, x) => a + x.length, 0), maxDias: Math.max(0, ...Object.values(diasPorPersona)), cambios: cambios.length, deBaja: staff.filter(p => deBaja(p, lunes)).map(p => p.id) },
+  // de baja = los siete días; una baja de parte de la semana sale aparte («de baja el lunes»)
+  const bajaDias = staff.map(p => ({ pid: p.id, dias: dias.filter(iso => deBaja(p, iso)) }));
+  return { lunes, dias, locales, libran, huecos, cambios, condiciones, aplicados: g.aplicados.length, rechazados: g.rechazados, retirados: g.retirados, avisos: g.avisos,
+    resumen: { turnos, plazas, condiciones: condiciones.length, condicionesRotas: condiciones.filter(c => !c.ok).length, huecos: huecos.length, descansos: Object.values(libran).reduce((a, x) => a + x.length, 0), maxDias: Math.max(0, ...Object.values(diasPorPersona)), cambios: cambios.length, retirados: g.retirados.length,
+      deBaja: bajaDias.filter(x => x.dias.length === 7).map(x => x.pid), bajasParciales: bajaDias.filter(x => x.dias.length && x.dias.length < 7) },
     estado: target };
+}
+
+// ---------- cambiar el día libre de una semana ya volcada ----------
+// 24/09 (reunión, D9): «esta semana libra martes en vez de miércoles… en el equipo te lo pone
+// tal cual, pero luego no lo quita». Si la semana ya está en la planilla, guardar el cambio en la
+// ficha lo aplica al momento, con el mismo mecanismo que el generador pero solo con esa persona
+// y quien la cubre: sale de los días que ahora libra (solo lo automático: lo puesto a mano o
+// forzado se queda, con su aviso, y se lista en `quedan`), se retira a quien la cubría el día
+// que ahora trabaja y entra ese día con sus plazas del día que deja libre (con su partido).
+// Con dias = [] se quita el cambio y todo vuelve a su sitio. Guarda el cambio en la ficha
+// (p.libraPuntual) y toca `est`; no mira el reloj (opts.desdeIso para no tocar días pasados).
+// Solo toca los días que cambian —los que libra de más o de menos, con el cambio de antes y con
+// el nuevo— y que ya tienen planilla (24/09, revisión: volvía a poner toda su semana tipo, también
+// lo quitado a mano otro día, y rellenaba días que nadie había generado). Un día que cambia y ya
+// ha pasado no se toca, y se avisa de cuántos días trabaja esa semana.
+// Devuelve { quitados, puestos, quedan, huecos, rechazados, avisos }.
+function moverDiaLibre(cfg, staff, est, pid, lunes, dias, opts) {
+  const o = opts || {};
+  const vacio = { quitados: [], puestos: [], quedan: [], huecos: [], rechazados: [], avisos: [] };
+  const p = personaDe(staff, pid);
+  if (!p) return vacio;
+  const l0 = lunesDe(lunes);
+  const antes = cambioDeLibre(cfg, p, l0);
+  ponerLibraPuntual(p, l0, dias);
+  const ahora = cambioDeLibre(cfg, p, l0);
+  const enEst = (est.days || []).map(d => d.iso).filter(iso => iso >= l0 && iso <= addDias(l0, 6));
+  if (!enEst.length) return vacio;
+  const desde = enEst[0], hasta = enEst[enEst.length - 1];
+  const cambian = new Set();
+  for (const c of [antes, ahora]) if (c) for (const d of c.nuevos.concat(c.liberados)) cambian.add(d);
+  const conPlanilla = iso => Object.values(est.asig[iso] || {}).some(l => l.length);
+  const diasQueCambian = enEst.filter(iso => cambian.has(isoDow(iso)) && conPlanilla(iso));
+  const tocables = diasQueCambian.filter(iso => !o.desdeIso || iso >= o.desdeIso);
+  const pasados = diasQueCambian.filter(iso => o.desdeIso && iso < o.desdeIso);
+  const trabaja = () => enEst.filter(iso => casillasDe(est, iso, pid).length).length;
+  const nAntes = trabaja();
+  const quitados = tocables.length ? retirarQueIncumplen(cfg, staff, est, desde, hasta, { soloPid: pid, soloDias: tocables }) : [];
+  const ip = tocables.length ? instanciarPatron(cfg, staff, est, desde, hasta, { soloPid: pid, soloDias: tocables }) : { aplicados: [], rechazados: [], avisos: [] };
+  const quedan = [];
+  for (const iso of tocables) {
+    if (!(activa(cfg, p, 'libra') && libraEn(p, iso))) continue;
+    for (const { tid } of casillasDe(est, iso, pid)) quedan.push({ iso, turnoId: tid, pid, avisos: avisosVigentes(cfg, staff, est, iso, tid, pid) });
+  }
+  const huecos = [], vistas = new Set();
+  for (const q of quitados) {
+    const k = q.iso + '|' + q.turnoId;
+    if (vistas.has(k)) continue;
+    vistas.add(k);
+    const rev = revisarTurno(cfg, staff, est, q.iso, q.turnoId);
+    if (rev.faltan) huecos.push({ iso: q.iso, turnoId: q.turnoId, faltan: rev.faltan, minimo: rev.minimo, supuesto: rev.supuesto });
+  }
+  const avisos = ip.avisos.filter(a => a.tipo !== 'pasado');
+  if (pasados.length) {
+    const nDespues = trabaja();
+    avisos.push({ pid, semana: l0, tipo: 'pasado', texto: `${pasados.map(iso => 'el ' + diaYNum(iso)).join(' y ')} ya ha${pasados.length > 1 ? 'n' : ''} pasado y no se toca${pasados.length > 1 ? 'n' : ''}${nDespues !== nAntes ? `: esta semana trabaja ${nDespues} días en vez de ${nAntes}` : ''}` });
+  }
+  return { quitados, puestos: ip.aplicados, quedan, huecos, rechazados: ip.rechazados, avisos };
 }
 
 // ---------- gestor de cobertura: quién cubre a quien falta ----------
@@ -1626,7 +1970,8 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
   const workers = activos.map(p => {
     const w = { id: p.id, name: p.nombre, allowed_shifts: (p.locales || []).length ? p.locales.slice() : todosLocales.slice(), skills: [], unavailable: {}, fixed: {}, preferences: [] };
     indices.forEach((x, i) => {
-      const bloqueada = ausenciaEn(p, x.iso) || (p.libra || []).includes(x.dow) || ((p.franjas || []).length && !p.franjas.includes(x.franja));
+      // el día libre de ESA semana (libraEn): el cambio puntual bloquea el martes y deja el miércoles (24/09)
+      const bloqueada = ausenciaEn(p, x.iso) || libraEn(p, x.iso) || ((p.franjas || []).length && !p.franjas.includes(x.franja));
       if (bloqueada) { w.unavailable[i] = '*'; return; }
       const vet = (p.vetos || []).filter(v => v.franja === x.franja && (dowsVeto(v) === null || dowsVeto(v).includes(x.dow))).map(v => v.localId);
       if (vet.length) w.unavailable[i] = vet;
@@ -1660,14 +2005,15 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
   for (const p of activos) for (const q of p.nuncaCon || []) if (activos.some(x => x.id === q)) pares.add([p.id, q].sort().join('|'));
   if (pares.size) rules.push({ type: 'same_shift_forbidden', mode: 'hard', tier: 3, id: 'nunca con', params: { pairs: [...pares].map(s => s.split('|')), shifts: todosLocales.slice() } });
   // quien no hace partido nunca y tiene las dos franjas: como mucho un medio día por ventana de dos
-  const sinPartido = activos.filter(p => (p.franjas || []).length !== 1 && !(p.partido && (p.partido.siempre || (p.partido.dias || []).length))).map(p => p.id);
+  const sinPartido = activos.filter(p => (p.franjas || []).length !== 1 && !indices.some(x => partidoEn(cfg, p, x.iso))).map(p => p.id);
   if (sinPartido.length) rules.push({ type: 'max_hours_in_window', mode: 'hard', tier: 2, id: 'sin partido', params: { days: 2, max_hours: 7 }, scope: { workers: sinPartido } });
   rules.push({ type: 'balance', mode: 'soft', weight: 2, tier: 1, id: 'reparto equilibrado', params: { dimension: 'work' } });
   rules.push({ type: 'preferences', mode: 'soft', weight: 1, tier: 1, id: 'criterios personales', params: {} });
-  // plazas fijas de la semana tipo (no supuestas) como asignaciones fijas
+  // plazas fijas de la semana tipo (no supuestas) como asignaciones fijas, con los cambios de
+  // día libre de cada semana (plazasDelDia, la misma lectura que la semana tipo del generador)
   if (o.conPatron !== false) {
     indices.forEach((x, i) => {
-      for (const pl of plazasDe(cfg, x.dow)) {
+      for (const pl of plazasDelDia(cfg, staff, x.iso).plazas) {
         if (pl.s) continue;
         const { localId, franja } = partirTurno(pl.t);
         if (franja !== x.franja) continue;
@@ -1683,13 +2029,18 @@ function desdeSolucion(cfg, staff, est, problema, sol, opts) {
   const o = opts || {};
   const r = { aplicados: [], rechazados: [] };
   const indices = (problema.meta && problema.meta.indices) || [];
+  // la plaza fija de la semana tipo que el núcleo ha respetado se vuelca con su «por» y su nota
+  // (24/09, revisión): sin ellos, un cambio de día libre no sabía que Lavinia cubría a Mari Luz
+  const fijas = {};
+  const fijaDe = (iso, tid, pid) => (fijas[iso] || (fijas[iso] = plazasDelDia(cfg, staff, iso).plazas)).find(pl => pl.t === tid && pl.p === pid) || null;
   for (const [pid, porIdx] of Object.entries(sol.schedule || {})) {
     for (const [i, code] of Object.entries(porIdx)) {
       if (!code || code === (problema.rest_code || 'OFF')) continue;
       const x = indices[+i]; if (!x) continue;
       const tid = turnoId(code, x.franja);
       if (pidsEn(est, x.iso, tid).includes(pid)) continue;
-      const a = asignar(est, cfg, staff, x.iso, tid, pid, { origen: 'nucleo', razon: o.razon || 'propuesto por el núcleo Shiftia (CP-SAT)', permitirPartido: true });
+      const pl = fijaDe(x.iso, tid, pid);
+      const a = asignar(est, cfg, staff, x.iso, tid, pid, { origen: 'nucleo', razon: o.razon || 'propuesto por el núcleo Shiftia (CP-SAT)', permitirPartido: true, por: pl ? pl.por : undefined, nota: pl ? pl.n : undefined });
       if (a.ok) r.aplicados.push({ iso: x.iso, turnoId: tid, pid, origen: 'nucleo', razon: a.entry.razon, avisos: a.avisos });
       else r.rechazados.push({ iso: x.iso, turnoId: tid, pid, motivo: a.motivo });
     }
@@ -1996,6 +2347,8 @@ if (typeof module !== 'undefined') {
     turnosMes, esComodin, candidatosPara, candidatosConAviso, porQueNadie, generarPlanilla,
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, migrarAltas, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe, enCocinaEse,
+    activa, librasPuntuales, libraPuntualDe, ponerLibraPuntual, textoCambioLibre, cambioDeLibre, partidoEn, estadoDia,
+    plazasDelDia, esAutomatica, retirarQueIncumplen, moverDiaLibre, porDe, retirarEntrada, motivoLibra,
     LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, fechaCandidato, ORDENES_CAND, ordenarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos, fundirSemillaEntrevistas, textoCampo,
     diasAusenciaMes, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes, cierreDe, tramoDe, registroApoyos,

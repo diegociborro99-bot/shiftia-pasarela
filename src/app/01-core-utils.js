@@ -52,6 +52,11 @@ function initials(n) { const p = String(n || '').trim().split(/\s+/); return ((p
 function pl(n, sing, plur) { return `${n} ${n === 1 ? sing : plur}`; }
 function isoHoy() { return fechaMadrid(); }
 function fmtDM(iso) { return `${+iso.slice(8, 10)}/${+iso.slice(5, 7)}`; }
+function fmtDDMM(iso) { return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`; }   // «28/09», como lo escribe el grupo
+// cómo se deshace en este dispositivo: con teclado, Ctrl+Z; en el móvil no hay teclado y la barra
+// de arriba se oculta, así que es «Más → Deshacer» (24/09, revisión: los avisos del día libre
+// decían Ctrl+Z también en el teléfono). La misma consulta que oculta esa barra en los estilos.
+function comoDeshacer() { return matchMedia('(max-width:640px), ((max-height:520px) and (pointer:coarse))').matches ? '«Más → Deshacer»' : 'Ctrl+Z'; }
 function fmtLargo(iso) { return `${DIAS_L[isoDow(iso)]} ${+iso.slice(8, 10)} de ${MESES[+iso.slice(5, 7) - 1].toLowerCase()}`; }
 function fmtCorto(iso) { return `${DOW_C[isoDow(iso)]} ${+iso.slice(8, 10)}`; }
 // «ayer», «hace 12 días», «dentro de 2 meses»: para que se vea cuándo lo que hay en
@@ -171,7 +176,10 @@ function abrirOverlay(id, html, opts) {
   // qué registro está mirando este panel («staff:pid», «cand:id») y cómo volver a pintarlo.
   // Con eso, un estado que llega de otro usuario solo cierra los paneles cuyo registro ha
   // cambiado de verdad, en vez de cerrarlos todos (Diego, 18/09).
-  if (opts && opts.vigila) { ov.dataset.vigila = opts.vigila; if (opts.reabrir) ov._reabrir = opts.reabrir; }
+  if (opts && opts.vigila) ov.dataset.vigila = opts.vigila;
+  // cómo volver a pintarlo contra el estado nuevo: al llegar el de otro usuario (con `vigila`) y al
+  // deshacer (24/09, revisión: tras Ctrl+Z la ficha abierta seguía con la persona de antes)
+  if (opts && opts.reabrir) ov._reabrir = opts.reabrir;
   document.body.appendChild(ov);
   ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('[data-ovx]')) ov.remove(); });
   return ov;

@@ -373,8 +373,8 @@ function pxgTablaLocal(res, l) {
   return h + '</tbody></table>';
 }
 function pxgLibran(res) {
-  const deBaja = (res.resumen && res.resumen.deBaja || []).map(nombrePid);
-  let h = `<div class="pxg-loc gris"><i></i><b>Quién libra cada día</b></div><table class="pxg-tab pxg-lib">${pxgCabeceraTabla(res)}<tbody><tr><td class="pxg-lbl"><b>Libran</b><small>${deBaja.length ? 'De baja: ' + esc(pxgLista(deBaja)) : 'sin turno ese día'}</small></td>`;
+  const bajas = lblBajasSemana(res);   // de baja toda la semana, y «Tere de baja el lunes» (24/09)
+  let h = `<div class="pxg-loc gris"><i></i><b>Quién libra cada día</b></div><table class="pxg-tab pxg-lib">${pxgCabeceraTabla(res)}<tbody><tr><td class="pxg-lbl"><b>Libran</b><small>${bajas.length ? 'De baja: ' + esc(pxgLista(bajas)) : 'sin turno ese día'}</small></td>`;
   for (const iso of res.dias) {
     const pids = res.libran[iso] || [];
     h += `<td class="pxg-c" data-libran="${iso}"><div class="pxg-cnt">${pids.length} libra${pids.length === 1 ? '' : 'n'}</div>${pids.length ? `<div class="pxg-chips">${pids.map(pid => `<span>${esc(nombrePid(pid))}</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`;
@@ -434,15 +434,15 @@ function pxgDestrapa(res, hu) {
     const yaAqui = enCasilla.includes(p.id);
     if (yaAqui && hu.tipo !== 'primero') continue;
     if (turnosDe(S).some(t => t.franja === franja && t.id !== hu.turnoId && pidsEn(est, iso, t.id).includes(p.id))) continue;
-    const act = k => regla(S, k) && caracteristicaActiva(p, k);
+    const act = k => activa(S, p, k);
     const bl = [];
     if (!yaAqui) {
       if (act('locales') && (p.locales || []).length && !p.locales.includes(localId)) bl.push(`solo trabaja en ${lblLocales(S, p.locales)}`);
       if (act('franjas') && (p.franjas || []).length && !p.franjas.includes(franja)) bl.push(franja === 'M' ? 'solo hace tardes' : 'solo hace mañanas');
-      if (act('libra') && (p.libra || []).includes(dow)) bl.push(`libra ${DOW_PL[dow]}`);
+      if (act('libra') && libraEn(p, iso)) bl.push(motivoLibra(p, iso));   // el día libre de ESA semana, con el texto del modelo (24/09)
       if (act('vetos') && (p.vetos || []).some(v => v.localId === localId && v.franja === franja)) bl.push(`no hace ${franja === 'M' ? 'mañanas' : 'tardes'} en ${l ? l.nombre : localId}`);
       const enOtra = turnosDe(S).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(p.id));
-      if (act('partido') && enOtra && !((p.partido || {}).siempre || ((p.partido || {}).dias || []).includes(dow))) bl.push(`no hace partido ${DOW_PL[dow]}`);
+      if (enOtra && !partidoEn(S, p, iso)) bl.push(`no hace partido ${DOW_PL[dow]}`);   // con el partido trasladado la semana de un cambio
       if (regla(S, 'nuncaCon')) for (const q of enCasilla) { const qp = personaDeId(q); if (qp && ((caracteristicaActiva(p, 'nuncaCon') && (p.nuncaCon || []).includes(q)) || (caracteristicaActiva(qp, 'nuncaCon') && (qp.nuncaCon || []).includes(p.id)))) bl.push(`no coincide con ${qp.nombre}`); }
     }
     if (hu.tipo === 'primero') {
@@ -460,7 +460,7 @@ function pxgDestrapa(res, hu) {
 const PXG_DURO = /^ya en |^ya está|^de baja|^de vacaciones|^día libre|^de permiso|^ausente|^no existe|no abre la |^nadie de la casilla/;
 function pxgHuecos(res) {
   if (!res.huecos.length) return '<p class="pxg-p mut">Todas las posiciones tienen nombre: no queda ningún hueco disponible.</p>';
-  const nPlantilla = S.staff.filter(p => !deBaja(p, res.lunes)).length;
+  const nPlantilla = S.staff.filter(p => !(res.resumen.deBaja || []).includes(p.id)).length;   // sin quien está de baja toda la semana
   return res.huecos.map(hu => {
     const { localId, franja } = partirTurno(hu.turnoId);
     const l = pxgLocal(res, localId), d = pxgDiaDe(res, localId, franja, hu.iso), slots = (d && d.slots) || [];

@@ -230,9 +230,26 @@ function deshacer() {
   if (u.staff) S.staff = u.staff;
   if (u.eventos) S.eventos = u.eventos;
   if (u.extras) S.extras = u.extras;
+  // «Guardar como semana tipo» apila la semana tipo de antes y promete «Ctrl+Z lo deshace», pero
+  // aquí no se devolvía (24/09, revisión)
+  if (u.patron) S.patron = u.patron;
   registrarCambio('Deshecho: ' + u.label, 'undo');
   saveState(); renderVistaActiva();
+  repintarPaneles();
   toast('Deshecho: ' + u.label, 'ok');
+}
+// Los paneles abiertos que saben volver a pintarse (la ficha, el día libre de la semana del
+// Generador) se repintan contra el estado deshecho, conservando el scroll. Sin esto la ficha
+// abierta seguía con la persona de antes de Ctrl+Z: enseñaba el cambio deshecho y lo que se tocaba
+// después se perdía sin avisar (24/09, revisión; reunión: «Vamos a darle para atrás, CTRL+Z»).
+// Deshacer no toca las entrevistas: sus paneles se dejan como están.
+function repintarPaneles() {
+  for (const o of [...document.querySelectorAll('.ovl')]) {
+    if (OVL_PERSISTENTES.includes(o.id) || !o._reabrir || (o.dataset.vigila && !o.dataset.vigila.startsWith('staff:'))) continue;
+    const caja = o.querySelector('.ovcard'), top = caja ? caja.scrollTop : 0;
+    try { o._reabrir(); const c = document.querySelector('#' + o.id + ' .ovcard'); if (c) c.scrollTop = top; } catch (e) {}
+    if (o.isConnected) o.remove();   // no se pudo volver a abrir (la persona ya no está): no se deja un panel viejo
+  }
 }
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !/input|textarea|select/i.test((e.target.tagName || ''))) { e.preventDefault(); deshacer(); }
@@ -241,7 +258,9 @@ document.addEventListener('keydown', e => {
 // ---------- ayudas de dominio para las vistas ----------
 const personaDeId = pid => S.staff.find(p => p.id === pid) || null;
 const nombrePid = pid => (personaDeId(pid) || { nombre: pid }).nombre;
-const activos = () => S.staff.filter(p => !deBaja(p));
+// quien no está de baja EL DÍA QUE SE MIRA (24/09, S6): hasta entonces se miraba siempre hoy,
+// y quien estaba de baja hoy desaparecía de los descansos y de la Cobertura de otras semanas
+const activos = iso => S.staff.filter(p => !deBaja(p, iso));
 // el mes está cerrado para la nómina: se avisa antes de tocarlo
 function mesCerrado(iso) { return !!(S.cierres && S.cierres[iso.slice(0, 7)]); }
 function confirmarSiCerrado(iso) {

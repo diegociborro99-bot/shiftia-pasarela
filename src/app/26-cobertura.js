@@ -60,18 +60,24 @@ function turnosDia(pid, iso) {
 }
 function renderCobertura() { pintaCob($('#cobRoot'), 'tab'); }
 function pintaCob(root, modo) {
-  const personas = activos().slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-  if (!COB.pid || !personas.some(p => p.id === COB.pid)) COB.pid = personas[0] ? personas[0].id : null;
   if (!COB.base) COB.base = mondayOf(isoDia());
+  const dias = []; for (let k = 0; k < 14; k++) dias.push(addDias(COB.base, k));
+  const fin = dias[13];
+  // se puede elegir a quien no está de baja TODOS los días de la tira (24/09, S6: antes, quien lo
+  // estaba hoy); y la hoja nunca cambia de persona por su cuenta: si la elegida está de baja
+  // algún día, la tira lo enseña y la cabecera lo avisa, pero sigue siendo ella
+  const personas = S.staff.filter(q => q.id === COB.pid || !dias.every(iso => deBaja(q, iso))).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  if (!COB.pid || !personaDeId(COB.pid)) COB.pid = personas[0] ? personas[0].id : null;
   const p = personaDeId(COB.pid);
   const cambio = COB.tipo === 'CAMBIO';
   const hoy = isoHoy();
-  const dias = []; for (let k = 0; k < 14; k++) dias.push(addDias(COB.base, k));
-  const fin = dias[13];
+  const bajaTira = p ? dias.filter(iso => deBaja(p, iso)) : [];
+  // los cambios de día libre de las semanas de la tira, para la cabecera: «(semana del 28/09: libra martes)»
+  const lpTira = p ? [COB.base, addDias(COB.base, 7)].map(l => ({ l, lp: libraPuntualDe(p, l) })).filter(x => x.lp && activa(S, p, 'libra')) : [];
   const celda = iso => {
     const ts = p ? turnosDia(p.id, iso) : [];
     const aus = p ? ausenciaEn(p, iso) : null;
-    const libra = p && (p.libra || []).includes(isoDow(iso));
+    const libra = p && estadoDia(S, p, iso).libra;   // el día libre de ESA semana
     const on = COB.dias.includes(iso);
     const dots = ts.map(t => `<i style="--lc:${colorLocal(t.localId)}" title="${esc(nombreLocal(t.localId) + ' · ' + FRANJA_LBL[t.franja].toLowerCase() + (t.abre ? ' · abre' : '') + (t.cocina ? ' · cocina' : ''))}">${t.franja}${t.cocina ? SVG_COCINA : ''}</i>`).join('');
     const pie = aus ? `<em class="a-${esc(aus.tipo)}">${esc((AUS_LBL[aus.tipo] || {}).label || aus.tipo)}</em>` : ts.length ? dots : `<em>${libra ? 'libra' : 'sin turno'}</em>`;
@@ -82,7 +88,7 @@ function pintaCob(root, modo) {
     ${modo === 'tab' ? `<div class="cobpick" role="listbox" aria-label="Persona">${personas.map(q => `<button type="button" class="cobpk${q.id === COB.pid ? ' on' : ''}" data-pk="${esc(q.id)}" style="--pc:${avColor(q.id)}" role="option" aria-selected="${q.id === COB.pid}"><span class="av">${esc(initials(q.nombre))}</span>${esc(nombreCorto(q.nombre))}</button>`).join('')}</div>` : ''}
     ${p ? `<div class="cobhead">
       <span class="av cobav" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span>
-      <div class="cobwho"><span class="micro">QUIÉN VA A FALTAR</span><b>${esc(p.nombre)}</b><small>${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${esc((p.locales || []).length ? p.locales.map(nombreLocal).join(', ') : 'comodín, cualquier local')}${(p.libra || []).length ? ' · libra ' + p.libra.map(d => DIAS_L[d].toLowerCase()).join(' y ') : ''}</small>${modo === 'ovl' ? `<select class="logininp cobsel2" id="cobPid" data-libre aria-label="Cambiar de persona">${personas.map(q => `<option value="${esc(q.id)}"${q.id === COB.pid ? ' selected' : ''}>${esc(q.nombre)}</option>`).join('')}</select>` : ''}</div>
+      <div class="cobwho"><span class="micro">QUIÉN VA A FALTAR</span><b>${esc(p.nombre)}</b><small>${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${esc((p.locales || []).length ? p.locales.map(nombreLocal).join(', ') : 'comodín, cualquier local')}${(p.libra || []).length ? ' · libra ' + p.libra.map(d => DIAS_L[d].toLowerCase()).join(' y ') : ''}${lpTira.map(x => ` (semana del ${fmtDDMM(x.l)}: ${textoCambioLibre(p, x.lp, true)})`).join('')}${bajaTira.length ? ` · de baja ${bajaTira.length === 1 ? 'el ' + fmtDM(bajaTira[0]) : `del ${fmtDM(bajaTira[0])} al ${fmtDM(bajaTira[bajaTira.length - 1])}`}` : ''}</small>${modo === 'ovl' ? `<select class="logininp cobsel2" id="cobPid" data-libre aria-label="Cambiar de persona">${personas.map(q => `<option value="${esc(q.id)}"${q.id === COB.pid ? ' selected' : ''}>${esc(q.nombre)}</option>`).join('')}</select>` : ''}</div>
       <div class="cobtipos" role="radiogroup" aria-label="Qué le pasa"><span class="micro">QUÉ LE PASA</span>${TIPOS_INCIDENCIA.map(t => `<button type="button" class="abschip a-${esc(t.id)}${COB.tipo === t.id ? ' on' : ''}" data-tipo="${esc(t.id)}" role="radio" aria-checked="${COB.tipo === t.id}">${esc(t.label)}</button>`).join('')}</div>
     </div>` : '<div class="genvacio">No hay nadie en activo.</div>'}
     <div class="cobdias">

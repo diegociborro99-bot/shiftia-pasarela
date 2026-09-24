@@ -3,18 +3,25 @@
 // (saveState) y deja una línea breve en el historial. Los campos llevan
 // data-libre para que el overlay no pregunte «¿cambios sin guardar?» al cerrar:
 // no hay nada sin guardar.
-function openFicha(pid) {
+function openFicha(pid, opts) {
   const p = personaDeId(pid); if (!p) return;
   if (typeof closePicker === 'function') closePicker();
-  // campos que la ficha da por existentes (estados guardados con esquemas viejos)
-  // día libre puntual: solo cuenta en la semana de la planilla que se está mirando
-  const lpSemana = () => lunesDe(S.semLunes || isoHoy());
-  const lpDias = q => (q.libraPuntual && q.libraPuntual.semana === lpSemana() ? q.libraPuntual.dias : []) || [];
+  // Día libre puntual (24/09, reunión: «aunque lo hayamos puesto en equipo, al generar no lo
+  // respeta»): el bloque enseña SIEMPRE la semana a la que se refiere, con ‹ › para cambiarla, y
+  // los cambios guardados para otras semanas. De partida, la semana que se está planificando; al
+  // volver a abrirse (tras deshacer o un cambio de otro usuario), la que se estaba mirando. Nunca
+  // una semana ya pasada (24/09, revisión): ese cambio no llegaba a ningún sitio y se borraba solo.
+  const lpMin = lunesDe(isoHoy());
+  let lpSem = (opts && opts.lpSem) || semanaPlanificada();
+  if (lpSem < lpMin) lpSem = lpMin;
+  const lpDias = q => (libraPuntualDe(q, lpSem) || { dias: [] }).dias;
   const lpTxt = q => {
     const d = lpDias(q);
-    const sem = `semana del ${fmtCorto(lpSemana())}`;
-    return d.length ? `Esta ${sem} libra ${d.map(x => lblDowPl(x)).join(' y ')} en vez de ${(q.libra || []).length ? q.libra.map(x => lblDowPl(x)).join(' y ') : 'nada'}.` : `Sin cambios en la ${sem}.`;
+    const sem = `semana del ${fmtDDMM(lpSem)}`;
+    return d.length ? `La ${sem} libra ${d.map(x => lblDowPl(x)).join(' y ')} en vez de ${(q.libra || []).length ? q.libra.map(x => lblDowPl(x)).join(' y ') : 'nada'}.` : `Sin cambios en la ${sem}: libra ${(q.libra || []).length ? q.libra.map(x => lblDowPl(x)).join(' y ') : 'como siempre'}.`;
   };
+  const lpOtras = q => librasPuntuales(q).filter(x => x.semana !== lpSem && x.dias.length && x.semana >= lunesDe(isoHoy()));
+  // campos que la ficha da por existentes (estados guardados con esquemas viejos)
   p.locales = p.locales || []; p.franjas = p.franjas || ['M', 'T']; p.libra = p.libra || []; p.partido = p.partido || { dias: [] }; p.partido.dias = p.partido.dias || [];
   p.cocina = p.cocina || { titular: [], reserva: [], soloDias: [] }; p.cocina.titular = p.cocina.titular || []; p.cocina.reserva = p.cocina.reserva || []; p.cocina.soloDias = p.cocina.soloDias || [];
   p.abre = p.abre || {}; p.noAbre = p.noAbre || []; p.nuncaCon = p.nuncaCon || []; p.cubreA = p.cubreA || []; p.vetos = p.vetos || [];
@@ -43,7 +50,7 @@ function openFicha(pid) {
       <div><div class="pinlbl">Color en la planilla</div><div class="colorset" id="fichColores"></div></div>
     </div>
     <div id="fichBody"></div>
-    <div class="fichfoot"><button type="button" class="btn btn-ghost" data-baja>Quitar del equipo</button><button type="button" class="btn btn-cta" data-ovx>Listo</button></div>`, { ancho: 640, vigila: 'staff:' + p.id, reabrir: () => openFicha(p.id) });
+    <div class="fichfoot"><button type="button" class="btn btn-ghost" data-baja>Quitar del equipo</button><button type="button" class="btn btn-cta" data-ovx>Listo</button></div>`, { ancho: 640, vigila: 'staff:' + p.id, reabrir: () => openFicha(p.id, { lpSem }) });
 
   const body = ov.querySelector('#fichBody');
   const locChips = (sel, attr, opts) => S.locales.map(l => `<button type="button" class="locchip${sel.includes(l.id) ? ' on' : ''}" data-${attr}="${esc(l.id)}" data-libre style="--lc:${esc(l.color)}"><i class="ldot"></i>${esc(opts && opts.corto ? l.corto : l.nombre)}</button>`).join('');
@@ -79,9 +86,11 @@ function openFicha(pid) {
        ${chk('libreVariable', !!p.libreVariable, 'Día libre variable (se decide cada semana)')}
        ${chk('standby', !!p.standby, 'En standby: no entra en la planilla hasta confirmar sus condiciones')}
        <div class="lpunt">
-         <div class="pinlbl">Esta semana libra otro día <small>(solo para la semana de la planilla; después vuelve a su día de siempre)</small></div>
+         <div class="pinlbl">Esta semana libra otro día <small>(solo esa semana; después vuelve a su día de siempre. Si la semana ya está en la planilla, se cambia al momento)</small></div>
+         <div class="lpsem"><button type="button" class="mbtn" data-lpsem="-1" aria-label="Semana anterior"${lpSem <= lpMin ? ' disabled title="Las semanas pasadas no se cambian"' : ''}>‹</button><b class="lpsemlbl" data-lunes="${lpSem}">Semana del ${fmtDDMM(lpSem)} al ${fmtDDMM(addDias(lpSem, 6))}</b><button type="button" class="mbtn" data-lpsem="1" aria-label="Semana siguiente">›</button></div>
          <div class="dowset">${dowSet(lpDias(p), 'tlpunt')}</div>
          <div class="lpuntpie">${lpTxt(p)}${lpDias(p).length ? ' <button type="button" class="btn-mini ghost" data-lpoff>Quitar</button>' : ''}</div>
+         ${lpOtras(p).length ? `<div class="lpotras">Guardado para otras semanas: ${lpOtras(p).map(x => `<span class="lpotra"><button type="button" class="glink" data-lpir="${x.semana}">semana del ${fmtDDMM(x.semana)}</button>: ${esc(textoCambioLibre(p, x))} <button type="button" class="festrm" data-lpquita="${x.semana}" aria-label="Quitar el cambio de la semana del ${fmtDDMM(x.semana)}">✕</button></span>`).join(' · ')}</div>` : ''}
        </div>`) +
       car('partido', 'Hace partido', '(mañana y tarde el mismo día) los…', `<div class="dowset">${dowSet(pd.dias, 'tpartido')}</div>
        ${chk('partidoSiempre', !!pd.siempre, 'Siempre partido')}`));
@@ -128,7 +137,7 @@ function openFicha(pid) {
     ov.querySelector('#fichAv').style.background = avColor(p.id);
     ov.querySelector('#fichAv').textContent = initials(p.nombre);
     const locs = p.locales.length ? p.locales.map(nombreLocal).join(' y ') : 'cualquier local (sin local fijo)';
-    ov.querySelector('#fichSub').textContent = `${lblPuesto(p.puesto)} · ${locs} · ${lblFranjas(p.franjas).toLowerCase()}${deBaja(p) ? ' · de baja' : ''}`;
+    ov.querySelector('#fichSub').textContent = `${lblPuesto(p.puesto)} · ${locs} · ${lblFranjas(p.franjas).toLowerCase()}${deBaja(p, isoHoy()) ? ' · de baja' : ''}`;
     ov.querySelector('#fichColores').innerHTML = PALETA_PERSONAS.map((col, i) => {
       const otros = S.staff.filter(q => q.id !== p.id && q.color === i).map(q => q.nombre);
       return `<button type="button" class="colsw${p.color === i ? ' on' : ''}${otros.length ? ' usado' : ''}" data-color="${i}" data-libre style="--pc:${col}" title="${otros.length ? 'Lo usa ' + esc(otros.join(', ')) : 'Libre'}" aria-label="Color ${i + 1}"></button>`;
@@ -155,7 +164,7 @@ function openFicha(pid) {
     const cs = t.closest('[data-color]');
     if (cs) { guarda('color', x => { x.color = +cs.dataset.color; }); pintaCabecera(); return; }
     const d = t.dataset || {};
-    const el = t.closest('[data-tloc],[data-tfranja],[data-tlibra],[data-tlpunt],[data-lpoff],[data-tpartido],[data-tcoct],[data-tcocr],[data-tcocd],[data-tabre],[data-tnoabre],[data-tnoprimero],[data-tevita],[data-rmnunca],[data-addnunca],[data-rmcubre],[data-addcubre],[data-rmveto],[data-addveto],[data-rmaus],[data-addaus],[data-rmsup],[data-addsup]');
+    const el = t.closest('[data-tloc],[data-tfranja],[data-tlibra],[data-tlpunt],[data-lpoff],[data-lpsem],[data-lpir],[data-lpquita],[data-tpartido],[data-tcoct],[data-tcocr],[data-tcocd],[data-tabre],[data-tnoabre],[data-tnoprimero],[data-tevita],[data-rmnunca],[data-addnunca],[data-rmcubre],[data-addcubre],[data-rmveto],[data-addveto],[data-rmaus],[data-addaus],[data-rmsup],[data-addsup]');
     if (!el) return;
     const ds = el.dataset;
     if (ds.tnoprimero !== undefined) {
@@ -167,17 +176,18 @@ function openFicha(pid) {
       if (p.franjas.length === 1 && p.franjas[0] === ds.tfranja) { toast('Tiene que hacer al menos una franja', 'warn'); return; }
       guarda(`franjas → ${lblFranjas(p.franjas.includes(ds.tfranja) ? p.franjas.filter(f => f !== ds.tfranja) : p.franjas.concat(ds.tfranja)).toLowerCase()}`, x => { alterna(x.franjas, ds.tfranja); x.franjas.sort(); }); pinta(); return;
     }
+    // el día libre de una semana: se guarda con cambiarDiaLibreUI, que si la semana ya está en
+    // la planilla la cambia al momento (con confirmación y un solo Ctrl+Z)
+    if (ds.lpsem !== undefined) { const n = addDias(lpSem, 7 * +ds.lpsem); if (n >= lpMin) { lpSem = n; pinta(); } return; }
+    if (ds.lpir !== undefined) { lpSem = ds.lpir; pinta(); return; }
     if (ds.tlpunt !== undefined) {
-      const d = +ds.tlpunt;
-      guarda(`libra ${lblDowPl(d)} solo esta semana`, x => {
-        const sem = lpSemana();
-        if (!x.libraPuntual || x.libraPuntual.semana !== sem) x.libraPuntual = { semana: sem, dias: [] };
-        alterna(x.libraPuntual.dias, d);
-        if (!x.libraPuntual.dias.length) x.libraPuntual = null;
-      });
+      const d = +ds.tlpunt, dias = lpDias(p).slice();
+      alterna(dias, d);
+      if (cambiarDiaLibreUI(p.id, lpSem, dias)) tocada = true;
       pinta(); return;
     }
-    if (ds.lpoff !== undefined) { guarda('día libre puntual quitado', x => { x.libraPuntual = null; }); pinta(); return; }
+    if (ds.lpoff !== undefined) { if (cambiarDiaLibreUI(p.id, lpSem, [])) tocada = true; pinta(); return; }
+    if (ds.lpquita !== undefined) { if (cambiarDiaLibreUI(p.id, ds.lpquita, [])) tocada = true; pinta(); return; }
     if (ds.tlibra !== undefined) { guarda(`libra ${lblDowPl(+ds.tlibra)} ${p.libra.includes(+ds.tlibra) ? 'quitado' : 'añadido'}`, x => alterna(x.libra, +ds.tlibra)); pinta(); return; }
     if (ds.tpartido !== undefined) { guarda(`partido ${lblDowPl(+ds.tpartido)} ${p.partido.dias.includes(+ds.tpartido) ? 'quitado' : 'añadido'}`, x => alterna(x.partido.dias, +ds.tpartido)); pinta(); return; }
     if (ds.tcoct !== undefined) { guarda(`cocina titular en ${nombreLocal(ds.tcoct)} ${p.cocina.titular.includes(ds.tcoct) ? 'quitada' : 'añadida'}`, x => { alterna(x.cocina.titular, ds.tcoct); if (x.cocina.titular.includes(ds.tcoct)) { const i = x.cocina.reserva.indexOf(ds.tcoct); if (i >= 0) x.cocina.reserva.splice(i, 1); } }); pinta(); return; }
@@ -256,4 +266,81 @@ function openFicha(pid) {
     if (ov.isConnected) ov.remove();
     if (tocada) repintarTrasEquipo(); else renderEquipo();
   }
+}
+
+// ---------- el día libre de una semana (ficha y Generador) ----------
+// 24/09 (reunión, D9): «esta semana libra martes en vez de miércoles… en el equipo te lo pone
+// tal cual, pero luego no lo quita». La semana del cambio es la que se está planificando: la del
+// Generador semanal si se ha abierto; si no, la de la vista Semana. Y siempre se enseña.
+function semanaPlanificada() { return lunesDe((typeof GEN !== 'undefined' && GEN.lunes) || S.semLunes || isoHoy()); }
+function semanaVolcada(lunes) {
+  for (let k = 0; k < 7; k++) { const iso = addDias(lunes, k); const a = estadoDeIso(iso).asig[iso]; if (a && Object.values(a).some(l => l.length)) return true; }
+  return false;
+}
+// lo que va a pasar en la planilla, contado antes de tocarla (para la confirmación): quién sale y
+// quién entra, lo que se queda por estar puesto a mano, los huecos, dónde no se la puede poner y
+// por qué (24/09, revisión: con Lavinia puesta a mano el miércoles solo decía «sale del martes») y
+// los avisos del modelo (un día que ya ha pasado, días que no se pueden emparejar)
+function lineasMoverDiaLibre(p, r, e) {
+  const dia = iso => `${DIAS_L[isoDow(iso)].toLowerCase()} ${+iso.slice(8, 10)}`;
+  const grupos = xs => { const m = new Map(); for (const x of xs) { const k = x.pid + '|' + x.iso; if (!m.has(k)) m.set(k, { pid: x.pid, iso: x.iso, tids: [] }); m.get(k).tids.push(x.turnoId); } return [...m.values()]; };
+  const donde = tids => { const loc = [...new Set(tids.map(t => partirTurno(t).localId))]; return loc.map(l => `${nombreLocal(l)} ${tids.filter(t => partirTurno(t).localId === l).map(t => FRANJA_LBL[partirTurno(t).franja].toLowerCase()).join(' y ')}`).join(', '); };
+  // «nunca con Lavinia (plaza puesta a mano)»: si lo impide una plaza puesta a mano o forzada, que
+  // nadie quita en automático, se dice, para que el encargado decida
+  const porQue = x => {
+    const m = /^nunca con (.+)$/.exec(x.motivo || '');
+    const q = m && e ? asignados(e, x.iso, x.turnoId).find(y => nombrePid(y.pid) === m[1]) : null;
+    return `${x.motivo}${q && !esAutomatica(q) ? ' (plaza puesta a mano)' : ''}`;
+  };
+  const lineas = [];
+  for (const g of grupos(r.quitados)) lineas.push(g.pid === p.id ? `${p.nombre} sale del ${dia(g.iso)} (${donde(g.tids)})` : `${nombrePid(g.pid)} deja de cubrir a ${p.nombre} el ${dia(g.iso)} (${donde(g.tids)})`);
+  for (const g of grupos(r.puestos)) lineas.push(g.pid === p.id ? `${p.nombre} entra el ${dia(g.iso)} en ${donde(g.tids)}` : `${nombrePid(g.pid)} cubre a ${p.nombre} el ${dia(g.iso)} (${donde(g.tids)})`);
+  for (const g of grupos(r.quedan)) lineas.push(`se queda el ${dia(g.iso)} en ${donde(g.tids)} porque se puso a mano o forzado (con su aviso)`);
+  for (const x of r.rechazados || []) lineas.push(`no se puede poner a ${nombrePid(x.pid)} el ${dia(x.iso)} en ${lblTurno(x.turnoId)}: ${porQue(x)}`);
+  for (const h of r.huecos) lineas.push(`queda un hueco el ${dia(h.iso)} en ${lblTurno(h.turnoId)} (${h.faltan === 1 ? 'falta' : 'faltan'} ${h.faltan} de ${h.minimo}): genera la semana o busca quién cubre`);
+  for (const a of r.avisos || []) lineas.push(a.texto);
+  return lineas;
+}
+function textoMoverDiaLibre(p, lunes, dias, r, e) {
+  const txtD = ds => ds.map(d => DIAS_L[d].toLowerCase()).join(' y ');
+  const que = dias.length ? `${p.nombre} libra ${txtD(dias)}${(p.libra || []).length ? ' en vez de ' + txtD(p.libra) : ''}` : `${p.nombre} vuelve a su día libre de siempre`;
+  return `La semana del ${fmtDDMM(lunes)} ya está en la planilla. Si ${que}:\n· ${lineasMoverDiaLibre(p, r, e).join('\n· ')}\n\n¿Cambiarlo? (${comoDeshacer()} lo deshace)`;
+}
+// Guarda el día libre de una semana (dias = [] lo quita). Si la semana ya está en la planilla,
+// lo aplica con moverDiaLibre del modelo tras confirmarlo; ficha y planilla van en un solo
+// pushUndo, con su línea en el historial. Devuelve false si se cancela o no hay nada que cambiar.
+// Las semanas ya pasadas no se cambian (24/09, revisión): el cambio se borraba solo al recargar.
+function cambiarDiaLibreUI(pid, lunes, dias) {
+  const p = personaDeId(pid); if (!p) return false;
+  const l0 = lunesDe(lunes), desdeIso = isoHoy();
+  if (l0 < lunesDe(desdeIso)) { toast('Esa semana ya ha pasado: su día libre no se cambia', 'warn'); return false; }
+  // marcar justo sus días de siempre no es un cambio (el modelo no lo guarda): no se pregunta nada
+  const prueba = JSON.parse(JSON.stringify(p));
+  ponerLibraPuntual(prueba, l0, dias);
+  if (JSON.stringify(librasPuntuales(prueba)) === JSON.stringify(librasPuntuales(p))) {
+    if (dias.length) toast(`${p.nombre} ya libra ${dias.map(d => DIAS_L[d].toLowerCase()).join(' y ')} de siempre: no hay nada que cambiar`, 'ok');
+    return false;
+  }
+  let volcar = false;
+  if (semanaVolcada(l0)) {
+    // se ensaya sobre copias para contar lo que va a pasar antes de tocar nada
+    const copia = clonarEstado(estadoSemana(l0, false));
+    const sim = moverDiaLibre(S, JSON.parse(JSON.stringify(S.staff)), copia, pid, l0, dias, { desdeIso });
+    if (sim.quitados.length || sim.puestos.length || sim.quedan.length || sim.rechazados.length || sim.avisos.length) {
+      if (!confirmarSiCerrado(l0)) return false;
+      if (!confirm(textoMoverDiaLibre(p, l0, dias, sim, copia))) return false;
+      volcar = true;
+    }
+  }
+  pushUndo(`día libre de ${p.nombre} (semana del ${fmtDDMM(l0)})`, { staff: true, otrosMeses: volcar });
+  const real = volcar ? estadoSemana(l0, true) : null;
+  const r = volcar ? moverDiaLibre(S, S.staff, real, pid, l0, dias, { desdeIso }) : null;
+  if (!volcar) ponerLibraPuntual(p, l0, dias);
+  const txtD = ds => ds.map(d => DIAS_L[d].toLowerCase()).join(' y ');
+  const nRech = r ? r.rechazados.length : 0;
+  registrarCambio(`Ficha de ${p.nombre}: ${dias.length ? `la semana del ${fmtDDMM(l0)} libra ${txtD(dias)}${(p.libra || []).length ? ' en vez de ' + txtD(p.libra) : ''}` : `la semana del ${fmtDDMM(l0)} vuelve a su día libre de siempre`}${r ? ` · planilla: ${r.quitados.length} plaza(s) fuera, ${r.puestos.length} dentro${r.huecos.length ? `, ${r.huecos.length} hueco(s) por cubrir` : ''}${nRech ? `, ${nRech} que no se ${nRech === 1 ? 'pudo' : 'pudieron'} poner (${r.rechazados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${r.avisos.length ? ` · ${r.avisos.map(a => a.texto).join(' · ')}` : ''}` : ''}`, 'equipo');
+  saveState();
+  if (typeof GEN !== 'undefined' && GEN.previa && GEN.previa.semana && GEN.lunes === l0) GEN.previa = null;   // la vista previa de esa semana ya no vale
+  if (r) toast(`${p.nombre}: la semana del ${fmtDDMM(l0)} ya está cambiada en la planilla${r.huecos.length ? ` · ${pl(r.huecos.length, 'hueco', 'huecos')} por cubrir` : ''}${nRech ? ` · ${nRech === 1 ? 'una plaza no se pudo poner' : `${nRech} plazas no se pudieron poner`}` : ''} · ${comoDeshacer()} para deshacer`, r.huecos.length || nRech ? 'warn' : 'ok');
+  return true;
 }

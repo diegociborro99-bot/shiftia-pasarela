@@ -34,7 +34,8 @@ function renderSemana() {
   }
   // pie de descansos: quién libra cada día y quién está ausente
   h += `<tr class="piedesc"><td class="lbl">Descansos</td>${cols.map(c => {
-    const libres = activos().filter(p => !ausenciaEn(p, c.iso) && !turnosDe(S).some(t => pidsEn(c.e, c.iso, t.id).includes(p.id)));
+    // quien está en standby no descansa: aún no entra en la planilla (como «Quién libra» del Generador)
+    const libres = activos(c.iso).filter(p => !p.standby && !ausenciaEn(p, c.iso) && !turnosDe(S).some(t => pidsEn(c.e, c.iso, t.id).includes(p.id)));
     return `<td>${libres.map(p => `<span class="dn">${esc(nombreCorto(p.nombre))}</span>`).join('') || '<span class="wcerr">—</span>'}</td>`;
   }).join('')}</tr>`;
   h += `<tr class="piedesc"><td class="lbl">Ausencias</td>${cols.map(c => {
@@ -60,10 +61,14 @@ $('#wVaciar').addEventListener('click', () => vaciarRangoUI(S.semLunes, addDias(
 $('#wGenerar').addEventListener('click', () => irAGenerador({ desde: S.semLunes, hasta: addDias(S.semLunes, 6), titulo: 'Generar esta semana' }));
 $('#wPatron').addEventListener('click', () => {
   const lunes = S.semLunes;
-  if (!confirm(`¿Guardar la semana del ${fmtDM(lunes)} al ${fmtDM(addDias(lunes, 6))} como nueva semana tipo? El generador la usará a partir de ahora como base (lo que hay ahora en la semana tipo se sustituye; Ctrl+Z lo deshace).`)) return;
+  // la semana tipo es la de siempre: quien esa semana cambió su día libre se guarda con su día de
+  // siempre, y se avisa (24/09, revisión: guardaba a Mari Luz sin martes ni miércoles para siempre)
+  const cambian = S.staff.filter(p => cambioDeLibre(S, p, lunes));
+  const aviso = cambian.length ? `\n\nEsta semana ${cambian.map(p => `${p.nombre} ${textoCambioLibre(p, libraPuntualDe(p, lunes))}`).join(' y ')}: en la semana tipo se ${cambian.length > 1 ? 'guardan' : 'guarda'} con su día de siempre.` : '';
+  if (!confirm(`¿Guardar la semana del ${fmtDM(lunes)} al ${fmtDM(addDias(lunes, 6))} como nueva semana tipo? El generador la usará a partir de ahora como base (lo que hay ahora en la semana tipo se sustituye; ${comoDeshacer()} lo deshace).${aviso}`)) return;
   const antes = JSON.stringify(S.patron);
-  const nuevo = {};
-  for (let k = 0; k < 7; k++) { const iso = addDias(lunes, k); const e = estadoDeIso(iso); const p = patronDesdeSemana(e, lunes); nuevo[isoDow(iso)] = p[isoDow(iso)] || []; }
+  // la semana entera, aunque cruce de mes (estadoSemana), para poder deshacer cada cambio de día libre
+  const nuevo = patronDesdeSemana(estadoSemana(lunes, false), lunes, S, S.staff);
   S.patron = nuevo;
   registrarCambio(`Semana tipo sustituida por la semana del ${fmtDM(lunes)} (${Object.values(nuevo).reduce((a, x) => a + x.length, 0)} plazas)`, 'cambio');
   saveState();
