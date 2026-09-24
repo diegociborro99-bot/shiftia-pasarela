@@ -16,7 +16,11 @@ function renderSemana() {
   $('#wHoy').classList.toggle('lejos', lunes !== lunesHoy);
   let cortos = 0, sinCocina = 0, forzados = 0, turnos = 0;
   const celda = (c, tid) => {
-    if (!turnoAbierto(S, c.e, c.iso, tid)) return `<td class="${c.dow >= 6 ? 'wk' : ''}${c.iso === hoy ? ' hoyc' : ''}"><span class="wcerr">cerrado</span></td>`;
+    if (!turnoAbierto(S, c.e, c.iso, tid)) {
+      // cerrado por fechas: con el motivo, y se pulsa para ver el cierre (24/09, D11)
+      const ci = cierreEn(S, c.iso, tid);
+      return `<td class="${c.dow >= 6 ? 'wk' : ''}${c.iso === hoy ? ' hoyc' : ''}">${ci ? `<span class="wcerr wcierre" role="button" tabindex="0" data-vercierre="${esc(ci.id)}" data-tipstr="${esc(textoCierre(S, ci))}">cerrado · ${esc(etiquetaCierre(ci).toLowerCase())}</span>` : '<span class="wcerr">cerrado</span>'}</td>`;
+    }
     const lista = asignados(c.e, c.iso, tid);
     const r = revisarTurno(S, S.staff, c.e, c.iso, tid);
     if (r.faltan) cortos++; if (r.sinCocina) sinCocina++; forzados += r.forzados; turnos += lista.length;
@@ -36,7 +40,9 @@ function renderSemana() {
   h += `<tr class="piedesc"><td class="lbl">Descansos</td>${cols.map(c => {
     // quien está en standby no descansa: aún no entra en la planilla (como «Quién libra» del Generador)
     const libres = activos(c.iso).filter(p => !p.standby && !ausenciaEn(p, c.iso) && !turnosDe(S).some(t => pidsEn(c.e, c.iso, t.id).includes(p.id)));
-    return `<td>${libres.map(p => `<span class="dn">${esc(nombreCorto(p.nombre))}</span>`).join('') || '<span class="wcerr">—</span>'}</td>`;
+    // quien no trabaja por el cierre de su local no «libra»: sale marcado «cierre» (24/09, D11)
+    // y quien apoya «donde haga falta» sin sitio todavía, tampoco: «apoyo · sin sitio» (revisión F2)
+    return `<td>${libres.map(p => { const m = marcaCierreDia(p, c.iso, c.e); return m ? `<span class="dn ${m.cls}" data-tipstr="${esc(m.tip)}">${esc(nombreCorto(p.nombre))}<em>${esc(m.txt)}</em></span>` : `<span class="dn">${esc(nombreCorto(p.nombre))}</span>`; }).join('') || '<span class="wcerr">—</span>'}</td>`;
   }).join('')}</tr>`;
   h += `<tr class="piedesc"><td class="lbl">Ausencias</td>${cols.map(c => {
     const aus = S.staff.map(p => ({ p, a: ausenciaEn(p, c.iso) })).filter(x => x.a);

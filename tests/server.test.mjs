@@ -132,6 +132,20 @@ test('PUT /api/estado: la forma se comprueba (staff, locales, listas y meses)', 
   assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: Object.assign({}, base, { locales: undefined, extras: null }) })).status, 200, 'ausentes o null valen');
 });
 
+// 24/09 (D11): el cierre de un local por fechas viaja con el estado y el PUT comprueba su forma
+test('PUT /api/estado: cierresPuntuales es una lista de cierres con local y días', async () => {
+  const cur = await admin('GET', '/api/estado');
+  const base = cur.datos.estado, v = cur.datos.version;
+  const malo = async (parche, por) => assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: Object.assign({}, base, parche) })).status, 400, por);
+  await malo({ cierresPuntuales: 'ups' }, 'debe ser array si viene');
+  await malo({ cierresPuntuales: [{ localId: 5, dias: {} }] }, 'localId es texto');
+  await malo({ cierresPuntuales: [{ localId: 'MONACO', dias: [] }] }, 'dias es un objeto { iso: [franjas] }');
+  await malo({ cierresPuntuales: [{ localId: 'MONACO', dias: { '2026-09-28': 'T' } }] }, 'las franjas de cada día van en lista');
+  const c = { id: 'cie_1', localId: 'MONACO', dias: { '2026-09-28': ['T'] }, motivo: 'reforma', detalle: '', decisiones: {}, retirados: [] };
+  assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: Object.assign({}, base, { cierresPuntuales: [c] }) })).status, 200);
+  assert.deepEqual((await admin('GET', '/api/estado')).datos.estado.cierresPuntuales, [c], 'y se guarda tal cual');
+});
+
 test('crear usuario empleado: contraseña GENÉRICA y cambio obligatorio al entrar', async () => {
   // 03/09 (piloto): al dar de alta se pone la genérica, la misma para todos, porque
   // hay que dar de alta a la plantilla entera de una vez. Sigue sin quedarse como

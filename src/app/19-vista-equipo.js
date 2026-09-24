@@ -303,12 +303,37 @@ function bajaPersona(pid) {
   return true;
 }
 
+// «Esto cierra TODOS los domingos por la tarde. ¿Querías cerrar solo unos días?» (24/09, D11).
+// cerrar() quita el día de l.abre y avisa a Ajustes; repinta, repinta la lista de cierres.
+function avisoCuandoAbre(l, f, dow, cerrar, repinta) {
+  const fr = FRANJA_LBL[f].toLowerCase();
+  const ov = abrirOverlay('abreAvisoOvl', `<span class="micro">CUÁNDO ABRE · ${esc(l.nombre.toUpperCase())}</span>
+    <h2 class="revh2">Esto cierra TODOS ${esc(DOW_PL[dow])} por la ${esc(fr)}</h2>
+    <p class="revsub">«Cuándo abre» es el horario de todas las semanas: ${esc(l.nombre)} dejaría de abrir ${esc(DOW_PL[dow])} por la ${esc(fr)} desde ya, también las semanas que vengan. ¿Querías cerrar solo unos días (una reforma, unas vacaciones del local)? Entonces es un cierre por fechas: al pasar, vuelve a abrir solo.</p>
+    <div class="ciebar" style="flex-wrap:wrap"><button type="button" class="btn btn-cta" data-abreav="fechas">Solo unos días → Cierre por fechas</button><button type="button" class="btn btn-sec" data-abreav="todas">Sí, todos ${esc(DOW_PL[dow])} por la ${esc(fr)}</button><button type="button" class="btn btn-ghost" data-abreav="no">Cancelar</button></div>`, { ancho: 580 });
+  ov.addEventListener('click', e => {
+    const b = e.target.closest('[data-abreav]'); if (!b) return;
+    ov.remove();
+    if (b.dataset.abreav === 'fechas') {
+      let iso = isoHoy(); while (isoDow(iso) !== dow) iso = addDias(iso, 1);
+      openCierre({ localId: l.id, iso, franja: f, despues: repinta });
+      return;
+    }
+    if (b.dataset.abreav !== 'todas') return;
+    const dias = diasPlanificadosCon(l.id, f, dow);
+    if (!Object.keys(dias).length) { l.abre[f] = (l.abre[f] || []).filter(d => d !== dow); cerrar(); return; }
+    openCierre({ localId: l.id, dias, motivo: 'otro', detalle: `cambio de horario: deja de abrir ${DOW_PL[dow]} por la ${fr}`, abre: { franja: f, dow }, paso: 2, despues: repinta });
+  });
+}
+
 // ---------- ajustes de los locales ----------
 // Un diálogo con una pestaña por local. Todo se guarda al vuelo (data-libre: el
 // overlay no pregunta al cerrar) y al cerrar se deja UNA entrada en el historial
 // por local tocado, con lo que cambió.
-function openAjustesLocales(localId) {
-  const cambios = {};   // localId → Set de campos tocados
+// cambiosPrevios: al volver a pintarla tras Ctrl+Z (repintarPaneles), lo tocado hasta entonces sigue
+// pendiente de apuntar en el historial al cerrar
+function openAjustesLocales(localId, cambiosPrevios) {
+  const cambios = cambiosPrevios || {};   // localId → Set de campos tocados
   const anota = (l, campo) => { (cambios[l.id] = cambios[l.id] || new Set()).add(campo); saveState(); };
   let actual = S.locales.some(l => l.id === localId) ? localId : S.locales[0].id;
   const ov = abrirOverlay('localesOvl', `<span class="micro">LOCALES</span>
@@ -316,7 +341,7 @@ function openAjustesLocales(localId) {
     <p class="revsub">Cuándo abre cada local, cuánta gente necesita, horarios, cocina y quién abre. Se guarda al momento; el asterisco ámbar marca lo que Highkey supuso y el grupo aún no ha confirmado.</p>
     <div class="segrow loctabs" id="locTabs"></div>
     <div id="locBody"></div>
-    <div class="bar" style="display:flex;justify-content:flex-end;margin-top:14px"><button type="button" class="btn btn-cta" data-ovx>Listo</button></div>`, { ancho: 760 });
+    <div class="bar" style="display:flex;justify-content:flex-end;margin-top:14px"><button type="button" class="btn btn-cta" data-ovx>Listo</button></div>`, { ancho: 760, reabrir: () => openAjustesLocales(actual, cambios) });
   const pintaTabs = () => {
     ov.querySelector('#locTabs').innerHTML = S.locales.map(l => `<button type="button" class="segk${l.id === actual ? ' on' : ''}" data-loctab="${esc(l.id)}" style="--lc:${esc(l.color)}"><i class="ldot"></i>${esc(l.nombre)}</button>`).join('');
   };
@@ -364,7 +389,12 @@ function openAjustesLocales(localId) {
         <label class="pinlbl">Color<input type="color" class="logininp colorinp" data-libre data-lf="color" value="${esc(l.color || '#6e6e6e')}"></label>
       </div>
       <div class="revgrp"><span class="dot" style="background:${esc(l.color)}"></span>CUÁNDO ABRE</div>
+      <p class="filltxt" style="margin:0 0 6px">El horario de todas las semanas.</p>
       <div class="tscrollx"><table class="loctab abretab"><thead><tr><th></th>${TODOS.map(d => `<th>${DIAS_L[d].slice(0, 3)}</th>`).join('')}</tr></thead><tbody>${FRANJAS.map(filaAbre).join('')}</tbody></table></div>
+      <div class="revgrp"><span class="dot" style="background:${esc(l.color)}"></span>CIERRES POR FECHAS</div>
+      <p class="filltxt" style="margin:0 0 6px">«Cuándo abre» cambia todas las semanas. Para cerrar solo unos días (una reforma, las vacaciones del local), un cierre por fechas: al pasar, el local vuelve a abrir solo, y al cerrarlo se decide qué hace cada persona esos días.</p>
+      <div class="cielista">${htmlCierresLocal(l.id)}</div>
+      <button type="button" class="btn-mini" data-cienuevo style="margin-top:6px">＋ Cerrar unos días</button>
       <div class="revgrp"><span class="dot" style="background:${esc(l.color)}"></span>PERSONAS MÍNIMAS POR CASILLA</div>
       <p class="filltxt" style="margin:0 0 6px">Cuántas personas hacen falta como mínimo cada día y franja (los eventos añaden refuerzo aparte). El <b class="supstar">*</b> ámbar marca un mínimo supuesto.</p>
       <div class="tscrollx"><table class="loctab mintab"><thead><tr><th></th>${TODOS.map(d => `<th>${DIAS_L[d].slice(0, 3)}</th>`).join('')}</tr></thead><tbody>${FRANJAS.map(filaMin).join('')}</tbody></table></div>
@@ -433,9 +463,20 @@ function openAjustesLocales(localId) {
     if (ab) {
       const [f, d] = ab.dataset.abre.split('|'); const dow = +d;
       const arr = l.abre[f] = l.abre[f] || [];
-      arr.includes(dow) ? arr.splice(arr.indexOf(dow), 1) : arr.push(dow); arr.sort((a, b) => a - b);
-      anota(l, 'apertura'); pintaLocal(); return;
+      // 24/09 (reunión y mensaje de Diego): para cerrar el Mónaco «este domingo» lo quitó aquí y se
+      // cerraron TODOS los domingos. Al desmarcar se avisa de que es para todas las semanas y se ofrece
+      // el cierre por fechas; y si ya había gente puesta en semanas planificadas, pasa por el visor.
+      if (arr.includes(dow)) { avisoCuandoAbre(l, f, dow, () => { anota(l, 'apertura'); pintaLocal(); }, pintaLocal); return; }
+      arr.push(dow); arr.sort((a, b) => a - b);
+      anota(l, 'apertura');
+      // si al quitarlo se cerraron las semanas ya planificadas, se ofrece reabrirlas (revisión F2)
+      ofrecerReabrirHorario(l, f, dow);
+      pintaLocal(); return;
     }
+    if (t.closest('[data-cienuevo]')) { openCierre({ localId: l.id, despues: pintaLocal }); return; }
+    const ce = t.closest('[data-cieedit]'); if (ce) { openCierre({ id: ce.dataset.cieedit, editar: true, despues: pintaLocal }); return; }
+    const cv = t.closest('[data-ciever]'); if (cv) { openCierre({ id: cv.dataset.ciever, despues: pintaLocal }); return; }
+    const cr = t.closest('[data-ciereabrir]'); if (cr) { reabrirCierreUI(cr.dataset.ciereabrir, pintaLocal); return; }
     const sp = t.closest('[data-sup]');
     if (sp) {
       const [f, d] = sp.dataset.sup.split('|');

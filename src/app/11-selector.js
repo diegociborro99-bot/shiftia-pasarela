@@ -42,7 +42,8 @@ function openPicker(iso, tid, anchor) {
   pop.innerHTML = `<div class="ph">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()}</div>
     <div class="pd">${fmtLargo(iso)} · ${r.n} de ${r.minimo}${r.supuesto ? ' (mínimo supuesto)' : ''}${r.refuerzo ? ' · con refuerzo' : ''}${r.sinCocina ? ' · <b>sin cocina</b>' : ''}</div>
     <label class="pbusca">${SVG_LUPA_PICK}<input type="search" id="pickQ" placeholder="Buscar por nombre…" autocomplete="off" aria-label="Buscar a alguien por su nombre"></label>
-    <div class="plist">${filasPicker('')}</div>`;
+    <div class="plist">${filasPicker('')}</div>
+    <button type="button" class="popb full pcierra" data-cierrafr title="Cerrar el local unos días (reforma, vacaciones del local)">Cerrar esta franja…</button>`;
   document.body.appendChild(pop);
   colocarPop(pop, anchor);
   cierraFuera(pop);
@@ -56,6 +57,8 @@ function openPicker(iso, tid, anchor) {
   // en el móvil NO se enfoca solo: el teclado subiría y taparía el propio selector
   if (matchMedia('(hover:hover)').matches) { const q = $('#pickQ'); if (q) q.focus(); }
   pop.addEventListener('click', ev => {
+    // 24/09 (D11): cerrar el local desde la casilla: el visor sale con este local, día y franja
+    if (ev.target.closest('[data-cierrafr]')) { closePicker(); openCierre({ localId, iso, franja }); return; }
     const f = ev.target.closest('[data-forzar]');
     if (f) {
       const pid = f.dataset.forzar;
@@ -109,6 +112,7 @@ function openMenuTurno(iso, tid, pid, anchor) {
     ${entry.abre ? '' : '<button class="popb full" data-mt="abre">Sale primero (abre el local)</button>'}
     ${localTieneCocina(l, franja) || entry.cocina ? (entry.cocina ? '<button class="popb full" data-mt="nococina">Quitar la marca de cocina</button>' : `<button class="popb full" data-mt="cocina">Lleva la cocina${puedeCocina(S, p, localId, iso) ? '' : ' (no es cocina de este local)'}</button>`) : ''}
     ${esApoyo(p) ? '' : btnTramo}
+    <button class="popb full" data-mt="cerrar">Cerrar esta franja…</button>
     <button class="popb full peligro" data-mt="quitar">Quitar de la casilla</button>`;
   document.body.appendChild(pop);
   colocarPop(pop, anchor);
@@ -154,6 +158,7 @@ function openMenuTurno(iso, tid, pid, anchor) {
     pop.remove();
     if (a === 'ficha') { openFicha(pid); return; }
     if (a === 'cobertura') { openCobertura({ pid, dias: [iso], tipo: 'LD' }); return; }
+    if (a === 'cerrar') { openCierre({ localId, iso, franja }); return; }
     if (!confirmarSiCerrado(iso)) return;
     const ew = estadoDeIso(iso, true);
     if (a === 'subir' || a === 'bajar') { pushUndo('reordenar casilla'); moverEnCasilla(ew, iso, tid, pid, i + (a === 'subir' ? -1 : 1)); registrarCambio(`${p.nombre} ${a === 'subir' ? 'sube' : 'baja'} en la casilla de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); }

@@ -130,7 +130,8 @@ function pxHojaDelEquipo(construir) {
 function pxNombre(pid, marcas) {
   const mk = marcas || {};
   const tipo = mk.tipo ? (AUS_LBL[mk.tipo] ? AUS_LBL[mk.tipo].label : mk.tipo) : '';
-  return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${mk.abre ? '<b class="pxg-mk abre">▸</b>' : ''}${esc(nombrePid(pid))}${tipo ? `<em>${esc(tipo)}</em>` : ''}</span>`;
+  // mk.cierre: «cierre» o «apoyo · sin sitio» en el pie de descansos (marcaCierreDia, revisión F2)
+  return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${mk.abre ? '<b class="pxg-mk abre">▸</b>' : ''}${esc(nombrePid(pid))}${tipo ? `<em>${esc(tipo)}</em>` : ''}${mk.cierre ? `<em class="cie">${esc(mk.cierre)}</em>` : ''}</span>`;
 }
 // la posición 1 de la casilla es quien abre / sale primero (vocabulario del grupo): si
 // nadie lleva la marca puesta, en el Excel se señala al primero para que no salga sin abre
@@ -177,20 +178,22 @@ function pxDescansos(cols, personas) {
   // quien está en standby no aparece en el pie de descansos: aún no entra en la planilla
   const resto = personas.filter(p => !bajaToda.includes(p) && !p.standby);
   const porDia = cols.map(c => {
-    const libran = [], ausentes = [];
+    const libran = [], ausentes = [], marcas = {};
     for (const p of resto) {
       const a = ausenciaEn(p, c.iso);
       if (a) { ausentes.push({ p, a }); continue; }
       if (!casillasDe(c.est, c.iso, p.id).length) libran.push(p);
     }
-    return { libran, ausentes };
+    // quien no trabaja por un cierre no «libra»: va con su marca (24/09, revisión F2)
+    for (const p of libran) { const m = marcaCierreDia(p, c.iso, c.est); if (m) marcas[p.id] = m.txt; }
+    return { libran, ausentes, marcas };
   });
   return { porDia, bajaToda };
 }
 function pxFilasDescansos(cols, personas, colspan) {
   const { porDia, bajaToda } = pxDescansos(cols, personas);
   let h = `<tr class="secrow pxdesc"><td class="sec" colspan="${colspan}"><span>Pie de descansos · quién libra cada día</span></td></tr>`;
-  h += `<tr class="pxdesc"><td class="lblp">Libran<small>sin turno ese día</small></td>${porDia.map((x, i) => `<td data-libran="${cols[i].iso}"><div class="pxg-cnt">${x.libran.length} libra${x.libran.length === 1 ? '' : 'n'}</div>${x.libran.length ? `<div class="pxg-chips">${x.libran.map(p => `<span><i style="background:${avColor(p.id)}"></i>${esc(p.nombre)}</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`).join('')}</tr>`;
+  h += `<tr class="pxdesc"><td class="lblp">Libran<small>sin turno ese día</small></td>${porDia.map((x, i) => `<td data-libran="${cols[i].iso}"><div class="pxg-cnt">${x.libran.length} libra${x.libran.length === 1 ? '' : 'n'}</div>${x.libran.length ? `<div class="pxg-chips">${x.libran.map(p => `<span><i style="background:${avColor(p.id)}"></i>${esc(p.nombre)}${x.marcas[p.id] ? ` <em class="cie">${esc(x.marcas[p.id])}</em>` : ''}</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`).join('')}</tr>`;
   h += `<tr class="pxdesc"><td class="lblp">Ausencias<small>vacaciones · permisos · libres</small></td>${porDia.map(x => `<td>${x.ausentes.map(({ p, a }) => pxNombre(p.id, { tipo: a.tipo })).join('') || '&nbsp;'}</td>`).join('')}</tr>`;
   if (bajaToda.length) h += `<tr class="pxdesc"><td class="lblp">De baja<small>toda la semana</small></td><td colspan="${colspan - 1}">${bajaToda.map(p => pxNombre(p.id, { tipo: 'BAJ' })).join('')}</td></tr>`;
   return h;
@@ -221,7 +224,12 @@ function pxCuenta(d) {
 // cuenta y las posiciones. Fondo ámbar si no llega al mínimo, rojo si hay hueco.
 function pxCasilla(c, l, franja) {
   const tid = turnoId(l.id, franja);
-  if (!turnoAbierto(S, c.est, c.iso, tid)) return `<td class="cerr" data-cas="${c.iso}|${tid}">—</td>`;
+  if (!turnoAbierto(S, c.est, c.iso, tid)) {
+    // 24/09 (D11): un cierre por fechas se imprime con su motivo, con la letra de la hoja (el papel del
+    // bar tiene que decir por qué ese día no hay nadie); el cierre de siempre sigue siendo «—»
+    const ci = cierreEn(S, c.iso, tid);
+    return ci ? `<td class="cerr cierre" data-cas="${c.iso}|${tid}">CERRADO · ${esc(etiquetaCierre(ci))}</td>` : `<td class="cerr" data-cas="${c.iso}|${tid}">—</td>`;
+  }
   const r = revisarTurno(S, S.staff, c.est, c.iso, tid);
   const slots = posicionesDe(S, S.staff, c.est, c.iso, tid);
   const hueco = slots.some(s => s.hueco);
@@ -307,7 +315,7 @@ function abrirImpresionLocal(localId) {
   const { porDia, bajaToda } = pxDescansos(cols, gente);
   h += `<h3 class="pxh3">Pie de descansos · plantilla de ${esc(l.nombre)}</h3><table class="pxw pxdesct" style="--lc:${esc(l.color)}"><thead><tr><th class="act">Día</th><th>Libran</th><th>Ausencias</th></tr></thead><tbody>`;
   cols.forEach((c, i) => {
-    h += `<tr><td class="lbld"><b>${DIAS_L[c.dow]} ${c.d}</b></td><td>${porDia[i].libran.map(p => pxNombre(p.id)).join('') || '<span class="pxvacio">nadie</span>'}</td><td>${porDia[i].ausentes.map(({ p, a }) => pxNombre(p.id, { tipo: a.tipo })).join('') || '&nbsp;'}</td></tr>`;
+    h += `<tr><td class="lbld"><b>${DIAS_L[c.dow]} ${c.d}</b></td><td>${porDia[i].libran.map(p => pxNombre(p.id, { cierre: porDia[i].marcas[p.id] })).join('') || '<span class="pxvacio">nadie</span>'}</td><td>${porDia[i].ausentes.map(({ p, a }) => pxNombre(p.id, { tipo: a.tipo })).join('') || '&nbsp;'}</td></tr>`;
   });
   if (bajaToda.length) h += `<tr><td class="lbld"><b>De baja</b></td><td colspan="2">${bajaToda.map(p => pxNombre(p.id, { tipo: 'BAJ' })).join('')}</td></tr>`;
   h += '</tbody></table>';
@@ -363,7 +371,7 @@ function pxgTablaLocal(res, l) {
   for (const f of l.franjas) {
     h += `<tr><td class="pxg-lbl"><b>${FRANJA_LBL[f.franja]}</b><small>${subLbl(f.franja)}</small></td>`;
     for (const d of f.dias) {
-      if (!d.abierto) { h += `<td class="pxg-c cerr" data-cas="${d.iso}|${d.tid}"><span>Cerrado</span></td>`; continue; }
+      if (!d.abierto) { h += `<td class="pxg-c cerr${d.cierre ? ' cierre' : ''}" data-cas="${d.iso}|${d.tid}"><span>${d.cierre ? `Cerrado · ${esc(d.cierre.etiqueta)}` : 'Cerrado'}</span></td>`; continue; }
       const hueco = (d.slots || []).some(s => s.hueco);
       const cls = ['pxg-c', hueco ? 'hueco' : '', d.cambiado ? 'corr' : '', d.faltan ? 'corta' : ''].filter(Boolean).join(' ');
       h += `<td class="${cls}" data-cas="${d.iso}|${d.tid}">${pxCuenta({ n: d.n, min: d.min, supuesto: d.supuesto, faltan: d.faltan, refuerzo: d.refuerzo, hueco, cambiado: d.cambiado })}${(d.slots || []).map(s => pxSlot(s, f.franja)).join('')}</td>`;
@@ -587,7 +595,7 @@ function abrirImpresionMes() {
       for (const f of FRANJAS) {
         const tid = turnoId(l.id, f);
         if (!turnoAbierto(S, est, d.iso, tid)) continue;
-        const k = Math.max(0, minimoDe(S, d.iso, tid).min - asignados(est, d.iso, tid).length);
+        const k = Math.max(0, minimoDe(S, d.iso, tid, est).min - asignados(est, d.iso, tid).length);
         if (k) { faltan += k; fr.push(f); }
       }
       h += `<td class="${d.dow >= 6 || d.festivo ? 'wk2' : ''}">${faltan ? `<b class="falta">${faltan}<small>${fr.join('')}</small></b>` : ''}</td>`;

@@ -146,6 +146,9 @@ function detalleHoras(p, f, extrasMes) {
   if (f.ausencias) notas.push(`${pl(f.ausencias, 'día', 'días')} de ausencia (no cuentan para el contrato)`);
   if (f.continuos) notas.push(`${pl(f.continuos, 'día de turno continuo', 'días de turno continuo')} (un turno seguido, se cuenta una vez)`);
   if (f.forzados) notas.push(`${pl(f.forzados, 'asignación forzada', 'asignaciones forzadas')} a mano`);
+  // 24/09 (D11 y revisión F2): los días (o medios días) sin trabajo por el cierre de un local; solo
+  // informativo: si se pagan o no lo decide el grupo
+  if ((f.sinTrabajoCierre || []).length) notas.push(textoSinTrabajoCierre(p.id, f.sinTrabajoCierre));
   if (notas.length) h += `<p class="hnota">${notas.join(' · ')}</p>`;
   h += `</div><div><span class="micro">Horas extra</span><div class="hxtras">${mias.length
     ? mias.map(x => `<span class="hx"><b>${fmtDM(x.iso)}</b><span>${numHoras((+x.min || 0) / 60)} h</span><em>${esc(x.motivo || '')}</em><button class="hxdel" type="button" data-xdel="${esc(x.id)}" title="Quitar esta hora extra" aria-label="Quitar la hora extra del ${fmtDM(x.iso)}">✕</button></span>`).join('')

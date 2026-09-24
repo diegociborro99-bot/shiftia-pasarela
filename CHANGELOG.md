@@ -2,6 +2,77 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Cierre por fechas, repasado antes de subirlo (24/09).** Lo que cambia para quien lo usa:
+  - En el móvil, «Siguiente» y «Cerrar Bar Mónaco» responden al primer toque (en Android había
+    que tocarlos dos veces, y si se cerraba la ventana el local no quedaba cerrado). Y «Cerrar
+    unos días» ya no se parte en tres líneas en la cabecera del local.
+  - Al editar un cierre, cambiar una fecha no reinicia los días: un cierre «solo tardes» sigue
+    siendo de tardes, y el día que se añade también. Y quien deja de estar afectado (porque ya no
+    se cierra su día) no se queda «sin trabajo» por error ni pierde la plaza que tenía en otro local.
+  - Quien esa semana estaba en otro local no sale «sin trabajo» porque en la semana tipo le
+    tocara el local cerrado: cuenta lo que había en la planilla.
+  - Quien hacía turno partido y se queda con la otra mitad la conserva tal cual: Hojan el lunes
+    28 sigue haciendo El 33 de 11:00 a 16:00 (no pasa solo a entrar a las 07:00) y sus horas
+    bajan las 3 h de la noche. El visor lo avisa en su tarjeta.
+  - Horas enseña en el detalle de cada persona los días sin trabajo por el cierre («Sin trabajo
+    por el cierre de Bar Mónaco: lun 28 por la tarde y mar 29»), solo como información. Un día
+    en que la persona trabaja la otra franja ya no cuenta como día entero sin trabajo.
+  - Las horas ya trabajadas no cambian al tocar «Cuándo abre»: quitar un día del horario semanal
+    ya no borraba de Horas (ni del registro de apoyos) los días de ese tipo ya trabajados, también
+    de meses cerrados para la nómina. Solo se descuenta un día que estuvo cerrado de verdad (por
+    fechas o a mano). La Revisión tampoco avisa de esos días ya pasados.
+  - Quien apoya «donde haga falta» y nadie ha colocado sale como «apoyo · sin sitio» en Hoy, en
+    la Semana, en el Generador y en el pie de la hoja del local, no como que libra; la Revisión lo
+    avisa, y en su perfil pone «aún sin sitio: te lo dirá el encargado».
+  - «Cuándo abre»: si al quitar un día se cerraron las semanas ya planificadas, al volver a
+    marcarlo la app pregunta si reabrirlas desde hoy (vuelve la gente que estaba puesta; lo ya
+    pasado se queda como está). Antes esos días seguían cerrados sin que nada lo dijera.
+  - El texto de un cierre con días sueltos los nombra uno a uno («dom 27/09 y mar 29/09, solo
+    tardes»; «los domingos por la tarde del 27/09 al 25/10»), en vez de parecer un intervalo seguido.
+  - Cerrar días que ya han pasado avisa antes de confirmar, y los cierres ya pasados de los dos
+    últimos meses siguen en Ajustes con «Ver» y «Reabrir».
+  - Ctrl+Z con Ajustes de los locales abierto deja la tabla de «Cuándo abre» como está de verdad.
+  - Detalles: el pie de la hoja del local marca «cierre» a quien no trabaja por el cierre; el Mes
+    pone un punto en la pastilla de quien no trabaja solo una franja; «Ver cierre» ya no dice «lo
+    cerró local» sin servidor; el historial dice «12 plazas retiradas» y no «plaza(s)».
+- **Cerrar un local unos días, como unas vacaciones del local** (reunión del 24/09: «no tiene
+  un botón de cerrar, de cerrar bares por vacaciones»). En Equipo → Ajustes de los locales hay
+  una sección nueva, «Cierres por fechas», con «＋ Cerrar unos días»; también se llega desde la
+  cabecera de cada local en Hoy («Cerrar unos días») y desde la casilla («Cerrar esta franja…»).
+  Se elige desde qué día y franja hasta qué día y franja —por ejemplo, del domingo 27 por la
+  tarde al martes 29— y cada día se puede dejar de mañana, de tarde, todo el día o abierto; y
+  el motivo: reforma, vacaciones del local u otro. Cuando pasa, el local vuelve a abrir solo:
+  el domingo 04/10 el Mónaco abre por la tarde con normalidad.
+- **Al cerrar, la app pregunta qué hace cada persona.** Sale quien trabajaba esos días (de la
+  planilla o, si la semana aún no está hecha, de la semana tipo), con sus turnos y avisos («el
+  domingo 27 también hace El 33 por la mañana»), y para cada uno: Apoyo, Sin trabajo, Día libre
+  o Vacaciones. Por defecto, sin trabajo: nadie se redistribuye solo. Quien apoya puede ir esos
+  días a otros locales sin forzar nada, y se puede elegir dónde cada día (la app propone
+  primero donde falta gente) o dejarlo «donde haga falta». Las vacaciones y los días libres van
+  a la ficha y a la nómina; si ese día la persona tenía también otro turno, no se le quita el
+  día entero: la parte cerrada cuenta como sin trabajo y la app lo avisa.
+- **El generador y la cobertura lo respetan.** No ponen a nadie en el local cerrado, no
+  recolocan a quien se ha quedado sin trabajo y a quien apoya lo ponen donde falta (o en su
+  sitio elegido), también después de «Vaciar lo generado». Las plazas que ya había en el local
+  cerrado salen de la planilla y dejan de contar en las horas; si se reabre, vuelven.
+- **Se ve en todas partes.** Hoy dice «Cerrado · Reforma (hasta mar 29)» con «Ver cierre»
+  (desde ahí se edita o se reabre) y cuenta quién apoya y quién no trabaja; la Semana pone
+  «cerrado · reforma» y marca «cierre» a quien no trabaja; el Mes marca el día y pone «CIE» en
+  la fila de la persona; el Generador pone «Cerrado · Reforma» y una nota con el cierre; la
+  hoja semanal y el Excel dicen «CERRADO · Reforma». Cada empleado ve su casilla «cerrado por
+  reforma» y lo que hace él, y nada de lo que hacen sus compañeros. Ctrl+Z lo deshace todo.
+- **«Cuándo abre» avisa de que es para todas las semanas.** Al desmarcar un día sale «Esto
+  cierra TODOS los domingos por la tarde. ¿Querías cerrar solo unos días?» con el botón al
+  cierre por fechas. Y si de verdad se cierran todos y ya había gente puesta en las semanas
+  planificadas, pasa por el mismo visor para decidir qué hace cada uno.
+- **«Abrir hoy» pregunta cuánta gente hace falta.** Una casilla que se abre a mano un día que
+  no abre ya no se queda con mínimo cero: el generador la rellena y la Revisión avisa si queda
+  vacía. La Revisión avisa también, en rojo, si en una casilla cerrada sigue puesta gente.
+- **Para el despliegue:** en la planilla de verdad el Mónaco tiene ahora quitado el domingo por
+  la tarde en «Cuándo abre» (y quizá también el lunes y el martes). Hay que volver a marcarlos y
+  crear el cierre por fechas del domingo 27/09 por la tarde al martes 29/09. Después, pasar
+  «Generar la semana» de la semana del 28: se generó con el domingo por la tarde cerrado, así
+  que el domingo 04/10 por la tarde del Mónaco está vacío y hay que rellenarlo.
 - **Cambiar el día libre también funciona en lo generado por meses.** Si la semana se había
   volcado con «Mes → Generar» (o «Completar este día»), al marcar «libra el martes» Mari Luz
   se quedaba sin trabajar ni el martes ni el miércoles: la app no sabía que Lavinia la cubría

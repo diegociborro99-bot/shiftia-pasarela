@@ -21,8 +21,15 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
   const avisos = (estado.avisos || [])
     .filter(a => avisoEsPara(a, pid))
     .map(a => { const dirigido = !!((Array.isArray(a.paraPids) && a.paraPids.length) || a.paraPid); const c = Object.assign({}, a, { ocultoPor: (a.ocultoPor || []).filter(q => q === pid) }); delete c.paraPid; delete c.paraPids; if (dirigido) c.paraPids = [pid]; return c; });
+  // 24/09 (D11): los cierres de un local por fechas sí viajan —su casilla sale «Cerrado por reforma»—,
+  // pero de las decisiones solo la suya (qué hace él esos días): ni lo que hacen los compañeros
+  // (vacaciones, sin trabajo) ni las plazas que se retiraron al cerrar.
+  const cierresPuntuales = (Array.isArray(estado.cierresPuntuales) ? estado.cierresPuntuales : []).map(c => ({
+    id: c.id, localId: c.localId, dias: c.dias, motivo: c.motivo, detalle: c.detalle,
+    decisiones: c.decisiones && c.decisiones[pid] ? { [pid]: c.decisiones[pid] } : {},
+  }));
   return {
-    staff,
+    staff, cierresPuntuales,
     // la configuración de los locales (horarios, mínimos, cocina) es pública dentro del grupo
     locales: Array.isArray(estado.locales) ? estado.locales : [],
     meses: mesesVisibles(estado, hoy), festivos: estado.festivos || [],

@@ -1,0 +1,77 @@
+/* Cierre de un local por fechas (24/09, reunión y mensaje de Diego; D11): el visor de tres
+   pasos, la casilla cerrada con su motivo en Hoy, Semana, Mes, Generador y en la hoja impresa,
+   y quién no trabaja por el cierre. */
+.ciepasos{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px}
+.ciepasos span{font-size:11px;font-weight:800;color:var(--ink3);border:1.5px solid var(--border);border-radius:999px;padding:4px 11px}
+.ciepasos span.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.cielocs,.ciemots{margin:4px 0 10px}
+.cielocs .segk{display:inline-flex;align-items:center;gap:6px}
+.cielocs .segk .ldot{width:8px;height:8px;border-radius:50%;background:var(--lc)}
+.cieint{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.cietira{display:flex;flex-direction:column;gap:4px;margin:4px 0 10px;max-height:300px;overflow:auto}
+.ciedia{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:5px 8px;background:var(--surface)}
+.ciedia b{min-width:78px;font-size:12.5px}
+.ciedia b small{margin-left:4px;font-weight:600;color:var(--ink3)}
+.ciedia.abierto{opacity:.7}
+.ciefr{border:1.5px solid var(--border);background:var(--surface);color:var(--ink2);border-radius:999px;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer}
+.ciefr.on{background:#2f6db5;border-color:#2f6db5;color:#fff}
+.ciedia.abierto .ciefr.on{background:var(--ok);border-color:var(--ok)}
+.ciepre{margin:10px 0;padding:10px 12px;border-radius:10px;background:var(--surface2);font-weight:700;font-size:13px}
+.cieerr{color:var(--bad);font-size:12px;margin:4px 0}
+.ciebar{display:flex;gap:8px;align-items:center;margin-top:14px}
+.cierojo{color:var(--bad)!important;border-color:var(--bad)!important}
+.cieh3{font-family:var(--font-d);font-size:15px;margin:8px 0 2px}
+.ciecards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin-top:8px}
+.ciecard{border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--surface);display:flex;flex-direction:column;gap:6px}
+.ciehd{display:flex;align-items:center;gap:8px}
+.ciehd .av{width:26px;height:26px;border-radius:50%;color:#fff;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.ciechips{display:flex;flex-wrap:wrap;gap:4px}
+.ciechip{font-size:11px;background:var(--surface2);border-radius:6px;padding:2px 7px;color:var(--ink2)}
+.cieaviso{font-size:11.5px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:4px 8px;margin:0}
+.ciedecs{gap:4px;flex-wrap:wrap}
+.ciedecs .segk{font-size:11px;padding:4px 9px}
+.ciedests{display:flex;flex-direction:column;gap:4px}
+.ciedests small{color:var(--ink3);font-size:11px}
+.ciedest{display:flex;align-items:center;gap:6px;font-size:12px}
+.ciedest span{min-width:52px;font-weight:700}
+.ciedest select{flex:1;min-width:0;font-size:12px;padding:5px 8px}
+.cieresumen p{margin:6px 0}
+.cieres{margin:6px 0 6px 18px;padding:0;font-size:13px;line-height:1.5}
+.cierrerow{border-left-color:#2f6db5}
+/* Hoy: la casilla cerrada por fechas y la tarjeta del lateral */
+.casilla.cerrada.cierre .cascerr{color:var(--ink2);font-weight:700}
+.cieside .cieitem{display:flex;flex-direction:column;gap:2px;padding:6px 0;border-top:1px solid var(--border)}
+.cieside .cieitem:first-of-type{border-top:0}
+.cieside .cieitem small{font-size:11.5px;color:var(--ink2)}
+.cieside .cieitem small em{font-style:normal;font-weight:700;color:var(--ink3)}
+.cieside .glink{align-self:flex-start}
+/* Semana */
+.wcerr.wcierre{opacity:1;color:var(--ink2);font-weight:700;font-size:11.5px;cursor:pointer;display:inline-block;border-radius:6px;padding:2px 6px;background:repeating-linear-gradient(135deg,var(--surface2) 0 6px,transparent 6px 12px)}
+.dn.cie em{background:#2f6db5!important;color:#fff!important}
+/* Mes */
+.plan th.day .cied{display:block;margin:2px auto 0;width:max-content;font-size:8px;font-weight:800;color:#fff;background:var(--lc,#2f6db5);border-radius:4px;padding:0 4px;letter-spacing:.02em}
+.pill.a-CIE,.lgd.a-CIE{background:#2f6db5;color:#fff}
+/* Generador */
+.gsem td.gcierre{background:repeating-linear-gradient(135deg,var(--surface2) 0 6px,transparent 6px 12px)}
+.gsem td.gcierre span{font-weight:700;color:var(--ink2)}
+.gcierres{margin:8px 0}
+/* empleado */
+.cieemp{display:block}
+/* hoja impresa: el motivo con la letra de la rejilla */
+.pxw td.cerr.cierre{color:#56606a;font-weight:800;letter-spacing:.02em;background:repeating-linear-gradient(135deg,#f1f3f5 0 6px,#fafbfc 6px 12px)}
+.pxg-tab td.cerr.cierre span{font-style:normal;font-weight:700;color:#56606a}
+/* revisión F2 (24/09): apoyo sin sitio, media jornada sin trabajo en el Mes, cierres ya pasados */
+.dn.cie.apoyo em{background:#8a5a00!important}
+.srow small.cieapoyo{color:#8a5a00;font-weight:700}
+.pill .cief{position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:#2f6db5;box-shadow:0 0 0 1.5px var(--surface)}
+.cierrerow.pasado{opacity:.75}
+.ciepas{margin:6px 0}
+.pxw .nm em.cie{background:#2f6db5;color:#fff}
+@media (max-width:640px){
+  .cieint{grid-template-columns:1fr 1fr}
+  .ciecards{grid-template-columns:1fr}
+  .ciebar{flex-wrap:wrap}
+  /* «Cerrar unos días» en una línea: la cabecera del local pasa a dos filas en vez de partir el botón */
+  .lochd{flex-wrap:wrap}
+  .lochd .lmini .btn-mini{white-space:nowrap}
+}

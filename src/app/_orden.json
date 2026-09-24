@@ -4,6 +4,7 @@
   "02-estado-y-modelo-datos.js",
   "10-vista-hoy.js",
   "11-selector.js",
+  "12-cierre-local.js",
   "13-vista-semana.js",
   "14-impresiones.js",
   "15-export-xlsx.js",

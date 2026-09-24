@@ -29,7 +29,7 @@ function xlsxNombres(lista) {
 }
 function xlsxCasilla(c, l, franja) {
   const tid = turnoId(l.id, franja);
-  if (!turnoAbierto(S, c.est, c.iso, tid)) return '—';
+  if (!turnoAbierto(S, c.est, c.iso, tid)) { const ci = cierreEn(S, c.iso, tid); return ci ? `CERRADO · ${etiquetaCierre(ci)}` : '—'; }   // el motivo, como en la hoja (24/09, D11)
   return xlsxNombres(asignados(c.est, c.iso, tid));
 }
 // «mañana 1 · tarde 2»: personas que faltan ese día para el mínimo de cada franja
@@ -38,7 +38,7 @@ function xlsxFaltan(c, l) {
   for (const f of FRANJAS) {
     const tid = turnoId(l.id, f);
     if (!turnoAbierto(S, c.est, c.iso, tid)) continue;
-    const n = Math.max(0, minimoDe(S, c.iso, tid).min - asignados(c.est, c.iso, tid).length);
+    const n = Math.max(0, minimoDe(S, c.iso, tid, c.est).min - asignados(c.est, c.iso, tid).length);
     if (n) partes.push(`${FRANJA_LBL[f].toLowerCase()} ${n}`);
   }
   return partes.join(' · ');

@@ -329,19 +329,522 @@ function personaDe(staff, pid) { return staff.find(p => p.id === pid) || null; }
 function nombreDe(staff, pid) { const p = personaDe(staff, pid); return p ? p.nombre : pid; }
 
 // ---------- apertura y mínimos ----------
-// abierto = el local abre esa franja ese día de la semana, salvo cierre puntual (est.apertura)
+// abierto = el local abre esa franja ese día de la semana (l.abre, «Cuándo abre»), salvo:
+//  · un cierre por fechas (S.cierresPuntuales, ver abajo), que manda sobre todo lo demás;
+//  · la apertura o el cierre a mano de ese día (est.apertura[iso][tid]): true/false o, desde el
+//    24/09, { abierto: true, min } cuando se abre a mano con su mínimo («abrir hoy», S28).
 function turnoAbierto(cfg, est, iso, tid) {
   const { localId, franja } = partirTurno(tid);
   const l = localDe(cfg, localId);
   if (!l) return false;
-  const ov = est && est.apertura && est.apertura[iso] && est.apertura[iso][tid];
-  if (ov !== undefined && ov !== null) return !!ov;
+  if (cierreEn(cfg, iso, tid)) return false;
+  const ov = aperturaDelDia(est, iso, tid);
+  if (ov !== null) return ov;
   return ((l.abre && l.abre[franja]) || []).includes(isoDow(iso));
+}
+// la apertura o el cierre a mano de ESE día (est.apertura): true, false o null si no hay
+function aperturaDelDia(est, iso, tid) {
+  const ov = est && est.apertura && est.apertura[iso] && est.apertura[iso][tid];
+  if (ov === undefined || ov === null) return null;
+  return typeof ov === 'object' ? !!ov.abierto : !!ov;
+}
+// ¿Cerrada ESE día concreto, por un cierre por fechas o a mano? Es lo que descuentan las horas y el
+// registro de apoyos. No mira «Cuándo abre» (l.abre), que es el horario de ahora en adelante: lo que
+// se trabajó con el horario de entonces no se borra (24/09, revisión F2: quitar el lunes por la tarde
+// del Mónaco quitaba de Horas los lunes ya trabajados, también los de agosto, cerrado para la nómina).
+function cerradaEseDia(cfg, est, iso, tid) {
+  return !!cierreEn(cfg, iso, tid) || aperturaDelDia(est, iso, tid) === false;
 }
 function toggleApertura(est, iso, tid, cfg) {
   const cur = turnoAbierto(cfg, est, iso, tid);
   (est.apertura[iso] = est.apertura[iso] || {})[tid] = !cur;
   return !cur;
+}
+// 24/09 (S28): «abrir hoy» una casilla que no abre ese día la dejaba con mínimo 0, así que nadie la
+// rellenaba y la condición salía cumplida. Se abre con el mínimo que diga el encargado y se guarda
+// con la apertura del día, como excepción por fecha que leen minimoDe y, con él, el generador, la
+// cobertura, la revisión y el núcleo. No se inventa un mínimo: si dice 0, es 0 (y la revisión avisa
+// de que está abierta y vacía).
+function abrirCasilla(est, iso, tid, min) {
+  const v = { abierto: true, min: Math.max(0, Math.round(+min) || 0) };
+  (est.apertura[iso] = est.apertura[iso] || {})[tid] = v;
+  return v;
+}
+// por qué una casilla está cerrada ese día, tal como lo dicen el selector, la retirada automática y
+// la revisión: el cierre por fechas con su motivo, o el horario semanal del local
+function motivoCerrado(cfg, iso, tid) {
+  const c = cierreEn(cfg, iso, tid);
+  if (c) return { regla: 'cierre', motivo: textoCierre(cfg, c), cierre: c };
+  const { localId, franja } = partirTurno(tid);
+  const l = localDe(cfg, localId);
+  return { regla: 'cerrado', motivo: `${l ? l.nombre : localId} no abre la ${FRANJA_LBL[franja].toLowerCase()} ${DOW_PL[isoDow(iso)].replace('los ', 'el ')}`, cierre: null };
+}
+
+// ---------- cierres puntuales de un local (por fechas) ----------
+// 24/09 (reunión: «la semana que viene vamos a cerrar el Mónaco para hacer una pequeñita reforma…
+// aunque tú le pongas que va a cerrar puntual, sigue generando para toda la semana»; y el mensaje
+// de Diego: «el Mónaco va a cerrar domingo por la tarde, lunes y martes… el domingo de la semana
+// que viene ya sí que estaríamos abiertos… que pueda elegir el día que cierra cada local y así hacer
+// como intervalos»). «Cuándo abre» (l.abre) es el horario de TODAS las semanas; esto es otra cosa:
+// como unas vacaciones del local, con principio y fin, y al pasar el local vuelve solo a su horario.
+//   S.cierresPuntuales = [{ id, localId, dias: { iso: ['M'] | ['T'] | ['M','T'] }, motivo, detalle,
+//     decisiones: { pid: { tipo, destinos?: { iso: tid }, turnos?: ['iso|franja'], dias?: [iso] } },
+//     retirados: [{ iso, tid, entry }], deSemanaTipo: [iso] (días sin planilla al cerrar),
+//     origen?: { abre: { franja, dow } } (salió de «Cuándo abre»), ts, usuario? (solo con servidor) }]
+// Las franjas van POR DÍA para que quepa «desde el domingo por la tarde hasta el martes». Nunca en
+// S.cierres, que es «mes cerrado para la nómina». Vive fuera de S.meses: un solo registro aunque
+// cruce semanas y meses, y sobrevive a vaciar la planilla. Decisión D11 (decisiones.md).
+const MOTIVOS_CIERRE = [
+  { id: 'reforma', label: 'Reforma', txt: 'reforma' },
+  { id: 'vacaciones', label: 'Vacaciones del local', txt: 'vacaciones' },
+  { id: 'otro', label: 'Otro', txt: '' },
+];
+// Qué hace cada persona mientras el local está cerrado (reunión: «que te salga un visor y te ponga
+// apoyos o vacaciones o sin trabajo»; Diego: «¿quién se queda apoyando? ¿quién no trabaja? ¿quién
+// tiene días libres?»). El apoyo se llama REFUERZA por dentro para no confundirlo con el puesto
+// «apoyo» (esApoyo), que es el extra que se paga por horas. Sin decisión = SIN: «cierra el local,
+// pero no tiene que redistribuir a los trabajadores».
+const DECISIONES_CIERRE = [
+  { id: 'REFUERZA', label: 'Apoyo', largo: 'Apoyo en otros locales' },
+  { id: 'SIN', label: 'Sin trabajo', largo: 'Sin trabajo hasta que reabra' },
+  { id: 'LD', label: 'Día libre', largo: 'Día libre' },
+  { id: 'VAC', label: 'Vacaciones', largo: 'Vacaciones' },
+];
+const DOW_ABR = ['', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+const fechaCortaCierre = iso => `${DOW_ABR[isoDow(iso)]} ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;   // «dom 27/09»
+function cierresDe(cfg) { return cfg && Array.isArray(cfg.cierresPuntuales) ? cfg.cierresPuntuales : []; }
+function diasDeCierre(c) { const d = (c && c.dias) || {}; return Object.keys(d).filter(iso => Array.isArray(d[iso]) && d[iso].length).sort(); }
+// El cierre que cubre ese local, franja y día, o null. Lo llama turnoAbierto, que es el camino más
+// transitado del generador: hay pocos cierres, y se descarta por local antes de mirar el día.
+function cierreEn(cfg, iso, tid) {
+  const cs = cierresDe(cfg);
+  if (!cs.length) return null;
+  const { localId, franja } = partirTurno(tid);
+  for (const c of cs) {
+    if (c.localId !== localId || !c.dias) continue;
+    const fs = c.dias[iso];
+    if (fs && fs.includes(franja)) return c;
+  }
+  return null;
+}
+// «reforma», «vacaciones» o lo que se escribió en «Otro»
+function motivoCierreTxt(c) { const m = MOTIVOS_CIERRE.find(x => x.id === (c && c.motivo)); return (m && m.txt) || String((c && c.detalle) || '').trim(); }
+// «Reforma», «Vacaciones del local»… lo que se enseña en la casilla cerrada
+function etiquetaCierre(c) { const m = MOTIVOS_CIERRE.find(x => x.id === (c && c.motivo)); return m && m.id !== 'otro' ? m.label : (String((c && c.detalle) || '').trim() || 'Cierre'); }
+// «mar 29/09»: el último día cerrado
+function hastaCierre(c) { const ds = diasDeCierre(c); return ds.length ? fechaCortaCierre(ds[ds.length - 1]) : ''; }
+// «Bar Mónaco cerrado por reforma (dom 27/09 tarde – mar 29/09)»: el texto de la regla, de los avisos
+// y del historial. Dice las fechas para que nadie lo lea como un cierre de todas las semanas (la
+// regla «cerrado» decía «no abre la tarde el lunes», que suena a horario fijo).
+// Con días sueltos los enumera («dom 27/09 y mar 29/09, solo tardes»; «los domingos por la tarde del
+// 27/09 al 25/10»): un guion entre el primero y el último se leía como si cerrara todo lo de en medio
+// (24/09, revisión F2).
+function textoCierre(cfg, c) {
+  const l = localDe(cfg, c.localId);
+  const m = motivoCierreTxt(c);
+  const cab = `${l ? l.nombre : c.localId} cerrado${m ? ' por ' + m : ''}`;
+  const ds = diasDeCierre(c);
+  if (!ds.length) return cab;
+  const una = iso => c.dias[iso].length === 1 ? c.dias[iso][0] : null;   // 'M' o 'T'; null = el día entero
+  const sg = { M: 'mañana', T: 'tarde' }, pl = { M: 'mañanas', T: 'tardes' };
+  const soloUna = una(ds[0]) && ds.every(iso => una(iso) === una(ds[0])) ? una(ds[0]) : null;
+  // tramos seguidos: con una sola franja, días consecutivos; si no, cada día empieza por la mañana y
+  // el anterior acaba por la tarde (así «dom 27 tarde – mar 29» no esconde un lunes solo de tarde)
+  const tramos = [];
+  for (const iso of ds) {
+    const u = tramos[tramos.length - 1], prev = u && u[u.length - 1];
+    const sigue = prev && addDias(prev, 1) === iso && (soloUna || (c.dias[prev].includes('T') && c.dias[iso].includes('M')));
+    if (sigue) u.push(iso); else tramos.push([iso]);
+  }
+  const conF = iso => fechaCortaCierre(iso) + (!soloUna && una(iso) ? ' ' + sg[una(iso)] : '');
+  const y = xs => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs[0];
+  let rango;
+  if (ds.length === 1) rango = fechaCortaCierre(ds[0]) + (una(ds[0]) ? ' ' + sg[una(ds[0])] : '');
+  else if (tramos.length === 1) rango = soloUna ? `${fechaCortaCierre(ds[0])} – ${fechaCortaCierre(ds[ds.length - 1])}, solo ${pl[soloUna]}` : `${conF(ds[0])} – ${conF(ds[ds.length - 1])}`;
+  else if (ds.length >= 3 && ds.every((iso, i) => !i || addDias(ds[i - 1], 7) === iso)) {
+    // el mismo día cada semana (lo que deja «Cuándo abre» en las semanas ya planificadas)
+    rango = `${DOW_PL[isoDow(ds[0])]}${soloUna ? ' por la ' + sg[soloUna] : ''} del ${ds[0].slice(8, 10)}/${ds[0].slice(5, 7)} al ${ds[ds.length - 1].slice(8, 10)}/${ds[ds.length - 1].slice(5, 7)}`;
+  } else rango = y(tramos.map(t => t.length === 1 ? conF(t[0]) : `${conF(t[0])} – ${conF(t[t.length - 1])}`)) + (soloUna ? `, solo ${pl[soloUna]}` : '');
+  return `${cab} (${rango})`;
+}
+// lo que se le dice a quien no trabaja esos días (regla, forzar y retirada automática)
+function motivoSinTrabajo(cfg, c) { const l = localDe(cfg, c.localId); return `sin trabajo: ${l ? l.nombre : c.localId} cerrado hasta el ${hastaCierre(c)}`; }
+const MAX_DIAS_CIERRE = 62;   // como la tira de la Cobertura: dos meses
+function validarCierre(cfg, c) {
+  const errores = [];
+  if (!c || typeof c !== 'object') return { ok: false, errores: ['falta el cierre'] };
+  const l = localDe(cfg, c.localId);
+  if (!l) errores.push('el local no existe');
+  const dias = c.dias && typeof c.dias === 'object' && !Array.isArray(c.dias) ? c.dias : {};
+  const isos = Object.keys(dias);
+  if (!isos.some(iso => Array.isArray(dias[iso]) && dias[iso].length)) errores.push('hay que cerrar al menos un día');
+  for (const iso of isos) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || isNaN(new Date(iso + 'T12:00:00').getTime())) { errores.push(`fecha no válida: ${iso}`); continue; }
+    if (!Array.isArray(dias[iso]) || dias[iso].some(f => !FRANJAS.includes(f))) errores.push(`franja no válida el ${iso}`);
+  }
+  const ds = diasDeCierre({ dias }).filter(iso => /^\d{4}-\d{2}-\d{2}$/.test(iso));
+  if (ds.length && addDias(ds[0], MAX_DIAS_CIERRE - 1) < ds[ds.length - 1]) errores.push(`un cierre no puede pasar de ${MAX_DIAS_CIERRE} días`);
+  if (!MOTIVOS_CIERRE.some(m => m.id === c.motivo)) errores.push('motivo no válido');
+  if (l && !errores.length) for (const o of cierresDe(cfg)) {
+    if (o === c || (c.id && o.id === c.id) || o.localId !== c.localId) continue;
+    if (isos.some(iso => ((o.dias && o.dias[iso]) || []).some(f => dias[iso].includes(f)))) { errores.push(`se solapa con otro cierre: ${textoCierre(cfg, o)}`); break; }
+  }
+  return { ok: !errores.length, errores };
+}
+// ¿Estaba esta persona en la casilla cerrada? Lo que se retiró al cerrar o, en los días que aún no
+// tenían planilla al cerrar (c.deSemanaTipo, lo apunta aplicarCierre), su plaza de la semana tipo. Es
+// lo que hace que «sin decisión» cuente como sin trabajo. En un día que ya tenía planilla la semana
+// tipo no dice nada: quien esa semana estaba en otro sitio no estaba en el local cerrado, y el visor
+// ni siquiera preguntó por él (24/09, revisión F2: Cristian, en Pasarela por la cobertura, salía «sin
+// trabajo» y el generador le quitaba la plaza). Tampoco en la vista del empleado, que no recibe
+// c.deSemanaTipo: allí la semana tipo es la de la semilla, no la real.
+function estabaEnCierre(cfg, c, pid, iso, franja) {
+  const tid = turnoId(c.localId, franja);
+  if ((c.retirados || []).some(r => r.iso === iso && r.tid === tid && r.entry && r.entry.pid === pid)) return true;
+  return Array.isArray(c.deSemanaTipo) && c.deSemanaTipo.includes(iso) && plazasDe(cfg, isoDow(iso)).some(pl => pl.t === tid && pl.p === pid);
+}
+// ¿Esa casilla (día y turno) está dentro del cierre c?
+function dentroDeCierre(c, iso, tid) { const { localId, franja } = partirTurno(tid); return !!c && localId === c.localId && ((c.dias && c.dias[iso]) || []).includes(franja); }
+// ¿Ese día ya tiene planilla (alguien puesto en alguna casilla)?
+function diaConPlanilla(est, iso) { return Object.values((est && est.asig && est.asig[iso]) || {}).some(l => l && l.length); }
+// Qué hace esa persona esa franja por un cierre: { cierre, tipo, d, explicita } o null. La decisión
+// vale en las franjas que tenía en el local cerrado (d.turnos, 'iso|franja'): Hojan sin trabajo la
+// tarde del lunes sigue haciendo su mañana en El 33. Sin decisión, quien estaba cuenta como SIN.
+function decisionCierre(cfg, pid, iso, franja) {
+  const cs = cierresDe(cfg);
+  if (!cs.length || !pid) return null;
+  const k = iso + '|' + franja;
+  let implicita = null;
+  for (const c of cs) {
+    const fs = c.dias && c.dias[iso];
+    if (!fs || !fs.includes(franja)) continue;
+    const d = c.decisiones && c.decisiones[pid];
+    if (d) {
+      if (!Array.isArray(d.turnos) || d.turnos.includes(k)) return { cierre: c, tipo: DECISIONES_CIERRE.some(x => x.id === d.tipo) ? d.tipo : 'SIN', d, explicita: true };
+      continue;
+    }
+    if (!implicita && estabaEnCierre(cfg, c, pid, iso, franja)) implicita = { cierre: c, tipo: 'SIN', d: null, explicita: false };
+  }
+  return implicita;
+}
+// APOYO por el cierre esa franja: puede ir a otros locales sin forzar (siguen valiendo los vetos, las
+// franjas, el día libre, «nunca con» y el partido). Una sola lectura para puedeEstar, la verificación
+// del Generador y el núcleo.
+function apoyoPorCierre(cfg, pid, iso, franja) { const dc = decisionCierre(cfg, pid, iso, franja); return !!dc && dc.tipo === 'REFUERZA'; }
+// Lo que suma en el relleno y en la cobertura quien apoya por un cierre («donde haga falta»). El
+// mismo helper para candidatosPara y candidatosCobertura: la puntuación no se copia.
+function puntosCierre(cfg, p, iso, tid) {
+  if (!p) return null;
+  const { localId, franja } = partirTurno(tid);
+  const dc = decisionCierre(cfg, p.id, iso, franja);
+  if (!dc || dc.tipo !== 'REFUERZA' || dc.cierre.localId === localId) return null;
+  const l = localDe(cfg, dc.cierre.localId);
+  return { puntos: 45, razon: `apoyo: ${l ? l.nombre : dc.cierre.localId} cerrado` };
+}
+// Quién trabajaba en las casillas cerradas: de la planilla o, si ese día aún no tiene plazas, de la
+// semana tipo (para que el visor no salga vacío en una semana sin generar). est es el estado virtual
+// y escribible del rango, que puede cruzar semanas y meses. Por persona: sus turnos cerrados, sus
+// otros turnos de esos días, si el cerrado era su único turno del día (soloTurno: VAC y LD solo así),
+// los avisos y la sugerencia, que siempre es «sin trabajo»: nadie se redistribuye solo.
+// opts.pendientes: plazas retiradas por un cierre anterior que no pudieron volver a su casilla al
+// editarlo ([{ iso, tid, entry }]); cuentan como si siguieran allí (revisión F2).
+function afectadosPorCierre(cfg, staff, est, c, opts) {
+  const pend = (opts && opts.pendientes) || [];
+  const porPid = new Map();
+  const tomar = pid => {
+    if (!porPid.has(pid)) { const p = personaDe(staff, pid); porPid.set(pid, { pid, nombre: p ? p.nombre : pid, turnos: [], otrosTurnos: [], soloTurno: {}, avisos: [], sugerencia: 'SIN', decision: (c.decisiones && c.decisiones[pid]) || null }); }
+    return porPid.get(pid);
+  };
+  for (const iso of diasDeCierre(c)) {
+    const cerradas = c.dias[iso];
+    const planilla = diaConPlanilla(est, iso) || pend.some(r => r.iso === iso);
+    const fuente = planilla ? 'planilla' : 'semana tipo';
+    const enDia = planilla
+      ? turnosDe(cfg).flatMap(t => asignados(est, iso, t.id).map(e => ({ pid: e.pid, tid: t.id, localId: t.localId, franja: t.franja, cocina: !!e.cocina, abre: !!e.abre })))
+      : plazasDelDia(cfg, staff, iso).plazas.filter(pl => { const p = personaDe(staff, pl.p); return p && !ausenciaEn(p, iso) && !p.standby; })
+        .map(pl => Object.assign({ pid: pl.p, tid: pl.t, cocina: !!pl.c, abre: !!pl.a }, partirTurno(pl.t)));
+    for (const r of pend) if (r.iso === iso && r.entry && !enDia.some(x => x.pid === r.entry.pid && x.tid === r.tid)) enDia.push(Object.assign({ pid: r.entry.pid, tid: r.tid, cocina: !!r.entry.cocina, abre: !!r.entry.abre }, partirTurno(r.tid)));
+    const cerrada = x => x.localId === c.localId && cerradas.includes(x.franja);
+    for (const x of enDia) if (cerrada(x)) tomar(x.pid).turnos.push({ iso, tid: x.tid, franja: x.franja, cocina: x.cocina, abre: x.abre, fuente });
+    for (const a of porPid.values()) {
+      if (!a.turnos.some(t => t.iso === iso)) continue;
+      const otros = enDia.filter(x => x.pid === a.pid && !cerrada(x));
+      for (const x of otros) a.otrosTurnos.push({ iso, tid: x.tid, localId: x.localId, franja: x.franja });
+      a.soloTurno[iso] = !otros.length;
+      if (!otros.length) continue;
+      // hacía partido y se queda con la otra mitad: la conserva con su tramo del partido (repartoDelDia),
+      // no pasa sola a turno completo (24/09, revisión F2: Hojan, El 33 de 11:00 a 16:00, no de 07:00)
+      const partido = FRANJAS.every(f => a.turnos.some(t => t.iso === iso && t.franja === f) || otros.some(x => x.franja === f));
+      const conTramo = x => {
+        if (!partido) return '';
+        const h = horarioDe(localDe(cfg, x.localId), isoDow(iso), x.franja, true, x.abre ? x.franja : null);
+        return h ? ` (hacía partido: se queda con su ${FRANJA_LBL[x.franja].toLowerCase()} en ${(localDe(cfg, x.localId) || { nombre: x.localId }).nombre} de ${h.ini} a ${h.fin})` : '';
+      };
+      a.avisos.push(`el ${diaYNum(iso)} también hace ${otros.map(x => `${(localDe(cfg, x.localId) || { nombre: x.localId }).nombre} por la ${FRANJA_LBL[x.franja].toLowerCase()}${conTramo(x)}`).join(' y ')}`);
+    }
+  }
+  return [...porPid.values()];
+}
+// Dónde puede apoyar esa persona cada día del cierre: casillas abiertas de la misma franja en otros
+// locales en las que puede estar con el permiso del cierre, primero las que tienen gente de menos,
+// luego sus otros locales y luego la menos cubierta. { iso: [{ tid, localId, franja, faltan, n, min, razon }] }
+function sugerenciasRefuerzo(cfg, staff, est, c, pid) {
+  const out = {};
+  const p = personaDe(staff, pid);
+  if (!p) return out;
+  const a = afectadosPorCierre(cfg, staff, est, c).find(x => x.pid === pid);
+  const claves = a ? [...new Set(a.turnos.map(t => t.iso + '|' + t.franja))] : [];
+  // se simula el cierre ya puesto, con su apoyo y sin las plazas de las casillas cerradas
+  const c2 = Object.assign({}, c, { decisiones: Object.assign({}, c.decisiones || {}, { [pid]: { tipo: 'REFUERZA', turnos: claves } }) });
+  const cfg2 = Object.assign({}, cfg, { cierresPuntuales: cierresDe(cfg).filter(x => x.id !== c.id).concat([c2]) });
+  const sim = clonarEstado(est);
+  for (const iso of diasDeCierre(c)) for (const f of c.dias[iso]) if (sim.asig[iso]) delete sim.asig[iso][turnoId(c.localId, f)];
+  for (const k of claves) {
+    const [iso, franja] = k.split('|');
+    const xs = [];
+    for (const t of turnosDe(cfg)) {
+      if (t.franja !== franja || t.localId === c.localId || !turnoAbierto(cfg2, sim, iso, t.id)) continue;
+      if (!puedeEstar(cfg2, staff, sim, iso, t.id, pid).ok) continue;
+      const rev = revisarTurno(cfg2, staff, sim, iso, t.id);
+      xs.push({ iso, tid: t.id, localId: t.localId, franja, faltan: rev.faltan, n: rev.n, min: rev.minimo, suyo: (p.locales || []).includes(t.localId), razon: rev.faltan ? `falta${rev.faltan > 1 ? 'n' : ''} ${rev.faltan} (hay ${rev.n} de ${rev.minimo})` : `tiene ${rev.n} de ${rev.minimo}` });
+    }
+    xs.sort((x, y) => (y.faltan > 0) - (x.faltan > 0) || y.faltan - x.faltan || (y.suyo ? 1 : 0) - (x.suyo ? 1 : 0) || (x.n - x.min) - (y.n - y.min) || (x.tid < y.tid ? -1 : 1));
+    out[iso] = (out[iso] || []).concat(xs);
+  }
+  return out;
+}
+// pone a quien apoya en su destino de ese día (al aplicar el cierre y al regenerar)
+function ponerApoyoCierre(cfg, staff, est, c, pid, iso, tid) {
+  if (pidsEn(est, iso, tid).includes(pid)) return { ok: true, ya: true };
+  const l = localDe(cfg, c.localId), m = motivoCierreTxt(c);
+  return asignar(est, cfg, staff, iso, tid, pid, { origen: 'cierre', razon: `apoyo: ${l ? l.nombre : c.localId} cerrado${m ? ` (${m})` : ''}` });
+}
+// Cierra el local (o edita un cierre que ya existe: primero se deshace y luego se vuelve a aplicar).
+//  1. valida y guarda el cierre en cfg.cierresPuntuales;
+//  2. retira TODAS las plazas de las casillas cerradas del rango (también las puestas a mano: lo
+//     decide el encargado en el visor, persona por persona) y las guarda en c.retirados, para poder
+//     devolverlas al reabrir. Se acaban las plazas fantasma, que seguían contando en las horas;
+//  3. VAC y LD: la ausencia de los días en que el turno cerrado era su único turno; si ese día tenía
+//     otro turno, la parte cerrada cuenta como sin trabajo y se avisa (las ausencias son de día
+//     entero hasta que lleguen las de media jornada);
+//  4. APOYO con destino: se le pone allí, con origen 'cierre' (lo vuelve a poner el generador);
+//  5. SIN: solo la decisión. Sin decisión explícita = SIN.
+// est tiene que cubrir todos los días del cierre (estado virtual del rango).
+function aplicarCierre(cfg, staff, est, c, decisiones) {
+  const res = { ok: false, errores: [], cierre: c, retirados: 0, ausencias: [], puestos: [], rechazados: [], avisos: [], deshecho: null };
+  const v = validarCierre(cfg, c);
+  if (!v.ok) { res.errores = v.errores; return res; }
+  if (c.id && cierresDe(cfg).some(x => x.id === c.id)) res.deshecho = quitarCierre(cfg, staff, est, c.id, { devolver: true, quitarVacaciones: true });
+  const l = localDe(cfg, c.localId);
+  const entrada = decisiones || c.decisiones || {};
+  const valida = t => DECISIONES_CIERRE.some(x => x.id === t);
+  // Al editar: lo retirado por el cierre de antes que no pudo volver a su casilla en el paso de en
+  // medio (se había forzado a la persona en otra casilla esa franja, por ejemplo). Si su casilla sigue
+  // cerrada, sigue retirado y con su decisión; si no, se avisa (24/09, revisión F2: se perdía de
+  // c.retirados, el visor no lo enseñaba y al reabrir ya no volvía).
+  const pendientes = [];
+  for (const x of (res.deshecho && res.deshecho.noDevueltos) || []) {
+    if (!x.entry) continue;
+    const { localId, franja } = partirTurno(x.tid);
+    if (dentroDeCierre(c, x.iso, x.tid)) pendientes.push({ iso: x.iso, tid: x.tid, entry: x.entry });
+    else res.avisos.push(`${nombreDe(staff, x.pid)} no ha podido volver a ${(localDe(cfg, localId) || { nombre: localId }).nombre} el ${diaYNum(x.iso)} por la ${FRANJA_LBL[franja].toLowerCase()}: ${x.motivo}`);
+  }
+  const af = afectadosPorCierre(cfg, staff, est, c, { pendientes });
+  // Solo reciben decisión quienes trabajaban en las casillas cerradas, y vale solo en esas franjas
+  // (d.turnos). Una decisión de otra persona (la que reenvía el visor al editar, de alguien que ya no
+  // está afectado) se ignora: sin alcance valía en todas las franjas cerradas y dejaba «sin trabajo»
+  // a quien nunca estuvo en el local cerrado (24/09, revisión F2).
+  const dec = {};
+  for (const a of af) {
+    const d0 = entrada[a.pid] || {};
+    const turnos = [...new Set(a.turnos.map(t => t.iso + '|' + t.franja))];
+    const d = { tipo: valida(d0.tipo) ? d0.tipo : 'SIN', turnos };
+    // el destino de apoyo, solo en los días y franjas que tenía cerrados (revisión F2: el de un día
+    // que ya no cierra se quedaba guardado y salía rechazado al editar y en cada generación)
+    if (d.tipo === 'REFUERZA' && d0.destinos) {
+      const ds = {};
+      for (const [iso, t] of Object.entries(d0.destinos)) {
+        const bien = [].concat(t).filter(tid => typeof tid === 'string' && tid && turnos.includes(iso + '|' + partirTurno(tid).franja));
+        if (bien.length) ds[iso] = Array.isArray(t) ? bien : bien[0];
+      }
+      if (Object.keys(ds).length) d.destinos = ds;
+    }
+    dec[a.pid] = d;
+  }
+  c.decisiones = dec;
+  c.retirados = [];
+  // los días que aún no tenían planilla al cerrar: solo en ellos cuenta la semana tipo (estabaEnCierre)
+  c.deSemanaTipo = diasDeCierre(c).filter(iso => !diaConPlanilla(est, iso) && !pendientes.some(r => r.iso === iso));
+  if (!Array.isArray(cfg.cierresPuntuales)) cfg.cierresPuntuales = [];
+  cfg.cierresPuntuales.push(c);
+  for (const iso of diasDeCierre(c)) for (const f of c.dias[iso]) {
+    const tid = turnoId(c.localId, f);
+    const lista = asignados(est, iso, tid);
+    if (!lista.length) continue;
+    for (const entry of lista) c.retirados.push({ iso, tid, entry: JSON.parse(JSON.stringify(entry)) });
+    res.retirados += lista.length;
+    // solo la casilla: el día sigue enlazado con su mes aunque est sea un estado virtual del rango
+    delete est.asig[iso][tid];
+    if (est.manual && est.manual[iso]) delete est.manual[iso][tid];
+  }
+  for (const r of pendientes) c.retirados.push({ iso: r.iso, tid: r.tid, entry: JSON.parse(JSON.stringify(r.entry)) });
+  const detalle = `cierre de ${l.nombre} · ${motivoCierreTxt(c) || etiquetaCierre(c).toLowerCase()}`;
+  for (const a of af) {
+    const d = dec[a.pid];
+    if (d.tipo !== 'VAC' && d.tipo !== 'LD') continue;
+    const p = personaDe(staff, a.pid);
+    if (!p) continue;
+    const dias = [];
+    for (const iso of [...new Set(a.turnos.map(t => t.iso))]) {
+      if (!a.soloTurno[iso]) {
+        const otros = a.otrosTurnos.filter(t => t.iso === iso).map(t => `${(localDe(cfg, t.localId) || { nombre: t.localId }).nombre} por la ${FRANJA_LBL[t.franja].toLowerCase()}`);
+        const cerr = a.turnos.filter(t => t.iso === iso).map(t => FRANJA_LBL[t.franja].toLowerCase());
+        res.avisos.push(`${p.nombre}: el ${diaYNum(iso)} también trabaja en ${otros.join(' y ')}, así que no se le pone ${d.tipo === 'VAC' ? 'vacaciones' : 'día libre'} ese día (es de día entero): su ${cerr.join(' y ')} cerrada cuenta como sin trabajo`);
+        continue;
+      }
+      if (ausenciaEn(p, iso)) continue;
+      dias.push(iso);
+    }
+    const tramos = [];
+    for (const iso of dias) { const u = tramos[tramos.length - 1]; if (u && addDias(u.hasta, 1) === iso) u.hasta = iso; else tramos.push({ desde: iso, hasta: iso }); }
+    for (const tr of tramos) anadirAusencia(p, { tipo: d.tipo, desde: tr.desde, hasta: tr.hasta, detalle });
+    d.dias = dias;   // los días que puso el cierre: son los únicos que se quitan al reabrir
+    if (dias.length) res.ausencias.push({ pid: a.pid, tipo: d.tipo, dias });
+  }
+  for (const [pid, d] of Object.entries(dec)) {
+    if (d.tipo !== 'REFUERZA' || !d.destinos) continue;
+    for (const [iso, t] of Object.entries(d.destinos)) for (const tid of [].concat(t).filter(Boolean)) {
+      const r = ponerApoyoCierre(cfg, staff, est, c, pid, iso, tid);
+      if (r.ok) { if (!r.ya) res.puestos.push({ iso, tid, pid }); }
+      else res.rechazados.push({ iso, tid, pid, motivo: r.motivo });
+    }
+  }
+  res.ok = true;
+  return res;
+}
+// Reabre: el cierre sale de la lista y el local vuelve a su horario. Los apoyos que puso el cierre
+// (automáticos) salen; con quitarVacaciones se quitan SOLO los días de VAC/LD que puso el cierre, día
+// a día (anadirAusencia pudo fundirlos con otras vacaciones de la persona: nunca se borra la ausencia
+// entera); con devolver, lo retirado vuelve a su casilla si la persona puede estar.
+function quitarCierre(cfg, staff, est, id, opts) {
+  const o = opts || {};
+  const res = { ok: false, cierre: null, devueltos: [], noDevueltos: [], vacacionesQuitadas: [], apoyosQuitados: [] };
+  const cs = cierresDe(cfg);
+  const i = cs.findIndex(x => x.id === id);
+  if (i < 0) return res;
+  const c = cs[i];
+  res.cierre = c;
+  cs.splice(i, 1);
+  // quien apoyaba: sale de su destino (origen 'cierre') y de lo automático que, sin el permiso del
+  // cierre, ya no puede estar (el generador lo puso «donde hacía falta» fuera de sus locales). Lo
+  // puesto a mano o forzado se queda.
+  for (const [pid, d] of Object.entries(c.decisiones || {})) {
+    if (!d || d.tipo !== 'REFUERZA') continue;
+    const casillas = new Set();
+    for (const iso of diasDeCierre(c)) for (const f of c.dias[iso]) for (const t of turnosDe(cfg)) if (t.franja === f) casillas.add(iso + '|' + t.id);
+    for (const [iso, t] of Object.entries(d.destinos || {})) for (const tid of [].concat(t).filter(Boolean)) casillas.add(iso + '|' + tid);
+    for (const k of casillas) {
+      const [iso, tid] = k.split('|');
+      const e = asignados(est, iso, tid).find(x => x.pid === pid);
+      if (!e || !esAutomatica(e)) continue;
+      if (e.origen !== 'cierre' && puedeEstar(cfg, staff, est, iso, tid, pid, { yaDentro: true, permitirPartido: true }).ok) continue;
+      if (retirarEntrada(est, cfg, staff, iso, tid, pid)) res.apoyosQuitados.push({ iso, tid, pid });
+    }
+  }
+  if (o.quitarVacaciones) for (const [pid, d] of Object.entries(c.decisiones || {})) {
+    if ((d.tipo !== 'VAC' && d.tipo !== 'LD') || !Array.isArray(d.dias)) continue;
+    const p = personaDe(staff, pid);
+    if (!p) continue;
+    for (const iso of d.dias) {
+      const a = ausenciaEn(p, iso);
+      if (!a || a.tipo !== d.tipo) continue;
+      p.ausencias = quitarDiaDeAusencia(p.ausencias, iso);
+      res.vacacionesQuitadas.push({ pid, iso, tipo: d.tipo });
+    }
+  }
+  if (o.devolver) for (const r of c.retirados || []) {
+    const e = r.entry;
+    if (!e || !e.pid || pidsEn(est, r.iso, r.tid).includes(e.pid)) continue;
+    const pe = turnoAbierto(cfg, est, r.iso, r.tid) ? puedeEstar(cfg, staff, est, r.iso, r.tid, e.pid, { forzar: !!e.forzado, permitirPartido: true }) : { ok: false, motivo: motivoCerrado(cfg, r.iso, r.tid).motivo };
+    if (!pe.ok) { res.noDevueltos.push({ iso: r.iso, tid: r.tid, pid: e.pid, motivo: pe.motivo, entry: JSON.parse(JSON.stringify(e)) }); continue; }
+    const lista = ((est.asig[r.iso] = est.asig[r.iso] || {})[r.tid] = est.asig[r.iso][r.tid] || []);
+    lista.push(JSON.parse(JSON.stringify(e)));
+    normalizarCasilla(est, cfg, staff, r.iso, r.tid);
+    res.devueltos.push({ iso: r.iso, tid: r.tid, pid: e.pid });
+  }
+  res.ok = true;
+  return res;
+}
+// Reabre un cierre a partir de una fecha: los días anteriores siguen cerrados con lo que se decidió (sus
+// plazas no se trabajaron y sus vacaciones sí se cogieron); del resto, lo retirado vuelve y se quitan
+// las vacaciones o libres que puso el cierre. Si no queda ningún día anterior, se reabre entero. Es lo
+// que pasa al volver a marcar un día en «Cuándo abre» (24/09, revisión F2): el cierre de los días ya
+// planificados que dejó al quitarlo no puede seguir mandando sobre el horario.
+function reabrirCierreDesde(cfg, staff, est, id, desde) {
+  const c = cierresDe(cfg).find(x => x.id === id);
+  if (!c) return { ok: false, cierre: null };
+  const quedan = diasDeCierre(c).filter(iso => iso < desde);
+  if (!quedan.length) return Object.assign(quitarCierre(cfg, staff, est, id, { devolver: true, quitarVacaciones: true }), { parcial: false });
+  const c2 = Object.assign({}, c, { dias: Object.fromEntries(quedan.map(iso => [iso, c.dias[iso].slice()])) });
+  const r = aplicarCierre(cfg, staff, est, c2, JSON.parse(JSON.stringify(c.decisiones || {})));
+  const q = r.deshecho || { devueltos: [], noDevueltos: [], vacacionesQuitadas: [], apoyosQuitados: [] };
+  // lo que devolvió y no volvió a retirar: solo lo de los días que reabren
+  return { ok: r.ok, parcial: true, cierre: c2, quedan, avisos: r.avisos,
+    devueltos: q.devueltos.filter(x => x.iso >= desde), noDevueltos: q.noDevueltos.filter(x => x.iso >= desde),
+    vacacionesQuitadas: q.vacacionesQuitadas.filter(x => x.iso >= desde), apoyosQuitados: q.apoyosQuitados.filter(x => x.iso >= desde) };
+}
+// Al generar (después de la semana tipo): vuelve a poner a quien apoya en su destino, así sobrevive
+// a «Vaciar lo generado». opts.desdeIso: no toca los días pasados.
+function instanciarCierres(cfg, staff, est, desde, hasta, opts) {
+  const o = opts || {};
+  const r = { aplicados: [], rechazados: [] };
+  for (const c of cierresDe(cfg)) for (const [pid, d] of Object.entries(c.decisiones || {})) {
+    if (!d || d.tipo !== 'REFUERZA' || !d.destinos) continue;
+    for (const [iso, t] of Object.entries(d.destinos)) {
+      if (iso < desde || iso > hasta || (o.desdeIso && iso < o.desdeIso)) continue;
+      for (const tid of [].concat(t).filter(Boolean)) {
+        const a = ponerApoyoCierre(cfg, staff, est, c, pid, iso, tid);
+        if (a.ok && !a.ya) r.aplicados.push({ iso, turnoId: tid, pid, origen: 'cierre', razon: a.entry.razon });
+        else if (!a.ok) r.rechazados.push({ iso, turnoId: tid, pid, motivo: a.motivo });
+      }
+    }
+  }
+  return r;
+}
+// Quien apoya por un cierre («donde haga falta») y ese día aún no está puesto en ninguna casilla de
+// su franja: [{ pid, franja, cierre }]. No «libra» ni está «sin turno»: está de apoyo, aún sin sitio.
+// Una sola lectura para el Generador, la revisión y las vistas (24/09, revisión F2: Yilian salía de
+// apoyo en Hoy y en su perfil, y a la vez como que libraba en Semana, el Generador y la hoja).
+function apoyosSinSitio(cfg, staff, est, iso) {
+  const out = [];
+  for (const c of cierresDe(cfg)) {
+    const fs = (c.dias && c.dias[iso]) || [];
+    if (!fs.length) continue;
+    for (const [pid, d] of Object.entries(c.decisiones || {})) {
+      if (!d || d.tipo !== 'REFUERZA') continue;
+      const p = personaDe(staff, pid);
+      if (!p || ausenciaEn(p, iso)) continue;
+      for (const f of fs) {
+        if (Array.isArray(d.turnos) && !d.turnos.includes(iso + '|' + f)) continue;
+        if (out.some(x => x.pid === pid && x.franja === f)) continue;
+        if (turnosDe(cfg).some(t => t.franja === f && pidsEn(est, iso, t.id).includes(pid))) continue;
+        out.push({ pid, franja: f, cierre: c });
+      }
+    }
+  }
+  return out;
+}
+// Las franjas de ese día en las que la persona estaba en un local cerrado por fechas (con decisión o
+// sin ella). Con ellas, repartoDelDia sabe que su otra mitad era de un partido.
+function mitadesCerradas(cfg, pid, iso) {
+  if (!cierresDe(cfg).length) return [];
+  return FRANJAS.filter(f => !!decisionCierre(cfg, pid, iso, f));
+}
+// Los cierres que se hicieron al quitar ese día y franja en «Cuándo abre» (c.origen.abre): al volver a
+// marcarlo se ofrece reabrirlos (24/09, revisión F2: el cierre de los domingos ya planificados se
+// quedaba escondido y mandaba sobre el horario aunque se volviera a marcar el domingo).
+function cierresDelHorario(cfg, localId, franja, dow) {
+  return cierresDe(cfg).filter(c => c.localId === localId && c.origen && c.origen.abre && c.origen.abre.franja === franja && +c.origen.abre.dow === +dow);
 }
 function turnosAbiertosSemana(cfg) {
   let n = 0;
@@ -359,13 +862,17 @@ function turnosConSupuesto(cfg) {
   return n;
 }
 function eventosDe(cfg, iso) { return (cfg.eventos || []).filter(e => e.iso === iso); }
-// mínimo de una casilla: el de la tabla del local + el refuerzo de los eventos del día
-function minimoDe(cfg, iso, tid) {
+// mínimo de una casilla: el de la tabla del local + el refuerzo de los eventos del día. Con est, la
+// casilla abierta a mano ese día trae su propio mínimo (abrirCasilla, S28, 24/09), que manda sobre
+// la tabla (que para un día que no abre suele ser 0).
+function minimoDe(cfg, iso, tid, est) {
   const { localId, franja } = partirTurno(tid);
   const l = localDe(cfg, localId);
   const dow = isoDow(iso);
-  const base = l && l.minimos && l.minimos[franja] && l.minimos[franja][dow] !== undefined ? +l.minimos[franja][dow] : 0;
-  const supuesto = !!(l && l.supuestos && l.supuestos[franja] && l.supuestos[franja][dow]);
+  const ov = est && est.apertura && est.apertura[iso] && est.apertura[iso][tid];
+  const aMano = !!ov && typeof ov === 'object' && ov.min !== undefined && ov.min !== null;
+  const base = aMano ? Math.max(0, +ov.min || 0) : l && l.minimos && l.minimos[franja] && l.minimos[franja][dow] !== undefined ? +l.minimos[franja][dow] : 0;
+  const supuesto = !aMano && !!(l && l.supuestos && l.supuestos[franja] && l.supuestos[franja][dow]);
   let refuerzo = 0; const evs = [];
   for (const e of eventosDe(cfg, iso)) {
     if (e.franja && e.franja !== 'MT' && e.franja !== franja) continue;
@@ -516,6 +1023,7 @@ const REGLA_NOMBRE = {
   vetos: 'No hace (local y franja)', partido: 'Días de partido', nuncaCon: '«Nunca con»',
   standby: 'En standby', cerrado: 'El local no abre', duplicado: 'Ya está en la casilla',
   ausencia: 'Ausencia', otraFranja: 'Ya está en otro bar esa franja',
+  cierre: 'Cierre del local',   // 24/09 (D11): cerrado por fechas, o sin trabajo mientras cierra
 };
 function nombreRegla(k) { return REGLA_NOMBRE[k] || k || ''; }
 function regla(cfg, k) { return !(cfg && cfg.reglas && cfg.reglas[k] === false); }
@@ -636,13 +1144,17 @@ function estadoDia(cfg, p, iso) {
   const puntual = on ? libraPuntualDe(p, iso) : null;
   const libra = on && libraEn(p, iso);
   const hab = (p && p.libra) || [];
+  // 24/09 (D11): qué hace ese día por el cierre de su local (sin trabajo, apoyo…), con sus franjas
+  let cierre = null;
+  if (p) for (const f of FRANJAS) { const dc = decisionCierre(cfg, p.id, iso, f); if (dc) { cierre = cierre || { tipo: dc.tipo, cierre: dc.cierre, franjas: [], explicita: dc.explicita }; cierre.franjas.push(f); } }
   let texto = '';
   if (ausencia) texto = motivoAusencia(ausencia);
   else if (standby) texto = 'en standby';
   else if (libra && puntual) texto = `libra ${textoDiasEl([dow])} esta semana${hab.length ? ` (en vez de ${textoDiasPl(hab)})` : ''}`;
   else if (libra) texto = `libra ${DOW_PL[dow]}`;
+  else if (cierre && cierre.tipo !== 'REFUERZA') texto = motivoSinTrabajo(cfg, cierre.cierre);
   else if (puntual && hab.includes(dow)) texto = `esta semana trabaja (libra ${textoDiasEl(puntual.dias)})`;
-  return { libra, puntual, ausencia, standby, texto };
+  return { libra, puntual, ausencia, standby, cierre, texto };
 }
 
 // ---------- reglas duras por persona ----------
@@ -666,13 +1178,21 @@ function puedeEstar(cfg, staff, est, iso, tid, pid, opts) {
   // selector, en el aviso de forzar y en el historial, e ir a corregir la ficha si hace falta.
   let m = null, mk = null;
   const forzable = (k, motivo) => { if (o.forzar) { avisos.push(motivo); return null; } mk = k; return motivo; };
-  if (!turnoAbierto(cfg, est, iso, tid)) return { ok: false, motivo: `${l.nombre} no abre la ${FRANJA_LBL[franja].toLowerCase()} ${DOW_PL[dow].replace('los ', 'el ')}`, regla: 'cerrado', avisos };
+  // cerrada: por fechas (regla 'cierre', con el motivo y las fechas) o por su horario semanal. No se fuerza.
+  if (!turnoAbierto(cfg, est, iso, tid)) { const mc = motivoCerrado(cfg, iso, tid); return { ok: false, motivo: mc.motivo, regla: mc.regla, avisos }; }
   if (!o.yaDentro && pidsEn(est, iso, tid).includes(pid)) return { ok: false, motivo: 'ya está en esta casilla', regla: 'duplicado', avisos };
   const aus = ausenciaEn(p, iso);
   if (aus) return { ok: false, motivo: motivoAusencia(aus) + (aus.detalle ? ' · ' + aus.detalle : ''), regla: 'ausencia', avisos };
   for (const t of turnosDe(cfg)) if (t.franja === franja && t.id !== tid && pidsEn(est, iso, t.id).includes(pid)) return { ok: false, motivo: `ya en ${t.local.nombre} esta ${FRANJA_LBL[franja].toLowerCase()}`, regla: 'otraFranja', avisos };
   const act = k => activa(cfg, p, k);
-  if (act('locales') && Array.isArray(p.locales) && p.locales.length && !p.locales.includes(localId)) m = forzable('locales', `solo ${lblLocales(cfg, p.locales)}`);
+  // 24/09 (D11): mientras su local cierra, quien no trabaja esos días (SIN, o VAC/LD que no se pudo
+  // poner) no entra en otra casilla de esa franja salvo que el encargado lo fuerce: el generador y la
+  // cobertura no redistribuyen a nadie solo. Quien apoya (REFUERZA) puede ir a cualquier local esa
+  // franja sin forzar; el resto de su ficha (franjas, día libre, vetos, partido, «nunca con») vale igual.
+  const dc = decisionCierre(cfg, pid, iso, franja);
+  const apoyaCierre = !!dc && dc.tipo === 'REFUERZA';
+  if (dc && !apoyaCierre) m = forzable('cierre', motivoSinTrabajo(cfg, dc.cierre));
+  if (!m && !apoyaCierre && act('locales') && Array.isArray(p.locales) && p.locales.length && !p.locales.includes(localId)) m = forzable('locales', `solo ${lblLocales(cfg, p.locales)}`);
   if (!m && act('franjas') && Array.isArray(p.franjas) && p.franjas.length && !p.franjas.includes(franja)) m = forzable('franjas', p.franjas.length === 1 ? (p.franjas[0] === 'M' ? 'siempre de mañana' : 'solo tardes') : 'franja no permitida');
   if (!m && p.standby) m = forzable('standby', 'en standby: aún no entra en la planilla');
   const libraHoy = !m && act('libra') && libraEn(p, iso);
@@ -935,7 +1455,7 @@ function revisarTurno(cfg, staff, est, iso, tid) {
   const l = localDe(cfg, localId);
   const abierto = turnoAbierto(cfg, est, iso, tid);
   const lista = asignados(est, iso, tid);
-  const m = minimoDe(cfg, iso, tid);
+  const m = minimoDe(cfg, iso, tid, est);
   const n = lista.length;
   const tieneCocina = l && localTieneCocina(l, franja);
   const coc = lista.find(e => e.cocina);
@@ -953,6 +1473,8 @@ function revisarTurno(cfg, staff, est, iso, tid) {
     forzados: lista.filter(e => e.forzado && vigentes(e.pid).length).length,
     avisos: lista.filter(e => vigentes(e.pid).length).map(e => `${nombreDe(staff, e.pid)}: ${vigentes(e.pid).join(', ')}`),
     incompatibles: [],
+    // 24/09 (S26): gente puesta en una casilla que ya no abre ese día (plazas fantasma)
+    enCerrado: abierto ? 0 : n,
   };
   for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
     const a = personaDe(staff, lista[i].pid), b = personaDe(staff, lista[j].pid);
@@ -966,9 +1488,21 @@ function revisionMes(cfg, staff, est, opts) {
   for (const d of est.days) {
     if (d.iso < desde || d.iso > hasta) continue;
     for (const t of turnosDe(cfg)) {
-      if (!turnoAbierto(cfg, est, d.iso, t.id)) continue;
-      const r = revisarTurno(cfg, staff, est, d.iso, t.id);
       const donde = `${t.local.nombre} · ${FRANJA_LBL[t.franja].toLowerCase()} del ${DOW_LBL[d.dow]} ${d.d}`;
+      if (!turnoAbierto(cfg, est, d.iso, t.id)) {
+        // 24/09 (S26, red de seguridad): una casilla cerrada (por fechas o porque «Cuándo abre» ya no
+        // la abre) con gente dentro. No se ve en la casilla, pero contaba en horas, en el Mes y en el
+        // pie de descansos, y bloqueaba a esa gente en otra casilla de la misma franja. Con opts.hoy,
+        // los días ya pasados que solo cierra «Cuándo abre» no se avisan: se trabajaron con el horario
+        // de entonces y cuentan en las horas (revisión F2)
+        const dentro = pidsEn(est, d.iso, t.id);
+        if (dentro.length && opts && opts.hoy && d.iso < opts.hoy && !cerradaEseDia(cfg, est, d.iso, t.id)) continue;
+        if (dentro.length) { const c = cierreEn(cfg, d.iso, t.id); out.push({ iso: d.iso, turnoId: t.id, tipo: 'plaza-en-cerrado', nivel: 'alta', n: dentro.length, msg: `${donde}: ${c ? `cerrado (${motivoCierreTxt(c) || etiquetaCierre(c).toLowerCase()})` : 'el local no abre'} y ${dentro.length > 1 ? 'siguen puestas' : 'sigue puesta'} ${dentro.map(pid => nombreDe(staff, pid)).join(', ')}` }); }
+        continue;
+      }
+      const r = revisarTurno(cfg, staff, est, d.iso, t.id);
+      // abierta a mano con mínimo 0 y sin nadie (S28): el mínimo no avisa, pero una casilla abierta vacía sí
+      if (!r.n && !r.minimo) out.push({ iso: d.iso, turnoId: t.id, tipo: 'abierta-vacia', nivel: 'media', msg: `${donde}: abierta y sin nadie (mínimo 0)` });
       if (r.faltan) out.push({ iso: d.iso, turnoId: t.id, tipo: 'falta', nivel: r.supuesto ? 'media' : 'alta', n: r.faltan, msg: `${donde}: falta${r.faltan > 1 ? 'n' : ''} ${r.faltan} (hay ${r.n} de ${r.minimo}${r.supuesto ? ', mínimo supuesto' : ''}${r.refuerzo ? ', con refuerzo' : ''})` });
       if (r.sinCocina) out.push({ iso: d.iso, turnoId: t.id, tipo: 'sin-cocina', nivel: r.cocinaObligatoria ? 'alta' : 'media', msg: `${donde}: sin cocina${r.cocinaObligatoria ? ' (obligatoria)' : ''}` });
       if (r.cocinaNoApta) out.push({ iso: d.iso, turnoId: t.id, tipo: 'cocina-no-apta', nivel: 'media', msg: `${donde}: la cocina la lleva alguien que no es cocina de ese local` });
@@ -976,6 +1510,12 @@ function revisionMes(cfg, staff, est, opts) {
       for (const [a, b] of r.incompatibles) out.push({ iso: d.iso, turnoId: t.id, tipo: 'incompatibles', nivel: 'alta', msg: `${donde}: ${a} y ${b} no pueden coincidir` });
       if (r.forzados) out.push({ iso: d.iso, turnoId: t.id, tipo: 'forzado', nivel: 'media', msg: `${donde}: ${r.forzados} asignación(es) forzada(s) a mano — ${r.avisos.join(' · ')}` });
       else if (r.avisos.length) out.push({ iso: d.iso, turnoId: t.id, tipo: 'aviso', nivel: 'media', msg: `${donde}: ${r.avisos.join(' · ')}` });
+    }
+    // quien apoya por un cierre «donde haga falta» y nadie ha colocado ese día (revisión F2): sin este
+    // aviso, en la planilla parecía que libraba. Va con la casilla cerrada de la que viene.
+    for (const x of apoyosSinSitio(cfg, staff, est, d.iso)) {
+      const lc = localDe(cfg, x.cierre.localId);
+      out.push({ iso: d.iso, turnoId: turnoId(x.cierre.localId, x.franja), pid: x.pid, tipo: 'apoyo-sin-sitio', nivel: 'media', msg: `${nombreDe(staff, x.pid)}: de apoyo por el cierre de ${lc ? lc.nombre : x.cierre.localId}, la ${FRANJA_LBL[x.franja].toLowerCase()} del ${DOW_LBL[d.dow]} ${d.d} aún sin sitio` });
     }
   }
   return out;
@@ -1140,6 +1680,8 @@ function candidatosPara(cfg, staff, est, iso, tid, opts) {
     if (o.primero) { const pr = puedePrimero(cfg, staff, est, iso, tid, p.id); if (!pr.ok) continue; if ((l.primero && l.primero[franja] === p.id) || (p.abre && p.abre[localId] && p.abre[localId].includes(franja))) { score += 25; razones.push('sale el primero'); } else razones.push('puede abrir (turno completo)'); }
     const cubre = (p.cubreA || []).find(c => ausentesHoy.includes(c.pid) && (!c.dow || c.dow === dow) && (!c.turnoId || c.turnoId === tid));
     if (cubre) { score += 60; razones.push(`cubre a ${nombreDe(staff, cubre.pid)}`); }
+    const pc = puntosCierre(cfg, p, iso, tid);   // apoyo por el cierre de su local (24/09, D11)
+    if (pc) { score += pc.puntos; razones.push(pc.razon); }
     if (esComodin(p)) { score += 30; razones.push('sin local fijo'); }
     else if (p.puesto === 'apoyo') { score += 15; razones.push('apoyo'); }
     if ((p.locales || []).length && p.locales[0] === localId) { score += 10; razones.push(`su local habitual es ${l.nombre}`); }
@@ -1172,8 +1714,13 @@ function porQueNadie(cfg, staff, est, iso, tid) {
 // se queda con su aviso. Cada retirada sale listada con su motivo («Qué ha cambiado»).
 const ORIGENES_AUTO = ['patron', 'generador', 'nucleo', 'cobertura', 'cierre'];
 function esAutomatica(e) { return !!e && ORIGENES_AUTO.includes(e.origen) && !e.forzado; }
-function motivoRetirada(cfg, staff, iso, tid, e) {
+function motivoRetirada(cfg, staff, est, iso, tid, e) {
   const dow = isoDow(iso);
+  // 24/09 (D11): lo automático que se ha quedado dentro de una casilla cerrada (por fechas o por
+  // «Cuándo abre»), y lo de quien no trabaja esos días por el cierre de su local
+  if (!turnoAbierto(cfg, est, iso, tid)) return motivoCerrado(cfg, iso, tid).motivo;
+  const dc = decisionCierre(cfg, e.pid, iso, partirTurno(tid).franja);
+  if (dc && dc.tipo !== 'REFUERZA') return motivoSinTrabajo(cfg, dc.cierre);
   const p = personaDe(staff, e.pid);
   if (p && activa(cfg, p, 'libra') && libraEn(p, iso)) return motivoLibra(p, iso);
   const x = personaDe(staff, porDe(staff, e));
@@ -1211,7 +1758,7 @@ function retirarQueIncumplen(cfg, staff, est, desde, hasta, opts) {
     for (const t of turnosDe(cfg)) {
       const fuera = asignados(est, iso, t.id)
         .filter(e => esAutomatica(e) && (!o.soloPid || e.pid === o.soloPid || porDe(staff, e) === o.soloPid))
-        .map(e => ({ e, motivo: motivoRetirada(cfg, staff, iso, t.id, e) })).filter(x => x.motivo);
+        .map(e => ({ e, motivo: motivoRetirada(cfg, staff, est, iso, t.id, e) })).filter(x => x.motivo);
       for (const { e, motivo } of fuera) { retirarEntrada(est, cfg, staff, iso, t.id, e.pid); out.push({ iso, turnoId: t.id, pid: e.pid, origen: e.origen, por: porDe(staff, e), motivo }); }
     }
   }
@@ -1230,6 +1777,9 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
     const p = instanciarPatron(cfg, staff, target, desde, hasta, { desdeIso: o.desdeIso });
     r.aplicados.push(...p.aplicados); r.coberturas.push(...p.coberturas); r.rechazados.push(...p.rechazados); r.avisos.push(...p.avisos);
   }
+  // quien apoya por el cierre de su local vuelve a su destino (sobrevive a «Vaciar lo generado»)
+  const ci = instanciarCierres(cfg, staff, target, desde, hasta, { desdeIso: o.desdeIso });
+  r.aplicados.push(...ci.aplicados); r.rechazados.push(...ci.rechazados);
   for (const iso of rangoIso(desde, hasta)) {
     if (o.desdeIso && iso < o.desdeIso) continue;
     // primero las casillas con menos candidatos (difícil primero)
@@ -1264,7 +1814,7 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
         const a = asignar(target, cfg, staff, iso, t.id, c.pid, { origen: 'generador', razon: c.razones.join(' · '), permitirPartido: !!o.permitirPartido });
         if (a.ok) { r.aplicados.push({ iso, turnoId: t.id, pid: c.pid, origen: 'generador', razon: a.entry.razon, avisos: a.avisos }); continue; }
       }
-      r.huecos.push({ iso, turnoId: t.id, pos: 1, tipo: 'primero', faltan: 0, minimo: minimoDe(cfg, iso, t.id).min, motivo: motivoSinPrimero(cfg, staff, target, iso, t.id), porQueNadie: porQueNadiePrimero(cfg, staff, target, iso, t.id) });
+      r.huecos.push({ iso, turnoId: t.id, pos: 1, tipo: 'primero', faltan: 0, minimo: minimoDe(cfg, iso, t.id, target).min, motivo: motivoSinPrimero(cfg, staff, target, iso, t.id), porQueNadie: porQueNadiePrimero(cfg, staff, target, iso, t.id) });
     }
   }
   return r;
@@ -1374,7 +1924,7 @@ function verificarSemana(cfg, staff, est, lunes) {
       for (const iso of dias) {
         const dow = isoDow(iso);
         const mis = turnosDe(cfg).filter(t => pidsEn(est, iso, t.id).includes(c.pid));
-        if (c.k === 'locales') for (const t of mis) if (!p.locales.includes(t.local.id)) v.push(`${dl(iso)}: en ${t.local.nombre}`);
+        if (c.k === 'locales') for (const t of mis) if (!p.locales.includes(t.local.id) && !apoyoPorCierre(cfg, c.pid, iso, t.franja)) v.push(`${dl(iso)}: en ${t.local.nombre}`);   // el apoyo por un cierre no rompe sus locales
         if (c.k === 'franjas') for (const t of mis) if (!p.franjas.includes(t.franja)) v.push(`${dl(iso)}: ${FRANJA_LBL[t.franja].toLowerCase()}`);
         if (c.k === 'libra' && mis.length && libraEn(p, iso)) v.push(`${dl(iso)}: trabaja`);   // el día libre de ESA semana
         if (c.k === 'partido' && mis.some(t => t.franja === 'M') && mis.some(t => t.franja === 'T') && !partidoEn(cfg, p, iso)) v.push(`${dl(iso)}: partido no declarado`);
@@ -1414,17 +1964,41 @@ function generarSemana(cfg, staff, est, lunes, opts) {
     id: l.id, nombre: l.nombre, corto: l.corto, color: l.color, cocina: descripcionCocina(cfg, l),
     franjas: FRANJAS.map(f => ({ franja: f, dias: dias.map(iso => {
       const tid = turnoId(l.id, f);
-      if (!turnoAbierto(cfg, target, iso, tid)) return { iso, tid, abierto: false };
+      if (!turnoAbierto(cfg, target, iso, tid)) { const c = cierreEn(cfg, iso, tid); return { iso, tid, abierto: false, cierre: c ? { id: c.id, localId: c.localId, motivo: c.motivo, detalle: c.detalle || '', etiqueta: etiquetaCierre(c), texto: textoCierre(cfg, c), hasta: hastaCierre(c) } : null }; }
       const r = revisarTurno(cfg, staff, target, iso, tid);
       return { iso, tid, abierto: true, n: r.n, min: r.minimo, supuesto: r.supuesto, refuerzo: r.refuerzo, faltan: r.faltan, cambiado: cambiado.has(iso + '|' + tid), slots: posicionesDe(cfg, staff, target, iso, tid) };
     }) })),
   }));
+  // 24/09 (D11): quién no trabaja por el cierre de su local y quién apoya en otro, día a día. Quien no
+  // trabaja por un cierre no «libra»: sale aparte, para que no se confunda con su descanso. Por medios
+  // días (revisión F2): sinTrabajo = el día entero, sin ningún otro turno; sinTrabajoParcial = la parte
+  // cerrada de quien trabaja la otra franja (Hojan hace El 33 por la mañana); apoyoSinSitio = quien
+  // apoya «donde haga falta» y nadie ha colocado (apoyosSinSitio): tampoco libra.
+  const sinTrabajo = {}, sinTrabajoParcial = {}, refuerzos = {}, apoyoSinSitio = {};
+  for (const iso of dias) {
+    sinTrabajo[iso] = []; sinTrabajoParcial[iso] = []; refuerzos[iso] = []; apoyoSinSitio[iso] = [];
+    if (!cierresDe(cfg).some(c => diasDeCierre(c).includes(iso))) continue;
+    for (const p of staff) {
+      if (ausenciaEn(p, iso)) continue;
+      const sin = [];
+      for (const f of FRANJAS) {
+        const dc = decisionCierre(cfg, p.id, iso, f);
+        if (!dc) continue;
+        if (dc.tipo === 'REFUERZA') { const t = turnosDe(cfg).find(x => x.franja === f && pidsEn(target, iso, x.id).includes(p.id)); refuerzos[iso].push({ pid: p.id, franja: f, tid: t ? t.id : null, localId: dc.cierre.localId }); }
+        else sin.push(f);
+      }
+      if (!sin.length) continue;
+      if (turnosDe(cfg).some(t => pidsEn(target, iso, t.id).includes(p.id))) sinTrabajoParcial[iso].push({ pid: p.id, franjas: sin });
+      else sinTrabajo[iso].push(p.id);
+    }
+    for (const x of apoyosSinSitio(cfg, staff, target, iso)) if (!apoyoSinSitio[iso].includes(x.pid) && !turnosDe(cfg).some(t => pidsEn(target, iso, t.id).includes(x.pid))) apoyoSinSitio[iso].push(x.pid);
+  }
   // la baja se mira día a día (24/09, S6): quien estuvo de baja solo el lunes libra el sábado
   const libran = {}, diasPorPersona = {};
   for (const iso of dias) {
     const trabajan = new Set();
     for (const t of turnosDe(cfg)) for (const pid of pidsEn(target, iso, t.id)) trabajan.add(pid);
-    libran[iso] = staff.filter(p => !trabajan.has(p.id) && !ausenciaEn(p, iso) && !p.standby).map(p => p.id);
+    libran[iso] = staff.filter(p => !trabajan.has(p.id) && !ausenciaEn(p, iso) && !p.standby && !sinTrabajo[iso].includes(p.id) && !apoyoSinSitio[iso].includes(p.id)).map(p => p.id);
     for (const pid of trabajan) diasPorPersona[pid] = (diasPorPersona[pid] || 0) + 1;
   }
   const huecos = g.huecos.filter(h => dias.includes(h.iso)).map(h => Object.assign({ pos: null, tipo: 'faltan' }, h));
@@ -1433,7 +2007,7 @@ function generarSemana(cfg, staff, est, lunes, opts) {
   const plazas = dias.reduce((a, iso) => a + turnosDe(cfg).reduce((b, t) => b + pidsEn(target, iso, t.id).length, 0), 0);
   // de baja = los siete días; una baja de parte de la semana sale aparte («de baja el lunes»)
   const bajaDias = staff.map(p => ({ pid: p.id, dias: dias.filter(iso => deBaja(p, iso)) }));
-  return { lunes, dias, locales, libran, huecos, cambios, condiciones, aplicados: g.aplicados.length, rechazados: g.rechazados, retirados: g.retirados, avisos: g.avisos,
+  return { lunes, dias, locales, libran, sinTrabajo, sinTrabajoParcial, apoyoSinSitio, refuerzos, huecos, cambios, condiciones, aplicados: g.aplicados.length, rechazados: g.rechazados, retirados: g.retirados, avisos: g.avisos,
     resumen: { turnos, plazas, condiciones: condiciones.length, condicionesRotas: condiciones.filter(c => !c.ok).length, huecos: huecos.length, descansos: Object.values(libran).reduce((a, x) => a + x.length, 0), maxDias: Math.max(0, ...Object.values(diasPorPersona)), cambios: cambios.length, retirados: g.retirados.length,
       deBaja: bajaDias.filter(x => x.dias.length === 7).map(x => x.pid), bajasParciales: bajaDias.filter(x => x.dias.length && x.dias.length < 7) },
     estado: target };
@@ -1560,6 +2134,8 @@ function candidatosCobertura(cfg, staff, est, iso, tid, faltaPid, opts) {
     if (o.cocina) { const rc = rangoCocina(cfg, l, p, franja, iso); if (rc < 0) continue; score += 40 - Math.min(rc, 30); razones.push(rc < 100 ? `cocina titular de ${l.nombre}` : 'cocina de reserva'); }
     const cubre = regla(cfg, 'cubreA') && caracteristicaActiva(p, 'cubreA') && falta && (p.cubreA || []).find(c => c.pid === faltaPid && (!c.dow || c.dow === dow) && (!c.turnoId || c.turnoId === tid));
     if (cubre) { score += 60; razones.push(`cubre a ${falta.nombre}`); }
+    const pc = puntosCierre(cfg, p, iso, tid);   // apoyo por el cierre de su local (24/09, D11)
+    if (pc) { score += pc.puntos; razones.push(pc.razon); }
     if (esComodin(p)) { score += 30; razones.push('sin local fijo'); }
     else if (p.puesto === 'apoyo') { score += 15; razones.push('apoyo'); }
     if ((p.locales || []).length && p.locales[0] === localId) { score += 10; razones.push(`su local habitual es ${l.nombre}`); }
@@ -1799,18 +2375,25 @@ function minutosNocturnos(l, dow, franja, override, partido, abre) {
 // Cómo cuenta el día de una persona: partido si trabaja las dos franjas; continuo si
 // además abre las dos del mismo local (un turno seguido, no dos); y la franja que abre,
 // que es la que fija su tramo del partido (entra a abrir y hace el tramo largo).
-function repartoDelDia(mias) {
+// cerradas (mitadesCerradas): las franjas en las que estaba en un local cerrado por fechas. Si el
+// cierre le quitó una mitad de su partido, la otra se queda con su tramo del partido (enPartido): nadie
+// ha decidido que entre a abrir ni que haga el turno entero (24/09, revisión F2: Hojan pasaba solo de
+// El 33 de 11:00 a 16:00 a El 33 de 07:00 a 16:00, y sus horas no bajaban). Ese día no cuenta como
+// partido (partido = trabaja las dos franjas).
+function repartoDelDia(mias, cerradas) {
   const partido = mias.some(x => x.franja === 'M') && mias.some(x => x.franja === 'T');
   const abren = mias.filter(x => x.e.abre);
   const continuo = partido && abren.length === 2 && abren[0].localId === abren[1].localId ? abren[0].localId : null;
   const fr = [...new Set(abren.map(x => x.franja))];
-  return { partido, continuo, abre: partido && !continuo && fr.length === 1 ? fr[0] : null };
+  const mitad = !partido && mias.length > 0 && (cerradas || []).some(f => !mias.some(x => x.franja === f));
+  const enPartido = (partido && !continuo) || mitad;
+  return { partido, continuo, abre: enPartido && fr.length === 1 ? fr[0] : null, enPartido };
 }
 // lo mismo para las vistas, que parten de la persona y el día en vez de la planilla del mes
 function turnoDelDia(cfg, est, iso, pid) {
   const mias = [];
   for (const t of turnosDe(cfg)) { const e = asignados(est, iso, t.id).find(x => x.pid === pid); if (e) mias.push({ e, localId: t.local.id, franja: t.franja }); }
-  return repartoDelDia(mias);
+  return repartoDelDia(mias, mitadesCerradas(cfg, pid, iso));
 }
 // ---------- apoyos: el registro de horas para pagarles ----------
 // José, 18/09: «a partir del 1 de octubre… un registro, que los apoyos son los extras que
@@ -1826,8 +2409,8 @@ function tramoDe(cfg, est, iso, tid, pid) {
   if (!e) return null;
   if (e.ini && e.fin) return { ini: e.ini, fin: e.fin, aMano: true };
   const { localId, franja } = partirTurno(tid);
-  const { partido, continuo, abre } = turnoDelDia(cfg, est, iso, pid);
-  const h = horarioDe(localDe(cfg, localId), isoDow(iso), franja, partido && !continuo, abre);
+  const { enPartido, abre } = turnoDelDia(cfg, est, iso, pid);
+  const h = horarioDe(localDe(cfg, localId), isoDow(iso), franja, enPartido, abre);
   return h ? { ini: h.ini, fin: h.fin, aMano: false } : null;
 }
 // el registro del mes: cada apoyo con sus días, y cada día con sus tramos (bar, franja,
@@ -1844,13 +2427,14 @@ function registroApoyos(cfg, staff, meses, y, m) {
     for (let d = 1; d <= n; d++) {
       const iso = isoDe(y, m, d), dow = isoDow(iso);
       const mias = [];
-      for (const t of turnosDe(cfg)) { const e = asignados(est, iso, t.id).find(x => x.pid === p.id); if (e) mias.push({ e, localId: t.local.id, franja: t.franja, tid: t.id }); }
+      // la casilla cerrada ESE día no se paga; «Cuándo abre» no borra lo ya trabajado (revisión F2)
+      for (const t of turnosDe(cfg)) { const e = asignados(est, iso, t.id).find(x => x.pid === p.id); if (e && !cerradaEseDia(cfg, est, iso, t.id)) mias.push({ e, localId: t.local.id, franja: t.franja, tid: t.id }); }
       if (!mias.length) continue;
-      const { partido, continuo, abre } = repartoDelDia(mias);
+      const { continuo, abre, enPartido } = repartoDelDia(mias, mitadesCerradas(cfg, p.id, iso));
       const dia = { iso, tramos: [], minutos: 0 };
       for (const { e, localId, franja, tid } of mias) {
         const seguido = continuo === localId && franja === 'M';
-        const min = seguido ? 0 : minutosTurno(localDe(cfg, localId), dow, franja, e, partido && !continuo, abre);
+        const min = seguido ? 0 : minutosTurno(localDe(cfg, localId), dow, franja, e, enPartido, abre);
         const tr = tramoDe(cfg, est, iso, tid, p.id) || { ini: null, fin: null, aMano: false };
         dia.tramos.push({ localId, franja, ini: tr.ini, fin: tr.fin, aMano: tr.aMano, minutos: min });
         dia.minutos += min;
@@ -1888,7 +2472,12 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
   const p = personaDe(staff, pid);
   const k = claveMes(y, m);
   const asig = (meses && meses[k] && meses[k].asig) || {};
-  const out = { pid, nombre: p ? p.nombre : pid, mananas: 0, tardes: 0, partidos: 0, continuos: 0, dias: 0, turnos: 0, minutos: 0, nocturnosMin: 0, festivas: 0, domingos: 0, festivasMin: 0, domingosMin: 0, extrasMin: 0, ausencias: 0, porLocal: {}, contratoHoras: null, saldo: null, refuerzos: 0, forzados: 0 };
+  // 24/09 (S26): una plaza en una casilla cerrada ESE día (por fechas o a mano) no se trabaja, así que
+  // no va a la nómina aunque siga guardada. «Cuándo abre» no cuenta: es el horario de ahora en
+  // adelante y lo ya trabajado no se borra (revisión F2, cerradaEseDia)
+  const estAp = { apertura: (meses && meses[k] && meses[k].apertura) || {} };
+  const hayCierres = cierresDe(cfg).length > 0;
+  const out = { pid, nombre: p ? p.nombre : pid, mananas: 0, tardes: 0, partidos: 0, continuos: 0, dias: 0, turnos: 0, minutos: 0, nocturnosMin: 0, festivas: 0, domingos: 0, festivasMin: 0, domingosMin: 0, extrasMin: 0, ausencias: 0, porLocal: {}, contratoHoras: null, saldo: null, refuerzos: 0, forzados: 0, sinTrabajoCierre: [] };
   const n = diasDelMes(y, m);
   for (let d = 1; d <= n; d++) {
     const iso = isoDe(y, m, d), dow = isoDow(iso);
@@ -1898,13 +2487,20 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
     const mias = [];
     for (const [tid, lista] of Object.entries(asig[iso] || {})) {
       const e = lista.find(x => x.pid === pid); if (!e) continue;
+      if (cerradaEseDia(cfg, estAp, iso, tid)) continue;
       mias.push(Object.assign({ e }, partirTurno(tid)));
     }
     // turno continuo: abre la mañana Y la tarde del mismo local. Es UN turno seguido, no
     // dos: se cuenta una sola vez (con la tarde, que es la que acaba al cierre).
-    const { partido, continuo, abre: abreF } = repartoDelDia(mias);
+    const cerradas = hayCierres ? mitadesCerradas(cfg, pid, iso) : [];
+    const { partido, continuo, abre: abreF, enPartido } = repartoDelDia(mias, cerradas);
     if (continuo) out.continuos++;
-    const enPartido = partido && !continuo;
+    // 24/09 (D11 y revisión F2): sin trabajo por el cierre de su local, por medios días. «trabaja» =
+    // ese día tiene otro turno (Hojan hace El 33 por la mañana: su tarde no es un día sin trabajo)
+    if (hayCierres && p && !ausenciaEn(p, iso)) {
+      const sin = cerradas.filter(f => { const dc = decisionCierre(cfg, pid, iso, f); return dc.tipo !== 'REFUERZA'; });
+      if (sin.length) out.sinTrabajoCierre.push({ iso, franjas: sin, trabaja: mias.length > 0 });
+    }
     let minDia = 0;
     for (const { e, localId, franja } of mias) {
       const l = localDe(cfg, localId);
@@ -1928,6 +2524,9 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
     out.libres = out.libresDias.length;
     out.bajaDias = diasAusenciaMes(p, y, m, 'BAJ').length;
   } else { out.vacacionesDias = []; out.vacaciones = 0; out.libresDias = []; out.libres = 0; out.bajaDias = 0; }
+  // 24/09 (D11): los días sin trabajo por el cierre de su local, enteros (sin ningún otro turno ese
+  // día). Solo informativo: no toca el pago ni el contrato (si se pagan o no, lo decide el grupo)
+  out.diasSinTrabajoCierre = out.sinTrabajoCierre.filter(x => !x.trabaja).map(x => x.iso);
   for (const x of cfg.extras || []) if (x.pid === pid && x.iso && x.iso.startsWith(k)) out.extrasMin += +x.min || 0;
   out.horas = Math.round((out.minutos + out.extrasMin) / 6) / 10;
   out.horasNocturnas = Math.round(out.nocturnosMin / 6) / 10;
@@ -1969,13 +2568,25 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
   const skillDe = (localId, dow) => `coc_${localId}${activos.some(p => Array.isArray(p.cocina && p.cocina.soloDias) && p.cocina.soloDias.length && ((p.cocina.titular || []).includes(localId) || (p.cocina.reserva || []).includes(localId))) ? '_d' + dow : ''}`;
   const workers = activos.map(p => {
     const w = { id: p.id, name: p.nombre, allowed_shifts: (p.locales || []).length ? p.locales.slice() : todosLocales.slice(), skills: [], unavailable: {}, fixed: {}, preferences: [] };
+    const apoyo = new Set();   // medios días en que apoya por el cierre de su local (24/09, D11)
     indices.forEach((x, i) => {
       // el día libre de ESA semana (libraEn): el cambio puntual bloquea el martes y deja el miércoles (24/09)
       const bloqueada = ausenciaEn(p, x.iso) || libraEn(p, x.iso) || ((p.franjas || []).length && !p.franjas.includes(x.franja));
       if (bloqueada) { w.unavailable[i] = '*'; return; }
+      // sin trabajo por el cierre de su local: ese medio día no está (el núcleo no redistribuye a nadie solo)
+      const dc = decisionCierre(cfg, p.id, x.iso, x.franja);
+      if (dc && dc.tipo !== 'REFUERZA') { w.unavailable[i] = '*'; return; }
+      if (dc) apoyo.add(i);
       const vet = (p.vetos || []).filter(v => v.franja === x.franja && (dowsVeto(v) === null || dowsVeto(v).includes(x.dow))).map(v => v.localId);
       if (vet.length) w.unavailable[i] = vet;
     });
+    // quien apoya puede ir a cualquier local esos medios días; el resto del horizonte sigue atado a
+    // sus locales (allowed_shifts es de todo el horizonte, así que se ata medio día a medio día)
+    if (apoyo.size && (p.locales || []).length) {
+      const fuera = todosLocales.filter(id => !p.locales.includes(id));
+      w.allowed_shifts = todosLocales.slice();
+      indices.forEach((x, i) => { if (apoyo.has(i) || w.unavailable[i] === '*') return; w.unavailable[i] = [...new Set([...(w.unavailable[i] || []), ...fuera])]; });
+    }
     for (const l of cfg.locales) for (const dow of TODOS) if (puedeCocina(cfg, p, l.id, isoDe(2026, 10, 4 + dow))) { const s = skillDe(l.id, dow); if (!w.skills.includes(s)) w.skills.push(s); }
     if (p.prefs && (p.prefs.evitaDows || []).length) indices.forEach((x, i) => { if (p.prefs.evitaDows.includes(x.dow)) w.preferences.push({ day: i, shift: 'OFF', weight: 3 }); });
     return w;
@@ -1987,18 +2598,20 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
     for (const l of cfg.locales) {
       const tid = turnoId(l.id, x.franja);
       if (!turnoAbierto(cfg, est, x.iso, tid)) { by_day[i][l.id] = { min: 0, max: 0 }; continue; }
-      by_day[i][l.id] = { min: minimoDe(cfg, x.iso, tid).min };
+      by_day[i][l.id] = { min: minimoDe(cfg, x.iso, tid, est).min };
     }
   });
   const rules = [{ type: 'coverage', mode: 'hard', tier: 3, id: 'mínimos por local, día y franja', params: { demand: {}, by_day } }];
-  // cocina: obligatoria = dura; con titulares definidos = blanda
+  // cocina: obligatoria = dura; con titulares definidos = blanda. Por medio día ABIERTO (turnoAbierto),
+  // no por día de la semana (24/09, D11 y S27): un medio día cerrado por fechas o a mano tiene cobertura
+  // 0/0 y una regla dura de cocina ahí lo hacía imposible.
   for (const l of cfg.locales) for (const f of FRANJAS) {
     if (!localTieneCocina(l, f)) continue;
     const dura = !!(l.cocina.obligatoria && l.cocina.obligatoria[f]);
-    for (const dow of TODOS) {
-      if (!((l.abre && l.abre[f]) || []).includes(dow)) continue;
-      rules.push({ type: 'skill_coverage', mode: dura ? 'hard' : 'soft', weight: 5, tier: dura ? 3 : 1, id: `cocina ${l.nombre} ${FRANJA_LBL[f].toLowerCase()} ${DOW_PL[dow]}`, params: { requirements: [{ shift: l.id, skill: skillDe(l.id, dow), min: 1 }] }, scope: { day_tags: [f, 'd' + dow] } });
-    }
+    indices.forEach(x => {
+      if (x.franja !== f || !turnoAbierto(cfg, est, x.iso, turnoId(l.id, f))) return;
+      rules.push({ type: 'skill_coverage', mode: dura ? 'hard' : 'soft', weight: 5, tier: dura ? 3 : 1, id: `cocina ${l.nombre} ${FRANJA_LBL[f].toLowerCase()} del ${DOW_LBL[x.dow]} ${+x.iso.slice(8, 10)}`, params: { requirements: [{ shift: l.id, skill: skillDe(l.id, x.dow), min: 1 }] }, scope: { day_tags: [x.iso + '_' + f] } });
+    });
   }
   // «nunca con»: mismo local y misma franja
   const pares = new Set();
@@ -2019,6 +2632,10 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
         if (franja !== x.franja) continue;
         const w = workers.find(z => z.id === pl.p);
         if (!w || w.unavailable[i]) continue;
+        // una casilla cerrada ese medio día (por fechas, a mano o por «Cuándo abre») tiene cobertura
+        // 0/0: fijar ahí a alguien (quien apoya por el cierre no está «no disponible») hacía el
+        // problema imposible (24/09, revisión F2)
+        if (!turnoAbierto(cfg, est, x.iso, pl.t)) continue;
         w.fixed[i] = localId;
       }
     });
@@ -2049,8 +2666,12 @@ function desdeSolucion(cfg, staff, est, problema, sol, opts) {
 }
 
 // ---------- sincronización (servidor) ----------
-const CLAVES_PLANILLA = ['meses', 'staff', 'locales', 'patron', 'eventos', 'equipos', 'extras', 'festivos', 'cierres'];
-const huellaPlanillaDe = e => JSON.stringify(CLAVES_PLANILLA.map(k => e[k] === undefined ? null : e[k]));
+// cierresPuntuales (24/09, D11): un cierre de otro dispositivo no se funde, manda el servidor
+const CLAVES_PLANILLA = ['meses', 'staff', 'locales', 'patron', 'eventos', 'equipos', 'extras', 'festivos', 'cierres', 'cierresPuntuales'];
+// Una clave que falta vale lo mismo que vacía ([] o {}): el primer 409 tras desplegar una clave nueva
+// (cierresPuntuales) no es un conflicto (24/09, revisión F2)
+const vacioHuella = v => v === undefined || v === null || (Array.isArray(v) ? !v.length : typeof v === 'object' && !Object.keys(v).length);
+const huellaPlanillaDe = e => JSON.stringify(CLAVES_PLANILLA.map(k => vacioHuella(e[k]) ? null : e[k]));
 // 409 del servidor: si entre `base` (lo que teníamos) y `servidor` solo cambiaron
 // peticiones o avisos (deltas de empleados), se funden con la edición local; si
 // cambió la planilla, manda el servidor.
@@ -2231,7 +2852,7 @@ function semillaPasarela() {
     { id: 'madrid', nombre: 'Madrid', corto: 'Madrid', color: '#3b3b3b', refuerzo: { EL33: 1, ZAPA: 1, MONACO: 1, PASARELA: 1 }, franja: 'T' },
     { id: 'elche', nombre: 'Elche', corto: 'Elche', color: '#0a7a3c', refuerzo: { EL33: 1, ZAPA: 1, MONACO: 1, PASARELA: 1 }, franja: 'T' },
   ];
-  return { locales, staff, patron, equipos, eventos: [], extras: [], festivos: [], cierres: {}, reglas: {} };
+  return { locales, staff, patron, equipos, eventos: [], extras: [], festivos: [], cierres: {}, cierresPuntuales: [], reglas: {} };
 }
 
 // ---------- navegación ----------
@@ -2337,7 +2958,7 @@ if (typeof module !== 'undefined') {
     fechaLocal, isoDow, addDias, diasDelMes, isoDe, claveMes, mondayOf, semanaDe, fechaMadrid, rangoIso,
     FRANJAS, FRANJA_LBL, DOW_LBL, DOW_PL, TODOS, TIPOS_AUSENCIA, AUS_LBL, PUESTOS,
     turnoId, partirTurno, turnosDe, localDe, personaDe, nombreDe,
-    turnoAbierto, toggleApertura, turnosAbiertosSemana, turnosAbiertosMes, turnosConSupuesto, eventosDe, minimoDe,
+    turnoAbierto, toggleApertura, abrirCasilla, motivoCerrado, turnosAbiertosSemana, turnosAbiertosMes, turnosConSupuesto, eventosDe, minimoDe,
     nuevoEstado, estadoDesde, clonarEstado, asignados, pidsEn, casillasDe, manualDe, marcarManual, quitarMarcaManual, primerDiaPlanificable,
     ausenciaEn, quitarDiaDeAusencia, anadirAusencia, deBaja,
     localTieneCocina, puedeCocina, rangoCocina, abrePorDefecto,
@@ -2356,6 +2977,9 @@ if (typeof module !== 'undefined') {
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente,
     CARACTERISTICAS, REGLAS, REGLA_NOMBRE, nombreRegla, regla, caracteristicaActiva, avisosVigentes, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
     resumenMinimos, descripcionCocina, condicionesDe, verificarSemana, generarSemana, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
+    MOTIVOS_CIERRE, DECISIONES_CIERRE, cierresDe, diasDeCierre, cierreEn, textoCierre, etiquetaCierre, hastaCierre, motivoCierreTxt, motivoSinTrabajo, fechaCortaCierre, validarCierre,
+    decisionCierre, apoyoPorCierre, puntosCierre, afectadosPorCierre, sugerenciasRefuerzo, aplicarCierre, quitarCierre, instanciarCierres, CLAVES_PLANILLA,
+    cerradaEseDia, aperturaDelDia, diaConPlanilla, apoyosSinSitio, mitadesCerradas, cierresDelHorario, reabrirCierreDesde, dentroDeCierre, repartoDelDia,
     TIPOS_INCIDENCIA, turnosAfectados, turnosSemanaDe, candidatosCobertura, planesCobertura, aplicarCobertura, vaciarPlanilla,
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,
   };

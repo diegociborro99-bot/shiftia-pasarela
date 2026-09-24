@@ -2,7 +2,7 @@
 // Las cuatro casillas de la mañana y las cuatro de la tarde del día en pantalla,
 // con el orden real de la planilla: quien abre va el primero y la cocina en su
 // posición. Es la pantalla que el encargado abre cada mañana.
-const ORIGEN_LBL = { patron: 'semana tipo', generador: 'generador', manual: 'a mano', nucleo: 'núcleo', refuerzo: 'refuerzo', cubre: 'cobertura', cobertura: 'gestor de cobertura' };
+const ORIGEN_LBL = { patron: 'semana tipo', generador: 'generador', manual: 'a mano', nucleo: 'núcleo', refuerzo: 'refuerzo', cubre: 'cobertura', cobertura: 'gestor de cobertura', cierre: 'apoyo por un cierre' };
 
 function chipPersona(iso, tid, s, opts) {
   const p = personaDeId(s.pid); if (!p) return '';
@@ -41,7 +41,13 @@ function htmlCasilla(iso, tid, opts) {
     ${abierto && r.sinAbre ? '<span class="bdg forz" data-tipstr="' + esc(r.motivoAbre || '') + '">hueco</span>' : ''}
     ${abierto && r.soloApoyos ? '<span class="bdg forz" data-tipstr="Dos apoyos no pueden quedarse solos en un turno: hace falta alguien de sala o de cocina">solo apoyos</span>' : ''}
     ${h ? `<span class="hor">${esc(h.ini)}–${esc(h.fin)}${l.horarioSupuesto ? '*' : ''}</span>` : ''}</div>`;
-  if (!abierto) return `<div class="casilla cerrada">${cab}<div class="cascerr">Cerrado ${DOW_PL[isoDow(iso)].replace('los ', 'el ')} ${opts && opts.soloLectura ? '' : `<button data-abrir="${iso}|${tid}">abrir hoy</button>`}</div></div>`;
+  if (!abierto) {
+    // 24/09 (D11): cerrado por fechas dice el motivo y hasta cuándo, y en vez de «abrir hoy» (que no
+    // lo abriría: el cierre manda) lleva a ver el cierre, donde se edita o se reabre
+    const c = cierreEn(S, iso, tid);
+    if (c) return `<div class="casilla cerrada cierre" data-cas="${iso}|${tid}">${cab}<div class="cascerr" data-tipstr="${esc(textoCierre(S, c))}">Cerrado · ${esc(etiquetaCierre(c))} (hasta ${esc(hastaCortoCierre(c))}) ${opts && opts.soloLectura ? '' : `<button data-vercierre="${esc(c.id)}">Ver cierre</button>`}</div></div>`;
+    return `<div class="casilla cerrada" data-cas="${iso}|${tid}">${cab}<div class="cascerr">Cerrado ${DOW_PL[isoDow(iso)].replace('los ', 'el ')} ${opts && opts.soloLectura ? '' : `<button data-abrir="${iso}|${tid}">abrir hoy</button>`}</div></div>`;
+  }
   let cuerpo = posicionesDe(S, S.staff, e, iso, tid).map(x => x.hueco ? chipHueco(iso, tid, x, opts) : chipPersona(iso, tid, x, opts)).join('');
   if (!(opts && opts.soloLectura)) {
     if (r.faltan) {
@@ -55,7 +61,7 @@ function htmlCasilla(iso, tid, opts) {
 function htmlLocal(iso, l, opts) {
   return `<div class="loccard" style="--lc:${esc(l.color)}">
     <div class="lochd"><span class="ldot"></span><b>${esc(l.nombre)}</b>
-      <span class="lmini">${opts && opts.soloLectura ? '' : `<button class="btn-mini ghost" data-printlocal="${l.id}" title="Imprimir la semana de este local">Imprimir</button><button class="btn-mini ghost" data-sharelocal="${l.id}" title="Imagen de la semana de este local para WhatsApp">Compartir</button>`}</span></div>
+      <span class="lmini">${opts && opts.soloLectura ? '' : `<button class="btn-mini ghost" data-cerrarlocal="${l.id}" title="Cerrar el local unos días (reforma, vacaciones del local)">Cerrar unos días</button><button class="btn-mini ghost" data-printlocal="${l.id}" title="Imprimir la semana de este local">Imprimir</button><button class="btn-mini ghost" data-sharelocal="${l.id}" title="Imagen de la semana de este local para WhatsApp">Compartir</button>`}</span></div>
     ${htmlCasilla(iso, turnoId(l.id, 'M'), opts)}${htmlCasilla(iso, turnoId(l.id, 'T'), opts)}
   </div>`;
 }
@@ -80,18 +86,31 @@ function renderDia() {
   $('#dStats').innerHTML = `<span class="dstat"><b>${abiertos}</b> casillas</span><span class="dstat ${cortos ? 'warn' : 'ok'}"><b>${cortos}</b> cortas</span><span class="dstat ${sinCocina ? 'warn' : 'ok'}"><b>${sinCocina}</b> sin cocina</span><span class="dstat"><b>${personas.size}</b> personas</span>${forzados ? `<span class="dstat sal"><b>${forzados}</b> forzadas</span>` : ''}`;
   // eventos del día y avisos
   const evs = eventosDe(S, iso);
-  const rev = revisionMes(S, S.staff, est, { desde: iso, hasta: iso }).filter(x => x.nivel === 'alta');
+  const rev = revisionMes(S, S.staff, est, { desde: iso, hasta: iso, hoy: isoHoy() }).filter(x => x.nivel === 'alta');
   $('#diaWarn').innerHTML = (evs.length ? `<div class="evrow">${evs.map(chipEvento).join('')}</div>` : '') +
     (rev.length ? `<div class="warnbanner"><b>${pl(rev.length, 'aviso importante', 'avisos importantes')} hoy</b>${rev.slice(0, 4).map(x => esc(x.msg)).join(' · ')}${rev.length > 4 ? ` · y ${rev.length - 4} más` : ''}</div>` : '');
   $('#diaLocales').innerHTML = S.locales.map(l => htmlLocal(iso, l)).join('');
   // lateral
   const libres = activos(iso).filter(p => !ausenciaEn(p, iso) && !turnosDe(S).some(t => pidsEn(est, iso, t.id).includes(p.id)));
-  $('#diaSide').innerHTML = `
+  $('#diaSide').innerHTML = htmlCierresDelDia(iso) + `
     <div class="scard"><span class="micro">Ausentes hoy · ${ausentes.length}</span><div class="lst">${ausentes.map(p => { const a = ausenciaEn(p, iso); return `<div class="srow"><span class="av" style="background:${avColor(p.id)};width:24px;height:24px;font-size:9px">${esc(initials(p.nombre))}</span><span class="nm">${esc(p.nombre)}</span><span class="abschip a-${esc(a.tipo)}">${esc((AUS_LBL[a.tipo] || {}).label || a.tipo)}</span></div>`; }).join('') || '<div class="szero">Nadie ausente.</div>'}</div></div>
-    <div class="scard"><span class="micro">Libran hoy · ${libres.length}</span><div class="lst">${libres.map(p => `<div class="srow"><span class="av" style="background:${avColor(p.id)};width:24px;height:24px;font-size:9px">${esc(initials(p.nombre))}</span><span class="nm">${esc(p.nombre)}</span><small>${esc(estadoDia(S, p, iso).texto || 'sin turno')}</small></div>`).join('') || '<div class="szero">Todo el equipo trabaja hoy.</div>'}</div></div>
+    <div class="scard"><span class="micro">Libran hoy · ${libres.length}</span><div class="lst">${libres.map(p => `<div class="srow"><span class="av" style="background:${avColor(p.id)};width:24px;height:24px;font-size:9px">${esc(initials(p.nombre))}</span><span class="nm">${esc(p.nombre)}</span>${(m => m ? `<small class="${m.cls === 'cie apoyo' ? 'cieapoyo' : ''}" data-tipstr="${esc(m.tip)}">${esc(m.largo)}</small>` : `<small>${esc(estadoDia(S, p, iso).texto || 'sin turno')}</small>`)(marcaCierreDia(p, iso, est))}</div>`).join('') || '<div class="szero">Todo el equipo trabaja hoy.</div>'}</div></div>
     <div class="scard"><span class="micro">Semana tipo</span><p class="szero">El generador parte de la semana tipo del grupo y rellena lo que falte. <button class="glink" data-irgen="${iso}">Completar este día</button></p></div>`;
   $('#dSticky').classList.toggle('on', scrollY > 235 && !$('#view-hoy').classList.contains('hidden'));
   pintaRevDot();
+}
+// los locales cerrados por fechas ese día: el motivo y qué hace cada uno (apoyo, sin trabajo,
+// vacaciones o día libre), para no tener que abrir el cierre (24/09, D11)
+function htmlCierresDelDia(iso) {
+  const cs = cierresDe(S).filter(c => diasDeCierre(c).includes(iso));
+  if (!cs.length) return '';
+  return `<div class="scard cieside"><span class="micro">Cerrado hoy · ${cs.length}</span>${cs.map(c => {
+    const xs = Object.entries(c.decisiones || {}).filter(([, d]) => !d.turnos || d.turnos.some(k => k.startsWith(iso + '|')));
+    // quien apoya «donde haga falta» y aún no está puesto en ningún sitio lo dice (revisión F2)
+    const sinSitio = new Set(apoyosSinSitio(S, S.staff, estadoDeIso(iso), iso).map(x => x.pid));
+    const grupo = t => xs.filter(([, d]) => d.tipo === t).map(([pid, d]) => { const dest = d.tipo === 'REFUERZA' && d.destinos && d.destinos[iso]; return nombrePid(pid) + (dest ? ` (${nombreLocal(partirTurno(dest).localId)})` : d.tipo === 'REFUERZA' && sinSitio.has(pid) ? ' (aún sin sitio)' : ''); });
+    return `<div class="cieitem"><b>${esc(textoCierre(S, c))}</b>${DECISIONES_CIERRE.filter(d => grupo(d.id).length).map(d => `<small><em>${esc(d.largo)}:</em> ${esc(grupo(d.id).join(', '))}</small>`).join('')}<button class="glink" data-vercierre="${esc(c.id)}">Ver cierre</button></div>`;
+  }).join('')}</div>`;
 }
 function chipEvento(ev) {
   const eq = (S.equipos || []).find(x => x.id === ev.equipo);
@@ -123,13 +142,26 @@ document.addEventListener('click', e => {
   }
   const ab = e.target.closest('[data-abrir]');
   if (ab) {
+    // 24/09 (S28): se abría con mínimo 0 y nadie la rellenaba. Se pide el mínimo y se guarda con la
+    // apertura de ese día; no se inventa ninguno
     const [iso, tid] = ab.dataset.abrir.split('|');
+    const { localId, franja } = partirTurno(tid);
+    const fr = FRANJA_LBL[franja].toLowerCase();
+    const v = prompt(`${nombreLocal(localId)} no abre ${DOW_PL[isoDow(iso)]} por la ${fr}: se abre solo el ${fmtLargo(iso).toLowerCase()}.\n\n¿Cuántas personas hacen falta como mínimo?`, '');
+    if (v === null) return;
+    const n = parseInt(String(v).trim(), 10);
+    if (!(n >= 0) || n > 20) { toast('Escribe cuántas personas hacen falta (un número)', 'warn'); return; }
+    if (!confirmarSiCerrado(iso)) return;
     pushUndo('abrir casilla');
-    toggleApertura(estadoDeIso(iso, true), iso, tid, S);
-    registrarCambio(`Casilla abierta a mano: ${nombreLocal(partirTurno(tid).localId)} ${FRANJA_LBL[partirTurno(tid).franja].toLowerCase()} del ${fmtDM(iso)}`, 'cambio');
+    abrirCasilla(estadoDeIso(iso, true), iso, tid, n);
+    registrarCambio(`Casilla abierta a mano: ${nombreLocal(localId)} ${fr} del ${fmtDM(iso)} (mínimo ${n})`, 'cambio');
     saveState(); renderVistaActiva();
     return;
   }
+  const vc = e.target.closest('[data-vercierre]');
+  if (vc) { cerrarPops(); openCierre({ id: vc.dataset.vercierre }); return; }
+  const cl = e.target.closest('[data-cerrarlocal]');
+  if (cl) { openCierre({ localId: cl.dataset.cerrarlocal, iso: isoDia() }); return; }
   const ch = e.target.closest('.pchip[data-turno]');
   if (ch && !e.target.closest('.rmx')) { const [iso, tid] = ch.dataset.turno.split('|'); openMenuTurno(iso, tid, ch.dataset.pid, ch); return; }
   const pr = e.target.closest('[data-printlocal]');

@@ -4,12 +4,13 @@
 const NIVEL_LBL = { alta: ['var(--bad)', 'Hay que resolver'], media: ['var(--warn)', 'Conviene revisar'], info: ['var(--accent)', 'Pendiente de confirmar con el grupo'] };
 function pintaRevDot() {
   const dot = document.getElementById('revDot'); if (!dot || !est) return;
-  const n = revisionMes(S, S.staff, est).filter(x => x.nivel === 'alta').length;
+  const n = revisionMes(S, S.staff, est, { hoy: isoHoy() }).filter(x => x.nivel === 'alta').length;
   dot.classList.toggle('hidden', !n);
   const b = document.getElementById('topRevisar'); if (b) b.title = n ? `Revisar el mes: ${n} aviso(s) importante(s)` : 'Revisar el mes';
 }
 function openRevision() {
-  const h = revisionMes(S, S.staff, est);
+  // con la fecha de hoy: lo ya pasado que solo cierra «Cuándo abre» no es un aviso (revisión F2)
+  const h = revisionMes(S, S.staff, est, { hoy: isoHoy() });
   const grupos = ['alta', 'media', 'info'].map(n => [n, h.filter(x => x.nivel === n)]);
   const supuestos = turnosConSupuesto(S);
   const html = `<span class="micro">REVISIÓN DE ${MESES[S.m - 1].toUpperCase()} ${S.y}</span>

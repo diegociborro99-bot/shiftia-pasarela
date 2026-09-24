@@ -6,6 +6,9 @@
 //   S.patron    semana tipo (plazas por día de la semana)
 //   S.meses     { 'YYYY-MM': { asig, apertura, manual } }
 //   S.eventos   partidos y eventos con refuerzo; S.extras horas extra; S.cierres meses cerrados
+//               para la nómina (no confundir con S.cierresPuntuales)
+//   S.cierresPuntuales  un local cerrado unos días (reforma, vacaciones del local), con lo que
+//               hace cada persona esos días (24/09, D11; ver modelo.js «cierres puntuales»)
 //   S.equipos   los botones de fútbol (equipo → refuerzo por local recordado)
 const LS_KEY = 'shiftia_pasarela_v01';
 const NAV_KEY = 'shiftia_pas_nav';
@@ -97,6 +100,8 @@ function migrarEstado(estado) {
   estado.equipos = Array.isArray(estado.equipos) && estado.equipos.length ? estado.equipos : base.equipos;
   for (const k of ['eventos', 'extras', 'festivos', 'peticiones', 'avisos', 'historial', 'mesesPublicados']) if (!Array.isArray(estado[k])) estado[k] = [];
   if (!estado.cierres || typeof estado.cierres !== 'object') estado.cierres = {};
+  // 24/09 (D11): los cierres de un local por fechas; las planillas de antes no traen ninguno
+  if (!Array.isArray(estado.cierresPuntuales)) estado.cierresPuntuales = [];
   if (!estado.meses || typeof estado.meses !== 'object') estado.meses = {};
   for (const p of estado.staff) {
     p.locales = p.locales || []; p.franjas = p.franjas || ['M', 'T']; p.libra = p.libra || []; p.partido = p.partido || { dias: [] };
@@ -161,7 +166,7 @@ function panelesVigilados(nuevo) {
   return out;
 }
 const mesesConContenido = m => Object.fromEntries(Object.entries(m || {}).filter(([, v]) => v && (Object.keys(v.apertura || {}).length || Object.keys(v.asig || {}).length)));
-const huellaPlanilla = e => JSON.stringify([mesesConContenido(e.meses), e.staff || [], e.locales || [], e.patron || {}, e.eventos || [], e.extras || [], e.festivos || [], e.cierres || {}]);
+const huellaPlanilla = e => JSON.stringify([mesesConContenido(e.meses), e.staff || [], e.locales || [], e.patron || {}, e.eventos || [], e.extras || [], e.festivos || [], e.cierres || {}, e.cierresPuntuales || []]);
 function aplicarEstadoExterno(nuevo) {
   const suave = !!S && huellaPlanilla(nuevo) === huellaPlanilla(S);
   // los paneles que miran un registro concreto se juzgan por ese registro, cambie o no la
@@ -213,6 +218,9 @@ function pushUndo(label, extra) {
     if (extra && extra.eventos) u.eventos = JSON.parse(JSON.stringify(S.eventos));
     if (extra && extra.extras) u.extras = JSON.parse(JSON.stringify(S.extras));
     if (extra && extra.otrosMeses) u.otrosMeses = JSON.parse(JSON.stringify(S.meses));
+    // 24/09 (D11): cerrar un local por fechas toca los cierres, las fichas (vacaciones) y varios meses
+    if (extra && extra.cierres) u.cierresPuntuales = JSON.parse(JSON.stringify(S.cierresPuntuales || []));
+    if (extra && extra.locales) u.locales = JSON.parse(JSON.stringify(S.locales));
     undoStack.push(u);
     if (undoStack.length > 20) undoStack.shift();
     actualizarUndoBtn();
@@ -233,6 +241,8 @@ function deshacer() {
   // «Guardar como semana tipo» apila la semana tipo de antes y promete «Ctrl+Z lo deshace», pero
   // aquí no se devolvía (24/09, revisión)
   if (u.patron) S.patron = u.patron;
+  if (u.cierresPuntuales) S.cierresPuntuales = u.cierresPuntuales;
+  if (u.locales) S.locales = u.locales;
   registrarCambio('Deshecho: ' + u.label, 'undo');
   saveState(); renderVistaActiva();
   repintarPaneles();

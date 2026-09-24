@@ -674,8 +674,11 @@ const server = http.createServer(async (req, res) => {
       // es una lista ORDENADA de {pid, cocina, abre, origen…}, no de pids
       {
         const lista = k => estado[k] === undefined || estado[k] === null || Array.isArray(estado[k]);
-        const bien = ['locales', 'peticiones', 'avisos', 'historial', 'festivos', 'eventos', 'extras', 'mesesPublicados'].every(lista)
+        // 24/09 (D11): los cierres de un local por fechas, con su local y sus días { iso: [franjas] }
+        const esCierre = c => !!c && typeof c === 'object' && typeof c.localId === 'string' && !!c.dias && typeof c.dias === 'object' && !Array.isArray(c.dias) && Object.values(c.dias).every(Array.isArray);
+        const bien = ['locales', 'peticiones', 'avisos', 'historial', 'festivos', 'eventos', 'extras', 'mesesPublicados', 'cierresPuntuales'].every(lista)
           && estado.staff.every(p => p && typeof p === 'object' && typeof p.id === 'string')
+          && (!Array.isArray(estado.cierresPuntuales) || estado.cierresPuntuales.every(esCierre))
           && (estado.meses === undefined || (estado.meses && typeof estado.meses === 'object' && !Array.isArray(estado.meses)));
         if (!bien) { json(res, 400, { error: 'estado inválido: alguna lista no tiene la forma esperada' }); return; }
       }

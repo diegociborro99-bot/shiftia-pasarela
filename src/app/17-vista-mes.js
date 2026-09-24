@@ -20,7 +20,7 @@ function renderKPIs() {
 }
 function renderLegend() {
   $('#legend').innerHTML = S.locales.map(l => `<span class="lg"><span class="lp" style="background:${esc(l.color)}"></span>${esc(l.nombre)}</span>`).join('') +
-    `<span class="lg"><span class="lgd pill pM" style="--lc:var(--ink3)">M</span>mañana</span><span class="lg"><span class="lgd pill pT" style="--lc:var(--ink3)">T</span>tarde</span><span class="lg"><span class="lgd pill pP" style="--lc:var(--ink3)">P</span>partido</span><span class="lg"><span class="lgd striped a-VAC">VAC</span>ausencia</span><span class="lg"><span class="lgd" style="background:var(--warn-bg);color:var(--warn)">n</span>faltan</span>`;
+    `<span class="lg"><span class="lgd pill pM" style="--lc:var(--ink3)">M</span>mañana</span><span class="lg"><span class="lgd pill pT" style="--lc:var(--ink3)">T</span>tarde</span><span class="lg"><span class="lgd pill pP" style="--lc:var(--ink3)">P</span>partido</span><span class="lg"><span class="lgd striped a-VAC">VAC</span>ausencia</span><span class="lg"><span class="lgd striped a-CIE">CIE</span>sin trabajo por un cierre</span><span class="lg"><span class="lgd" style="background:var(--warn-bg);color:var(--warn)">n</span>faltan</span>`;
 }
 function renderMes() {
   const kHoy = isoHoy().slice(0, 7), kMes = mesKey(S.y, S.m);
@@ -34,7 +34,9 @@ function renderMes() {
   const wDia = getComputedStyle(document.documentElement).getPropertyValue('--w-dia').trim() || '62px';
   const wNom = getComputedStyle(document.documentElement).getPropertyValue('--w-nombre').trim() || '175px';
   let h = `<div class="mesev">${evs.map(chipEvento).join('')}</div><table class="plan" style="width:calc(${wNom} + ${est.days.length} * ${wDia})"><thead><tr><th class="pname">Persona</th>`;
-  for (const d of est.days) h += `<th class="day${d.dow >= 6 ? ' wk' : ''}${evPor[d.iso] ? ' evday' : ''}" data-irdia="${d.iso}" title="Ir al día"><span class="dn">${DOW_C[d.dow]}</span><span class="dd">${d.d}</span>${evPor[d.iso] ? `<span class="evd" role="button" tabindex="0" data-evpop="${d.iso}" title="Ver o quitar el evento">⚽</span>` : ''}</th>`;
+  // un local cerrado por fechas ese día: una marca del color del local con el motivo (24/09, D11)
+  const cierresDia = iso => cierresDe(S).filter(c => diasDeCierre(c).includes(iso));
+  for (const d of est.days) { const cs = cierresDia(d.iso); h += `<th class="day${d.dow >= 6 ? ' wk' : ''}${evPor[d.iso] ? ' evday' : ''}" data-irdia="${d.iso}" title="Ir al día"><span class="dn">${DOW_C[d.dow]}</span><span class="dd">${d.d}</span>${evPor[d.iso] ? `<span class="evd" role="button" tabindex="0" data-evpop="${d.iso}" title="Ver o quitar el evento">⚽</span>` : ''}${cs.length ? `<span class="cied" style="--lc:${esc(colorLocal(cs[0].localId))}" data-tipstr="${esc(cs.map(c => textoCierre(S, c)).join('\n'))}">${esc(cs.map(c => (localDe(S, c.localId) || {}).corto || c.localId).join(' '))}</span>` : ''}</th>`; }
   h += '</tr></thead><tbody>';
   const grupos = [];
   // «De baja» = de baja todo el mes que se mira (24/09: antes, quien lo estaba HOY); una baja de
@@ -56,7 +58,10 @@ function renderMes() {
         const wk = d.dow >= 6 ? ' wk' : '';
         if (!cas.length) {
           if (aus) { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-${esc(aus.tipo)}" data-tipstr="${esc(((AUS_LBL[aus.tipo] || {}).label || aus.tipo) + (aus.detalle ? ' · ' + aus.detalle : ''))}">${esc(aus.tipo)}</span></td>`; continue; }
-          h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill vacio">${estadoDia(S, p, d.iso).libra ? 'libra' : ''}</span></td>`;
+          const ed = estadoDia(S, p, d.iso);
+          // sin trabajo por el cierre de su local: pastilla «CIE» (24/09, D11)
+          if (!ed.libra && ed.cierre && ed.cierre.tipo !== 'REFUERZA') { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-CIE" data-tipstr="${esc(ed.texto)}">CIE</span></td>`; continue; }
+          h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill vacio">${ed.libra ? 'libra' : ''}</span></td>`;
           continue;
         }
         const m = cas.find(c => partirTurno(c.tid).franja === 'M'), t = cas.find(c => partirTurno(c.tid).franja === 'T');
@@ -64,8 +69,12 @@ function renderMes() {
         const cls = m && t ? 'pP' + (lm.id !== lt.id ? ' dobla' : '') : m ? 'pM' : 'pT';
         const txt = m && t ? (lm.id !== lt.id ? `${lm.corto}+${lt.corto}` : `P·${lm.corto}`) : m ? `M·${lm.corto}` : `T·${lt.corto}`;
         const forz = cas.some(c => c.entry.forzado);
-        const tip = cas.map(c => `${FRANJA_LBL[partirTurno(c.tid).franja]}: ${nombreLocal(partirTurno(c.tid).localId)}${c.entry.abre ? ' (abre)' : ''}${c.entry.cocina ? ' (cocina)' : ''}${c.entry.avisos && c.entry.avisos.length ? ' · ' + c.entry.avisos.join(', ') : ''}`).join('\n');
-        h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill ${cls}${evPor[d.iso] ? ' ev' : ''}" style="--lc:${esc((lm || lt).color)};--lc2:${esc((lt || lm).color)}" data-tipstr="${esc(tip)}">${forz ? '<i class="fz"></i>' : ''}${esc(txt)}</span></td>`;
+        // la otra mitad del día sin trabajo por un cierre (Hojan: El 33 por la mañana, la tarde del Mónaco
+        // cerrada): un punto en la pastilla y la franja en el aviso (24/09, revisión F2)
+        const edc = cierresDe(S).length ? estadoDia(S, p, d.iso) : null;
+        const cieF = edc && edc.cierre && edc.cierre.tipo !== 'REFUERZA' && !edc.libra ? edc : null;
+        const tip = cas.map(c => `${FRANJA_LBL[partirTurno(c.tid).franja]}: ${nombreLocal(partirTurno(c.tid).localId)}${c.entry.abre ? ' (abre)' : ''}${c.entry.cocina ? ' (cocina)' : ''}${c.entry.avisos && c.entry.avisos.length ? ' · ' + c.entry.avisos.join(', ') : ''}`).concat(cieF ? [`${cieF.cierre.franjas.map(f => FRANJA_LBL[f]).join(' y ')}: ${cieF.texto}`] : []).join('\n');
+        h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill ${cls}${evPor[d.iso] ? ' ev' : ''}" style="--lc:${esc((lm || lt).color)};--lc2:${esc((lt || lm).color)}" data-tipstr="${esc(tip)}">${forz ? '<i class="fz"></i>' : ''}${cieF ? '<i class="cief"></i>' : ''}${esc(txt)}</span></td>`;
       }
       h += '</tr>';
     }

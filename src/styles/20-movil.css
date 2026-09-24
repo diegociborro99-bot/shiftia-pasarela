@@ -361,7 +361,10 @@
   .perslist{max-height:none;overflow:visible}
   .popfondo{display:block;position:fixed;inset:0;z-index:119;background:rgba(20,24,30,.28);touch-action:none}
   .pop.sheet{bottom:calc(64px + env(safe-area-inset-bottom) + var(--kb,0px))}
-  .ovcard:focus-within{padding-bottom:calc(18px + env(safe-area-inset-bottom) + 30vh)}
+  /* sitio para el teclado, solo con un campo de TEXTO con el foco: con :focus-within bastaba tocar un
+     botón (en Android toma el foco) para que la ventana creciera 30vh entre el toque y el levantar el
+     dedo, y el clic caía fuera: «Cerrar Bar Mónaco» no respondía al primer toque (24/09, revisión F2) */
+  .ovcard:has(:is(input:not([type=button]):not([type=checkbox]):not([type=radio]),textarea):focus){padding-bottom:calc(18px + env(safe-area-inset-bottom) + 30vh)}
 }
 
 /* ---------- 19. LA BARRA INFERIOR DEL PROFESIONAL ----------
