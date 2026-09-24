@@ -57,7 +57,7 @@ function renderMes() {
         const aus = ausenciaEn(p, d.iso);
         const wk = d.dow >= 6 ? ' wk' : '';
         if (!cas.length) {
-          if (aus) { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-${esc(aus.tipo)}" data-tipstr="${esc(((AUS_LBL[aus.tipo] || {}).label || aus.tipo) + (aus.detalle ? ' · ' + aus.detalle : ''))}">${esc(aus.tipo)}</span></td>`; continue; }
+          if (aus) { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-${esc(aus.tipo)}" data-tipstr="${esc(etiquetaAusencia(aus) + (aus.detalle ? ' · ' + aus.detalle : ''))}">${esc(aus.tipo)}</span></td>`; continue; }
           const ed = estadoDia(S, p, d.iso);
           // sin trabajo por el cierre de su local: pastilla «CIE» (24/09, D11)
           if (!ed.libra && ed.cierre && ed.cierre.tipo !== 'REFUERZA') { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-CIE" data-tipstr="${esc(ed.texto)}">CIE</span></td>`; continue; }
@@ -128,7 +128,7 @@ function openDiaPersona(pid, iso, anchor) {
   const aus = ausenciaEn(p, iso);
   const pop = document.createElement('div');
   pop.className = 'pop'; pop.id = 'diaPersPop'; pop.setAttribute('role', 'dialog');
-  pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div><div class="pd">${fmtLargo(iso)}${aus ? ` · <b>${esc((AUS_LBL[aus.tipo] || {}).label || aus.tipo)}</b>` : ''}</div>
+  pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div><div class="pd">${fmtLargo(iso)}${aus ? ` · <b>${esc(etiquetaAusencia(aus))}</b>` : ''}</div>
     ${cas.map(c => { const { localId, franja } = partirTurno(c.tid); return `<div class="festrow" style="border-left-color:${colorLocal(localId)}"><span class="festinfo"><b>${esc(nombreLocal(localId))} · ${FRANJA_LBL[franja].toLowerCase()}</b><small>${c.entry.abre ? 'abre · ' : ''}${c.entry.cocina ? 'cocina · ' : ''}${esc(c.entry.razon || ORIGEN_LBL[c.entry.origen] || '')}</small></span><button class="festrm" data-quita="${c.tid}" aria-label="Quitar">✕</button></div>`; }).join('') || '<div class="festvacio">Sin turno este día.</div>'}
     <button class="popb full" data-dp="dia">Ir al día</button>
     ${aus ? `<button class="popb full" data-dp="quitaraus">Quitar la ausencia de este día</button>` : `<button class="popb full" data-dp="aus">Marcar ausencia</button>`}

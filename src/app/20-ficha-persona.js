@@ -21,12 +21,9 @@ function openFicha(pid, opts) {
     return d.length ? `La ${sem} libra ${d.map(x => lblDowPl(x)).join(' y ')} en vez de ${(q.libra || []).length ? q.libra.map(x => lblDowPl(x)).join(' y ') : 'nada'}.` : `Sin cambios en la ${sem}: libra ${(q.libra || []).length ? q.libra.map(x => lblDowPl(x)).join(' y ') : 'como siempre'}.`;
   };
   const lpOtras = q => librasPuntuales(q).filter(x => x.semana !== lpSem && x.dias.length && x.semana >= lunesDe(isoHoy()));
-  // campos que la ficha da por existentes (estados guardados con esquemas viejos)
-  p.locales = p.locales || []; p.franjas = p.franjas || ['M', 'T']; p.libra = p.libra || []; p.partido = p.partido || { dias: [] }; p.partido.dias = p.partido.dias || [];
-  p.cocina = p.cocina || { titular: [], reserva: [], soloDias: [] }; p.cocina.titular = p.cocina.titular || []; p.cocina.reserva = p.cocina.reserva || []; p.cocina.soloDias = p.cocina.soloDias || [];
-  p.abre = p.abre || {}; p.noAbre = p.noAbre || []; p.nuncaCon = p.nuncaCon || []; p.cubreA = p.cubreA || []; p.vetos = p.vetos || [];
-  p.contrato = p.contrato || { horasSemana: null }; p.ausencias = p.ausencias || []; p.prefs = p.prefs || {}; p.supuestos = p.supuestos || [];
-  p.noPrimero = Array.isArray(p.noPrimero) ? p.noPrimero : []; if (p.inactivas !== undefined && !Array.isArray(p.inactivas)) delete p.inactivas;
+  // campos que la ficha da por existentes: los pone migrarEstado al cargar (normalizarFicha); aquí solo
+  // hacen falta para quien se ha dado de alta en esta sesión (revisión F3)
+  normalizarFicha(p);
 
   let tocada = false, undoHecho = false;
   // un registro por cambio; deshacer con una sola instantánea por ficha abierta
@@ -94,11 +91,12 @@ function openFicha(pid, opts) {
        </div>`) +
       car('partido', 'Hace partido', '(mañana y tarde el mismo día) los…', `<div class="dowset">${dowSet(pd.dias, 'tpartido')}</div>
        ${chk('partidoSiempre', !!pd.siempre, 'Siempre partido')}`));
-    h += sec('cocina', 'Cocina', subOff('cocina', c.nunca ? 'nunca cocina' : `${c.titular.length + c.reserva.length ? 'titular o reserva' : p.puesto === 'cocina' ? 'por su puesto' : 'no cocina'}`),
+    h += sec('cocina', 'Cocina', subOff('cocina', c.nunca ? 'nunca cocina' : `${c.titular.length + c.reserva.length ? 'titular o reserva' : p.puesto === 'cocina' ? 'por su puesto' : 'no cocina'}${p.soloCocina ? ' · solo cocina' : ''}`),
       car('cocina', '', '', `<div class="pinlbl">Titular de cocina en</div><div class="locset">${locChips(c.titular, 'tcoct')}</div>
        <div class="pinlbl">Reserva de cocina en</div><div class="locset">${locChips(c.reserva, 'tcocr')}</div>
        <div class="pinlbl">Solo cocina estos días <small>(ninguno = cualquiera)</small></div><div class="dowset">${dowSet(c.soloDias, 'tcocd')}</div>
-       ${chk('cocinaNunca', !!c.nunca, 'Nunca cocina')}`));
+       ${chk('cocinaNunca', !!c.nunca, 'Nunca cocina')}
+       ${chk('soloCocina', !!p.soloCocina, 'Solo hace cocina: no refuerza la sala (el generador, la cobertura y el selector no la ponen de sala)')}`));
     h += sec('abre', 'Abre el local', 'quién sale primero, quién no',
       car('abre', 'Sale el primero en', '', S.locales.map(l => `<div class="abrerow" style="--lc:${esc(l.color)}"><span class="abrenm"><i class="ldot"></i>${esc(l.nombre)}</span><span class="segrow" style="margin:0">${FRANJAS.map(f => `<button type="button" class="segk${((p.abre[l.id] || []).includes(f)) ? ' on' : ''}" data-tabre="${esc(l.id)}|${f}" data-libre>${FRANJA_LBL[f]}</button>`).join('')}</span></div>`).join('')) +
       car('noAbre', 'No abre nunca en', '', `<div class="locset">${locChips(p.noAbre, 'tnoabre')}</div>`) +
@@ -106,7 +104,7 @@ function openFicha(pid, opts) {
     h += sec('reglas', 'Reglas con otras personas', `${p.nuncaCon.length ? p.nuncaCon.length + ' incompatibles' : 'sin incompatibles'} · cubre a ${p.cubreA.length}`,
       car('nuncaCon', 'Nunca coincide con', '(es mutua: se apaga también en su ficha)', `<div class="chiprow">${p.nuncaCon.map((q, i) => `<span class="tchip warn"><i>${esc(nombrePid(q))}</i><button type="button" class="festrm" data-rmnunca="${i}" aria-label="Quitar">✕</button></span>`).join('') || '<span class="festvacio">Con nadie en especial.</span>'}</div>
        <span class="addrow">${selPersonas('fNuncaSel', p.nuncaCon)}<button type="button" class="btn-mini" data-addnunca>Añadir</button></span>`) +
-      car('cubreA', 'Cubre a', '(ocupa su sitio cuando falta)', `${p.cubreA.map((cb, i) => fila(esc(nombrePid(cb.pid)), '', `<span class="cubrectl">${selDia(`data-cubred="${i}"`, cb.dow)}${selTurno(`data-cubret="${i}"`, cb.turnoId)}</span>`, `data-rmcubre="${i}"`)).join('') || '<div class="festvacio">No cubre a nadie en concreto.</div>'}
+      car('cubreA', 'Cubre a', '(ocupa su sitio cuando falta y, si hace falta, puede hacer partido para cubrirle; no se salta nada más)', `${p.cubreA.map((cb, i) => fila(esc(nombrePid(cb.pid)), '', `<span class="cubrectl">${selDia(`data-cubred="${i}"`, cb.dow)}${selTurno(`data-cubret="${i}"`, cb.turnoId)}</span>`, `data-rmcubre="${i}"`)).join('') || '<div class="festvacio">No cubre a nadie en concreto.</div>'}
        <span class="addrow addrow3">${selPersonas('fCubreP')}${selDia('id="fCubreD"')}${selTurno('id="fCubreT"')}<button type="button" class="btn-mini" data-addcubre>Añadir</button></span>`));
     h += sec('vetos', 'Vetos', subOff('vetos', p.vetos.length ? `${p.vetos.length} franja(s) que no hace` : 'ninguno'),
       car('vetos', '', '', (p.vetos.map((v, i) => fila(`<i class="ldot" style="--lc:${esc(colorLocal(v.localId))}"></i>${esc(nombreLocal(v.localId))}`, `no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'}`, '', `data-rmveto="${i}"`)).join('') || '<div class="festvacio">Sin vetos: puede ir a cualquier franja de sus locales.</div>') +
@@ -117,7 +115,7 @@ function openFicha(pid, opts) {
       car('prefs', '', '', `<div class="pinlbl">Prefiere no trabajar los…</div><div class="dowset">${dowSet(p.prefs.evitaDows || [], 'tevita')}</div>
        <label class="pinlbl">Criterio personal<input type="text" class="logininp" data-txt="prefsNota" data-libre value="${esc(p.prefs.nota || '')}" placeholder="p. ej. concilia los lunes"></label>`));
     h += sec('aus', 'Ausencias', p.ausencias.length ? `${p.ausencias.length} registrada(s)` : 'ninguna',
-      (p.ausencias.map((a, i) => fila(`<span class="abschip a-${esc(a.tipo)}">${esc((AUS_LBL[a.tipo] || { label: a.tipo }).label)}</span> del ${fmtDM(a.desde)}${a.hasta ? (a.hasta !== a.desde ? ' al ' + fmtDM(a.hasta) : '') : ' sin fecha de fin'}`, esc(a.detalle || ''), '', `data-rmaus="${i}"`)).join('') || '<div class="festvacio">Sin ausencias registradas.</div>') +
+      (p.ausencias.map((a, i) => fila(`<span class="abschip a-${esc(a.tipo)}">${esc((AUS_LBL[a.tipo] || { label: a.tipo }).label)}</span> del ${fmtDM(a.desde)}${a.hasta ? (a.hasta !== a.desde ? ' al ' + fmtDM(a.hasta) : '') : ' sin fecha de fin'}${esc(textoFranjasAusencia(a))}`, esc(a.detalle || ''), '', `data-rmaus="${i}"`)).join('') || '<div class="festvacio">Sin ausencias registradas.</div>') +
       `<div class="absform ausalta" style="display:grid">
         <div class="row2"><span><label>Tipo</label><select id="fAusTipo" data-libre>${TIPOS_AUSENCIA.map(t => `<option value="${t.id}"${t.id === 'VAC' ? ' selected' : ''}>${esc(t.label)}</option>`).join('')}</select></span>
         <span><label>Detalle</label><input type="text" id="fAusDet" data-libre placeholder="opcional"></span></div>
@@ -247,6 +245,8 @@ function openFicha(pid, opts) {
       if (ds.chk === 'standby') guarda(on ? 'en standby' : 'fuera de standby: ya entra en la planilla', x => { if (on) x.standby = true; else delete x.standby; });
       else if (ds.chk === 'partidoSiempre') guarda(`siempre partido ${on ? 'sí' : 'no'}`, x => { if (on) x.partido.siempre = true; else delete x.partido.siempre; });
       else if (ds.chk === 'cocinaNunca') guarda(`nunca cocina ${on ? 'sí' : 'no'}`, x => { if (on) x.cocina.nunca = true; else delete x.cocina.nunca; });
+      // 24/09 (S34): «solo hace cocina» se veía en la semilla pero no se podía ni ver ni cambiar
+      else if (ds.chk === 'soloCocina') guarda(`solo cocina ${on ? 'sí' : 'no'}`, x => { if (on) x.soloCocina = true; else delete x.soloCocina; });
       pinta(); return;
     }
     if (ds.num === 'horasSemana') {

@@ -2,6 +2,80 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **«Cubre a», repasado antes de subirlo (24/09).** Lo que cambia para quien lo usa:
+  - El domingo 4, sin Iván, la tarde de Pasarela ya no se queda con dos apoyos (Lavinia y Dulce):
+    «dos apoyos no se quedan solos» vale siempre, también en el plan con avisos y en el Generador.
+    Ahora el plan A pone a Roberto, con el aviso de que no tiene declarado el partido los
+    domingos, y el plan B deja el hueco y dice por qué («dejaría la casilla solo con apoyos: Dulce,
+    Cristian»). Si preferís a Dulce, se puede poner a mano desde la casilla: sale en «con aviso».
+  - Si Mari Luz ya está de mañana y de tarde y no tiene el partido declarado ese día, el plan ya
+    no enseña huecos que no existen: sale abriendo, igual que luego en la planilla. Y abre de
+    verdad: su hora es la de quien abre (16:00–21:00), no 21:00–00:00.
+  - Generador → Periodo: al volcar, Mari Luz queda «por Iván» como relevo; cuando Iván vuelve, el
+    generador ya no le quita su propia plaza.
+  - Generador → Semana: si lo único nuevo es que Mari Luz pasa a cubrir a Iván, se puede volcar
+    («Volcar a la planilla (1 relevo «cubre a»)») y «Qué ha cambiado» lo enseña.
+  - Cambio de turno: el turno a cambio que propone el plan se hace al confirmar. Antes se perdía.
+  - Selector: la ★ de quien cubre se puede poner, y queda «por Iván». Al forzar a Hojan en la sala,
+    queda como forzado con «solo hace cocina». Y si un clic no se puede poner, Ctrl+Z no se queda
+    con un paso vacío.
+  - Mirar una ficha sin cambiar nada ya no deja el plan de la Cobertura «viejo».
+  - La Revisión pone el partido autorizado en su propio grupo, «Autorizado · para que lo sepas»,
+    con una línea por persona y día (antes salía en «Pendiente de confirmar con el grupo», dos
+    veces).
+  - Solo una persona va «por Iván» en cada turno; quien entra además lo hace «para llegar al
+    mínimo (había 2 de 3)». Quien ya va por otra persona (Roberto, el jueves, por Susana Luna) no
+    pasa a cubrir a otra.
+  - «Cubre a» de quien no sale en la semana tipo (Maydeth, Laura y Susi, de baja) sigue dando
+    prioridad y el «por», pero no autoriza partidos: Hojan ya no hace partido «para cubrir a
+    Maydeth» toda la semana.
+  - Cuando hay que elegir entre planes igual de buenos, gana el que pone a quien tiene «Cubre a».
+  - Quien ese día ya está de sala no entra a llevar una cocina: el Generador lo hacía y luego la
+    Revisión lo marcaba.
+  - Media jornada: Horas y «Vacaciones del año» cuentan media jornada de vacaciones como medio día
+    («0,5», con la fecha «28/09 (tarde)»). La tarjeta de Equipo, Hoy, la Semana, el Mes, el pie de
+    la hoja impresa y el perfil de cada empleado dicen «por la mañana». Y al cerrar un local se
+    ponen las vacaciones de la franja cerrada aunque ese día haya un permiso de la otra.
+  - Lo aplicado se cuenta por turnos: «3 turnos de Iván cubiertos: 2 por Mari Luz, que ya estaba;
+    entra Dulce (3)». El historial dice «Mari Luz (ya estaba)».
+- **«Cubre a» ya manda en la Cobertura: Mari Luz cubre a Iván** (reunión del 24/09: «preferimos
+  que lo cubra Mariluz viernes y sábado por la tarde… sigue poniendo a Dulce»). Con Iván de
+  vacaciones el viernes 2, el sábado 3 y el domingo 4, y Mari Luz con «Cubre a Iván», el plan A
+  dice ahora que Mari Luz, que ya estaba de tarde esos días, pasa a cubrirle y abre: «Mari Luz ·
+  ya estaba · cubre a Iván · ABRE». No sale en «Entran», porque no es un turno nuevo. Como esas
+  tardes piden tres personas, entra una más «para llegar al mínimo (había 2 de 3)». El domingo no se le
+  propone: hace la mañana por Lola y por la tarde está Lavinia, con la que no coincide.
+  - Al confirmar, la planilla la enseña «por Iván» en Hoy, en la Semana y en la planilla propuesta
+    del Generador (la hoja del equipo sigue siendo solo nombres). Lo mismo pasa al generar la
+    semana con las vacaciones de Iván ya puestas en su ficha.
+  - Quien tiene «Cubre a» va siempre el primero de la lista para cubrir a esa persona, aunque
+    tenga más turnos esa semana. Antes pesaba menos que estar libre ese día.
+  - «Cubre a» vale en el sitio de quien falta y para su puesto: ya no suma en otro local ni para
+    llevar una cocina que no era la suya. Con el interruptor «Cubre a» apagado, nadie lo aplica.
+- **«Cubre a» permite el partido necesario para cubrir, y nada más.** Si Mari Luz no tuviera
+  declarado el partido del viernes, el plan la pondría igual, con la nota «partido para cubrir a
+  Iván». Es una nota, no un aviso: no quita puntos al plan, el Generador da la condición de
+  partido por cumplida y la Revisión la enseña aparte, solo para que se sepa. Donde se puede
+  abrir la tarde haciendo partido (Pasarela y El 33), también puede abrir. «Cubre a» no se salta
+  nada más: ni el día libre, ni los vetos, ni «nunca con», ni las ausencias, ni las franjas, ni
+  los locales, ni el standby. En Equipo, «Cubre a» lo explica.
+- **El plan de la Cobertura ya no se queda viejo.** Si después de buscar se cambia algo en Equipo,
+  en la planilla o con Ctrl+Z, la pestaña ya no enseña el plan de antes: dice «La ficha ha
+  cambiado: vuelve a buscar», con un botón para buscar otra vez. La columna de quien falta dice
+  ahora quién se queda en el turno («quedan Mari Luz y Leo, 2 de 3»).
+- **La Cobertura cuenta con la semana entera.** «N turnos esa semana» ya cuenta los turnos de toda
+  la semana, no solo de los días marcados. El cambio de turno vuelve a encontrar un turno a cambio.
+- **Dos apoyos no se quedan solos** (José, 17/09). Ni la Cobertura ni el Generador dejan un turno
+  solo con apoyos, ni con uno solo: si no hay nadie más, queda el hueco con el porqué. La Revisión
+  lo pone en rojo (hasta ahora solo se veía en Hoy) y el Generador lo comprueba como condición.
+- **Quien solo hace cocina, o ese día ya lleva una cocina, no refuerza la sala**, tampoco en la
+  Cobertura. Antes la Cobertura podía meter a Hojan en la sala del Mónaco. El selector dice por
+  qué no puede, y se puede forzar. «Solo hace cocina» se ve y se cambia en la ficha, en Cocina.
+- **Permisos y vacaciones de media jornada.** En la Cobertura, un permiso «solo por la mañana»
+  queda así en la ficha: Mari Luz conserva su tarde, al regenerar no la pierde y la Revisión ya no
+  la da por ausente. Horas lo cuenta como media jornada. Al cerrar un local, quien ese día
+  trabaja también en otro sitio coge vacaciones (o el día libre) solo de la franja cerrada. Antes
+  esa franja contaba como sin trabajo.
 - **Cierre por fechas, repasado antes de subirlo (24/09).** Lo que cambia para quien lo usa:
   - En el móvil, «Siguiente» y «Cerrar Bar Mónaco» responden al primer toque (en Android había
     que tocarlos dos veces, y si se cerraba la ventana el local no quedaba cerrado). Y «Cerrar

@@ -39,6 +39,7 @@
 .revitem.alta{border-left:4px solid var(--bad)}
 .revitem.media{border-left:4px solid var(--warn)}
 .revitem.info{border-left:4px solid var(--accent)}
+.revitem.autorizado{border-left:4px solid var(--ok)}   /* 24/09 (revisión F3): el partido autorizado para cubrir, solo para que se sepa */
 .revitem .msg{flex:1;min-width:0}
 .revgo{flex:none;border:1px solid var(--border);background:var(--surface);border-radius:8px;font-size:10px;font-weight:700;padding:4px 9px;cursor:pointer;color:var(--accent);font-family:var(--mono)}
 .revgo:hover{background:var(--accent-l)}

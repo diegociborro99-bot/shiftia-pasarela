@@ -91,6 +91,18 @@ function loadState() {
   }
 }
 // migraciones idempotentes: estados guardados con versiones anteriores del esquema
+// Los campos que la ficha da por existentes (estados guardados con esquemas viejos), en un solo sitio:
+// lo hace migrarEstado al cargar y openFicha no tiene nada que añadir. 24/09 (revisión F3): abrir y
+// cerrar una ficha sin tocar nada le añadía `noPrimero: []` y otros campos vacíos, cambiaba la huella
+// de la planilla y la Cobertura daba el plan por viejo («La ficha ha cambiado: vuelve a buscar»).
+function normalizarFicha(p) {
+  p.locales = p.locales || []; p.franjas = p.franjas || ['M', 'T']; p.libra = p.libra || []; p.partido = p.partido || { dias: [] }; p.partido.dias = p.partido.dias || [];
+  p.cocina = p.cocina || { titular: [], reserva: [], soloDias: [] }; p.cocina.titular = p.cocina.titular || []; p.cocina.reserva = p.cocina.reserva || []; p.cocina.soloDias = p.cocina.soloDias || [];
+  p.abre = p.abre || {}; p.noAbre = p.noAbre || []; p.nuncaCon = p.nuncaCon || []; p.cubreA = p.cubreA || []; p.vetos = p.vetos || [];
+  p.contrato = p.contrato || { horasSemana: null }; p.ausencias = p.ausencias || []; p.prefs = p.prefs || {}; p.supuestos = p.supuestos || [];
+  p.noPrimero = Array.isArray(p.noPrimero) ? p.noPrimero : []; if (p.inactivas !== undefined && !Array.isArray(p.inactivas)) delete p.inactivas;
+  return p;
+}
 function migrarEstado(estado) {
   if (!estado) return;
   const base = semillaPasarela();
@@ -103,14 +115,11 @@ function migrarEstado(estado) {
   // 24/09 (D11): los cierres de un local por fechas; las planillas de antes no traen ninguno
   if (!Array.isArray(estado.cierresPuntuales)) estado.cierresPuntuales = [];
   if (!estado.meses || typeof estado.meses !== 'object') estado.meses = {};
-  for (const p of estado.staff) {
-    p.locales = p.locales || []; p.franjas = p.franjas || ['M', 'T']; p.libra = p.libra || []; p.partido = p.partido || { dias: [] };
-    p.cocina = p.cocina || { titular: [], reserva: [], soloDias: [] }; p.abre = p.abre || {}; p.noAbre = p.noAbre || []; p.nuncaCon = p.nuncaCon || [];
-    p.cubreA = p.cubreA || []; p.vetos = p.vetos || []; p.contrato = p.contrato || { horasSemana: null }; p.ausencias = p.ausencias || []; p.prefs = p.prefs || {}; p.supuestos = p.supuestos || [];
-  }
+  for (const p of estado.staff) normalizarFicha(p);
   migrarHorarios(estado);   // 15/09: los horarios que confirmó la encargada por WhatsApp
   migrarPuestos(estado);    // 17/09: el puesto «comodín» pasa a ser «apoyo»
   migrarAltas(estado);      // 17/09: Dulce y Susi, que entraron después del primer arranque
+  for (const p of estado.staff) normalizarFicha(p);   // también las altas de arriba (revisión F3)
   // 17/09: la base de entrevistas de Notion (entrevistas + alerta interna)
   if (!Array.isArray(estado.entrevistas) || !estado.entrevistas.length) estado.entrevistas = JSON.parse(JSON.stringify(ENTREVISTAS_SEMILLA));
   // 17/09: las 150 entrevistas que estaban en papel. A quien ya tenía la app en marcha no

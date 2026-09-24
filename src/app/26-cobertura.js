@@ -7,11 +7,11 @@
 // se aplica: la ausencia queda en la ficha, la persona sale de esos turnos y quien
 // cubre entra con «por X». Ctrl+Z lo deshace. La misma hoja vive en la pestaña
 // Cobertura (con selector de persona) y se abre desde Hoy, Semana y Mes.
-const COB = { pid: null, tipo: 'LD', dias: [], base: null, franjas: [], detalle: '', sinFin: false, siempre: false, intercambio: true, res: null, aplicado: null, ovl: null };
+const COB = { pid: null, tipo: 'LD', dias: [], base: null, franjas: [], detalle: '', sinFin: false, siempre: false, intercambio: true, res: null, aplicado: null, ovl: null, caducado: null };
 const COB_TIPO_LBL = { BAJ: 'Baja', VAC: 'Vacaciones', LD: 'Día libre', PERM: 'Permiso', OTRO: 'Otro motivo', CAMBIO: 'Cambio de turno' };
 function resetCob(o) {
   const x = o || {};
-  COB.res = null; COB.aplicado = null; COB.ovl = null;
+  COB.res = null; COB.aplicado = null; COB.ovl = null; COB.caducado = null;
   if (x.pid) COB.pid = x.pid;
   if (x.tipo) COB.tipo = x.tipo;
   COB.dias = (x.dias || (x.desde ? [...rangoIso(x.desde, x.hasta || x.desde)] : [])).slice().sort();
@@ -29,12 +29,15 @@ function openCobertura(o) {
   pintaCob(ov.querySelector('#cobOvlBody'), 'ovl');
 }
 // estado «virtual» de un rango de días (puede cruzar de mes): cada día apunta a los
-// objetos del mes al que pertenece; escribible=true los crea si faltan
+// objetos del mes al que pertenece; escribible=true los crea si faltan.
+// 24/09 (S8): la propuesta trae semanas enteras (rangoNecesario: hasta dos meses marcados más la
+// semana de antes y la de después), así que el tope pasa de 62 a 100 días.
+const MAX_DIAS_RANGO = 100;
 function estadoRango(desde, hasta, escribible) {
   const e = { y: +desde.slice(0, 4), m: +desde.slice(5, 7), days: [], asig: {}, apertura: {}, manual: {}, festivos: [], virtual: true };
   let n = 0;
   for (const iso of rangoIso(desde, hasta)) {
-    if (++n > 62) break;
+    if (++n > MAX_DIAS_RANGO) break;
     const me = estadoDeIso(iso, escribible);
     e.days.push(me.days.find(x => x.iso === iso));
     if (escribible) { me.asig[iso] = me.asig[iso] || {}; me.apertura[iso] = me.apertura[iso] || {}; me.manual = me.manual || {}; me.manual[iso] = me.manual[iso] || {}; }
@@ -59,8 +62,21 @@ function turnosDia(pid, iso) {
   return turnosDe(S).filter(t => pidsEn(e, iso, t.id).includes(pid)).map(t => { const en = asignados(e, iso, t.id).find(x => x.pid === pid); return { tid: t.id, localId: t.localId, franja: t.franja, cocina: !!en.cocina, abre: primeroDe(S, S.staff, e, iso, t.id) === pid }; });
 }
 function renderCobertura() { pintaCob($('#cobRoot'), 'tab'); }
+// 24/09 (reunión: «tú vas a equipo… Cubre a Iván… y ahora en el generador de cobertura debería ya
+// sugerir… sigue poniendo a Dulce»): el plan que se enseña se calculó con una plantilla y una
+// planilla concretas. Si cambian (en Equipo, en la planilla o con Ctrl+Z), ese plan ya no vale: no
+// se vuelve a pintar el viejo, se avisa «La ficha ha cambiado: vuelve a buscar». La huella es la de
+// la sincronización (huellaPlanilla): meses, fichas, locales, semana tipo, eventos y cierres.
+function planCaducado() { return !!COB.res && COB.res.huella !== huellaPlanilla(S); }
+const mismaIncidencia = (a, b) => !!a && !!b && a.pid === b.pid && a.tipo === b.tipo && JSON.stringify(a.dias) === JSON.stringify(b.dias) && JSON.stringify(a.franjas || []) === JSON.stringify(b.franjas || []);
+function htmlCaducado() {
+  return `<div class="cobcard cobvacia cobcaduca" id="cobCaduco" role="status"><span class="micro">EL PLAN DE ANTES YA NO VALE</span><h3>La ficha ha cambiado: vuelve a buscar</h3>
+    <p class="revsub">Desde que se buscó quién cubre ha cambiado la plantilla o la planilla (en Equipo, en la planilla o con Ctrl+Z), así que ese plan podría no cumplir lo que hay ahora.</p>
+    <button class="btn btn-cta" id="cobRebuscar">✦ Buscar otra vez</button></div>`;
+}
 function pintaCob(root, modo) {
   if (!COB.base) COB.base = mondayOf(isoDia());
+  if (planCaducado()) { COB.caducado = COB.res.inc; COB.res = null; }
   const dias = []; for (let k = 0; k < 14; k++) dias.push(addDias(COB.base, k));
   const fin = dias[13];
   // se puede elegir a quien no está de baja TODOS los días de la tira (24/09, S6: antes, quien lo
@@ -80,7 +96,9 @@ function pintaCob(root, modo) {
     const libra = p && estadoDia(S, p, iso).libra;   // el día libre de ESA semana
     const on = COB.dias.includes(iso);
     const dots = ts.map(t => `<i style="--lc:${colorLocal(t.localId)}" title="${esc(nombreLocal(t.localId) + ' · ' + FRANJA_LBL[t.franja].toLowerCase() + (t.abre ? ' · abre' : '') + (t.cocina ? ' · cocina' : ''))}">${t.franja}${t.cocina ? SVG_COCINA : ''}</i>`).join('');
-    const pie = aus ? `<em class="a-${esc(aus.tipo)}">${esc((AUS_LBL[aus.tipo] || {}).label || aus.tipo)}</em>` : ts.length ? dots : `<em>${libra ? 'libra' : 'sin turno'}</em>`;
+    // una ausencia de media jornada (D10) deja ver el turno de la otra franja
+    const media = aus && franjasAusencia(aus);
+    const pie = aus && !media ? `<em class="a-${esc(aus.tipo)}">${esc((AUS_LBL[aus.tipo] || {}).label || aus.tipo)}</em>` : ts.length ? dots + (media ? `<em class="a-${esc(aus.tipo)}" title="${esc(motivoAusencia(aus))}">½</em>` : '') : aus ? `<em class="a-${esc(aus.tipo)}">${esc((AUS_LBL[aus.tipo] || {}).label || aus.tipo)} ½</em>` : `<em>${libra ? 'libra' : 'sin turno'}</em>`;
     return `<button type="button" class="cobdia${on ? ' on' : ''}${iso === hoy ? ' hoy' : ''}${iso < hoy ? ' pasado' : ''}${ts.length ? '' : ' vacio'}${isoDow(iso) >= 6 ? ' finde' : ''}" data-dia="${iso}" aria-pressed="${on ? 'true' : 'false'}" title="${esc(fmtLargo(iso))}"><small>${DIAS_L[isoDow(iso)].slice(0, 3)}</small><b>${+iso.slice(8, 10)}</b><span class="cobdots">${pie}</span></button>`;
   };
   const nTurnos = p ? COB.dias.reduce((a, iso) => a + turnosDia(p.id, iso).filter(t => !COB.franjas.length || COB.franjas.includes(t.franja)).length, 0) : 0;
@@ -108,7 +126,7 @@ function pintaCob(root, modo) {
       <label class="genopt"><input type="checkbox" id="cobSiempre" ${COB.siempre ? 'checked' : ''} data-libre> <span><b>Reemplazar siempre</b> · aunque la casilla siga completa sin esa persona</span></label>
       <button class="btn btn-cta cobgo" id="cobProponer" ${p && COB.dias.length ? '' : 'disabled'}>✦ Buscar quién cubre${nTurnos ? ` (${pl(nTurnos, 'turno', 'turnos')})` : ''}</button>
     </div>
-    <div class="genres" id="cobRes">${COB.aplicado ? htmlCoberturaAplicada(COB.aplicado) : COB.res ? htmlPlanesCobertura(COB.res) : ''}</div>
+    <div class="genres" id="cobRes">${COB.aplicado ? htmlCoberturaAplicada(COB.aplicado) : COB.res ? htmlPlanesCobertura(COB.res) : mismaIncidencia(COB.caducado, incidenciaActual()) ? htmlCaducado() : ''}</div>
   </div>`;
   const repinta = () => pintaCob(root, modo);
   const sel = root.querySelector('#cobPid'); if (sel) sel.addEventListener('change', e => { COB.pid = e.target.value; COB.res = null; COB.aplicado = null; repinta(); });
@@ -138,7 +156,7 @@ function pintaCob(root, modo) {
     }
     const fr = e.target.closest('[data-fr]');
     if (fr) { COB.franjas = fr.dataset.fr ? [fr.dataset.fr] : []; COB.res = null; repinta(); return; }
-    if (e.target.id === 'cobProponer') { proponerCobertura(root, modo); return; }
+    if (e.target.id === 'cobProponer' || e.target.id === 'cobRebuscar') { proponerCobertura(root, modo); return; }
     const ap = e.target.closest('[data-aplicar]');
     if (ap) { aplicarPlanCobertura(ap.dataset.aplicar, root, modo); return; }
     if (e.target.id === 'cobSoloAus') { aplicarPlanCobertura(null, root, modo); return; }
@@ -152,10 +170,13 @@ function proponerCobertura(root, modo) {
   const inc = incidenciaActual();
   if (!inc.pid || !inc.dias.length) { toast('Marca al menos un día', 'warn'); return; }
   try {
-    const base = clonarEstado(estadoRango(inc.desde, inc.hasta, false));
+    // semanas enteras (S8): el modelo dice qué días necesita; con solo los días marcados contaba mal
+    // «N turnos esa semana» (Mari Luz, 3 en vez de 8) y el cambio de turno no encontraba nada
+    const rango = rangoNecesario(inc);
+    const base = clonarEstado(estadoRango(rango.desde, rango.hasta, false));
     const res = planesCobertura(S, S.staff, base, inc, { siempre: COB.siempre, intercambio: COB.tipo === 'CAMBIO' && COB.intercambio });
-    res.inc = inc; res.ts = Date.now();
-    COB.res = res; COB.aplicado = null;
+    res.inc = inc; res.ts = Date.now(); res.rango = rango; res.huella = huellaPlanilla(S);
+    COB.res = res; COB.aplicado = null; COB.caducado = null;
   } catch (e) { toast('No se pudo proponer: ' + (e && e.message ? e.message : e), 'bad'); }
   pintaCob(root, modo);
   const r = root.querySelector('#cobRes'); if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -177,11 +198,20 @@ function htmlPlanesCobertura(res) {
       const as = P.asignaciones.filter(x => x.iso === a.iso && x.tid === a.tid);
       const hs = P.huecos.filter(x => x.iso === a.iso && x.tid === a.tid);
       const sc = P.sinCubrir.find(x => x.iso === a.iso && x.tid === a.tid);
-      const entra = as.map(x => `<div class="cobrow"><span class="av" style="background:${avColor(x.pid)}">${esc(initials(x.nombre))}</span><span class="cobtxt"><b>${esc(x.nombre)}${x.abre ? ' <em class="bdg abre">ABRE</em>' : ''}${x.cocina ? ` <em class="bdg cocina">${SVG_COCINA} COCINA</em>` : ''}${x.avisos.length ? ` <em class="bdg forz" title="${esc(x.avisos.join(', '))}">!</em>` : ''}</b><small>${esc(x.razones.filter(r => !x.avisos.includes(r)).slice(0, 3).join(' · '))}${x.avisos.length ? ` · <span class="cobaviso">aviso: ${esc(x.avisos.join(', '))}</span>` : ''}</small>${x.intercambio ? `<small class="cobinter">⇄ a cambio, ${esc(nombreCorto(nombre))} hace ${dlCob(x.intercambio.iso)} ${lpCob(x.intercambio.tid)} de ${esc(nombreCorto(x.nombre))}</small>` : ''}</span></div>`).join('')
+      // 24/09 (fase 3): el relevo (D3) sale como «ya estaba · cubre a Iván», con ABRE si pasa a abrir,
+      // y no cuenta en «Entran»; el partido autorizado para cubrir a alguien (D1) es una nota, no un aviso
+      const nota = x => (x.autorizados || []).length ? `<small class="cobnota">✓ ${esc(x.autorizados.map(a => a.texto).join(', '))}</small>` : '';
+      const badges = x => `${x.abre ? ' <em class="bdg abre">ABRE</em>' : ''}${x.cocina ? ` <em class="bdg cocina">${SVG_COCINA} COCINA</em>` : ''}`;
+      const entra = as.map(x => x.yaEstaba
+        ? `<div class="cobrow relevo" data-pid="${esc(x.pid)}"><span class="av" style="background:${avColor(x.pid)}">${esc(initials(x.nombre))}</span><span class="cobtxt"><b>${esc(x.nombre)}${badges(x)}</b><small>ya estaba · ${esc(x.razones[0])}</small>${nota(x)}</span></div>`
+        : `<div class="cobrow" data-pid="${esc(x.pid)}"><span class="av" style="background:${avColor(x.pid)}">${esc(initials(x.nombre))}</span><span class="cobtxt"><b>${esc(x.nombre)}${badges(x)}${x.avisos.length ? ` <em class="bdg forz" title="${esc(x.avisos.join(', '))}">!</em>` : ''}</b><small>${esc(x.razones.filter(r => !x.avisos.includes(r) && !(x.autorizados || []).some(a => a.texto === r)).slice(0, 3).join(' · '))}${x.avisos.length ? ` · <span class="cobaviso">aviso: ${esc(x.avisos.join(', '))}</span>` : ''}</small>${nota(x)}${x.intercambio ? `<small class="cobinter">⇄ a cambio, ${esc(nombreCorto(nombre))} hace ${dlCob(x.intercambio.iso)} ${lpCob(x.intercambio.tid)} de ${esc(nombreCorto(x.nombre))}</small>` : ''}</span></div>`).join('')
         + hs.map(h => { const pq = Object.entries(h.porQueNadie || {}).slice(0, 4).map(([m, q]) => `<b>${esc(m)}</b>: ${esc(q.slice(0, 4).join(', '))}${q.length > 4 ? ' +' + (q.length - 4) : ''}`).join(' · '); return `<div class="cobrow hueco"><span class="av">?</span><span class="cobtxt"><b>Hueco: ${esc(h.tipo === 'primero' ? 'nadie puede abrir (1.ª posición)' : h.tipo === 'cocina' ? 'sin cocina' : h.motivo)}</b><small>${pq || esc(h.motivo || 'nadie de la plantilla puede')}</small></span></div>`; }).join('')
         + (sc ? `<div class="cobrow sobra"><span class="av">✓</span><span class="cobtxt"><b>Nadie hace falta</b><small>${esc(sc.motivo)}</small></span></div>` : '');
-      return `<div class="cobmv"><div class="cobmvd"><b>${dlCob(a.iso)}</b>${lpCob(a.tid)}<small>${FRANJA_LBL[a.franja].toLowerCase()}${a.cocina ? ' · llevaba la cocina' : ''}${a.abre ? ' · abría' : ''}</small><button class="glink cobver" data-irdia="${a.iso}">ver el día</button></div>
-        <div class="cobsale"><span class="av" style="background:${avColor(inc.pid)}">${esc(initials(nombre))}</span><span class="cobtxt"><b><s>${esc(nombre)}</s></b><small>sale${a.necesario ? (a.faltan ? ` · quedan ${a.quedan} de ${a.min}` : a.sinCocina ? ' · sin cocina' : ' · nadie abre') : ` · quedan ${a.quedan} de ${a.min}`}</small></span></div>
+      // quién se queda en la casilla («quedan Mari Luz y Leo, 2 de 3»)
+      const quedan = (a.quedanPids || []).map(nombrePid);
+      const quienes = quedan.length ? `quedan ${quedan.length > 1 ? quedan.slice(0, -1).join(', ') + ' y ' + quedan[quedan.length - 1] : quedan[0]}, ${a.quedan} de ${a.min}` : `quedan ${a.quedan} de ${a.min}`;
+      return `<div class="cobmv" data-cas="${a.iso}|${a.tid}"><div class="cobmvd"><b>${dlCob(a.iso)}</b>${lpCob(a.tid)}<small>${FRANJA_LBL[a.franja].toLowerCase()}${a.cocina ? ' · llevaba la cocina' : ''}${a.abre ? ' · abría' : ''}</small><button class="glink cobver" data-irdia="${a.iso}">ver el día</button></div>
+        <div class="cobsale"><span class="av" style="background:${avColor(inc.pid)}">${esc(initials(nombre))}</span><span class="cobtxt"><b><s>${esc(nombre)}</s></b><small>sale · ${esc(quienes)}${a.necesario && !a.faltan ? (a.sinCocina ? ' · sin cocina' : ' · nadie abre') : ''}</small></span></div>
         <div class="cobarrow" aria-hidden="true">→</div>
         <div class="cobentra">${entra}</div></div>`;
     }).join('');
@@ -189,7 +219,7 @@ function htmlPlanesCobertura(res) {
     return `<div class="cobplan${P.id === 'A' ? ' reco' : ''}">
       <div class="cobph"><span><span class="micro">${esc(P.titulo.toUpperCase())}</span><small>${esc(P.estrategia)}${P.distinto ? ` · ${pl(P.distinto, 'turno distinto', 'turnos distintos')} del plan A` : ''}</small></span>${estado}</div>
       <div class="cobmvs">${filas}</div>
-      <div class="cobpf"><span class="cobpers2">${P.personas.length ? 'Entran: ' : ''}${P.personas.map(pid => `<span class="glchip" style="--pc:${avColor(pid)}">${esc(nombreCorto(nombrePid(pid)))}</span>`).join('') || '<em class="gnadie">no entra nadie nuevo</em>'}</span><button class="btn ${P.id === 'A' ? 'btn-cta' : 'btn-sec'}" data-aplicar="${P.id}">Confirmar plan ${P.id}${P.completo ? '' : ` (${pl(P.huecos.length, 'hueco queda', 'huecos quedan')})`}</button></div>
+      <div class="cobpf"><span class="cobpers2">${P.personas.length ? 'Entran: ' : ''}${P.personas.map(pid => `<span class="glchip" style="--pc:${avColor(pid)}">${esc(nombreCorto(nombrePid(pid)))}</span>`).join('') || '<em class="gnadie">no entra nadie nuevo</em>'}${(P.relevos || []).length ? `<span class="cobyaestan">ya estaban y pasan a cubrir: ${esc([...new Set(P.relevos.map(x => nombrePid(x.pid)))].join(', '))}</span>` : ''}</span><button class="btn ${P.id === 'A' ? 'btn-cta' : 'btn-sec'}" data-aplicar="${P.id}">Confirmar plan ${P.id}${P.completo ? '' : ` (${pl(P.huecos.length, 'hueco queda', 'huecos quedan')})`}</button></div>
     </div>`;
   };
   return `<div class="cobcard cobres">
@@ -199,14 +229,25 @@ function htmlPlanesCobertura(res) {
     </div>
     <div class="cobplanes">${res.planes.map(plan).join('')}</div>`;
 }
+// «3 turnos de Iván cubiertos: 2 por Mari Luz, que ya estaba; entra Dulce (3)» (revisión F3: decía «5
+// turnos cubiertos (2 por quien ya estaba)» con solo 3 turnos afectados: contaba plazas, no turnos)
+function resumenCubiertos(r, nombre) {
+  const turnos = new Set(r.asignados.map(x => x.iso + '|' + x.tid)).size;
+  const cuenta = xs => { const m = new Map(); for (const x of xs) m.set(x.pid, (m.get(x.pid) || 0) + 1); return [...m]; };
+  const ya = cuenta(r.asignados.filter(x => x.yaEstaba)).map(([pid, n]) => `${n} por ${nombrePid(pid)}, que ya estaba`);
+  const entran = cuenta(r.asignados.filter(x => !x.yaEstaba)).map(([pid, n]) => `${nombrePid(pid)} (${n})`);
+  const cab = r.quitados && turnos === r.quitados ? `${pl(r.quitados, 'turno', 'turnos')} de ${nombre} ${turnos === 1 ? 'cubierto' : 'cubiertos'}` : `${pl(turnos, 'turno cubierto', 'turnos cubiertos')}`;
+  const detalle = [ya.join(' y '), entran.length ? `entra${entran.length > 1 ? 'n' : ''} ${entran.join(', ')}` : ''].filter(Boolean).join('; ');
+  return turnos ? cab + (detalle ? ': ' + detalle : '') : 'ningún turno cubierto';
+}
 function htmlCoberturaAplicada(ap) {
   const r = ap.res, inc = ap.inc;
-  const lista = r.asignados.map(x => `<li>${lpCob(x.tid)} <b>${dlCob(x.iso)}</b>: entra ${esc(nombrePid(x.pid))}${x.avisos.length ? ` <span class="cobaviso">(aviso: ${esc(x.avisos.join(', '))})</span>` : ''}</li>`).join('')
+  const lista = r.asignados.map(x => `<li>${lpCob(x.tid)} <b>${dlCob(x.iso)}</b>: ${x.yaEstaba ? `${esc(nombrePid(x.pid))}, que ya estaba, pasa a cubrir a ${esc(nombrePid(inc.pid))}` : `entra ${esc(nombrePid(x.pid))}`}${x.avisos.length ? ` <span class="cobaviso">(aviso: ${esc(x.avisos.join(', '))})</span>` : ''}</li>`).join('')
     + r.intercambios.map(x => `<li>${lpCob(x.tid)} <b>${dlCob(x.iso)}</b>: ${esc(nombrePid(x.pid))} a cambio de ${esc(nombrePid(x.quita))}</li>`).join('')
     + r.rechazados.map(x => `<li class="bad">${lpCob(x.tid)} <b>${dlCob(x.iso)}</b>: ${esc(nombrePid(x.pid))} no se pudo poner (${esc(x.motivo)})</li>`).join('');
   return `<div class="cobcard cobok"><span class="micro">APLICADO · ${esc(ap.plan ? 'PLAN ' + ap.plan : 'SOLO LA AUSENCIA')}</span>
     <h3>${esc(nombrePid(inc.pid))}: ${inc.tipo === 'CAMBIO' ? 'cambio de turno hecho' : `${esc((COB_TIPO_LBL[inc.tipo] || inc.tipo).toLowerCase())} registrada en su ficha`}</h3>
-    <p class="revsub">${pl(r.quitados, 'turno retirado', 'turnos retirados')} · ${pl(r.asignados.length, 'turno cubierto', 'turnos cubiertos')}${r.intercambios.length ? ` · ${pl(r.intercambios.length, 'intercambio', 'intercambios')}` : ''}${ap.huecos ? ` · <b style="color:var(--bad)">${pl(ap.huecos, 'hueco queda', 'huecos quedan')}</b> en rojo en Hoy y Semana` : ''}.</p>
+    <p class="revsub">${esc(resumenCubiertos(r, nombrePid(inc.pid)))}${r.intercambios.length ? ` · ${pl(r.intercambios.length, 'intercambio', 'intercambios')}` : ''}${r.rechazados.length ? ` · <b style="color:var(--bad)">${pl(r.rechazados.length, 'no se pudo hacer', 'no se pudieron hacer')}</b>` : ''}${ap.huecos ? ` · <b style="color:var(--bad)">${pl(ap.huecos, 'hueco queda', 'huecos quedan')}</b> en rojo en Hoy y Semana` : ''}.</p>
     ${lista ? `<ul class="gcamblist">${lista}</ul>` : ''}
     <div class="genbar" style="position:static;padding:6px 0 0"><button class="btn btn-sec" data-irdia="${inc.desde}">Ver el día en la planilla</button><button class="btn btn-ghost" id="cobDeshacer">Deshacer</button><button class="btn btn-ghost" id="cobOtra">Otra cobertura</button></div></div>`;
 }
@@ -229,15 +270,19 @@ function hacerCobertura(res, plan, root, modo) {
   const nombre = nombrePid(inc.pid);
   const cuando = inc.dias.length === 1 ? 'el ' + fmtDM(inc.desde) : `los días ${inc.dias.map(fmtDM).join(', ')}`;
   pushUndo(`cobertura de ${nombre}`, { staff: true, otrosMeses: true });
-  const real = estadoRango(inc.desde, inc.hasta, true);
+  // 24/09 (revisión F3): se aplica sobre los mismos días con los que se propuso (rangoNecesario, semanas
+  // enteras): el turno a cambio de un cambio de turno es de otro día, y con solo los días marcados se
+  // perdía sin avisar
+  const rg = res.rango || rangoNecesario(inc);
+  const real = estadoRango(rg.desde, rg.hasta, true);
   const r = aplicarCobertura(S, S.staff, real, inc, plan);
   const huecos = plan ? plan.huecos.length : 0;
-  registrarCambio(`Cobertura (${plan ? 'plan ' + plan.id : 'solo ausencia'}): ${COB_TIPO_LBL[inc.tipo] || inc.tipo} de ${nombre} ${cuando} — ${r.quitados} turno(s) retirados, ${r.asignados.length} cubiertos${r.intercambios.length ? `, ${r.intercambios.length} intercambio(s)` : ''}${huecos ? `, ${huecos} hueco(s)` : ''}${r.asignados.length ? ': ' + r.asignados.map(x => `${nombrePid(x.pid)} ${fmtDM(x.iso)} ${nombreLocal(partirTurno(x.tid).localId)} ${FRANJA_LBL[partirTurno(x.tid).franja].toLowerCase()}`).join(', ') : ''}`, 'cobertura');
+  registrarCambio(`Cobertura (${plan ? 'plan ' + plan.id : 'solo ausencia'}): ${COB_TIPO_LBL[inc.tipo] || inc.tipo} de ${nombre} ${cuando} — ${r.quitados} turno(s) retirados, ${resumenCubiertos(r, nombre)}${r.intercambios.length ? `, ${r.intercambios.length} intercambio(s)` : ''}${huecos ? `, ${huecos} hueco(s)` : ''}${r.asignados.length ? ': ' + r.asignados.map(x => `${nombrePid(x.pid)}${x.yaEstaba ? ' (ya estaba)' : ''} ${fmtDM(x.iso)} ${nombreLocal(partirTurno(x.tid).localId)} ${FRANJA_LBL[partirTurno(x.tid).franja].toLowerCase()}`).join(', ') : ''}`, 'cobertura');
   if (mesCerrado(inc.desde)) registrarCambio(`Cambio en un mes cerrado (${inc.desde.slice(0, 7)})`, 'aviso');
   saveState();
   COB.aplicado = { plan: plan ? plan.id : null, inc, res: r, huecos };
   COB.res = null;
-  toast(`${nombre}: ${r.quitados} turno(s) retirados, ${r.asignados.length} cubiertos${huecos ? `, ${huecos} hueco(s) quedan` : ''} · Ctrl+Z para deshacer`, huecos || r.rechazados.length ? 'warn' : 'ok');
+  toast(`${resumenCubiertos(r, nombre)}${r.rechazados.length ? ` · ${pl(r.rechazados.length, 'no se pudo hacer', 'no se pudieron hacer')}` : ''}${huecos ? `, ${huecos} hueco(s) quedan` : ''} · Ctrl+Z para deshacer`, huecos || r.rechazados.length ? 'warn' : 'ok');
   if (typeof pintaRevDot === 'function') pintaRevDot();
   if (modo === 'ovl' && COB.ovl) { COB.ovl.remove(); COB.ovl = null; renderVistaActiva(); return; }   // desde la planilla: se vuelve a ella con los cambios a la vista
   pintaCob(root, modo);
@@ -259,6 +304,7 @@ function openPreviaCobertura(res, plan, alConfirmar) {
   fila(inc.pid, aus);
   for (const a of res.afectados) cel(inc.pid, a.iso, aus).sale.push(a.tid);
   for (const as of plan.asignaciones) {
+    if (as.yaEstaba) { const c = cel(as.pid, as.iso, 'CUBRE'); (c.sigue = c.sigue || []).push(as.tid); continue; }   // D3: ya estaba
     cel(as.pid, as.iso, 'CUBRE').entra.push(as.tid);
     if (as.intercambio) { cel(as.pid, as.intercambio.iso, 'CUBRE').sale.push(as.intercambio.tid); cel(inc.pid, as.intercambio.iso, aus).entra.push(as.intercambio.tid); }
   }
@@ -267,15 +313,20 @@ function openPreviaCobertura(res, plan, alConfirmar) {
   const dias = [...new Set([...Object.values([...filas.values()]).flatMap(f => Object.keys(f.dias)), ...Object.keys(huecosPorDia)])].sort();
   const celda = (f, iso) => {
     const c = f.dias[iso];
-    if (!c || (!c.sale.length && !c.entra.length)) return '<td class="pvnada">·</td>';
+    const sigue = (c && c.sigue) || [];
+    if (!c || (!c.sale.length && !c.entra.length && !sigue.length)) return '<td class="pvnada">·</td>';
     const esAus = f.rol !== 'CUBRE' && c.sale.length;
-    return `<td class="${esAus ? 'pvsale' : c.entra.length ? 'pventra' : 'pvsale'}">
+    return `<td class="${esAus ? 'pvsale' : c.entra.length || sigue.length ? 'pventra' : 'pvsale'}">
       ${c.sale.map(t => `<s style="--lc:${lc(t)}">${esc(tur(t))}</s>`).join('')}
-      ${esAus ? `<b>${esc(aus)}</b>` : c.entra.map(t => `<b style="--lc:${lc(t)}">${esc(tur(t))}</b>`).join('')}</td>`;
+      ${esAus ? `<b>${esc(aus)}</b>` : c.entra.map(t => `<b style="--lc:${lc(t)}">${esc(tur(t))}</b>`).join('')}
+      ${sigue.map(t => `<b style="--lc:${lc(t)}">${esc(tur(t))}</b><small class="pvya">ya estaba</small>`).join('')}</td>`;
   };
   const cabeza = iso => `<th class="${isoDow(iso) >= 6 ? 'wk' : ''}"><small>${DIAS_L[isoDow(iso)].slice(0, 3)}</small>${+iso.slice(8, 10)}<i>${esc(MES3[+iso.slice(5, 7) - 1])}</i></th>`;
   const quienes = plan.personas.map(p => nombreCorto(nombrePid(p)));
-  const resumen = `<b>${esc((COB_TIPO_LBL[inc.tipo] || inc.tipo).toLowerCase())}</b> de <b>${esc(nombre)}</b> → ${pl(res.afectados.length, 'turno', 'turnos')} en ${pl(inc.dias.length, 'día', 'días')}${quienes.length ? `, que cubre${quienes.length > 1 ? 'n' : ''} <b>${esc(quienes.join(', '))}</b>` : ', <b>sin nadie que entre</b>'}${plan.huecos.length ? ` · <span class="pvmal">${pl(plan.huecos.length, 'hueco sin cubrir', 'huecos sin cubrir')}</span>` : ''}`;
+  const relevos = [...new Set((plan.relevos || []).map(x => nombreCorto(nombrePid(x.pid))))];
+  // «que cubren Dulce y Mari L., que ya estaba en la casilla y pasa a cubrir»: el verbo, con todos (revisión F3)
+  const cubren = quienes.length + relevos.length > 1 ? 'cubren' : 'cubre';
+  const resumen = `<b>${esc((COB_TIPO_LBL[inc.tipo] || inc.tipo).toLowerCase())}</b> de <b>${esc(nombre)}</b> → ${pl(res.afectados.length, 'turno', 'turnos')} en ${pl(inc.dias.length, 'día', 'días')}${quienes.length ? `, que ${cubren} <b>${esc(quienes.join(', '))}</b>` : relevos.length ? `, que ${cubren}` : ', <b>sin nadie que entre</b>'}${relevos.length ? `${quienes.length ? ' y' : ''} <b>${esc(relevos.join(', '))}</b>, que ya estaba${relevos.length > 1 ? 'n' : ''} en la casilla y pasa${relevos.length > 1 ? 'n' : ''} a cubrir` : ''}${plan.huecos.length ? ` · <span class="pvmal">${pl(plan.huecos.length, 'hueco sin cubrir', 'huecos sin cubrir')}</span>` : ''}`;
   const html = `<div class="pvhead"><span class="pvico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.6"/></svg></span>
       <span><h2 class="revh2" style="margin:0">Vista previa del cambio</h2><p class="revsub" style="margin:2px 0 0">Así quedará la planilla con el ${esc('plan ' + plan.id)} aplicado. Nada se guarda hasta que confirmes.</p></span></div>
     <div class="pvres">${resumen}</div>

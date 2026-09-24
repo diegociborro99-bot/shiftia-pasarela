@@ -18,7 +18,9 @@ function openPicker(iso, tid, anchor) {
   const ok = candidatosPara(S, S.staff, e, iso, tid);
   const conAviso = candidatosConAviso(S, S.staff, e, iso, tid);
   const yaOk = new Set([...ok, ...conAviso].map(c => c.pid));
-  const noPueden = S.staff.filter(p => !yaOk.has(p.id) && !pidsEn(e, iso, tid).includes(p.id)).map(p => ({ p, r: puedeEstar(S, S.staff, e, iso, tid, p.id, { permitirPartido: true }) }));
+  // con el puesto de sala, como candidatosPara (24/09, S34): «solo hace cocina» y «ya lleva la cocina
+  // ese día» salen aquí con su motivo, en vez de «no pueden» sin decir por qué
+  const noPueden = S.staff.filter(p => !yaOk.has(p.id) && !pidsEn(e, iso, tid).includes(p.id)).map(p => ({ p, r: puedeEstar(S, S.staff, e, iso, tid, p.id, { permitirPartido: true, puesto: 'sala' }) }));
   const fila = (c, cls, sub, extra) => `<button class="prowp ${cls}" data-pickpid="${c.pid}"${extra || ''}><span class="av" style="background:${avColor(c.pid)}">${esc(initials(c.nombre))}</span><span class="pn2">${esc(c.nombre)}<span class="prsub">${esc(sub)}</span></span>${cls === 'rec' ? '<span class="star">★ RECOMENDADO</span>' : ''}</button>`;
   const pop = document.createElement('div');
   pop.className = 'pop picker'; pop.id = 'pickerPop'; pop.setAttribute('role', 'dialog');
@@ -66,17 +68,25 @@ function openPicker(iso, tid, anchor) {
       const cual = rr.regla ? `${nombreRegla(rr.regla)} — ${rr.motivo}` : 'una regla del grupo';
       const motivo = prompt(`Vas a poner a ${nombrePid(pid)} incumpliendo esta regla:\n\n${cual}\n\nSi la equivocada es la ficha, se corrige en Equipo. Escribe por qué lo haces (quedará en el historial):`);
       if (motivo === null) return;
+      // 24/09 (revisión F3): con el puesto de sala, como el resto del selector: sin él, «solo hace cocina»
+      // no quedaba en la entrada como regla forzada y la Revisión no lo daba por forzado
       pushUndo(`forzar a ${nombrePid(pid)}`);
-      const res = asignarUI(iso, tid, pid, { origen: 'manual', forzar: true, permitirPartido: true, razon: motivo.trim() || 'forzado por el encargado' });
-      if (res.ok) { closePicker(); renderVistaActiva(); toast(`${nombrePid(pid)} puesto a la fuerza · incumple ${nombreRegla(rr.regla).toLowerCase()}: ${res.avisos.join(', ')}`, 'warn'); } else toast(`${nombreRegla(res.regla)} — ${res.motivo}`, 'bad');
+      const res = asignarUI(iso, tid, pid, { origen: 'manual', forzar: true, permitirPartido: true, puesto: 'sala', razon: motivo.trim() || 'forzado por el encargado' });
+      if (res.ok) { closePicker(); renderVistaActiva(); toast(`${nombrePid(pid)} puesto a la fuerza · incumple ${nombreRegla(rr.regla).toLowerCase()}: ${res.avisos.join(', ')}`, 'warn'); }
+      else { undoStack.pop(); actualizarUndoBtn(); toast(`${nombreRegla(res.regla)} — ${res.motivo}`, 'bad'); }
       return;
     }
     const b = ev.target.closest('[data-pickpid]'); if (!b) return;
     const pid = b.dataset.pickpid;
     const c = [...ok, ...conAviso].find(x => x.pid === pid);
+    // 24/09 (revisión F3, S11): se pone como la recomienda candidatosPara: de sala, y si cubre a quien
+    // falta, con su «por» y el partido autorizado para cubrirle (D1). Antes la ★ de Mari Luz «cubre a
+    // Iván» se rechazaba al pulsarla («no hace partido los viernes») y, si entraba, iba sin «por».
+    // Si no se puede poner, el paso de Ctrl+Z se retira: no queda un paso vacío
     pushUndo(`poner a ${nombrePid(pid)}`);
-    const res = asignarUI(iso, tid, pid, { origen: 'manual', permitirPartido: !!b.dataset.aviso, razon: c ? c.razones.join(' · ') : undefined });
-    if (!res.ok) { toast(res.motivo, 'bad'); return; }
+    const cub = c && c.cubre ? { por: c.cubre, cubrePor: c.cubre } : {};
+    const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', permitirPartido: !!b.dataset.aviso, puesto: 'sala', razon: c ? c.razones.join(' · ') : undefined }, cub));
+    if (!res.ok) { undoStack.pop(); actualizarUndoBtn(); toast(res.motivo, 'bad'); return; }
     closePicker(); renderVistaActiva();
     toast(res.avisos.length ? `${nombrePid(pid)} añadido con aviso: ${res.avisos.join(', ')}` : `${nombrePid(pid)} añadido`, res.avisos.length ? 'warn' : 'ok');
   });

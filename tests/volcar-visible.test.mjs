@@ -9,7 +9,9 @@ const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(RAIZ, 'index.html'), 'utf8');
 
 test('el generador semanal vuelca a la planilla con un botón claro, también desde la hoja impresa', () => {
-  assert.match(html, /Volcar a la planilla \(\$\{pl\(res\.aplicados, 'plaza nueva', 'plazas nuevas'\)\}\)/);
+  // desde la revisión F3 el botón también cuenta los relevos «cubre a» (y el «por» que se quita)
+  assert.match(html, /Volcar a la planilla \(\$\{\[res\.aplicados \? pl\(res\.aplicados, 'plaza nueva', 'plazas nuevas'\)/);
+  assert.match(html, /pl\(res\.relevos, 'relevo «cubre a»', 'relevos «cubre a»'\)/);
   assert.match(html, /Ya está volcada en la planilla/);
   assert.match(html, /id="pVolcar"/);
   assert.match(html, /abrirImpresionSemanaGenerada\(GEN\.previa, \{ titulo: 'Planilla propuesta', volcar:/);

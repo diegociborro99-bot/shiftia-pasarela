@@ -95,14 +95,14 @@ function renderHoras() {
       <td class="num">${f.dias || mut}</td><td class="num">${f.mananas || mut}</td><td class="num">${f.tardes || mut}</td><td class="num">${f.partidos || mut}</td>
       <td class="num hh"><b>${numHoras(f.horas)}</b></td>
       <td class="num">${f.extrasMin ? numHoras(f.extrasMin / 60) : mut}</td>
-      <td class="num${f.vacaciones ? ' vac' : ''}" ${f.vacaciones ? `title="${esc(f.vacacionesDias.map(fmtDM).join(', '))}"` : ''}>${f.vacaciones || mut}</td>
+      <td class="num${f.vacaciones ? ' vac' : ''}" ${f.vacaciones ? `title="${esc(fechasAusencia(f.vacacionesDias, f.vacacionesMedias).join(', '))}"` : ''}>${f.vacaciones ? numJornadas(f.vacaciones) : mut}</td>
       <td class="num opt">${f.festivas || mut}</td><td class="num opt">${f.domingos || mut}</td><td class="num opt">${f.nocturnosMin ? numHoras(f.horasNocturnas) : mut}</td>
       <td class="num">${f.contratoHoras === null ? '<span class="cmut" title="Sin horas de contrato en la ficha">—</span>' : numHoras(f.contratoHoras)}</td>
       <td class="num saldo ${sc}">${f.saldo === null ? '<span class="cmut">—</span>' : (f.saldo > 0 ? '+' : '') + numHoras(f.saldo)}</td>
     </tr>`;
     h += `<tr class="hdet" data-hdet="${esc(p.id)}"${abierta ? '' : ' hidden'}><td colspan="12">${detalleHoras(p, f, extrasMes)}</td></tr>`;
   }
-  h += `</tbody><tfoot><tr><td>Total · ${pl(orden.length, 'persona', 'personas')}</td><td class="num">${tot.dias}</td><td class="num">${tot.mananas}</td><td class="num">${tot.tardes}</td><td class="num">${tot.partidos}</td><td class="num hh"><b>${numHoras(tot.horas)}</b></td><td class="num">${numHoras(tot.extras)}</td><td class="num">${tot.vac || ''}</td><td class="num opt">${tot.festivas}</td><td class="num opt">${tot.domingos}</td><td class="num opt">${numHoras(tot.noct)}</td><td class="num">${tot.conContrato ? numHoras(tot.contrato) : '—'}</td><td class="num saldo ${tot.saldo > 0 ? 'pos' : tot.saldo < 0 ? 'neg' : ''}">${tot.conContrato ? (tot.saldo > 0 ? '+' : '') + numHoras(tot.saldo) : '—'}</td></tr></tfoot></table></div></div>`;
+  h += `</tbody><tfoot><tr><td>Total · ${pl(orden.length, 'persona', 'personas')}</td><td class="num">${tot.dias}</td><td class="num">${tot.mananas}</td><td class="num">${tot.tardes}</td><td class="num">${tot.partidos}</td><td class="num hh"><b>${numHoras(tot.horas)}</b></td><td class="num">${numHoras(tot.extras)}</td><td class="num">${tot.vac ? numJornadas(tot.vac) : ''}</td><td class="num opt">${tot.festivas}</td><td class="num opt">${tot.domingos}</td><td class="num opt">${numHoras(tot.noct)}</td><td class="num">${tot.conContrato ? numHoras(tot.contrato) : '—'}</td><td class="num saldo ${tot.saldo > 0 ? 'pos' : tot.saldo < 0 ? 'neg' : ''}">${tot.conContrato ? (tot.saldo > 0 ? '+' : '') + numHoras(tot.saldo) : '—'}</td></tr></tfoot></table></div></div>`;
   h += '<p class="hfoot">Horas = turnos + extras. Contrato = horas semanales de la ficha × días del mes, descontados los días de ausencia. Saldo = horas − contrato. Festivos y domingos cuentan días trabajados; nocturnas, las horas entre las 22:00 y las 06:00. Pulsa una fila para ver el desglose por local y sus extras.</p>';
 
   // ---- registro de apoyos (José, 18/09: «los apoyos son los extras que hay que pagarle») ----
@@ -144,6 +144,7 @@ function detalleHoras(p, f, extrasMes) {
     : '<span class="hnota">Sin turnos este mes</span>'}</div>`;
   const notas = [];
   if (f.ausencias) notas.push(`${pl(f.ausencias, 'día', 'días')} de ausencia (no cuentan para el contrato)`);
+  if (f.ausenciasMedias) notas.push(`${pl(f.ausenciasMedias, 'media jornada', 'medias jornadas')} de ausencia (cuenta${f.ausenciasMedias > 1 ? 'n' : ''} medio día para el contrato)`);
   if (f.continuos) notas.push(`${pl(f.continuos, 'día de turno continuo', 'días de turno continuo')} (un turno seguido, se cuenta una vez)`);
   if (f.forzados) notas.push(`${pl(f.forzados, 'asignación forzada', 'asignaciones forzadas')} a mano`);
   // 24/09 (D11 y revisión F2): los días (o medios días) sin trabajo por el cierre de un local; solo
@@ -154,8 +155,8 @@ function detalleHoras(p, f, extrasMes) {
     ? mias.map(x => `<span class="hx"><b>${fmtDM(x.iso)}</b><span>${numHoras((+x.min || 0) / 60)} h</span><em>${esc(x.motivo || '')}</em><button class="hxdel" type="button" data-xdel="${esc(x.id)}" title="Quitar esta hora extra" aria-label="Quitar la hora extra del ${fmtDM(x.iso)}">✕</button></span>`).join('')
     : '<span class="hnota">Ninguna este mes</span>'}</div><button class="btn-mini ghost" type="button" data-xadd="${esc(p.id)}">＋ Hora extra a ${esc(nombreCorto(p.nombre))}</button></div>
     ${f.vacaciones || f.libres ? `<div class="hdet-b"><span class="micro">AUSENCIAS DEL MES</span><div class="hausl">
-      ${f.vacaciones ? `<span class="hausx vac"><b>${f.vacaciones} ${f.vacaciones === 1 ? 'día' : 'días'} de vacaciones</b><small>${esc(f.vacacionesDias.map(fmtDM).join(' · '))}</small></span>` : ''}
-      ${f.libres ? `<span class="hausx"><b>${f.libres} ${f.libres === 1 ? 'día libre' : 'días libres'}</b><small>${esc(f.libresDias.map(fmtDM).join(' · '))}</small></span>` : ''}
+      ${f.vacaciones ? `<span class="hausx vac"><b>${numJornadas(f.vacaciones)} ${f.vacaciones === 1 ? 'día' : 'días'} de vacaciones</b><small>${esc(fechasAusencia(f.vacacionesDias, f.vacacionesMedias).join(' · '))}</small></span>` : ''}
+      ${f.libres ? `<span class="hausx"><b>${numJornadas(f.libres)} ${f.libres === 1 ? 'día libre' : 'días libres'}</b><small>${esc(fechasAusencia(f.libresDias, f.libresMedias).join(' · '))}</small></span>` : ''}
     </div></div>` : ''}</div>`;
   return h;
 }
@@ -290,6 +291,10 @@ function moverMesHoras(dir) {
   }
 }
 
+// 24/09 (revisión F3, D10): media jornada de vacaciones = medio día. «0,5» y «1,5» en vez de «0.5», y la
+// fecha de una media jornada dice su franja: «28/09 (tarde)»
+const numJornadas = n => String(n).replace('.', ',');
+const fechasAusencia = (dias, medias) => dias.map(iso => fmtDM(iso) + ((medias || {})[iso] ? ` (${FRANJA_LBL[medias[iso][0]].toLowerCase()})` : ''));
 // ---------- vacaciones de toda la plantilla en el año (José, 17/09) ----------
 // «Un enlace rápido con las vacaciones de la gente de todo el año» para pasarlas a nómina.
 function abrirVacacionesAno(ano) {
@@ -304,13 +309,13 @@ function abrirVacacionesAno(ano) {
       <button class="btn-mini ghost" data-vy="${y - 1}">‹ ${y - 1}</button>
       <button class="btn-mini ghost" data-vy="${y + 1}">${y + 1} ›</button>
       <span class="vacsp"></span>
-      <span class="vactot"><b>${total}</b> ${total === 1 ? 'día' : 'días'} · ${filas.length} ${filas.length === 1 ? 'persona' : 'personas'}</span>
+      <span class="vactot"><b>${numJornadas(total)}</b> ${total === 1 ? 'día' : 'días'} · ${filas.length} ${filas.length === 1 ? 'persona' : 'personas'}</span>
       <button class="btn-mini" data-vexcel>Excel</button>
     </div>
     ${filas.length ? `<div class="tscroll"><table class="htab vactab"><thead><tr><th>Persona</th>${MESES.map((m, i) => `<th class="num">${esc(mesCorto(i))}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>
       ${filas.map(f => `<tr><td class="per"><span class="av" style="background:${avColor(f.pid)}">${esc(initials(f.nombre))}</span><b>${esc(f.nombre)}</b></td>
-        ${f.meses.map(d => `<td class="num${d.length ? ' vac' : ''}"${d.length ? ` title="${esc(d.map(fmtDM).join(', '))}"` : ''}>${d.length || '<span class="cmut">·</span>'}</td>`).join('')}
-        <td class="num hh"><b>${f.total}</b></td></tr>`).join('')}
+        ${f.meses.map((d, i) => `<td class="num${d.length ? ' vac' : ''}"${d.length ? ` title="${esc(fechasAusencia(d, f.medias).join(', '))}"` : ''}>${d.length ? numJornadas(f.dias[i]) : '<span class="cmut">·</span>'}</td>`).join('')}
+        <td class="num hh"><b>${numJornadas(f.total)}</b></td></tr>`).join('')}
     </tbody></table></div>` : '<div class="entzero"><b>Nadie tiene vacaciones registradas en ' + y + '.</b><span>Se registran desde la ficha de la persona o marcando «Vacaciones» en el gestor de cobertura.</span></div>'}`, { ancho: 900 });
   ov.addEventListener('click', e => {
     const b = e.target.closest('[data-vy],[data-vexcel]');
@@ -323,8 +328,8 @@ async function exportarVacacionesAno(y, filas) {
   await asegurarXlsx();
   const aoa = [[`GRUPO PASARELA · Vacaciones de ${y}`], [],
     ['PERSONA', ...MESES.map(m => m.toUpperCase()), 'TOTAL (días)', 'FECHAS']];
-  for (const f of filas) aoa.push([f.nombre, ...f.meses.map(d => d.length || ''), f.total, f.fechas.map(fmtDM).join(' · ')]);
-  aoa.push(['TOTAL', ...Array.from({ length: 12 }, (_, i) => filas.reduce((a, f) => a + f.meses[i].length, 0) || ''), filas.reduce((a, f) => a + f.total, 0), '']);
+  for (const f of filas) aoa.push([f.nombre, ...f.dias.map(d => d || ''), f.total, fechasAusencia(f.fechas, f.medias).join(' · ')]);
+  aoa.push(['TOTAL', ...Array.from({ length: 12 }, (_, i) => filas.reduce((a, f) => a + f.dias[i], 0) || ''), filas.reduce((a, f) => a + f.total, 0), '']);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 22 }, ...Array.from({ length: 12 }, () => ({ wch: 6 })), { wch: 12 }, { wch: 60 }];
   const wb = XLSX.utils.book_new();

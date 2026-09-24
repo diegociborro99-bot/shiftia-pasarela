@@ -90,7 +90,8 @@ function chipsCondiciones(p) {
   if ((p.nuncaCon || []).length) h.push(tc('nuncaCon', 'Nunca con', esc(p.nuncaCon.map(nombrePid).join(', ')), 'warn'));
   for (const cb of p.cubreA || []) {
     const cuando = [cb.dow ? lblDowPl(cb.dow) : '', cb.turnoId ? lblTurno(cb.turnoId) : ''].filter(Boolean).join(' · ');
-    h.push(tc('cubreA', 'Cubre a', esc(nombrePid(cb.pid)) + (cuando ? ` <small>(${esc(cuando)})</small>` : ''), 'fix'));
+    // 24/09 (D1): la designación le autoriza el partido para cubrirle (y solo eso)
+    h.push(tc('cubreA', 'Cubre a', esc(nombrePid(cb.pid)) + (cuando ? ` <small>(${esc(cuando)})</small>` : ''), 'fix', `ocupa el sitio de ${nombrePid(cb.pid)} cuando falta; si hace falta, puede hacer partido para cubrirle`));
   }
   for (const v of p.vetos || []) h.push(tc('vetos', 'No hace', chipLocal(v.localId, v.franja === 'M' ? 'mañanas' : 'tardes'), 'loc warn'));
   if (p.contrato && +p.contrato.horasSemana > 0) h.push(tc('contrato', 'Contrato', `${+p.contrato.horasSemana} h/semana`));
@@ -103,7 +104,7 @@ function chipsCondiciones(p) {
 function chipsAusencias(p) {
   return (p.ausencias || []).map((a, i) => {
     const rango = a.hasta ? (a.hasta !== a.desde ? `${fmtDM(a.desde)}–${fmtDM(a.hasta)}` : fmtDM(a.desde)) : `desde ${fmtDM(a.desde)}`;
-    const lbl = (AUS_LBL[a.tipo] || { label: a.tipo }).label;
+    const lbl = etiquetaAusencia(a);   // con la media jornada: «Permiso por la mañana» (revisión F3, D10)
     // una baja sin fecha de fin se cierra desde la ficha: aquí solo se ve
     const quitable = !(a.tipo === 'BAJ' && !a.hasta);
     return `<span class="abschip a-${esc(a.tipo)}" title="${esc(a.detalle || lbl)}">${esc(lbl)} ${rango}${quitable ? `<button type="button" data-rmabs="${esc(p.id)}:${i}" aria-label="Quitar ausencia">✕</button>` : ''}</span>`;

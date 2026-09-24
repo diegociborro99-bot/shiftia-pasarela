@@ -45,8 +45,10 @@ function renderSemana() {
     return `<td>${libres.map(p => { const m = marcaCierreDia(p, c.iso, c.e); return m ? `<span class="dn ${m.cls}" data-tipstr="${esc(m.tip)}">${esc(nombreCorto(p.nombre))}<em>${esc(m.txt)}</em></span>` : `<span class="dn">${esc(nombreCorto(p.nombre))}</span>`; }).join('') || '<span class="wcerr">—</span>'}</td>`;
   }).join('')}</tr>`;
   h += `<tr class="piedesc"><td class="lbl">Ausencias</td>${cols.map(c => {
+    // con la media jornada, «PERM · mañana» (revisión F3, D10): Mari Luz con permiso por la mañana
+    // trabaja esa tarde, y «PERM» a secas parecía el día entero
     const aus = S.staff.map(p => ({ p, a: ausenciaEn(p, c.iso) })).filter(x => x.a);
-    return `<td>${aus.map(x => `<span class="dn">${esc(nombreCorto(x.p.nombre))}<em>${esc(x.a.tipo)}</em></span>`).join('') || '<span class="wcerr">—</span>'}</td>`;
+    return `<td>${aus.map(x => `<span class="dn">${esc(nombreCorto(x.p.nombre))}<em>${esc(etiquetaAusencia(x.a, true))}</em></span>`).join('') || '<span class="wcerr">—</span>'}</td>`;
   }).join('')}</tr>`;
   h += '</tbody></table>';
   $('#semRoot').innerHTML = h;

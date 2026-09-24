@@ -324,6 +324,7 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .gcond i{font-style:normal;font-weight:800;color:#1c7c43;min-width:12px}
 .gcond.rota i{color:var(--bad)}
 .gcond.rota span{color:var(--ink)}
+.gcond small.gnota{display:block;color:#1c7c43;font-size:10.5px}   /* 24/09 (D1): cumplida, con nota */
 .gcond small{display:block;color:var(--bad);font-size:10.5px}
 .gcond b{font-family:var(--mono);color:var(--ink3);font-weight:600;margin-right:2px}
 .gnueva{font-family:var(--mono);font-size:8.5px;font-weight:800;color:var(--teal);letter-spacing:.08em;font-style:normal;border:1px solid color-mix(in srgb, var(--teal) 50%, transparent);border-radius:3px;padding:0 4px;margin-left:4px}
@@ -413,6 +414,14 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .cobrow.hueco .av{background:var(--bad)}
 .cobrow.hueco .cobtxt>b{color:var(--bad)}
 .cobrow.sobra .av{background:var(--ok)}
+/* 24/09 (fase 3): el relevo («ya estaba · cubre a Iván»), la nota del partido autorizado y el plan caducado */
+.cobrow.relevo{background:color-mix(in srgb, var(--accent) 6%, var(--surface))}
+.cobrow.relevo .cobtxt small{color:var(--accent)}
+.cobtxt small.cobnota{color:var(--ok)}
+.cobyaestan{font-size:11.5px;color:var(--ink3);margin-left:6px}
+.pvya{display:block;font-size:9.5px;color:var(--ink3);font-weight:600}
+.cobcard.cobcaduca{border-color:color-mix(in srgb, var(--warn) 55%, var(--border));background:color-mix(in srgb, var(--warn) 6%, var(--surface))}
+.cobcard.cobcaduca .btn{margin-top:6px}
 .cobpf{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
 .cobpers2{display:flex;flex-wrap:wrap;gap:0 4px;align-items:center;font-size:11.5px;color:var(--ink3)}
 .cobok .gcamblist li.bad{color:var(--bad)}

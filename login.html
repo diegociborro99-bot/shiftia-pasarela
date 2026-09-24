@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Shiftia · Grupo Pasarela · Acceso</title>
 <meta name="robots" content="noindex,nofollow">
-<meta name="shiftia-build" content="0.5.0+4c2c398282">
+<meta name="shiftia-build" content="0.5.0+507cbe3152">
 <meta name="theme-color" content="#f8f6f3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%2232%22%20y2%3D%2232%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234ecdc4%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%232980b9%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22url%28%23g%29%22/%3E%3Cpath%20d%3D%22M16%2026c-6-1.5-10-6-9-12s7-9%2013-7.5c-4.5-0.7-9%202.2-9.7%206.7s3%209%207.5%2010.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M14.5%208c6%201.5%2010%206%209%2012s-7%209-13%207.5c4.5%200.7%209-2.2%209.7-6.7s-3-9-7.5-10.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
@@ -767,6 +767,7 @@ html.themeing, html.themeing *{transition:background-color .32s var(--ease2),col
 .revitem.alta{border-left:4px solid var(--bad)}
 .revitem.media{border-left:4px solid var(--warn)}
 .revitem.info{border-left:4px solid var(--accent)}
+.revitem.autorizado{border-left:4px solid var(--ok)}   /* 24/09 (revisión F3): el partido autorizado para cubrir, solo para que se sepa */
 .revitem .msg{flex:1;min-width:0}
 .revgo{flex:none;border:1px solid var(--border);background:var(--surface);border-radius:8px;font-size:10px;font-weight:700;padding:4px 9px;cursor:pointer;color:var(--accent);font-family:var(--mono)}
 .revgo:hover{background:var(--accent-l)}
@@ -1904,6 +1905,7 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .gcond i{font-style:normal;font-weight:800;color:#1c7c43;min-width:12px}
 .gcond.rota i{color:var(--bad)}
 .gcond.rota span{color:var(--ink)}
+.gcond small.gnota{display:block;color:#1c7c43;font-size:10.5px}   /* 24/09 (D1): cumplida, con nota */
 .gcond small{display:block;color:var(--bad);font-size:10.5px}
 .gcond b{font-family:var(--mono);color:var(--ink3);font-weight:600;margin-right:2px}
 .gnueva{font-family:var(--mono);font-size:8.5px;font-weight:800;color:var(--teal);letter-spacing:.08em;font-style:normal;border:1px solid color-mix(in srgb, var(--teal) 50%, transparent);border-radius:3px;padding:0 4px;margin-left:4px}
@@ -1993,6 +1995,14 @@ table.gsem td.gfalta{box-shadow:inset 3px 0 0 var(--bad)}
 .cobrow.hueco .av{background:var(--bad)}
 .cobrow.hueco .cobtxt>b{color:var(--bad)}
 .cobrow.sobra .av{background:var(--ok)}
+/* 24/09 (fase 3): el relevo («ya estaba · cubre a Iván»), la nota del partido autorizado y el plan caducado */
+.cobrow.relevo{background:color-mix(in srgb, var(--accent) 6%, var(--surface))}
+.cobrow.relevo .cobtxt small{color:var(--accent)}
+.cobtxt small.cobnota{color:var(--ok)}
+.cobyaestan{font-size:11.5px;color:var(--ink3);margin-left:6px}
+.pvya{display:block;font-size:9.5px;color:var(--ink3);font-weight:600}
+.cobcard.cobcaduca{border-color:color-mix(in srgb, var(--warn) 55%, var(--border));background:color-mix(in srgb, var(--warn) 6%, var(--surface))}
+.cobcard.cobcaduca .btn{margin-top:6px}
 .cobpf{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
 .cobpers2{display:flex;flex-wrap:wrap;gap:0 4px;align-items:center;font-size:11.5px;color:var(--ink3)}
 .cobok .gcamblist li.bad{color:var(--bad)}

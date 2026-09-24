@@ -129,7 +129,8 @@ function pxHojaDelEquipo(construir) {
 
 function pxNombre(pid, marcas) {
   const mk = marcas || {};
-  const tipo = mk.tipo ? (AUS_LBL[mk.tipo] ? AUS_LBL[mk.tipo].label : mk.tipo) : '';
+  // con la ausencia entera (mk.aus), su etiqueta con la media jornada: «Permiso por la mañana» (revisión F3)
+  const tipo = mk.aus ? etiquetaAusencia(mk.aus) : mk.tipo ? (AUS_LBL[mk.tipo] ? AUS_LBL[mk.tipo].label : mk.tipo) : '';
   // mk.cierre: «cierre» o «apoyo · sin sitio» en el pie de descansos (marcaCierreDia, revisión F2)
   return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${mk.abre ? '<b class="pxg-mk abre">▸</b>' : ''}${esc(nombrePid(pid))}${tipo ? `<em>${esc(tipo)}</em>` : ''}${mk.cierre ? `<em class="cie">${esc(mk.cierre)}</em>` : ''}</span>`;
 }
@@ -194,7 +195,7 @@ function pxFilasDescansos(cols, personas, colspan) {
   const { porDia, bajaToda } = pxDescansos(cols, personas);
   let h = `<tr class="secrow pxdesc"><td class="sec" colspan="${colspan}"><span>Pie de descansos · quién libra cada día</span></td></tr>`;
   h += `<tr class="pxdesc"><td class="lblp">Libran<small>sin turno ese día</small></td>${porDia.map((x, i) => `<td data-libran="${cols[i].iso}"><div class="pxg-cnt">${x.libran.length} libra${x.libran.length === 1 ? '' : 'n'}</div>${x.libran.length ? `<div class="pxg-chips">${x.libran.map(p => `<span><i style="background:${avColor(p.id)}"></i>${esc(p.nombre)}${x.marcas[p.id] ? ` <em class="cie">${esc(x.marcas[p.id])}</em>` : ''}</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`).join('')}</tr>`;
-  h += `<tr class="pxdesc"><td class="lblp">Ausencias<small>vacaciones · permisos · libres</small></td>${porDia.map(x => `<td>${x.ausentes.map(({ p, a }) => pxNombre(p.id, { tipo: a.tipo })).join('') || '&nbsp;'}</td>`).join('')}</tr>`;
+  h += `<tr class="pxdesc"><td class="lblp">Ausencias<small>vacaciones · permisos · libres</small></td>${porDia.map(x => `<td>${x.ausentes.map(({ p, a }) => pxNombre(p.id, { tipo: a.tipo, aus: a })).join('') || '&nbsp;'}</td>`).join('')}</tr>`;
   if (bajaToda.length) h += `<tr class="pxdesc"><td class="lblp">De baja<small>toda la semana</small></td><td colspan="${colspan - 1}">${bajaToda.map(p => pxNombre(p.id, { tipo: 'BAJ' })).join('')}</td></tr>`;
   return h;
 }
@@ -438,7 +439,7 @@ function pxgDestrapa(res, hu) {
   const otra = franja === 'M' ? 'T' : 'M';
   const out = [];
   for (const p of S.staff) {
-    if (ausenciaEn(p, iso)) continue;
+    if (ausenciaEn(p, iso, franja)) continue;   // por franja (revisión F3, D10): quien falta solo por la mañana sí cuenta para la tarde
     const yaAqui = enCasilla.includes(p.id);
     if (yaAqui && hu.tipo !== 'primero') continue;
     if (turnosDe(S).some(t => t.franja === franja && t.id !== hu.turnoId && pidsEn(est, iso, t.id).includes(p.id))) continue;

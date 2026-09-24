@@ -178,6 +178,8 @@ function htmlPrevia(p) {
   const dias = Object.keys(porDia).sort();
   const nPatron = p.aplicados.filter(a => a.origen === 'patron').length, nGen = p.aplicados.length - nPatron;
   const conAviso = p.aplicados.filter(a => a.avisos && a.avisos.length).length;
+  // D3: quien ya estaba y pasa a cubrir; solo los nuevos (revisión F3: el relevo ya volcado no es nada que volcar)
+  const nRelevos = (p.coberturas || []).filter(c => c.yaEstaba && c.nuevo).length;
   const lp = tid => { const { localId } = partirTurno(tid); return `<span class="lpill" style="--lc:${colorLocal(localId)}">${esc((localDe(S, localId) || {}).corto || localId)}·${partirTurno(tid).franja}</span>`; };
   const fila = a => `<div class="genrow"><span class="av" style="background:${avColor(a.pid)}">${esc(initials(nombrePid(a.pid)))}</span><span class="gtxt"><b>${esc(nombrePid(a.pid))}</b><small>${esc(a.razon || '')}${a.avisos && a.avisos.length ? ' · <span style="color:var(--warn)">' + esc(a.avisos.join(', ')) + '</span>' : ''}${a.supuesto ? ' · <span style="color:var(--warn)">supuesto</span>' : ''}</small></span>${lp(a.turnoId)}</div>`;
   const hueco = h => {
@@ -200,36 +202,23 @@ function htmlPrevia(p) {
     ${p.rechazados.length ? `<div class="warnbanner"><b>${pl(p.rechazados.length, 'plaza de la semana tipo no se pudo poner', 'plazas de la semana tipo no se pudieron poner')}</b>${p.rechazados.slice(0, 5).map(r => `${esc(nombrePid(r.pid))} en ${esc(nombreLocal(partirTurno(r.turnoId).localId))} el ${fmtDM(r.iso)}: ${esc(r.motivo)}`).join(' · ')}</div>` : ''}
     ${!p.aplicados.length && !p.huecos.length && !(p.retirados || []).length ? '<div class="genvacio">Nada que proponer: el periodo ya está completo (o queda fuera de «solo desde hoy»).</div>' : ''}
     ${dias.map(iso => `<div class="gendia"><div class="gdh">${fmtLargo(iso)}<small>${pl(porDia[iso].ap.length, 'plaza', 'plazas')}${porDia[iso].hu.length ? ` · ${pl(porDia[iso].hu.length, 'casilla corta', 'casillas cortas')}` : ''} · <button class="glink" data-irdia="${iso}">ver el día</button></small></div>${porDia[iso].hu.map(hueco).join('')}${porDia[iso].ap.map(fila).join('')}</div>`).join('')}
-    <div class="genbar"><button class="btn btn-cta" id="genAplicar" ${p.aplicados.length || (p.retirados || []).length ? '' : 'disabled'}>${p.aplicados.length || (p.retirados || []).length ? `Volcar a la planilla (${[p.aplicados.length ? pl(p.aplicados.length, 'plaza', 'plazas') : '', (p.retirados || []).length ? pl(p.retirados.length, 'retirada', 'retiradas') : ''].filter(Boolean).join(', ')})` : 'Nada nuevo que volcar'}</button><span class="revsub" style="margin:0">Se puede deshacer con Ctrl+Z. Las casillas cortas quedan marcadas en rojo en Hoy, Semana y Mes.</span></div>`;
+    <div class="genbar"><button class="btn btn-cta" id="genAplicar" ${p.aplicados.length || (p.retirados || []).length || nRelevos ? '' : 'disabled'}>${p.aplicados.length || (p.retirados || []).length || nRelevos ? `Volcar a la planilla (${[p.aplicados.length ? pl(p.aplicados.length, 'plaza', 'plazas') : '', (p.retirados || []).length ? pl(p.retirados.length, 'retirada', 'retiradas') : '', nRelevos ? pl(nRelevos, 'relevo «cubre a»', 'relevos «cubre a»') : ''].filter(Boolean).join(', ')})` : 'Nada nuevo que volcar'}</button><span class="revsub" style="margin:0">Se puede deshacer con Ctrl+Z. Las casillas cortas quedan marcadas en rojo en Hoy, Semana y Mes.</span></div>`;
 }
 function aplicarPrevia() {
-  const p = GEN.previa; if (!p || !(p.aplicados.length || (p.retirados || []).length)) return;
+  const p = GEN.previa; if (!p || !(p.aplicados.length || (p.retirados || []).length || (p.coberturas || []).some(c => c.yaEstaba && c.nuevo))) return;
   if (!confirmarSiCerrado(GEN.desde)) return;
   pushUndo(`generar ${fmtDM(GEN.desde)}–${fmtDM(GEN.hasta)}`, { otrosMeses: true });
-  let n = 0, fallos = 0, nRet = 0;
-  // primero lo que la vista previa retira (24/09): solo si sigue siendo automático y sin forzar, y
-  // con retirarEntrada del modelo, la misma que usa el generador (si llevaba la cocina, la casilla
-  // la recalcula en vez de quedarse sin ella)
-  for (const x of p.retirados || []) {
-    const e = estadoDeIso(x.iso, true);
-    const en = asignados(e, x.iso, x.turnoId).find(y => y.pid === x.pid);
-    if (!en || !esAutomatica(en)) continue;
-    if (retirarEntrada(e, S, S.staff, x.iso, x.turnoId, x.pid)) nRet++;
-  }
-  // cada plaza se vuelca con su «por» y su nota (24/09, revisión): sin el «por», cambiar después el
-  // día libre de Mari Luz no sabía que Lavinia la cubría y la dejaba sin martes ni miércoles
-  for (const a of p.aplicados) {
-    const e = estadoDeIso(a.iso, true);
-    if (pidsEn(e, a.iso, a.turnoId).includes(a.pid)) continue;
-    const prev = p.meses[a.iso.slice(0, 7)];
-    const entry = (asignados(prev, a.iso, a.turnoId).find(x => x.pid === a.pid)) || {};
-    const r = asignar(e, S, S.staff, a.iso, a.turnoId, a.pid, { origen: a.origen, razon: a.razon, supuesto: !!a.supuesto || !!entry.supuesto, permitirPartido: true, cocina: entry.cocina ? true : undefined, abre: entry.abre ? true : undefined, por: entry.por || a.por, nota: entry.nota });
-    if (r.ok) n++; else fallos++;
-  }
-  registrarCambio(`Generador (${p.motor === 'nucleo' ? 'núcleo Shiftia' : 'local'}): ${n} plaza(s) aplicadas del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}${nRet ? ` · ${nRet} retirada(s) que ya no valían` : ''}${p.huecos.length ? ` · ${p.huecos.length} casilla(s) siguen cortas` : ''}${fallos ? ` · ${fallos} no se pudieron poner` : ''}`, 'ia');
+  // 24/09 (revisión F3): el volcado vive en el modelo (volcarPrevia), en el orden que no pierde el relevo:
+  // lo que se retira (solo lo automático, con retirarEntrada), el «por» de quien ya no falta, las plazas
+  // (cada una con su «por» y su nota) y, al final, los relevos «cubre a» con su marca. Antes los relevos se
+  // marcaban antes de volcar las plazas y Mari Luz entraba «por Iván» sin la marca: al volver Iván, el
+  // generador le retiraba su propia plaza
+  const r = volcarPrevia(S, S.staff, iso => estadoDeIso(iso, true), p, { desde: GEN.desde, hasta: GEN.hasta, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, previaDe: iso => p.meses[iso.slice(0, 7)] });
+  const n = r.aplicadas, fallos = r.fallos, nRet = r.retiradas;
+  registrarCambio(`Generador (${p.motor === 'nucleo' ? 'núcleo Shiftia' : 'local'}): ${n} plaza(s) aplicadas del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}${nRet ? ` · ${nRet} retirada(s) que ya no valían` : ''}${r.relevos ? ` · ${pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : ''}${p.huecos.length ? ` · ${p.huecos.length} casilla(s) siguen cortas` : ''}${fallos ? ` · ${fallos} no se pudieron poner` : ''}`, 'ia');
   saveState();
   GEN.previa = null;
-  toast(`${n} plaza(s) aplicadas${nRet ? ` · ${pl(nRet, 'retirada', 'retiradas')}` : ''}${p.huecos.length ? ` · ${p.huecos.length} casilla(s) cortas por cubrir` : ''} · ${comoDeshacer()} para deshacer`, p.huecos.length ? 'warn' : 'ok');
+  toast(`${n} plaza(s) aplicadas${nRet ? ` · ${pl(nRet, 'retirada', 'retiradas')}` : ''}${r.relevos ? ` · ${pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : ''}${p.huecos.length ? ` · ${p.huecos.length} casilla(s) cortas por cubrir` : ''} · ${comoDeshacer()} para deshacer`, p.huecos.length ? 'warn' : 'ok');
   renderGenerador(); pintaRevDot();
 }
 function vaciarGenerado() {
@@ -325,19 +314,23 @@ function generarPreviaSemana() {
   finally { GEN.ocupado = false; renderGeneradorSemana(); }
 }
 function aplicarSemana() {
-  const p = GEN.previa; if (!p || !p.semana || !(p.aplicados || (p.retirados || []).length)) return;
+  // también si lo único nuevo es un relevo «cubre a» o un «por» que se quita (revisión F3: cambios lo cuenta)
+  const p = GEN.previa; if (!p || !p.semana || !(p.aplicados || (p.retirados || []).length || p.cambios.length)) return;
   if (!confirmarSiCerrado(GEN.lunes)) return;
   pushUndo(`generar la semana del ${fmtDM(GEN.lunes)}`, { otrosMeses: true });
   const real = estadoSemana(GEN.lunes, true);
   const res = generarSemana(S, S.staff, real, GEN.lunes, opcionesSemana());
-  registrarCambio(`Generador semanal: semana del ${fmtDM(GEN.lunes)} al ${fmtDM(addDias(GEN.lunes, 6))} — ${res.aplicados} plaza(s) nuevas${res.retirados.length ? `, ${res.retirados.length} retirada(s) (${res.retirados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}, ${res.huecos.length} hueco(s) disponibles, ${res.resumen.condicionesRotas} condición(es) sin cumplir`, 'ia');
+  const rel = res.relevos ? `, ${pl(res.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : '';
+  registrarCambio(`Generador semanal: semana del ${fmtDM(GEN.lunes)} al ${fmtDM(addDias(GEN.lunes, 6))} — ${res.aplicados} plaza(s) nuevas${res.retirados.length ? `, ${res.retirados.length} retirada(s) (${res.retirados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${rel}, ${res.huecos.length} hueco(s) disponibles, ${res.resumen.condicionesRotas} condición(es) sin cumplir`, 'ia');
   saveState(); GEN.previa = null;
-  toast(`${res.aplicados} plaza(s) aplicadas${res.retirados.length ? ` · ${res.retirados.length} retirada(s)` : ''}${res.huecos.length ? ` · ${res.huecos.length} hueco(s) quedan disponibles` : ''} · Ctrl+Z para deshacer`, res.huecos.length ? 'warn' : 'ok');
+  toast(`${res.aplicados} plaza(s) aplicadas${res.retirados.length ? ` · ${res.retirados.length} retirada(s)` : ''}${rel ? ' ·' + rel.slice(1) : ''}${res.huecos.length ? ` · ${res.huecos.length} hueco(s) quedan disponibles` : ''} · Ctrl+Z para deshacer`, res.huecos.length ? 'warn' : 'ok');
   renderGeneradorSemana(); pintaRevDot();
 }
 function htmlSemanaGenerada(res) {
   const r = res.resumen;
-  const nRet = (res.retirados || []).length, hayQueVolcar = !!(res.aplicados || nRet);
+  // revisión F3: los cambios de «por» (el relevo de Mari Luz «por Iván», o quitarlo cuando Iván vuelve)
+  // también se vuelcan; antes solo contaban las plazas nuevas y las retiradas
+  const nRet = (res.retirados || []).length, nPor = (res.relevos || 0) + (res.desmarcados || 0), hayQueVolcar = !!(res.aplicados || nRet || res.cambios.length);
   const dl = iso => `${DIAS_L[isoDow(iso)].slice(0, 3)} ${+iso.slice(8, 10)}`;
   const nc = pid => esc(nombreCorto(nombrePid(pid)));
   const lp = tid => { const { localId, franja } = partirTurno(tid); return `<span class="lpill" style="--lc:${colorLocal(localId)}">${esc((localDe(S, localId) || {}).corto || localId)}·${franja}</span>`; };
@@ -366,10 +359,12 @@ function htmlSemanaGenerada(res) {
   const rechCierre = {}, rechResto = [];
   for (const x of res.rechazados || []) { const c = cierreEn(S, x.iso, x.turnoId); if (c && x.motivo === textoCierre(S, c)) (rechCierre[c.id] = rechCierre[c.id] || { c, n: 0 }).n++; else rechResto.push(x); }
   const rechCierreTxt = Object.values(rechCierre).map(({ c, n }) => `<div class="ghitem gcierre"><b>${pl(n, 'plaza', 'plazas')} de la semana tipo del ${esc(nombreLocal(c.localId))}</b><p>${esc(textoCierre(S, c).replace(nombreLocal(c.localId) + ' ', ''))}</p></div>`).join('');
-  const cambios = res.cambios.map(c => `<li>${lp(c.turnoId)} <b>${dl(c.iso)}</b>: ${c.antes.length ? '<s>' + c.antes.map(nc).join(', ') + '</s> → ' : '<em>nueva:</em> '}${c.despues.map(nc).join(', ') || 'vacía'}</li>`).join('');
+  // con su «por» (revisión F3): «Mari L. → Mari L. por Iván» es un cambio aunque la casilla tenga la misma gente
+  const ncPor = (pid, por) => nc(pid) + (por ? ` <small>por ${nc(por)}</small>` : '');
+  const cambios = res.cambios.map(c => `<li>${lp(c.turnoId)} <b>${dl(c.iso)}</b>: ${c.antes.length ? '<s>' + c.antes.map(pid => ncPor(pid, (c.porAntes || {})[pid])).join(', ') + '</s> → ' : '<em>nueva:</em> '}${c.despues.map(pid => ncPor(pid, (c.porDespues || {})[pid])).join(', ') || 'vacía'}</li>`).join('');
   const huecos = res.huecos.map(h => { const pq = Object.entries(h.porQueNadie || {}).slice(0, 6).map(([m, q]) => `<b>${esc(m)}</b>: ${esc(q.slice(0, 5).join(', '))}${q.length > 5 ? ' +' + (q.length - 5) : ''}`).join(' · '); return `<div class="ghitem">${lp(h.turnoId)} <b>${dl(h.iso)}</b> · ${h.tipo === 'primero' ? '1.ª posición vacante' : `faltan ${h.faltan} de ${h.minimo}`}<p>${esc(h.motivo || '')}</p><small>${pq || 'nadie de la plantilla puede'}</small></div>`; }).join('');
   const grupos = [['minimos', 'Mínimos'], ['cocina', 'Cocina'], ['persona', 'Fichas'], ['regla', 'Reglas del grupo']];
-  const conds = grupos.map(([t, lbl]) => { const xs = res.condiciones.filter(c => c.tipo === t); return xs.length ? `<div class="gcgrp">${lbl} · ${xs.length}</div>` + xs.map(c => `<div class="gcond${c.ok ? '' : ' rota'}"><i>${c.ok ? '✓' : '✗'}</i><span><b>${c.num}</b> ${esc(c.texto)}${c.nueva ? ' <em class="gnueva">NUEVA</em>' : ''}${c.ok ? '' : `<small>${esc(c.detalle)}</small>`}</span></div>`).join('') : ''; }).join('');
+  const conds = grupos.map(([t, lbl]) => { const xs = res.condiciones.filter(c => c.tipo === t); return xs.length ? `<div class="gcgrp">${lbl} · ${xs.length}</div>` + xs.map(c => `<div class="gcond${c.ok ? '' : ' rota'}"><i>${c.ok ? '✓' : '✗'}</i><span><b>${c.num}</b> ${esc(c.texto)}${c.nueva ? ' <em class="gnueva">NUEVA</em>' : ''}${c.ok ? (c.nota ? `<small class="gnota">✓ ${esc(c.nota)}</small>` : '') : `<small>${esc(c.detalle)}</small>`}</span></div>`).join('') : ''; }).join('');
   return `<div class="genkpis">
       <div class="genk ok"><b>${r.turnos}</b><span>turnos abiertos</span></div>
       <div class="genk"><b>${res.aplicados}</b><span>plazas nuevas</span></div>
@@ -379,7 +374,7 @@ function htmlSemanaGenerada(res) {
       <div class="genk"><b>${r.descansos}</b><span>descansos</span></div>
     </div>
     <p class="revsub gsres">${r.huecos ? `La semana sale con <b>${pl(r.huecos, 'hueco disponible', 'huecos disponibles')}</b>: ninguna de las ${S.staff.filter(p => !r.deBaja.includes(p.id)).length} personas puede ocupar esa posición sin romper una condición, así que se deja señalada para ofrecérsela a quien pueda.` : 'La semana sale completa: todos los turnos tienen su gente mínima, su cocina y quien abre.'} ${r.condicionesRotas ? `<b style="color:var(--warn)">${pl(r.condicionesRotas, 'condición no se cumple', 'condiciones no se cumplen')}</b> (lo puesto a mano no se toca).` : `Se cumplen las ${r.condiciones} condiciones.`} ${res.cambios.length ? `${pl(res.cambios.length, 'casilla cambia', 'casillas cambian')} respecto a lo que había.` : 'Nada cambia respecto a lo que había.'}</p>
-    <div class="genbar"><button class="btn btn-cta" id="genAplicar" ${hayQueVolcar ? '' : 'disabled'} title="${hayQueVolcar ? 'Pasa la planilla propuesta a la semana: la verás en Hoy, Semana y Mes' : 'La semana ya está como la propone el generador: no hay nada nuevo que volcar'}">${res.aplicados ? `Volcar a la planilla (${pl(res.aplicados, 'plaza nueva', 'plazas nuevas')})${nRet ? ` · ${pl(nRet, 'retirada', 'retiradas')}` : ''}` : nRet ? `Volcar a la planilla (${pl(nRet, 'retirada', 'retiradas')})` : 'Ya está volcada en la planilla'}</button><button class="btn btn-sec" id="gsPrint">Imprimir la planilla propuesta</button><span class="revsub" style="margin:0">${hayQueVolcar ? 'Al volcar, la semana queda así en la planilla; Ctrl+Z lo deshace.' : 'Nada cambia respecto a lo que hay: vacía la semana si quieres regenerarla desde cero.'} Los huecos siguen en rojo en Hoy y Semana hasta que alguien los coja.</span></div>
+    <div class="genbar"><button class="btn btn-cta" id="genAplicar" ${hayQueVolcar ? '' : 'disabled'} title="${hayQueVolcar ? 'Pasa la planilla propuesta a la semana: la verás en Hoy, Semana y Mes' : 'La semana ya está como la propone el generador: no hay nada nuevo que volcar'}">${hayQueVolcar ? `Volcar a la planilla (${[res.aplicados ? pl(res.aplicados, 'plaza nueva', 'plazas nuevas') : '', nRet ? pl(nRet, 'retirada', 'retiradas') : '', res.relevos ? pl(res.relevos, 'relevo «cubre a»', 'relevos «cubre a»') : '', res.desmarcados ? pl(res.desmarcados, '«por» que se quita', '«por» que se quitan') : '', !res.aplicados && !nRet && !nPor ? pl(res.cambios.length, 'cambio', 'cambios') : ''].filter(Boolean).join(' · ')})` : 'Ya está volcada en la planilla'}</button><button class="btn btn-sec" id="gsPrint">Imprimir la planilla propuesta</button><span class="revsub" style="margin:0">${hayQueVolcar ? 'Al volcar, la semana queda así en la planilla; Ctrl+Z lo deshace.' : 'Nada cambia respecto a lo que hay: vacía la semana si quieres regenerarla desde cero.'} Los huecos siguen en rojo en Hoy y Semana hasta que alguien los coja.</span></div>
     ${notaCierres}
     <div class="gsemwrap">${tablas}${libran}</div>
     <div class="gsleg"><span><b>1</b> orden en la casilla: el primero abre y hace turno completo</span><span><u class="gfijo">▸</u> sale el primero (fijo)</span><span><u class="gcoc">${SVG_COCINA}</u> cocina</span><span><em class="gm">P</em> partido</span><span><em class="gm gc">C</em> turno continuo</span><span><em class="gm">□</em> comodín</span><span class="gcnt">n/mín*</span> mínimo supuesto</span><span class="gcorr">cambia</span> respecto a lo que había</span><span class="ghk">hueco</span> nadie puede ocupar la posición</span></div>
