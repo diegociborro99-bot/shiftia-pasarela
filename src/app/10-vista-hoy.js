@@ -52,7 +52,8 @@ function htmlCasilla(iso, tid, opts) {
   if (!(opts && opts.soloLectura)) {
     if (r.faltan) {
       cuerpo += `<button class="addchip corta" data-pick="${iso}|${tid}" aria-haspopup="true">＋ Asignar · faltan ${r.faltan}</button>`;
-      const c = candidatosPara(S, S.staff, e, iso, tid)[0];
+      // la misma ★ que el selector (fase 4, S35): si falta la cocina, quien puede llevarla
+      const c = gruposSelector(S, S.staff, e, iso, tid, { meses: S.meses }).recomendado;   // la semana entera (revisión F4)
       if (c) cuerpo += `<button class="addchip sust" data-sust="${iso}|${tid}|${c.pid}" title="${esc(c.razones.join(' · '))}">★ ${esc(nombreCorto(c.nombre))}</button>`;
     } else cuerpo += `<button class="addchip" data-pick="${iso}|${tid}" aria-haspopup="true">＋ Añadir</button>`;
   }
@@ -136,7 +137,8 @@ document.addEventListener('click', e => {
     // la ★ pone igual que el selector (ponerRecomendadoUI: de sala, con su «por» si cubre a quien falta y el
     // partido autorizado para cubrirle; revisión F3b: sin eso fallaba «no hace partido los domingos»)
     const [iso, tid, pid] = su.dataset.sust.split('|');
-    if (ponerRecomendadoUI(iso, tid, pid, candidatosPara(S, S.staff, estadoDeIso(iso), iso, tid).find(x => x.pid === pid), false).ok) renderVistaActiva();
+    const g = gruposSelector(S, S.staff, estadoDeIso(iso), iso, tid, { meses: S.meses });
+    if (ponerRecomendadoUI(iso, tid, pid, [...g.cocina, ...g.pueden].find(x => x.pid === pid), false).ok) renderVistaActiva();
     return;
   }
   const ab = e.target.closest('[data-abrir]');

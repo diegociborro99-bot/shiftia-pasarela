@@ -92,13 +92,16 @@ function estadosDelRango(desde, hasta, clonar) {
   }
   return meses;
 }
-// genera sobre varios meses (el periodo puede cruzar de mes): un estado por mes
+// genera sobre varios meses (el periodo puede cruzar de mes): un estado por mes. 24/09 (revisión F4): con
+// `meses` (lo que ya hay en S.meses y, encima, los meses que se están generando), «N turnos esa semana»
+// cuenta la semana entera cuando cruza de mes; antes, en la del 28/09, solo los días de octubre
 function generarSobre(meses, desde, hasta, simular) {
   const total = { aplicados: [], huecos: [], coberturas: [], rechazados: [], retirados: [], avisos: [] };
+  const todos = Object.assign({}, S.meses, meses);
   for (const [k, e] of Object.entries(meses)) {
     const d1 = desde > e.days[0].iso ? desde : e.days[0].iso, d2 = hasta < e.days[e.days.length - 1].iso ? hasta : e.days[e.days.length - 1].iso;
     if (d1 > d2) continue;
-    const r = generarPlanilla(S, S.staff, e, d1, d2, { simular: false, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron });
+    const r = generarPlanilla(S, S.staff, e, d1, d2, { simular: false, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron, meses: todos });
     total.aplicados.push(...r.aplicados); total.huecos.push(...r.huecos); total.coberturas.push(...r.coberturas); total.rechazados.push(...r.rechazados);
     total.retirados.push(...r.retirados); for (const a of r.avisos) if (!total.avisos.some(x => x.pid === a.pid && x.semana === a.semana)) total.avisos.push(a);
   }

@@ -310,7 +310,7 @@ try {
   const ordenAntes = await pg.$$eval('#entrevistasRoot .entrow b', x => x.slice(0, 3).map(y => y.firstChild.textContent.trim()));
   // las que nadie ha tocado van por la fecha de la entrevista (la que leyó el OCR de las
   // hojas), la más reciente antes; las que no la tienen, al final; y nunca por nombre
-  const fechasOrden = await pg.evaluate(() => ordenarCandidatos(candidatos()).filter(c => c.lista === 'ent').map(c => fechaCandidato(c)));
+  const fechasOrden = await pg.evaluate(() => ordenarCandidatos(listaCandidatos()).filter(c => c.lista === 'ent').map(c => fechaCandidato(c)));
   const conFecha = fechasOrden.filter(Boolean);
   ok(`Entrevistas: ${conFecha.length} de 194 tienen fecha legible y salen de la más reciente a la más antigua`, conFecha.length >= 160 && conFecha.every((f, i) => !i || f <= conFecha[i - 1]), JSON.stringify(fechasOrden.slice(0, 6)));
   ok('Entrevistas: las que no tienen fecha van al final, no mezcladas', fechasOrden.slice(conFecha.length).every(f => !f), JSON.stringify(fechasOrden.slice(conFecha.length, conFecha.length + 3)));
@@ -318,7 +318,7 @@ try {
   const fechaFila = await pg.$eval('#entrevistasRoot .entrow small', e => e.textContent);
   ok(`Entrevistas: cada fila enseña la fecha de la entrevista («${fechaFila.slice(0, 14)}»)`, /^\d{1,2} [a-z]{3} 20\d\d/.test(fechaFila), fechaFila);
   const valorado = await pg.evaluate(() => {
-    const lista = ordenarCandidatos(candidatos()).filter(c => c.lista === 'ent');
+    const lista = ordenarCandidatos(listaCandidatos()).filter(c => c.lista === 'ent');
     const c = lista[lista.length - 1];                          // el último de la lista de hoy
     c.val = 'bien'; c.ts = Date.now();                          // lo que hace Guardar en la ficha
     renderEntrevistas();
@@ -351,7 +351,7 @@ try {
     JSON.stringify({ primeros: vals.slice(0, 3), ultimo: vals[vals.length - 1] }));
   await pg.click('#entrevistasRoot [data-entord="fecha"]'); await pg.waitForTimeout(300);
   const casaFecha = await pg.evaluate(() => {
-    const esperado = filtrarCandidatos(ordenarCandidatos(candidatos(), null, 'fecha'), { lista: 'ent' }).map(nombreCand);
+    const esperado = filtrarCandidatos(ordenarCandidatos(listaCandidatos(), null, 'fecha'), { lista: 'ent' }).map(nombreCand);
     const filas = [...document.querySelectorAll('#entrevistasRoot .entrow b')].map(e => e.firstChild.textContent.trim());
     return { igual: esperado.length === filas.length && esperado.every((v, i) => v === filas[i]), primera: filas[0] };
   });

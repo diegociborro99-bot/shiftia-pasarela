@@ -22,10 +22,12 @@ function chipsPuesto(c) {
 }
 const icoVal = v => { const x = VAL_LBL[v]; return x ? icoCand(x.ico) : ''; };
 
-function candidatos() { S.entrevistas = S.entrevistas || []; return S.entrevistas; }
-function candidatoDe(id) { return candidatos().find(c => c.id === id) || null; }
+// (24/09, fase 4: se llamaba candidatos(), el mismo nombre que la puntuación del modelo, candidatos(ctx,
+// iso, tid, opts); en el navegador los dos viven juntos y esta la pisaba)
+function listaCandidatos() { S.entrevistas = S.entrevistas || []; return S.entrevistas; }
+function candidatoDe(id) { return listaCandidatos().find(c => c.id === id) || null; }
 function nuevoIdCand() {
-  let i = 1; const usados = new Set(candidatos().map(c => c.id));
+  let i = 1; const usados = new Set(listaCandidatos().map(c => c.id));
   while (usados.has('c' + i)) i++;
   return 'c' + i;
 }
@@ -44,7 +46,7 @@ function fechaCortaCand(c) {
 }
 
 function renderEntrevistas() {
-  const todos = candidatos();
+  const todos = listaCandidatos();
   const res = LISTAS_CAND.map(l => ({ l, r: resumenCandidatos(todos, l.id) }));
   // el orden lo elige quien mira (de partida, el que pidió José: las últimas primero)
   const vistos = filtrarCandidatos(ordenarCandidatos(todos, null, ENT.orden), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
@@ -108,8 +110,8 @@ function altaAlertaRapida() {
 }
 // repinta solo la lista al teclear, para no perder el foco del buscador
 function pintaListaEnt() {
-  const vistos = filtrarCandidatos(ordenarCandidatos(candidatos(), null, ENT.orden), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
-  const tot = resumenCandidatos(candidatos(), ENT.lista).total;
+  const vistos = filtrarCandidatos(ordenarCandidatos(listaCandidatos(), null, ENT.orden), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
+  const tot = resumenCandidatos(listaCandidatos(), ENT.lista).total;
   $('#entrevistasRoot .entlist').innerHTML = vistos.length ? vistos.map(filaCand).join('') : `<div class="entzero"><b>No hay nadie con esos filtros.</b><span>Prueba a quitarlos o registra a alguien nuevo.</span></div>`;
   $('#entrevistasRoot .entcount').firstChild.textContent = vistos.length === tot ? `${tot} ${tot === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${tot}`;
 }
@@ -299,7 +301,7 @@ function abrirFichaCand(id, editar) {
     }
     if (b.dataset.cdel !== undefined) {
       if (!confirm(`¿Borrar a ${nombreCand(c)} de la base?`)) return;
-      S.entrevistas = candidatos().filter(x => x.id !== c.id);
+      S.entrevistas = listaCandidatos().filter(x => x.id !== c.id);
       ov.remove(); guardarCand(`Candidato borrado: ${nombreCand(c)}`); return;
     }
     ov.querySelectorAll('[data-cin]').forEach(i => { tmp[i.dataset.cin] = i.value.trim(); });
@@ -312,7 +314,7 @@ function abrirFichaCand(id, editar) {
     if (tmp.lista !== 'alerta') tmp.motivo = null;
     // el sello de «última vez tocada» (José, 21/09: las últimas primero): al registrar, y al
     // guardar solo si cambió algo, para que abrir una ficha y darle a Guardar no la suba
-    if (nuevo) { tmp.fecha = tmp.fecha || fmtLargo(isoHoy()); tmp.ts = Date.now(); candidatos().push(tmp); }   // por si la borró
+    if (nuevo) { tmp.fecha = tmp.fecha || fmtLargo(isoHoy()); tmp.ts = Date.now(); listaCandidatos().push(tmp); }   // por si la borró
     else { const antes = JSON.stringify(c); Object.assign(c, tmp); if (JSON.stringify(c) !== antes) c.ts = Date.now(); }
     ENT.lista = tmp.lista;
     ov.remove();

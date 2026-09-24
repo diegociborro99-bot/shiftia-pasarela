@@ -2,6 +2,59 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **La puerta única de reglas, repasada antes de subirla (24/09).** Lo que cambia para quien la usa:
+  - **Si a la casilla le falta la cocina y quien la lleva solo rompe algo que se puede relajar** (Jenny,
+    que el lunes lleva la cocina del Mónaco por la mañana y por la tarde haría un partido que no tiene
+    declarado), sale arriba de «CON AVISO» como cocina y, al pulsarla, entra llevándola. Antes salía en
+    «NO PUEDEN» con «ya lleva la cocina de Bar Mónaco ese día», y «forzar» la ponía de sala: la casilla
+    seguía sin cocina. En «NO PUEDEN», quien lleva esa cocina se fuerza también como cocina.
+  - **«Forzar» dice todas las reglas que se saltan, cada una con la suya** (en el selector y en el Mes):
+    «Locales donde trabaja — solo Zapatillera», «Mañanas y tardes — siempre de mañana», «Días de
+    partido — partido no declarado los lunes». Antes nombraba solo la primera y el aviso de después se
+    las atribuía todas a ella.
+  - **«N turnos esa semana» cuenta la semana entera también cuando cruza de mes**, en el selector, en la ★
+    de Hoy y en el Generador → Periodo. En la semana del 28/09 al 04/10 contaba solo los días de ese mes
+    (el lunes 28, «2 turnos esa semana» de Cristian, que tenía 7) y la Cobertura daba otra cifra.
+  - **Las condiciones del Generador enseñan tres reglas que ya se aplicaban**: «Hojan solo hace cocina»,
+    «quien lleva la cocina un día no refuerza la sala ese día» (nueva, de Aroa el 17/09) y el standby de
+    Dulce («Dulce está en standby: aún no entra en la planilla»). Y el Generador las comprueba.
+  - **Un local que ya no abre una franja en «Cuándo abre»** (el horario de todas las semanas): quien seguía
+    puesto ahí sigue contando como puesto, en la planilla y en Horas, hasta que el Generador lo retira al
+    volver a generar o se quita a mano; la Revisión lo avisa en rojo. Solo un cierre de ese día (por fechas
+    o a mano) deja a esa persona libre para otro local, y entonces Horas tampoco le cuenta esa franja. La
+    primera versión también la dejaba libre con «Cuándo abre», y podía quedar puesta en dos locales a la
+    vez y contada dos veces en Horas.
+  - La hoja impresa dice «Dulce, que está en standby» y, con un hueco de uno, «Falta uno para el mínimo de
+    3» (decía «Faltan un»).
+  - **Pendiente de decidir con Diego:** generando un mes entero sin semana tipo (la casilla «Partir de la
+    semana tipo» desmarcada), el reparto del mes sale menos igualado que antes (en octubre, Victoria 36
+    turnos y Juani 9, frente a 25 y 13). Con la semana tipo no cambia nada.
+- **Todo lo que se pone en Equipo se lee igual en todas partes (24/09).** Diego: «que lea todas
+  las variables». Las reglas de la ficha estaban copiadas en el selector, el Generador, la Cobertura,
+  la Revisión y la hoja impresa, y cada copia decía una cosa. Ahora hay una sola puerta de reglas y
+  una sola forma de puntuar, y una prueba que falla si un campo nuevo de la ficha no lo lee alguien
+  o si un camino se salta una condición. Lo que se nota:
+  - **El selector de la casilla.** Si a la casilla le falta la cocina, arriba sale «COCINA» con quien
+    puede llevarla; la ★ es esa persona (también la ★ de un toque de Hoy) y, al pulsarla, entra
+    llevando la cocina. En «NO PUEDEN»
+    todos dicen por qué y qué regla les frena, y el botón «forzar» sale solo donde se puede forzar
+    (ya no sale con un local cerrado por fechas, donde fallaba).
+  - **La hoja impresa del Generador, «se destraparía si…».** Dice la verdad: a Dulce, en standby, ya
+    no se le propone levantar «no sale el primero» (seguiría en standby); si lo único que la frena es
+    el standby, lo dice. El veto de Mari Luz de los lunes no se le pone un martes, el día libre es el
+    de esa semana, y cuentan la cocina y «dos apoyos no se quedan solos».
+  - **El Generador reparte por semanas, como la Cobertura.** Al elegir entre varias personas cuenta
+    los turnos de esa semana, la semana entera (antes, los del mes). Con la semana tipo no cambia
+    ninguna plaza de la semana del 28/09, la del 05/10 ni la de octubre; la razón dice «2 turnos esa
+    semana». Generando un mes sin semana tipo, el reparto del mes sale menos igualado (ver arriba).
+  - **Alguien que se quedó puesto en un local cerrado ese día** (por el visor de cierres o cerrado a
+    mano ese día) ya no queda atado a ese local: se le puede poner en otro esa franja sin forzar, y
+    Horas no le cuenta la franja cerrada. La Revisión sigue avisando en rojo de la plaza en el local
+    cerrado.
+  - En la Cobertura, el porqué de un hueco de cocina nombra también a quien no lleva la cocina de ese
+    local.
+  - Las condiciones que enseña el Generador salen del mismo sitio que las reglas que aplica: dicen
+    justo lo que se comprueba.
 - **«Cubre a» hasta nueva orden, repasado antes de subirlo (24/09).** Lo que cambia para quien lo usa:
   - La ★ de Hoy (la recomendación de un toque) pone a Mari Luz «por Iván», igual que «＋ Asignar».
     Antes fallaba el domingo («no hace partido los domingos») o la ponía sin «por Iván».

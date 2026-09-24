@@ -163,7 +163,7 @@ function renderEquipo() {
   const stats = $('#eqStats');
   if (stats) {
     const sinLocal = enActivo.filter(esComodin).length;
-    const cocineros = enActivo.filter(p => p.puesto === 'cocina' || ((p.cocina || {}).titular || []).length).length;
+    const cocineros = enActivo.filter(p => p.puesto === 'cocina' || cocinasTitular(p).length).length;   // la capa de lectura (revisión F4)
     stats.innerHTML = `<span class="dstat"><b>${enActivo.length}</b> en activo</span>${deBajaHoy.length ? `<span class="dstat warn"><b>${deBajaHoy.length}</b> de baja</span>` : ''}<span class="dstat"><b>${sinLocal}</b> sin local fijo</span><span class="dstat"><b>${cocineros}</b> cocina</span>`;
     stats.querySelectorAll('b').forEach(countUp);
   }

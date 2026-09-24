@@ -381,7 +381,7 @@ try {
     abrirImpresionSemanaGenerada(res, {});
     return { huecos: res.huecos.length, primeros: res.huecos.filter(h => h.tipo === 'primero').length, cambios: res.cambios.length, condiciones: res.condiciones.length, nuevas: res.condiciones.filter(c => c.nueva).length, resumen: res.resumen };
   }, LUNES);
-  ok(`generarSemana simula la semana (${gen.condiciones} condiciones, ${gen.nuevas} nuevas, ${gen.huecos} huecos, ${gen.cambios} cambios)`, gen.condiciones >= 30 && gen.nuevas === 7);   // revisión F3: + «dos apoyos no se quedan solos»
+  ok(`generarSemana simula la semana (${gen.condiciones} condiciones, ${gen.nuevas} nuevas, ${gen.huecos} huecos, ${gen.cambios} cambios)`, gen.condiciones >= 30 && gen.nuevas === 8);   // revisión F3: + «dos apoyos no se quedan solos»; revisión F4: + «quien lleva la cocina no refuerza la sala»
   ok('abrirImpresionSemanaGenerada monta una hoja apaisada con dos páginas .pxg-pag', await llega(pg, () => { const r = document.getElementById('printRoot'); return !!r && !r.classList.contains('hidden') && r.querySelectorAll('.pxpage.apaisado .pxg-pag').length === 2; }, null, 4000) >= 0);
   const p1 = await pg.evaluate(() => {
     const pag = document.querySelectorAll('#printRoot .pxg-pag')[0];
@@ -399,7 +399,7 @@ try {
   });
   ok(`página 2: título «${p2.h1}»`, /^Qué ha cambiado · y /.test(p2.h1), p2.h1);
   ok(`página 2: la lista numerada tiene ≥ 30 condiciones (${p2.conds}) con ✓/✗`, p2.conds >= 30 && p2.conds === gen.condiciones && p2.ok + p2.ko === p2.conds, JSON.stringify({ conds: p2.conds, ok: p2.ok, ko: p2.ko }));
-  ok(`página 2: las NUEVA de la lista y de la columna coinciden`, p2.nuevas === 7 && p2.nuevasCol === 7, JSON.stringify({ lista: p2.nuevas, col: p2.nuevasCol }));
+  ok(`página 2: las NUEVA de la lista y de la columna coinciden`, p2.nuevas === 8 && p2.nuevasCol === 8, JSON.stringify({ lista: p2.nuevas, col: p2.nuevasCol }));
   ok(`página 2: ${p2.huecos} cajas de hueco, todas con «Queda:» y «Se destraparía / No se destrapa»`, p2.huecos === gen.huecos && p2.queda === p2.huecos && p2.destrapa.length === p2.huecos && p2.destrapa.every(t => /destrapa/.test(t)), JSON.stringify(p2.destrapa));
   ok('página 2: el hueco de El 33 del martes ya no existe (José lo quitó el 17/09)', !p2.destrapa.some(t => /Noe/.test(t)), JSON.stringify(p2.destrapa));
   ok(`página 2: preguntas para el cliente (${p2.preguntas}: quién sale el primero, supuestos, mínimos con *, cierre y tramos del partido)`, p2.preguntas >= 3 && p2.pregTxt.some(t => /Quién sale el primero/.test(t)) && p2.pregTxt.some(t => /Horarios reales|hora de cierre/.test(t)) && p2.pregTxt.some(t => /mínimos marcados/.test(t)), JSON.stringify(p2.pregTxt));

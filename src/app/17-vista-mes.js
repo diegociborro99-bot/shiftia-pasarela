@@ -146,11 +146,14 @@ function openDiaPersona(pid, iso, anchor) {
       const tid = pon.dataset.pon;
       const r0 = puedeEstar(S, S.staff, e, iso, tid, pid, { permitirPartido: true });
       let opts = { origen: 'manual', permitirPartido: true };
-      // el aviso nombra la regla, no solo el motivo (Diego, 18/09)
-      if (!r0.ok) { if (!confirm(`${p.nombre} incumpliría esta regla:\n\n${nombreRegla(r0.regla)} — ${r0.motivo}\n\n¿Ponerlo de todas formas? Quedará constancia.`)) return; opts.forzar = true; opts.razon = `forzado desde el mes · ${nombreRegla(r0.regla)}`; }
+      // el aviso nombra la regla, no solo el motivo (Diego, 18/09); desde la revisión F4, TODAS las que se
+      // incumplirían forzándola, cada una con la suya (siSeFuerza, como el selector)
+      const f = r0.ok ? null : siSeFuerza(S, S.staff, e, iso, tid, pid, { permitirPartido: true });
+      const inc = f && f.forzable && f.incumple.length ? f.incumple : (r0.ok ? [] : [{ k: r0.regla, motivo: r0.motivo }]);
+      if (!r0.ok) { if (!confirm(`${p.nombre} incumpliría ${inc.length > 1 ? 'estas reglas' : 'esta regla'}:\n\n${lineasIncumple(inc)}\n\n¿Ponerlo de todas formas? Quedará constancia.`)) return; opts.forzar = true; opts.razon = `forzado desde el mes · ${inc.map(x => nombreRegla(x.k)).join(', ')}`; }
       pushUndo(`poner a ${p.nombre}`);
       const r = asignarUI(iso, tid, pid, opts);
-      if (r.ok) { renderVistaActiva(); toast(r.avisos.length ? `Con aviso: ${r.avisos.join(', ')}` : 'Añadido', r.avisos.length ? 'warn' : 'ok'); } else toast(r.motivo, 'bad');
+      if (r.ok) { renderVistaActiva(); toast(r.avisos.length ? `Con aviso: ${conSuRegla(r.avisos, f ? f.incumple : [])}` : 'Añadido', r.avisos.length ? 'warn' : 'ok'); } else toast(r.motivo, 'bad');
       return;
     }
     const b = ev.target.closest('[data-dp]'); if (!b) return;

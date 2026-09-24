@@ -428,41 +428,18 @@ function pxgContinuos(res) {
   if (!out.length) return '';
   return `<h3 class="pxg-h2">${out.length === 1 ? 'El único turno continuo de la semana' : `Los ${pxgNum(out.length)} turnos continuos de la semana`}</h3>` + out.map(x => `<div class="pxg-cambio"><h4>${esc(x.l.nombre)} · ${pxgDia(x.iso)}</h4><p class="pxg-p">${esc(x.s.nombre)}${x.s.por ? ` cubre a ${esc(nombrePid(x.s.por))} y` : ''} sale ${/a$/i.test(x.s.nombre.split(' ')[0]) ? 'la primera' : 'el primero'} de mañana y de tarde: no es un partido, es un turno continuo y se marca <em class="pxg-tag c">C</em>.</p></div>`).join('');
 }
-// Personas a las que UNA sola condición les impide ocupar el hueco (y cuál): son la
-// pista de «se destraparía si…». Quien está ausente o ya colocado esa franja en otro
-// local no cuenta: eso no es una condición que se pueda levantar. Mismas reglas que
-// puedeEstar / puedePrimero, pero contadas todas y no solo la primera que salta.
+// Personas a las que UNA sola condición les impide ocupar el hueco (y cuál): son la pista de «se
+// destraparía si…». Quien está ausente o ya colocado esa franja en otro local no cuenta: eso no es una
+// condición que se pueda levantar. 24/09 (fase 4, S41): sale del modelo (destrapa), de la misma puerta
+// que el selector, el generador y la Cobertura. Antes era una tercera copia de las reglas: sin el standby
+// (proponía a Dulce levantar «no sale primero» y seguía en standby), con los días libres de siempre y no
+// los de esa semana, los vetos sin su día («no hace mañanas en Pasarela» un martes) y sin la cocina.
 function pxgDestrapa(res, hu) {
-  const { localId, franja } = partirTurno(hu.turnoId);
-  const est = res.estado || estadoDeIso(hu.iso), iso = hu.iso, dow = isoDow(iso), l = localDe(S, localId);
-  const enCasilla = pidsEn(est, iso, hu.turnoId);
-  const otra = franja === 'M' ? 'T' : 'M';
+  const est = res.estado || estadoDeIso(hu.iso);
   const out = [];
   for (const p of S.staff) {
-    if (ausenciaEn(p, iso, franja)) continue;   // por franja (revisión F3, D10): quien falta solo por la mañana sí cuenta para la tarde
-    const yaAqui = enCasilla.includes(p.id);
-    if (yaAqui && hu.tipo !== 'primero') continue;
-    if (turnosDe(S).some(t => t.franja === franja && t.id !== hu.turnoId && pidsEn(est, iso, t.id).includes(p.id))) continue;
-    const act = k => activa(S, p, k);
-    const bl = [];
-    if (!yaAqui) {
-      if (act('locales') && (p.locales || []).length && !p.locales.includes(localId)) bl.push(`solo trabaja en ${lblLocales(S, p.locales)}`);
-      if (act('franjas') && (p.franjas || []).length && !p.franjas.includes(franja)) bl.push(franja === 'M' ? 'solo hace tardes' : 'solo hace mañanas');
-      if (act('libra') && libraEn(p, iso)) bl.push(motivoLibra(p, iso));   // el día libre de ESA semana, con el texto del modelo (24/09)
-      if (act('vetos') && (p.vetos || []).some(v => v.localId === localId && v.franja === franja)) bl.push(`no hace ${franja === 'M' ? 'mañanas' : 'tardes'} en ${l ? l.nombre : localId}`);
-      const enOtra = turnosDe(S).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(p.id));
-      if (enOtra && !partidoEn(S, p, iso)) bl.push(`no hace partido ${DOW_PL[dow]}`);   // con el partido trasladado la semana de un cambio
-      if (regla(S, 'nuncaCon')) for (const q of enCasilla) { const qp = personaDeId(q); if (qp && ((caracteristicaActiva(p, 'nuncaCon') && (p.nuncaCon || []).includes(q)) || (caracteristicaActiva(qp, 'nuncaCon') && (qp.nuncaCon || []).includes(p.id)))) bl.push(`no coincide con ${qp.nombre}`); }
-    }
-    if (hu.tipo === 'primero') {
-      if (regla(S, 'noPrimero') && caracteristicaActiva(p, 'noPrimero') && (p.noPrimero || []).includes(franja)) bl.push(`no sale ${franja === 'M' ? 'el primero de la mañana' : 'el primero de la tarde'}`);
-      if (caracteristicaActiva(p, 'noAbre') && (p.noAbre || []).includes(localId)) bl.push(`no abre ${l ? l.nombre : localId}`);
-      if (franja === 'T' && regla(S, 'primeroCompleto')) {
-        const tm = turnosDe(S).find(t => t.franja === 'M' && pidsEn(est, iso, t.id).includes(p.id));
-        if (tm && !(tm.local.id === localId && primeroDe(S, S.staff, est, iso, tm.id) === p.id)) bl.push('viene de hacer la mañana y el primero de la tarde hace turno completo');
-      }
-    }
-    if (bl.length === 1) out.push({ nombre: p.nombre, motivo: bl[0] });
+    const d = destrapa(S, S.staff, est, hu.iso, hu.turnoId, p.id, { primero: hu.tipo === 'primero' });
+    if (d) out.push({ nombre: d.nombre, motivo: d.frase, regla: d.regla });
   }
   return out;
 }
@@ -476,7 +453,8 @@ function pxgHuecos(res) {
     const fr = FRANJA_LBL[franja].toLowerCase();
     let h = `<div class="pxg-hueco"><h4>${esc(l.nombre)} · ${pxgDia(hu.iso)} por la ${fr}</h4>`;
     if (hu.tipo === 'primero') h += `<p class="pxg-p">Ninguna de las ${pxgNum(nPlantilla)} personas puede abrir esa ${fr}. ${esc(pxgCap(String(hu.motivo || '').replace(/^nadie de la casilla puede abrir:?\s*/i, 'En la casilla, ')))}${/[.!?]$/.test(hu.motivo || '') ? '' : '.'}</p>`;
-    else h += `<p class="pxg-p">Faltan ${pxgNum(hu.faltan)} para el mínimo de ${hu.minimo}${hu.supuesto ? ' (mínimo supuesto)' : ''}${d && d.refuerzo ? ', que ese día lleva refuerzo por el evento' : ''}: ninguna de las ${pxgNum(nPlantilla)} personas puede entrar.</p>`;
+    // (revisión F4, cliente) «Faltan un para el mínimo de 3» → «Falta uno para el mínimo de 3»
+    else h += `<p class="pxg-p">${hu.faltan === 1 ? 'Falta uno' : `Faltan ${pxgNum(hu.faltan)}`} para el mínimo de ${hu.minimo}${hu.supuesto ? ' (mínimo supuesto)' : ''}${d && d.refuerzo ? ', que ese día lleva refuerzo por el evento' : ''}: ninguna de las ${pxgNum(nPlantilla)} personas puede entrar.</p>`;
     // el resto de la plantilla, por motivo (solo los que son condiciones; los ya colocados y los de baja, en una frase)
     const pq = Object.entries(hu.porQueNadie || {}).filter(([m]) => !PXG_DURO.test(m) && !/viene de hacer la mañana|no sale el primero/.test(m));
     const colocados = Object.entries(hu.porQueNadie || {}).filter(([m]) => /^ya en /.test(m)).reduce((a, [, qs]) => a + qs.length, 0);

@@ -1,8 +1,10 @@
 // ================= SELECTOR DE PERSONAS Y MENÚ DE LA CASILLA =================
-// El selector enseña a todo el equipo en tres grupos: quien puede (ordenado por
-// prioridad, con la razón), quien puede con aviso (rompe una regla blanda: un
-// partido no declarado) y quien no puede (con el motivo). El encargado distribuye
-// «de la manera que quiera»: cualquiera se puede FORZAR, y queda constancia.
+// El selector enseña a todo el equipo en grupos: si la casilla no tiene cocina, primero quien
+// puede llevarla; quien puede (ordenado por prioridad, con la razón), quien puede con aviso
+// (rompe una regla blanda: un partido no declarado) y quien no puede (con el motivo y la
+// regla). El encargado distribuye «de la manera que quiera»: casi todo se puede FORZAR, y
+// queda constancia. 24/09 (fase 4, S35): los grupos los da el modelo (gruposSelector), de la
+// misma puerta y la misma puntuación que el Generador y la Cobertura; aquí solo se pintan.
 function closePicker() { const ex = document.getElementById('pickerPop'); if (ex) ex.remove(); document.querySelectorAll('.popfondo').forEach(f => f.remove()); }
 // 18/09 (Diego): «que aparezca una lupita en el blop para buscarlo por nombre». El selector
 // pinta a la plantilla ENTERA en tres grupos, así que con 21 personas hay que bajar
@@ -15,30 +17,36 @@ function openPicker(iso, tid, anchor) {
   const { localId, franja } = partirTurno(tid);
   const l = localDe(S, localId);
   const r = revisarTurno(S, S.staff, e, iso, tid);
-  const ok = candidatosPara(S, S.staff, e, iso, tid);
-  const conAviso = candidatosConAviso(S, S.staff, e, iso, tid);
-  const yaOk = new Set([...ok, ...conAviso].map(c => c.pid));
-  // con el puesto de sala, como candidatosPara (24/09, S34): «solo hace cocina» y «ya lleva la cocina
-  // ese día» salen aquí con su motivo, en vez de «no pueden» sin decir por qué
-  const noPueden = S.staff.filter(p => !yaOk.has(p.id) && !pidsEn(e, iso, tid).includes(p.id)).map(p => ({ p, r: puedeEstar(S, S.staff, e, iso, tid, p.id, { permitirPartido: true, puesto: 'sala' }) }));
-  const fila = (c, cls, sub, extra) => `<button class="prowp ${cls}" data-pickpid="${c.pid}"${extra || ''}><span class="av" style="background:${avColor(c.pid)}">${esc(initials(c.nombre))}</span><span class="pn2">${esc(c.nombre)}<span class="prsub">${esc(sub)}</span></span>${cls === 'rec' ? '<span class="star">★ RECOMENDADO</span>' : ''}</button>`;
+  // los grupos, del modelo (S35): la cocina arriba si la casilla no la tiene; en «no pueden», cada
+  // uno con su motivo y su regla (también «solo hace cocina» o «ya lleva la cocina ese día», S34).
+  // 24/09 (revisión F4): con S.meses, «N turnos esa semana» cuenta la semana entera aunque cruce de mes
+  // (el lunes 28 decía «2 turnos esa semana» de Cristian, que tenía 7)
+  const g = gruposSelector(S, S.staff, e, iso, tid, { meses: S.meses });
+  const cocina = g.cocina, ok = g.pueden, conAviso = g.conAviso, noPueden = g.noPueden;
+  const fila = (c, cls, sub, extra) => `<button class="prowp ${cls}" data-pickpid="${c.pid}"${extra || ''}><span class="av" style="background:${avColor(c.pid)}">${esc(initials(c.nombre))}</span><span class="pn2">${esc(c.nombre)}<span class="prsub">${esc(sub)}</span></span>${/\brec\b/.test(cls) ? '<span class="star">★ RECOMENDADO</span>' : ''}</button>`;
   const pop = document.createElement('div');
   pop.className = 'pop picker'; pop.id = 'pickerPop'; pop.setAttribute('role', 'dialog');
   // cada fila dice QUÉ regla choca, no solo el motivo: es lo que se va a corregir en Equipo
-  // si la equivocada es la ficha (Diego, 18/09)
-  const porPid = new Map(noPueden.map(x => [x.p.id, x.r]));
-  const filaNo = ({ p, r }) => `<div class="prowp dis"><span class="av" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span><span class="pn2">${esc(p.nombre)}<span class="prregla">${esc(nombreRegla(r.regla))}</span><span class="prsub">${esc(r.motivo)}</span></span>${/no abre|ya en|ya está|de baja|vacaciones|permiso|día libre|ausente/i.test(r.motivo) ? '' : `<button class="forzar" data-forzar="${p.id}" title="Ponerlo de todas formas y dejar constancia">forzar</button>`}</div>`;
+  // si la equivocada es la ficha (Diego, 18/09). «forzar» solo donde se puede forzar (lo dice
+  // la puerta: una ausencia, el local cerrado o estar ya en otro local esa franja, no)
+  const porPid = new Map(noPueden.map(x => [x.pid, x]));
+  // (revisión F4) en una casilla sin cocina, quien la lleva se evalúa y se fuerza como cocina (data-cocina)
+  const filaNo = x => `<div class="prowp dis${x.cocina ? ' coc' : ''}"${x.cocina ? ' data-cocina="1"' : ''}><span class="av" style="background:${avColor(x.pid)}">${esc(initials(x.nombre))}</span><span class="pn2">${esc(x.nombre)}<span class="prregla">${esc(nombreRegla(x.regla))}${x.cocina ? ' · como cocina' : ''}</span><span class="prsub">${esc(x.motivo)}</span></span>${x.forzable ? `<button class="forzar" data-forzar="${x.pid}" title="Ponerlo de todas formas y dejar constancia">forzar</button>` : ''}</div>`;
   // las filas ya filtradas por lo que se haya escrito en la lupa. Los grupos que se quedan
-  // sin nadie desaparecen con su cabecera: un «PUEDEN · 0» solo estorba.
+  // sin nadie desaparecen con su cabecera: un «PUEDEN · 0» solo estorba. La ★ es la primera
+  // de la cocina si la casilla no la tiene; si no, la primera de «pueden».
   const filasPicker = q => {
     const n = pickNorm(q);
     const pasa = nombre => !n || pickNorm(nombre).includes(n);
+    const vCoc = cocina.filter(c => pasa(c.nombre));
     const vOk = ok.filter(c => pasa(c.nombre));
     const vAviso = conAviso.filter(c => pasa(c.nombre));
-    const vNo = noPueden.filter(x => pasa(x.p.nombre));
-    if (n && !vOk.length && !vAviso.length && !vNo.length) return `<div class="pgroup">No hay nadie con ese nombre</div>`;
-    return `${vOk.length ? `<div class="pgroup">PUEDEN · ${vOk.length}</div>${vOk.map((c, i) => fila(c, !n && i === 0 ? 'rec' : '', c.razones.join(' · '))).join('')}` : (n ? '' : '<div class="pgroup">NADIE PUEDE SIN ROMPER NADA</div>')}
-      ${vAviso.length ? `<div class="pgroup">CON AVISO · ${vAviso.length}</div>${vAviso.map(c => fila(c, 'aviso', c.razones.join(' · '), ' data-aviso="1"')).join('')}` : ''}
+    const vNo = noPueden.filter(x => pasa(x.nombre));
+    if (n && !vCoc.length && !vOk.length && !vAviso.length && !vNo.length) return `<div class="pgroup">No hay nadie con ese nombre</div>`;
+    const recCoc = !n && vCoc.length > 0;
+    return `${vCoc.length ? `<div class="pgroup">COCINA · ${vCoc.length} <small>la casilla no tiene cocina</small></div>${vCoc.map((c, i) => fila(c, `coc${recCoc && i === 0 ? ' rec' : ''}`, c.razones.join(' · '), ' data-cocina="1"')).join('')}` : ''}
+      ${vOk.length ? `<div class="pgroup">PUEDEN · ${vOk.length}</div>${vOk.map((c, i) => fila(c, !n && !recCoc && i === 0 ? 'rec' : '', c.razones.join(' · '))).join('')}` : (n || vCoc.length ? '' : '<div class="pgroup">NADIE PUEDE SIN ROMPER NADA</div>')}
+      ${vAviso.length ? `<div class="pgroup">CON AVISO · ${vAviso.length}</div>${vAviso.map(c => fila(c, c.cocina ? 'aviso coc' : 'aviso', c.razones.join(' · '), c.cocina ? ' data-aviso="1" data-cocina="1"' : ' data-aviso="1"')).join('')}` : ''}
       ${vNo.length ? `<div class="pgroup">NO PUEDEN · ${vNo.length}</div>${vNo.map(filaNo).join('')}` : ''}`;
   };
   pop.innerHTML = `<div class="ph">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()}</div>
@@ -65,33 +73,47 @@ function openPicker(iso, tid, anchor) {
     if (f) {
       const pid = f.dataset.forzar;
       const rr = porPid.get(pid) || {};
-      const cual = rr.regla ? `${nombreRegla(rr.regla)} — ${rr.motivo}` : 'una regla del grupo';
-      const motivo = prompt(`Vas a poner a ${nombrePid(pid)} incumpliendo esta regla:\n\n${cual}\n\nSi la equivocada es la ficha, se corrige en Equipo. Escribe por qué lo haces (quedará en el historial):`);
+      // 24/09 (revisión F4, cliente): TODAS las reglas que se incumplen, una por línea y cada una con la
+      // suya (siSeFuerza); antes solo la primera, y el aviso de después se las atribuía todas a ella
+      const inc = rr.incumple && rr.incumple.length ? rr.incumple : (rr.regla ? [{ k: rr.regla, motivo: rr.motivo }] : []);
+      const cual = inc.length ? lineasIncumple(inc) : 'una regla del grupo';
+      const motivo = prompt(`Vas a poner a ${nombrePid(pid)}${rr.cocina ? ' llevando la cocina' : ''} incumpliendo ${inc.length > 1 ? 'estas reglas' : 'esta regla'}:\n\n${cual}\n\nSi la equivocada es la ficha, se corrige en Equipo. Escribe por qué lo haces (quedará en el historial):`);
       if (motivo === null) return;
       // 24/09 (revisión F3): con el puesto de sala, como el resto del selector: sin él, «solo hace cocina»
-      // no quedaba en la entrada como regla forzada y la Revisión no lo daba por forzado
+      // no quedaba en la entrada como regla forzada y la Revisión no lo daba por forzado. Revisión F4: en una
+      // casilla sin cocina, quien la lleva entra llevándola (la fila lo dice); antes quedaba de sala y la
+      // casilla seguía sin cocina
       pushUndo(`forzar a ${nombrePid(pid)}`);
-      const res = asignarUI(iso, tid, pid, { origen: 'manual', forzar: true, permitirPartido: true, puesto: 'sala', razon: motivo.trim() || 'forzado por el encargado' });
-      if (res.ok) { closePicker(); renderVistaActiva(); toast(`${nombrePid(pid)} puesto a la fuerza · incumple ${nombreRegla(rr.regla).toLowerCase()}: ${res.avisos.join(', ')}`, 'warn'); }
+      const puesto = rr.cocina ? { puesto: 'cocina', cocina: true } : { puesto: 'sala' };
+      const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', forzar: true, permitirPartido: true, razon: motivo.trim() || 'forzado por el encargado' }, puesto));
+      if (res.ok) { closePicker(); renderVistaActiva(); toast(`${nombrePid(pid)} puesto a la fuerza · incumple ${conSuRegla(res.avisos, inc)}`, 'warn'); }
       else { undoStack.pop(); actualizarUndoBtn(); toast(`${nombreRegla(res.regla)} — ${res.motivo}`, 'bad'); }
       return;
     }
     const b = ev.target.closest('[data-pickpid]'); if (!b) return;
     const pid = b.dataset.pickpid;
-    if (ponerRecomendadoUI(iso, tid, pid, [...ok, ...conAviso].find(x => x.pid === pid), !!b.dataset.aviso).ok) { closePicker(); renderVistaActiva(); }
+    // cada persona sale en un solo grupo; la fila trae si entra llevando la cocina (c.cocina)
+    const c = [...cocina, ...ok, ...conAviso].find(x => x.pid === pid);
+    if (ponerRecomendadoUI(iso, tid, pid, c, !!b.dataset.aviso).ok) { closePicker(); renderVistaActiva(); }
   });
 }
+// Las reglas que se incumplen, una por línea («Regla — motivo»), y los avisos que quedan, cada uno con su
+// regla («Regla: motivo»). inc: [{ k, motivo }] del modelo (siSeFuerza). Las usan el selector y el Mes.
+function lineasIncumple(inc) { return inc.map(x => `${x.k ? nombreRegla(x.k) + ' — ' : ''}${x.motivo}`).join('\n'); }
+function conSuRegla(avisos, inc) { return (avisos || []).map(t => { const x = (inc || []).find(y => y.motivo === t); return x && x.k ? `${nombreRegla(x.k)}: ${t}` : t; }).join(' · '); }
 // Pone a quien se ha elegido de la lista tal como la recomienda candidatosPara: de sala, y si cubre a
 // quien falta, con su «por» y el partido autorizado para cubrirle (D1). 24/09 (revisión F3, S11): antes la
 // ★ de Mari Luz «cubre a Iván» se rechazaba al pulsarla («no hace partido los viernes») y, si entraba,
 // iba sin «por». Revisión F3b: la ★ de un toque de Hoy tenía su propia copia sin nada de esto y volvía a
 // fallar el domingo 4; ahora el selector y la ★ llaman aquí. Si no se puede poner, el paso de Ctrl+Z se
 // retira (no queda un paso vacío) y se dice por qué. c: su fila de candidatosPara (o nada); conAviso: la
-// fila es de «con aviso» (un partido no declarado).
+// fila es de «con aviso» (un partido no declarado). Fase 4 (S35): la fila del grupo de cocina (c.cocina)
+// entra llevando la cocina, con el puesto de cocina.
 function ponerRecomendadoUI(iso, tid, pid, c, conAviso) {
   pushUndo(`poner a ${nombrePid(pid)}`);
   const cub = c && c.cubre ? { por: c.cubre, cubrePor: c.cubre } : {};
-  const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', permitirPartido: !!conAviso, puesto: 'sala', razon: c ? c.razones.join(' · ') : 'recomendado' }, cub));
+  const puesto = c && c.cocina ? { puesto: 'cocina', cocina: true } : { puesto: 'sala' };
+  const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', permitirPartido: !!conAviso, razon: c ? c.razones.join(' · ') : 'recomendado' }, puesto, cub));
   if (!res.ok) { undoStack.pop(); actualizarUndoBtn(); toast(res.motivo, 'bad'); return res; }
   toast(res.avisos.length ? `${nombrePid(pid)} añadido con aviso: ${res.avisos.join(', ')}` : `${nombrePid(pid)} añadido`, res.avisos.length ? 'warn' : 'ok');
   return res;
