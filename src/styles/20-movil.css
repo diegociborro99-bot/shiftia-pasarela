@@ -363,8 +363,10 @@
   .pop.sheet{bottom:calc(64px + env(safe-area-inset-bottom) + var(--kb,0px))}
   /* sitio para el teclado, solo con un campo de TEXTO con el foco: con :focus-within bastaba tocar un
      botón (en Android toma el foco) para que la ventana creciera 30vh entre el toque y el levantar el
-     dedo, y el clic caía fuera: «Cerrar Bar Mónaco» no respondía al primer toque (24/09, revisión F2) */
-  .ovcard:has(:is(input:not([type=button]):not([type=checkbox]):not([type=radio]),textarea):focus){padding-bottom:calc(18px + env(safe-area-inset-bottom) + 30vh)}
+     dedo, y el clic caía fuera: «Cerrar Bar Mónaco» no respondía al primer toque (24/09, revisión F2).
+     Las fechas y las horas tampoco: abren su selector, no el teclado, y al tocar «Guardar ausencia» justo
+     después de elegir el «Hasta» la barra de abajo saltaba 34 px y el toque se perdía (24/09, D13) */
+  .ovcard:has(:is(input:not([type=button]):not([type=checkbox]):not([type=radio]):not([type=date]):not([type=time]):not([type=month]),textarea):focus){padding-bottom:calc(18px + env(safe-area-inset-bottom) + 30vh)}
 }
 
 /* ---------- 19. LA BARRA INFERIOR DEL PROFESIONAL ----------

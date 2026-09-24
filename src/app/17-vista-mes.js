@@ -170,6 +170,7 @@ function openAusenciaMes(pid, anchor, iso0) {
   pop.innerHTML = `<div class="ph">Ausencia de ${esc(p.nombre)}</div>
     <div class="austipos" style="display:flex;flex-wrap:wrap;gap:5px;margin:8px 0">${TIPOS_AUSENCIA.map((t, i) => `<button type="button" class="austipo abschip a-${t.id}${i === 1 ? ' on' : ''}" data-tipo="${t.id}" style="${i === 1 ? 'outline:2px solid var(--ink)' : ''}">${esc(t.label)}</button>`).join('')}</div>
     <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><label class="pinlbl">Desde<input type="date" id="ausD1" class="logininp" value="${d1}"></label><label class="pinlbl">Hasta<input type="date" id="ausD2" class="logininp" value="${d1}"></label></div>
+    <label class="pinlbl">Cuándo${selFranjaAusencia('id="ausFr" class="logininp"')}</label>
     <label class="pinlbl">Detalle (opcional)<input type="text" id="ausDet" class="logininp" placeholder="p. ej. boda, médico"></label>
     <button class="popb full rec" id="ausOk">Guardar ausencia</button>`;
   document.body.appendChild(pop);
@@ -181,19 +182,15 @@ function openAusenciaMes(pid, anchor, iso0) {
     if (t) { tipo = t.dataset.tipo; pop.querySelectorAll('[data-tipo]').forEach(x => { x.style.outline = x === t ? '2px solid var(--ink)' : ''; }); if (tipo === 'BAJ') pop.querySelector('#ausD2').value = ''; return; }
     if (ev.target.id === 'ausOk') {
       const desde = pop.querySelector('#ausD1').value, hasta = pop.querySelector('#ausD2').value || undefined, detalle = pop.querySelector('#ausDet').value.trim();
+      // revisión F3b: la franja (D10), con el mismo selector que la ficha y la tarjeta: desde el Mes no se podía
+      // apuntar «solo tarde»
+      const fr = (pop.querySelector('#ausFr') || {}).value;
       if (!desde) { toast('Falta la fecha de inicio', 'warn'); return; }
-      pushUndo(`ausencia de ${p.nombre}`, { staff: true, otrosMeses: true });
-      const a = { tipo, desde }; if (hasta) a.hasta = hasta; if (detalle) a.detalle = detalle;
-      const r = anadirAusencia(p, a);
-      // sus turnos de esos días salen de la planilla y quedan como huecos
-      let quitados = 0;
-      for (const iso of rangoIso(r.ausencia.desde, r.ausencia.hasta || addDias(r.ausencia.desde, 60))) {
-        const e = estadoDeIso(iso, true);
-        for (const t2 of turnosDe(S)) if (desasignar(e, iso, t2.id, pid)) quitados++;
-      }
-      registrarCambio(`${(AUS_LBL[tipo] || {}).label || tipo}: ${p.nombre} del ${fmtDM(desde)}${hasta ? ' al ' + fmtDM(hasta) : ' (sin fecha de fin)'}${quitados ? ` · ${quitados} turno(s) retirados de la planilla` : ''}${detalle ? ' · ' + detalle : ''}`, 'aus');
-      saveState(); pop.remove(); renderVistaActiva();
-      toast(quitados ? `Ausencia guardada · ${quitados} turno(s) quedan por cubrir: el generador los propone` : 'Ausencia guardada', quitados ? 'warn' : 'ok');
+      // 24/09 (D13): la misma alta que Equipo y la ficha (altaAusenciaUI): en días ya planificados sale de sus
+      // turnos y entra quien le cubre por «cubre a», con la confirmación y un solo Ctrl+Z. Aquí se copiaba la
+      // regla y solo quitaba a la persona.
+      pop.remove();
+      altaAusenciaUI(pid, { tipo, desde, hasta, detalle, franjas: fr ? [fr] : undefined }, () => renderVistaActiva());
     }
   });
 }

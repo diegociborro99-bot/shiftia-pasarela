@@ -101,10 +101,19 @@ function openFicha(pid, opts) {
       car('abre', 'Sale el primero en', '', S.locales.map(l => `<div class="abrerow" style="--lc:${esc(l.color)}"><span class="abrenm"><i class="ldot"></i>${esc(l.nombre)}</span><span class="segrow" style="margin:0">${FRANJAS.map(f => `<button type="button" class="segk${((p.abre[l.id] || []).includes(f)) ? ' on' : ''}" data-tabre="${esc(l.id)}|${f}" data-libre>${FRANJA_LBL[f]}</button>`).join('')}</span></div>`).join('')) +
       car('noAbre', 'No abre nunca en', '', `<div class="locset">${locChips(p.noAbre, 'tnoabre')}</div>`) +
       car('noPrimero', 'No sale nunca el primero', '(entra a partir del segundo puesto en esas franjas)', `<div class="segrow">${franjaChips(p.noPrimero, 'tnoprimero')}</div>${p.noPrimero.length ? `<div class="festvacio">Nunca 1.º ${esc(lblNoPrimero(p.noPrimero))}${p.noPrimero.includes('T') ? ': no hace la tarde completa' : ''}.</div>` : '<div class="festvacio">Puede salir el primero en las dos franjas.</div>'}`, { nueva: true }));
-    h += sec('reglas', 'Reglas con otras personas', `${p.nuncaCon.length ? p.nuncaCon.length + ' incompatibles' : 'sin incompatibles'} · cubre a ${p.cubreA.length}`,
+    // 24/09 (D13): la designación por los dos lados. Quien falta ve quién le cubre, con enlace a su ficha
+    // (donde se pone y se quita); quien cubre, «Cubre a Iván · siempre que falte · hasta que lo quites».
+    // Revisión F3b: «Si falta, le cubre Mari Luz», sin «(siempre que falte)», que era redundante (como la
+    // tarjeta); la condición solo se dice si la hay («cuando falte los viernes»)
+    const leCubren = quienLeCubre(S, S.staff, p.id);
+    const bloqueLeCubre = `<div class="lecubre" data-lecubre>${leCubren.length
+      ? `<b>Si falta, le cubre${leCubren.length > 1 ? 'n' : ''}</b> ${leCubren.map(d => { const nota = [d.cuando !== 'siempre que falte' ? d.cuando : '', d.activa ? '' : '«Cubre a» apagado: ahora no se aplica'].filter(Boolean).join(' · '); return `<button type="button" class="glink" data-irficha="${esc(d.pid)}">${esc(d.nombre)}</button>${nota ? ` <small>(${esc(nota)})</small>` : ''}`; }).join(' y ')}<small class="lecubrepie">Se pone y se quita en la ficha de quien cubre. Vale hasta que se quite.</small>`
+      : `<b>Nadie le cubre en concreto.</b> <small>Si falta, se busca quién en la Cobertura. Para que alguien le cubra siempre, ponlo en la ficha de esa persona, en «Cubre a».</small>`}</div>`;
+    h += sec('reglas', 'Reglas con otras personas', `${p.nuncaCon.length ? p.nuncaCon.length + ' incompatibles' : 'sin incompatibles'} · cubre a ${p.cubreA.length}${leCubren.length ? ` · le cubre${leCubren.length > 1 ? 'n' : ''} ${leCubren.length}` : ''}`,
+      bloqueLeCubre +
       car('nuncaCon', 'Nunca coincide con', '(es mutua: se apaga también en su ficha)', `<div class="chiprow">${p.nuncaCon.map((q, i) => `<span class="tchip warn"><i>${esc(nombrePid(q))}</i><button type="button" class="festrm" data-rmnunca="${i}" aria-label="Quitar">✕</button></span>`).join('') || '<span class="festvacio">Con nadie en especial.</span>'}</div>
        <span class="addrow">${selPersonas('fNuncaSel', p.nuncaCon)}<button type="button" class="btn-mini" data-addnunca>Añadir</button></span>`) +
-      car('cubreA', 'Cubre a', '(ocupa su sitio cuando falta y, si hace falta, puede hacer partido para cubrirle; no se salta nada más)', `${p.cubreA.map((cb, i) => fila(esc(nombrePid(cb.pid)), '', `<span class="cubrectl">${selDia(`data-cubred="${i}"`, cb.dow)}${selTurno(`data-cubret="${i}"`, cb.turnoId)}</span>`, `data-rmcubre="${i}"`)).join('') || '<div class="festvacio">No cubre a nadie en concreto.</div>'}
+      car('cubreA', 'Cubre a', '(ocupa su sitio cuando falta, hasta que lo quites, y si hace falta puede hacer partido para cubrirle; no se salta nada más)', `${p.cubreA.map((cb, i) => fila(`Cubre a ${esc(nombrePid(cb.pid))}`, `${esc(cuandoCubre(S, cb))} · hasta que lo quites`, `<span class="cubrectl">${selDia(`data-cubred="${i}"`, cb.dow)}${selTurno(`data-cubret="${i}"`, cb.turnoId)}</span>`, `data-rmcubre="${i}"`)).join('') || '<div class="festvacio">No cubre a nadie en concreto.</div>'}
        <span class="addrow addrow3">${selPersonas('fCubreP')}${selDia('id="fCubreD"')}${selTurno('id="fCubreT"')}<button type="button" class="btn-mini" data-addcubre>Añadir</button></span>`));
     h += sec('vetos', 'Vetos', subOff('vetos', p.vetos.length ? `${p.vetos.length} franja(s) que no hace` : 'ninguno'),
       car('vetos', '', '', (p.vetos.map((v, i) => fila(`<i class="ldot" style="--lc:${esc(colorLocal(v.localId))}"></i>${esc(nombreLocal(v.localId))}`, `no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'}`, '', `data-rmveto="${i}"`)).join('') || '<div class="festvacio">Sin vetos: puede ir a cualquier franja de sus locales.</div>') +
@@ -121,6 +130,7 @@ function openFicha(pid, opts) {
         <span><label>Detalle</label><input type="text" id="fAusDet" data-libre placeholder="opcional"></span></div>
         <div class="row2"><span><label>Desde</label><input type="date" id="fAusD1" data-libre value="${isoHoy()}"></span>
         <span><label>Hasta <small>(en blanco: un día; una baja, sin fin)</small></label><input type="date" id="fAusD2" data-libre value="${isoHoy()}"></span></div>
+        <div class="row2"><span><label>Cuándo</label>${selFranjaAusencia('id="fAusFr"')}</span><span></span></div>
         <div class="bar"><button type="button" class="btn-mini" data-addaus>Guardar ausencia</button></div></div>`);
     h += sec('notas', 'Notas y supuestos', p.supuestos.length ? `${p.supuestos.length} supuesto(s) por confirmar` : 'sin supuestos',
       `<label class="pinlbl">Nota <small>(lo que hay que saber de esta persona, con sus palabras)</small><textarea class="logininp" rows="3" data-txt="nota" data-libre>${esc(p.nota || '')}</textarea></label>
@@ -162,6 +172,9 @@ function openFicha(pid, opts) {
     const cs = t.closest('[data-color]');
     if (cs) { guarda('color', x => { x.color = +cs.dataset.color; }); pintaCabecera(); return; }
     const d = t.dataset || {};
+    // 24/09 (D13): el nombre de quien le cubre lleva a su ficha (donde se pone y se quita la designación)
+    const irf = t.closest('[data-irficha]');
+    if (irf) { const q = irf.dataset.irficha; cerrar(); openFicha(q); return; }
     const el = t.closest('[data-tloc],[data-tfranja],[data-tlibra],[data-tlpunt],[data-lpoff],[data-lpsem],[data-lpir],[data-lpquita],[data-tpartido],[data-tcoct],[data-tcocr],[data-tcocd],[data-tabre],[data-tnoabre],[data-tnoprimero],[data-tevita],[data-rmnunca],[data-addnunca],[data-rmcubre],[data-addcubre],[data-rmveto],[data-addveto],[data-rmaus],[data-addaus],[data-rmsup],[data-addsup]');
     if (!el) return;
     const ds = el.dataset;
@@ -203,7 +216,14 @@ function openFicha(pid, opts) {
       const q = ov.querySelector('#fNuncaSel').value; if (!q) { toast('Elige a alguien', 'warn'); return; }
       guarda(`nunca con ${nombrePid(q)}`, x => { if (!x.nuncaCon.includes(q)) x.nuncaCon.push(q); }); pinta(); return;
     }
-    if (ds.rmcubre !== undefined) { const cb = p.cubreA[+ds.rmcubre]; guarda(`ya no cubre a ${nombrePid(cb.pid)}`, x => x.cubreA.splice(+ds.rmcubre, 1)); pinta(); return; }
+    if (ds.rmcubre !== undefined) {
+      const cb = p.cubreA[+ds.rmcubre];
+      guarda(`ya no cubre a ${nombrePid(cb.pid)}`, x => x.cubreA.splice(+ds.rmcubre, 1)); pinta();
+      // D13: deja de aplicarse ya en todos los caminos; lo que puso la designación en la planilla se quita al
+      // volver a generar (lo puesto a mano, no)
+      toast(`${p.nombre} ya no cubre a ${nombrePid(cb.pid)}. Lo que ya estaba puesto por eso se quita al volver a generar la semana; lo puesto a mano se queda`, 'ok');
+      return;
+    }
     if (ds.addcubre !== undefined) {
       const q = ov.querySelector('#fCubreP').value; if (!q) { toast('Elige a quién cubre', 'warn'); return; }
       const dow = +ov.querySelector('#fCubreD').value || 0, tid = ov.querySelector('#fCubreT').value;
@@ -216,11 +236,13 @@ function openFicha(pid, opts) {
       if (p.vetos.some(v => v.localId === lid && v.franja === f)) { toast('Ese veto ya está', 'warn'); return; }
       guarda(`no hace ${f === 'M' ? 'mañanas' : 'tardes'} en ${nombreLocal(lid)}`, x => x.vetos.push({ localId: lid, franja: f })); pinta(); return;
     }
-    if (ds.rmaus !== undefined) { if (quitarAusenciaUI(p.id, +ds.rmaus)) { tocada = true; pinta(); toast('Ausencia retirada', 'warn'); } return; }
+    if (ds.rmaus !== undefined) { const aviso = quitarAusenciaUI(p.id, +ds.rmaus); if (aviso) { tocada = true; pinta(); toast(aviso, 'warn'); } return; }
     if (ds.addaus !== undefined) {
       const tipo = ov.querySelector('#fAusTipo').value, desde = ov.querySelector('#fAusD1').value; let hasta = ov.querySelector('#fAusD2').value;
       if (tipo !== 'BAJ' && !hasta) hasta = desde;
-      if (altaAusenciaUI(p.id, { tipo, desde, hasta: hasta || undefined, detalle: ov.querySelector('#fAusDet').value.trim() })) { tocada = true; pinta(); }
+      // la franja (D10) y, en días ya planificados, quién le cubre (D13): altaAusenciaUI lo confirma y lo aplica
+      const fr = ov.querySelector('#fAusFr').value;
+      altaAusenciaUI(p.id, { tipo, desde, hasta: hasta || undefined, detalle: ov.querySelector('#fAusDet').value.trim(), franjas: fr ? [fr] : undefined }, () => { tocada = true; if (ov.isConnected) pinta(); });
       return;
     }
     if (ds.rmsup !== undefined) { const s = p.supuestos[+ds.rmsup]; guarda(`supuesto confirmado o retirado: ${s}`, x => x.supuestos.splice(+ds.rmsup, 1)); pinta(); return; }

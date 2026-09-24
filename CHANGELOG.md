@@ -2,6 +2,64 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **«Cubre a» hasta nueva orden, repasado antes de subirlo (24/09).** Lo que cambia para quien lo usa:
+  - La ★ de Hoy (la recomendación de un toque) pone a Mari Luz «por Iván», igual que «＋ Asignar».
+    Antes fallaba el domingo («no hace partido los domingos») o la ponía sin «por Iván».
+  - Una baja apuntada hoy con fecha de inicio de días atrás ya no mete a nadie en días ya
+    trabajados (cambiaba sus horas). Esos días la persona sale de la planilla, pero no se pone a nadie
+    en su sitio; la confirmación lo dice: «si alguien le cubrió, ponlo a mano».
+  - Equipo, la Cobertura y el Generador eligen siempre a la misma persona: con dos personas que cubren
+    a Iván, las tres dicen la misma; y el Generador tampoco deja ya a Lavinia y a Dulce solas la tarde
+    del miércoles 30 (dos apoyos no se quedan solos), que es lo que ya decía Equipo.
+  - Si quien falta llevaba la cocina, quien le cubre y la hace entra con la cocina también desde
+    Equipo (Hojan por Jenny), como en el Generador.
+  - Cuando quien cubre no puede, se dice siempre por qué («ya está en ese turno de sala, y Hojan
+    llevaba la cocina»). Ya no sale «no se pudo poner».
+  - Después de un «Guardar» simple, la pestaña Cobertura encuentra el domingo que quedó pendiente:
+    antes decía «Iván no tiene turnos en la planilla ese día».
+  - «Guardar como semana tipo» una semana en que alguien estaba de vacaciones ya no deja a quien le
+    cubría como plaza fija ni borra las plazas de quien faltaba.
+  - Ctrl+Z (o «Más → Deshacer») después de apuntar una ausencia, usar la Cobertura o el Generador ya
+    no te lleva a otro mes: te quedas en el día que estabas mirando.
+  - La confirmación se lee mejor: «El viernes 2 y el sábado 3 ya estaba en ese turno y pasa a
+    cubrirle, abriendo. El domingo 4 no puede: nunca con Lavinia.» El historial pone las fechas en
+    orden, y la ficha de Iván dice solo «Si falta, le cubre Mari Luz».
+  - Al quitar una ausencia, el aviso dice que la persona vuelve a sus turnos al volver a generar la
+    semana y cómo deshacerlo.
+  - El alta de ausencias del Mes deja elegir día entero, solo mañana o solo tarde. Como en la ficha,
+    unas vacaciones con «Hasta» vacío son de un solo día (antes, en el Mes, quedaban sin fecha de fin).
+  - Los empleados no reciben la marca interna que decía qué compañero cubre a quién por designación.
+- **«Cubre a» hasta nueva orden, de punta a punta desde Equipo (24/09).** Diego: «que pueda decir
+  en equipo, tal persona cubre a tal persona, hasta nueva orden… antes no se hablaba bien equipo con
+  generador ni con cobertura». Lo que cambia para quien lo usa:
+  - Se pone en la ficha de quien cubre y vale hasta que se quite. La ficha y la tarjeta de Mari Luz
+    dicen «Cubre a Iván · siempre que falte · hasta que lo quites» (o «cuando falte los viernes» si
+    tiene día), y las de Iván «Si falta, le cubre Mari Luz», con su nombre para ir a su ficha.
+  - Al apuntar unas vacaciones, un permiso, una baja o un día libre (desde la tarjeta, la ficha o el
+    Mes) en días que ya están en la planilla, Iván sale de sus turnos y Mari Luz entra en su sitio.
+    Antes de guardar, una ventana lo cuenta: «Iván no está del viernes 2 al domingo 4 por la tarde.
+    Mari Luz le cubre (hasta nueva orden). El viernes 2 y el sábado 3 ya estaba en ese turno y pasa a
+    cubrirle, abriendo. El domingo 4 no puede: nunca con Lavinia», y lo que queda por cubrir. Se guarda todo
+    junto y Ctrl+Z (en el móvil, «Más → Deshacer») lo deshace de una vez. Antes solo se quitaba a Iván
+    y quedaba el hueco.
+  - «Guardar y buscar en la Cobertura lo que queda» abre la Cobertura con esos días ya marcados,
+    aunque Iván ya no esté en esas casillas, y al confirmar no se apunta la ausencia dos veces.
+  - Las ausencias de la ficha y de la tarjeta se pueden apuntar de día entero, solo por la mañana o
+    solo por la tarde.
+  - La Cobertura dice arriba «Iván tiene quien le cubra: Mari Luz» y, el día que no puede, por qué
+    («Mari Luz no puede: nunca con Lavinia»). El hueco de ese día dice lo mismo (antes, «no hace
+    partido los domingos»).
+  - El Generador (semana y periodo) dice lo mismo que Equipo y la Cobertura. Si Iván está de
+    vacaciones en su ficha pero seguía en su tarde, al generar sale de ella; si lo pusiste a mano, se
+    queda con su aviso.
+  - Quitar «Cubre a» deja de aplicarse en todas partes: el Generador, la Cobertura, el selector, la
+    Revisión y las condiciones. Lo que ya estaba en la planilla solo por esa designación se quita al
+    volver a generar la semana; lo puesto a mano se queda. Mari Luz, que estaba en su plaza de
+    siempre, la conserva y deja de ir «por Iván».
+  - En el móvil, «Guardar ausencia» no respondía al primer toque si justo antes se había elegido la
+    fecha: arreglado.
+  - Quitar a alguien de una casilla a mano ya no deja la casilla sin quien abra cuando era esa persona
+    la que abría.
 - **«Cubre a», repasado antes de subirlo (24/09).** Lo que cambia para quien lo usa:
   - El domingo 4, sin Iván, la tarde de Pasarela ya no se queda con dos apoyos (Lavinia y Dulce):
     «dos apoyos no se quedan solos» vale siempre, también en el plan con avisos y en el Generador.

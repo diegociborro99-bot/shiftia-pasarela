@@ -28,11 +28,23 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
     id: c.id, localId: c.localId, dias: c.dias, motivo: c.motivo, detalle: c.detalle,
     decisiones: c.decisiones && c.decisiones[pid] ? { [pid]: c.decisiones[pid] } : {},
   }));
+  // 24/09 (revisión F3b, D13): la casilla sigue diciendo «por Iván» (lo necesita para leerla), pero no la
+  // marca interna `porDesignacion`, que dice que un compañero tiene la designación de cubrir a otro (lo
+  // mismo que se le oculta de las fichas). Copia: el estado del servidor no se toca.
+  const meses = {};
+  for (const [k, v] of Object.entries(mesesVisibles(estado, hoy))) {
+    const asig = {};
+    for (const [iso, porT] of Object.entries((v && v.asig) || {})) {
+      asig[iso] = {};
+      for (const [tid, lista] of Object.entries(porT || {})) asig[iso][tid] = (lista || []).map(e => { if (!e || !e.porDesignacion) return e; const c = Object.assign({}, e); delete c.porDesignacion; return c; });
+    }
+    meses[k] = Object.assign({}, v, { asig });
+  }
   return {
     staff, cierresPuntuales,
     // la configuración de los locales (horarios, mínimos, cocina) es pública dentro del grupo
     locales: Array.isArray(estado.locales) ? estado.locales : [],
-    meses: mesesVisibles(estado, hoy), festivos: estado.festivos || [],
+    meses, festivos: estado.festivos || [],
     eventos: Array.isArray(estado.eventos) ? estado.eventos : [],
     mesesPublicados: Array.isArray(estado.mesesPublicados) ? estado.mesesPublicados.slice() : undefined,
     festVersion: estado.festVersion, staffVersion: estado.staffVersion, nextId: estado.nextId,

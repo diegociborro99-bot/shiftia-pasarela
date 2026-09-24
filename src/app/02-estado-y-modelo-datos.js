@@ -239,11 +239,20 @@ function deshacer() {
   const u = undoStack.pop();
   actualizarUndoBtn();
   if (!u) { toast('Nada que deshacer', 'warn'); return; }
-  if (u.otrosMeses) S.meses = u.otrosMeses;
-  if (u.y !== S.y || u.m !== S.m) { S.y = u.y; S.m = u.m; }
-  cargarMes();
-  est.apertura = u.apertura; est.asig = u.asig; est.manual = u.manual;
-  S.meses[mesKey(S.y, S.m)] = { apertura: est.apertura, asig: est.asig, manual: est.manual };
+  if (u.otrosMeses) {
+    // 24/09 (revisión F3b): el paso guarda TODOS los meses (su foto ya lleva el mes que se miraba al
+    // apilarlo): se devuelven y se recarga el que está en pantalla, sin moverse de él. Antes se volvía al
+    // mes del paso: apuntar las vacaciones de Iván desde Equipo (septiembre), mirar Hoy el viernes 2/10 y
+    // deshacer dejaba Hoy en el 2 de septiembre
+    S.meses = u.otrosMeses;
+    cargarMes();
+  } else {
+    // el paso solo guarda su mes: se vuelve a él para devolverlo
+    if (u.y !== S.y || u.m !== S.m) { S.y = u.y; S.m = u.m; }
+    cargarMes();
+    est.apertura = u.apertura; est.asig = u.asig; est.manual = u.manual;
+    S.meses[mesKey(S.y, S.m)] = { apertura: est.apertura, asig: est.asig, manual: est.manual };
+  }
   if (u.staff) S.staff = u.staff;
   if (u.eventos) S.eventos = u.eventos;
   if (u.extras) S.extras = u.extras;
@@ -303,7 +312,9 @@ function asignarUI(iso, tid, pid, opts) {
 function desasignarUI(iso, tid, pid) {
   if (!confirmarSiCerrado(iso)) return false;
   const e = estadoDeIso(iso, true);
-  if (!desasignar(e, iso, tid, pid)) return false;
+  // 24/09 (D13): con retirarEntrada su marca de «abre» o de cocina se va con ella y la casilla se recalcula;
+  // con desasignar la casilla seguía «fijada» sin nadie marcado
+  if (!retirarEntrada(e, S, S.staff, iso, tid, pid)) return false;
   const { localId, franja } = partirTurno(tid);
   registrarCambio(`${nombrePid(pid)} sale de ${nombreLocal(localId)} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig');
   saveState();

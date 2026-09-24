@@ -133,11 +133,10 @@ document.addEventListener('click', e => {
   if (pk) { const [iso, tid] = pk.dataset.pick.split('|'); openPicker(iso, tid, pk); return; }
   const su = e.target.closest('[data-sust]');
   if (su) {
+    // la ★ pone igual que el selector (ponerRecomendadoUI: de sala, con su «por» si cubre a quien falta y el
+    // partido autorizado para cubrirle; revisión F3b: sin eso fallaba «no hace partido los domingos»)
     const [iso, tid, pid] = su.dataset.sust.split('|');
-    pushUndo(`poner a ${nombrePid(pid)}`);
-    const c = candidatosPara(S, S.staff, estadoDeIso(iso), iso, tid).find(x => x.pid === pid);
-    const r = asignarUI(iso, tid, pid, { origen: 'manual', razon: c ? c.razones.join(' · ') : 'recomendado' });
-    if (r.ok) { renderVistaActiva(); toast(`${nombrePid(pid)} añadido`, 'ok'); } else toast(r.motivo, 'bad');
+    if (ponerRecomendadoUI(iso, tid, pid, candidatosPara(S, S.staff, estadoDeIso(iso), iso, tid).find(x => x.pid === pid), false).ok) renderVistaActiva();
     return;
   }
   const ab = e.target.closest('[data-abrir]');

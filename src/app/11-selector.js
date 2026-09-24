@@ -78,18 +78,23 @@ function openPicker(iso, tid, anchor) {
     }
     const b = ev.target.closest('[data-pickpid]'); if (!b) return;
     const pid = b.dataset.pickpid;
-    const c = [...ok, ...conAviso].find(x => x.pid === pid);
-    // 24/09 (revisión F3, S11): se pone como la recomienda candidatosPara: de sala, y si cubre a quien
-    // falta, con su «por» y el partido autorizado para cubrirle (D1). Antes la ★ de Mari Luz «cubre a
-    // Iván» se rechazaba al pulsarla («no hace partido los viernes») y, si entraba, iba sin «por».
-    // Si no se puede poner, el paso de Ctrl+Z se retira: no queda un paso vacío
-    pushUndo(`poner a ${nombrePid(pid)}`);
-    const cub = c && c.cubre ? { por: c.cubre, cubrePor: c.cubre } : {};
-    const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', permitirPartido: !!b.dataset.aviso, puesto: 'sala', razon: c ? c.razones.join(' · ') : undefined }, cub));
-    if (!res.ok) { undoStack.pop(); actualizarUndoBtn(); toast(res.motivo, 'bad'); return; }
-    closePicker(); renderVistaActiva();
-    toast(res.avisos.length ? `${nombrePid(pid)} añadido con aviso: ${res.avisos.join(', ')}` : `${nombrePid(pid)} añadido`, res.avisos.length ? 'warn' : 'ok');
+    if (ponerRecomendadoUI(iso, tid, pid, [...ok, ...conAviso].find(x => x.pid === pid), !!b.dataset.aviso).ok) { closePicker(); renderVistaActiva(); }
   });
+}
+// Pone a quien se ha elegido de la lista tal como la recomienda candidatosPara: de sala, y si cubre a
+// quien falta, con su «por» y el partido autorizado para cubrirle (D1). 24/09 (revisión F3, S11): antes la
+// ★ de Mari Luz «cubre a Iván» se rechazaba al pulsarla («no hace partido los viernes») y, si entraba,
+// iba sin «por». Revisión F3b: la ★ de un toque de Hoy tenía su propia copia sin nada de esto y volvía a
+// fallar el domingo 4; ahora el selector y la ★ llaman aquí. Si no se puede poner, el paso de Ctrl+Z se
+// retira (no queda un paso vacío) y se dice por qué. c: su fila de candidatosPara (o nada); conAviso: la
+// fila es de «con aviso» (un partido no declarado).
+function ponerRecomendadoUI(iso, tid, pid, c, conAviso) {
+  pushUndo(`poner a ${nombrePid(pid)}`);
+  const cub = c && c.cubre ? { por: c.cubre, cubrePor: c.cubre } : {};
+  const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', permitirPartido: !!conAviso, puesto: 'sala', razon: c ? c.razones.join(' · ') : 'recomendado' }, cub));
+  if (!res.ok) { undoStack.pop(); actualizarUndoBtn(); toast(res.motivo, 'bad'); return res; }
+  toast(res.avisos.length ? `${nombrePid(pid)} añadido con aviso: ${res.avisos.join(', ')}` : `${nombrePid(pid)} añadido`, res.avisos.length ? 'warn' : 'ok');
+  return res;
 }
 // menú de una persona ya sentada en la casilla: ficha, orden, abre, cocina, quitar
 function openMenuTurno(iso, tid, pid, anchor) {

@@ -88,11 +88,12 @@ function chipsCondiciones(p) {
   for (const lid of p.noAbre || []) h.push(tc('noAbre', 'No abre', chipLocal(lid), 'loc warn'));
   if ((p.noPrimero || []).length) h.push(tc('noPrimero', 'Nunca 1.º', esc(lblNoPrimero(p.noPrimero)), 'warn', 'no sale nunca el primero en esa franja: entra a partir del segundo puesto'));
   if ((p.nuncaCon || []).length) h.push(tc('nuncaCon', 'Nunca con', esc(p.nuncaCon.map(nombrePid).join(', ')), 'warn'));
-  for (const cb of p.cubreA || []) {
-    const cuando = [cb.dow ? lblDowPl(cb.dow) : '', cb.turnoId ? lblTurno(cb.turnoId) : ''].filter(Boolean).join(' · ');
-    // 24/09 (D1): la designación le autoriza el partido para cubrirle (y solo eso)
-    h.push(tc('cubreA', 'Cubre a', esc(nombrePid(cb.pid)) + (cuando ? ` <small>(${esc(cuando)})</small>` : ''), 'fix', `ocupa el sitio de ${nombrePid(cb.pid)} cuando falta; si hace falta, puede hacer partido para cubrirle`));
-  }
+  // 24/09 (D13, Diego: «tal persona cubre a tal persona, hasta nueva orden»): la designación se dice igual
+  // que en la ficha, y por los dos lados: en la de quien cubre «Cubre a Iván · siempre que falte · hasta que
+  // lo quites»; en la de quien falta, «Si falta, le cubre Mari Luz». La designación le autoriza el partido
+  // para cubrirle (D1, y solo eso)
+  for (const cb of p.cubreA || []) h.push(tc('cubreA', 'Cubre a', `${esc(nombrePid(cb.pid))} · ${esc(cuandoCubre(S, cb))} · hasta que lo quites`, 'fix cubrea', `ocupa el sitio de ${nombrePid(cb.pid)} cuando falta, hasta que se quite en esta ficha; si hace falta, puede hacer partido para cubrirle`));
+  for (const d of quienLeCubre(S, S.staff, p.id)) h.push(tchip('Si falta, le cubre', `${esc(d.nombre)}${d.cuando !== 'siempre que falte' ? ` <small>(${esc(d.cuando)})</small>` : ''}`, 'fix cubrea' + (d.activa ? '' : ' off'), d.activa ? `${d.nombre} ocupa su sitio cuando falta (se cambia en la ficha de ${d.nombre})` : `«Cubre a» está apagado en la ficha de ${d.nombre} o en las reglas del grupo: ahora no se aplica`));
   for (const v of p.vetos || []) h.push(tc('vetos', 'No hace', chipLocal(v.localId, v.franja === 'M' ? 'mañanas' : 'tardes'), 'loc warn'));
   if (p.contrato && +p.contrato.horasSemana > 0) h.push(tc('contrato', 'Contrato', `${+p.contrato.horasSemana} h/semana`));
   if (p.prefs && (p.prefs.evitaDows || []).length) h.push(tc('prefs', 'Prefiere no', esc(lblDows(p.prefs.evitaDows)), 'teal', 'criterio personal: no bloquea, el generador lo respeta al priorizar'));
@@ -117,6 +118,7 @@ function htmlAbsForm(p) {
     <span><label>Detalle</label><input type="text" data-f="detalle" placeholder="opcional"></span></div>
     <div class="row2"><span><label>Desde</label><input type="date" data-f="desde" value="${hoy}" required></span>
     <span><label>Hasta</label><input type="date" data-f="hasta" value="${hoy}"></span></div>
+    <label>Cuándo</label>${selFranjaAusencia('data-f="franja"')}
     <p class="filltxt" style="margin:0">Una baja puede ir sin fecha de fin: deja «Hasta» vacío.</p>
     <div class="bar"><button type="button" class="btn-mini ghost" data-cancelabs="${esc(p.id)}">Cancelar</button><button type="submit" class="btn-mini">Guardar</button></div>
   </form>`;
@@ -170,26 +172,116 @@ function vistaActivaId() { const t = document.querySelector('.tab[aria-selected=
 // tras tocar a una persona: Equipo siempre, y la vista que esté abierta si es otra
 function repintarTrasEquipo() { renderEquipo(); if (vistaActivaId() !== 'equipo') renderVistaActiva(); }
 
-// ---------- ausencias (la tarjeta y la ficha comparten esto) ----------
-// Alta con deshacer, y sus turnos de esos días salen de la planilla para que
-// queden como huecos (mismo criterio que el ＋ del cuadrante del mes).
-function altaAusenciaUI(pid, aus) {
+// ---------- ausencias (la tarjeta, la ficha y el Mes comparten esto) ----------
+// 24/09 (D10): la ausencia puede ser del día entero o de una franja; «solo mañana» no le quita la tarde.
+function selFranjaAusencia(attr) { return `<select ${attr} data-libre><option value="">Día entero</option><option value="M">Solo mañana</option><option value="T">Solo tarde</option></select>`; }
+// «el viernes 2», «del viernes 2 al domingo 4», «desde el viernes 2 (sin fecha de fin)»
+const diaLargoAus = iso => `${DIAS_L[isoDow(iso)].toLowerCase()} ${+iso.slice(8, 10)}`;
+const listaY = xs => xs.length > 1 ? xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1] : (xs[0] || '');
+function cuandoAusencia(a) {
+  const fr = a.franjas && a.franjas.length === 1 ? ` por la ${FRANJA_LBL[a.franjas[0]].toLowerCase()}` : '';
+  if (!a.hasta) return `desde el ${diaLargoAus(a.desde)} (sin fecha de fin)${fr}`;
+  return (a.hasta === a.desde ? `el ${diaLargoAus(a.desde)}` : `del ${diaLargoAus(a.desde)} al ${diaLargoAus(a.hasta)}`) + fr;
+}
+// Lo que va a pasar en la planilla, en llano, para la confirmación (24/09, D13): «Iván no está del viernes 2 al
+// domingo 4 por la tarde. Mari Luz le cubre (hasta nueva orden). El viernes 2 y el sábado 3 ya estaba en ese
+// turno y pasa a cubrirle. El domingo 4 no puede: nunca con Lavinia», y lo que queda por cubrir. r: lo que
+// devuelve cubrirAusencia. Revisión F3b: una frase por cosa —antes «entra en su sitio (ya estaba en ese
+// turno)» se contradecía y el porqué iba entre paréntesis dentro de paréntesis—, y los días ya pasados se dicen
+// aparte (ahí no entra nadie).
+function lineasCubrirAusencia(p, a, r) {
+  const dias = xs => listaY([...new Set(xs.map(x => x.iso))].sort().map(i => 'el ' + diaLargoAus(i)));
+  const frase = s => s.charAt(0).toUpperCase() + s.slice(1) + '.';
+  const donde = x => `${nombreLocal(partirTurno(x.tid).localId)} por la ${FRANJA_LBL[partirTurno(x.tid).franja].toLowerCase()}`;
+  const out = { cabeza: `${p.nombre} no está ${cuandoAusencia(a)}.`, quien: [], quedan: [], pasados: '' };
+  const designadas = [...new Set(quienLeCubre(S, S.staff, p.id).map(d => d.pid))];
+  for (const qid of designadas) {
+    const d = quienLeCubre(S, S.staff, p.id).filter(x => x.pid === qid);
+    // con el interruptor apagado (en su ficha o en las reglas del grupo) la designación está, pero no se aplica
+    if (!d.some(x => x.activa)) { out.quien.push({ pid: qid, txt: `${nombrePid(qid)} tiene «Cubre a» ${p.nombre}, pero está apagado: ahora no le cubre.` }); continue; }
+    const nuevos = r.puestos.filter(x => x.pid === qid), ya = r.relevos.filter(x => x.pid === qid);
+    const frases = [];
+    if (nuevos.length) frases.push(frase(`${dias(nuevos)} entra en su sitio`));
+    if (ya.length) frases.push(frase(`${dias(ya)} ya estaba en ese turno y pasa a cubrirle${ya.every(x => x.abre) ? ', abriendo' : ''}`));
+    // un día que no puede, con su porqué («nunca con Lavinia»); agrupados por porqué
+    const noPuede = new Map();
+    for (const s of r.sinCubrir) { const q = s.quien.find(x => x.pid === qid); if (q) { if (!noPuede.has(q.porQue)) noPuede.set(q.porQue, []); noPuede.get(q.porQue).push(s); } }
+    for (const [pq, xs] of noPuede) frases.push(frase(`${dias(xs)} no puede: ${pq}`));
+    out.quien.push({ pid: qid, txt: `${nombrePid(qid)} le cubre (hasta nueva orden${d.every(x => x.cuando === 'siempre que falte') ? '' : ', ' + listaY(d.map(x => x.cuando))}). ${frases.join(' ') || 'No le toca ninguno de estos días.'}` });
+  }
+  if (!designadas.length) out.quien.push({ pid: null, txt: `Nadie tiene «Cubre a» ${p.nombre}: sus turnos de esos días quedan por cubrir.` });
+  for (const h of r.huecos) out.quedan.push(`${diaLargoAus(h.iso)} en ${donde(h)} (${h.tipo === 'faltan' ? `${h.faltan === 1 ? 'falta' : 'faltan'} ${h.faltan} de ${h.minimo}` : h.tipo === 'primero' ? 'nadie abre' : 'sin cocina'})`);
+  // los días ya pasados: sale de la planilla (no los trabajó), pero no se pone a nadie en su sitio
+  const pas = r.pasados || [];
+  if (pas.length) out.pasados = frase(`${dias(pas)} ${new Set(pas.map(x => x.iso)).size > 1 ? 'ya han pasado' : 'ya ha pasado'}: ${p.nombre} sale de la planilla esos días, pero no se pone a nadie en su sitio; si alguien le cubrió, ponlo a mano`);
+  return out;
+}
+// Alta de una ausencia con deshacer. En días ya planificados, la persona sale de sus casillas y entra quien
+// la cubre por «cubre a» (cubrirAusencia del modelo, la misma regla que la Cobertura y el Generador). Antes
+// solo se quitaba a la persona y quedaba el hueco, y la designación no se enteraba hasta regenerar (D13:
+// «antes no se hablaba bien equipo con generador ni con cobertura»). Se ensaya sobre copias y una
+// confirmación lo cuenta; al guardar va todo en un solo Ctrl+Z (ficha y planilla) y una línea del
+// historial, y lo que queda se puede llevar a la Cobertura (con las casillas que dejó). Sin días
+// planificados se guarda sin preguntar, como siempre. hecho(r) se llama tras guardar (para repintar).
+function altaAusenciaUI(pid, aus, hecho) {
   const p = personaDeId(pid); if (!p) return null;
   if (!aus.desde) { toast('Falta la fecha de inicio', 'warn'); return null; }
   if (aus.hasta && aus.hasta < aus.desde) { toast('La fecha de fin es anterior a la de inicio', 'warn'); return null; }
-  pushUndo(`ausencia de ${p.nombre}`, { staff: true, otrosMeses: true });
   const a = { tipo: aus.tipo, desde: aus.desde }; if (aus.hasta) a.hasta = aus.hasta; if (aus.detalle) a.detalle = aus.detalle;
-  const r = anadirAusencia(p, a);
-  let quitados = 0;
-  for (const iso of rangoIso(r.ausencia.desde, r.ausencia.hasta || addDias(r.ausencia.desde, 60))) {
-    const e = estadoDeIso(iso, true);
-    for (const t of turnosDe(S)) if (desasignar(e, iso, t.id, pid)) quitados++;
-  }
-  registrarCambio(`${(AUS_LBL[a.tipo] || { label: a.tipo }).label}: ${p.nombre} del ${fmtDM(a.desde)}${a.hasta ? ' al ' + fmtDM(a.hasta) : ' (sin fecha de fin)'}${quitados ? ` · ${quitados} turno(s) retirados de la planilla` : ''}${a.detalle ? ' · ' + a.detalle : ''}`, 'aus');
-  saveState();
-  toast(quitados ? `Ausencia guardada · ${quitados} turno(s) quedan por cubrir` : (r.fusionada ? 'Ausencia unida a otra del mismo tipo' : 'Ausencia guardada'), quitados ? 'warn' : 'ok');
-  return r;
+  if (!a.hasta && a.tipo !== 'BAJ') a.hasta = a.desde;   // solo una baja va sin fecha de fin
+  const fs = (aus.franjas || []).filter(f => FRANJAS.includes(f));
+  if (fs.length === 1) a.franjas = fs;
+  // una baja sin fecha de fin: los días ya planificados de los dos meses siguientes
+  const hasta = a.hasta || addDias(a.desde, 60);
+  // revisión F3b: semanas enteras, como la Cobertura (rangoNecesario, S8): con solo los días de la ausencia,
+  // «N turnos esa semana» contaba mal y con dos personas designadas Equipo elegía a otra que la Cobertura.
+  // cubrirAusencia solo toca las casillas de la ausencia. Y la fecha de hoy: en los días ya pasados sale de la
+  // planilla, pero no se pone a nadie (antes metía a Roberto en días ya trabajados y le cambiaba las horas)
+  const rg = rangoNecesario({ desde: a.desde, hasta });
+  const hoy = isoHoy();
+  const prueba = JSON.parse(JSON.stringify(S.staff));
+  anadirAusencia(personaDe(prueba, pid), a);
+  const sim = cubrirAusencia(S, prueba, clonarEstado(estadoRango(rg.desde, rg.hasta, false)), pid, a.desde, hasta, a.franjas, { desdeIso: hoy });
+  const guardar = conCobertura => {
+    pushUndo(`ausencia de ${p.nombre}`, { staff: true, otrosMeses: true });
+    const r0 = anadirAusencia(p, a);
+    const r = cubrirAusencia(S, S.staff, estadoRango(rg.desde, rg.hasta, true), pid, a.desde, hasta, a.franjas, { desdeIso: hoy });
+    const quien = r.puestos.concat(r.relevos);
+    // las fechas en orden (revisión F3b: salían en el orden en que se cubrían: «20/9, 15/9, 22/9…»)
+    const cubren = [...new Set(quien.map(x => x.pid))].map(q => `${nombrePid(q)} le cubre ${listaY([...new Set(quien.filter(x => x.pid === q).map(x => x.iso))].sort().map(fmtDM))}`);
+    registrarCambio(`${(AUS_LBL[a.tipo] || { label: a.tipo }).label}: ${p.nombre} ${a.hasta ? (a.hasta !== a.desde ? `del ${fmtDM(a.desde)} al ${fmtDM(a.hasta)}` : `el ${fmtDM(a.desde)}`) : `desde el ${fmtDM(a.desde)} (sin fecha de fin)`}${a.franjas ? ` por la ${FRANJA_LBL[a.franjas[0]].toLowerCase()}` : ''}${r.quitados.length ? ` · sale de ${r.quitados.length} turno(s)` : ''}${r.pasados.length ? ` (${r.pasados.length} ya pasado(s), sin poner a nadie)` : ''}${cubren.length ? ` · ${cubren.join('; ')} (cubre a)` : ''}${r.sinCubrir.length ? ` · ${r.sinCubrir.length} sin quien le cubra` : ''}${r.huecos.length ? ` · ${r.huecos.length} hueco(s)` : ''}${a.detalle ? ' · ' + a.detalle : ''}`, 'aus');
+    if (r.quitados.some(x => mesCerrado(x.iso))) registrarCambio(`Cambio en un mes cerrado (${a.desde.slice(0, 7)})`, 'aviso');
+    saveState();
+    const falta = r.pendiente ? r.pendiente.dejadas.length : 0;
+    toast(!r.quitados.length ? (r0.fusionada ? 'Ausencia unida a otra del mismo tipo' : 'Ausencia guardada') : `Ausencia guardada${cubren.length ? ' · ' + cubren.join(' · ') : ''}${falta ? ` · ${pl(falta, 'turno queda', 'turnos quedan')} por cubrir` : ''} · ${comoDeshacer()} para deshacer`, falta ? 'warn' : 'ok');
+    if (typeof hecho === 'function') hecho(r0, r);
+    if (conCobertura && r.pendiente && typeof openCobertura === 'function') openCobertura(Object.assign({}, r.pendiente, { tipo: a.tipo, detalle: a.detalle }));
+    return r0;
+  };
+  if (!sim.quitados.length) return guardar(false);
+  if (!confirmarSiCerrado(a.desde)) return null;
+  const t = lineasCubrirAusencia(p, a, sim);
+  const pend = sim.pendiente;
+  const ov = abrirOverlay('ausOvl', `<div class="ausconf">
+      <span class="micro">${esc(((AUS_LBL[a.tipo] || {}).label || a.tipo).toUpperCase())} · DÍAS YA PLANIFICADOS</span>
+      <h2 class="revh2">${esc(t.cabeza)}</h2>
+      <p class="revsub">Sale de ${pl(sim.quitados.length, 'turno', 'turnos')} de la planilla.</p>
+      <ul class="ausconfl">${t.quien.map(x => `<li${x.pid ? ` data-quien="${esc(x.pid)}"` : ''}>${esc(x.txt)}</li>`).join('')}</ul>
+      ${t.pasados ? `<p class="ausquedan ausyapasados">${esc(t.pasados)}</p>` : ''}
+      ${t.quedan.length ? `<p class="ausquedan"><b>Queda por cubrir:</b> ${esc(listaY(t.quedan))}.</p>` : ''}
+      <p class="revsub">Se guarda todo junto: ${esc(comoDeshacer())} lo deshace de una vez.</p>
+      <div class="pvbar ausbar"><button type="button" class="btn btn-ghost" data-ovx>Cancelar</button><button type="button" class="btn ${pend ? 'btn-sec' : 'btn-cta'}" data-ausok="guardar">Guardar</button>${pend ? `<button type="button" class="btn btn-cta" data-ausok="cobertura">Guardar y buscar en la Cobertura lo que queda</button>` : ''}</div></div>`, { ancho: 560 });
+  ov.addEventListener('click', e => {
+    const b = e.target.closest('[data-ausok]');
+    if (!b) return;
+    ov.remove();
+    guardar(b.dataset.ausok === 'cobertura');
+  });
+  return null;
 }
+// Quita una ausencia de la ficha. Devuelve el aviso para el toast (o false). Revisión F3b: apuntarla mueve
+// gente al momento y quitarla no (la persona vuelve a sus turnos al regenerar, como antes; lo puesto a mano
+// no lo quita nadie), así que el aviso lo dice, igual que al quitar «Cubre a».
 function quitarAusenciaUI(pid, idx) {
   const p = personaDeId(pid); if (!p || !p.ausencias || !p.ausencias[idx]) return false;
   const a = p.ausencias[idx];
@@ -197,7 +289,10 @@ function quitarAusenciaUI(pid, idx) {
   p.ausencias.splice(idx, 1);
   registrarCambio(`Ausencia retirada: ${p.nombre}, ${(AUS_LBL[a.tipo] || { label: a.tipo }).label} del ${fmtDM(a.desde)}${a.hasta ? ' al ' + fmtDM(a.hasta) : ''}`, 'aus');
   saveState();
-  return true;
+  // ¿tocaba días ya planificados? (una baja sin fin: los dos meses siguientes)
+  let planificada = false, n = 0;
+  for (const iso of rangoIso(a.desde, a.hasta || addDias(a.desde, 60))) { if (++n > 62 || planificada) break; planificada = diaConPlanilla(estadoDeIso(iso), iso); }
+  return planificada ? `Ausencia retirada · ${p.nombre} vuelve a sus turnos al volver a generar la semana; si fue un error, ${comoDeshacer()} lo deshace` : 'Ausencia retirada';
 }
 
 // ---------- alta y baja ----------
@@ -741,7 +836,8 @@ document.addEventListener('click', e => {
   const rm = t.closest('[data-rmabs]');
   if (rm) {
     const [pid, i] = rm.dataset.rmabs.split(':');
-    if (quitarAusenciaUI(pid, +i)) { repintarTrasEquipo(); toast('Ausencia retirada', 'warn'); }
+    const aviso = quitarAusenciaUI(pid, +i);
+    if (aviso) { repintarTrasEquipo(); toast(aviso, 'warn'); }
     return;
   }
   const add = t.closest('[data-addabs]');
@@ -765,7 +861,7 @@ document.addEventListener('submit', e => {
   const v = k => { const el = f.querySelector(`[data-f="${k}"]`); return el ? el.value.trim() : ''; };
   const tipo = v('tipo'), desde = v('desde'); let hasta = v('hasta');
   if (tipo !== 'BAJ' && !hasta) hasta = desde;
-  if (altaAusenciaUI(f.dataset.absform, { tipo, desde, hasta: hasta || undefined, detalle: v('detalle') })) repintarTrasEquipo();
+  altaAusenciaUI(f.dataset.absform, { tipo, desde, hasta: hasta || undefined, detalle: v('detalle'), franjas: v('franja') ? [v('franja')] : undefined }, () => repintarTrasEquipo());
 });
 document.addEventListener('change', e => {
   // en el formulario de ausencia, elegir «Baja» vacía el «Hasta»: lo normal es que no se sepa
