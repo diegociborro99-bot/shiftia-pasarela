@@ -2,6 +2,55 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Revisión final de todo lo del 24/09 (25/09).** Tres revisiones con el caso completo (el Mónaco cerrado del
+  domingo 27 por la tarde al martes 29, Mari Luz libra el martes 29, «cubre a Iván» y sus vacaciones del 2 al 4 por
+  la tarde), con la base de datos de producción abierta con la versión nueva y con el servidor. Lo que se arregla:
+  - **Quien apoya por el cierre del Mónaco va donde falta, de verdad.** Con Dulce fuera de standby (como está desde
+    la reunión), el martes 29 faltaba una persona en Pasarela por la mañana (Mari Luz libra) y el Generador ponía a
+    Dulce y dejaba a Yilian «aún sin sitio». Ahora quien apoya «donde haga falta» va delante de los demás en las
+    franjas del cierre (solo por detrás de «cubre a»): el 29 entra Yilian.
+  - **«Con aviso», primero lo más suave.** El domingo 4 por la tarde, el selector de la casilla y el Generador
+    ofrecían primero a Mari Luz con Lavinia, cuando Equipo y la Cobertura decían Roberto. Ahora van por orden: primero
+    quien solo hace un partido no declarado (Roberto), luego quien dejaría la casilla solo con apoyos (Cristian) y la
+    pareja «nunca con» flexible la última (Mari Luz).
+  - **El botón «Con aviso» del Generador → Periodo pone igual que el selector.** Mari Luz entraba el domingo 4 sin
+    «por Iván» y con «partido no declarado los domingos»; ahora entra «por Iván» con el partido autorizado para
+    cubrirle, y Ctrl+Z la quita aunque la pantalla esté en otro mes.
+  - **La plantilla antes que los apoyos (José, 18/09: «tirar de plantilla todo lo que podamos y apoyos ir a lo
+    justo»).** Al elegir entre varias personas, ser apoyo ahora resta en vez de sumar: a igual carga entra la
+    plantilla. Un apoyo solo pasa por delante si quien es de plantilla lleva unos diez turnos más ese mes. Con la
+    semana tipo, octubre sale igual (624 plazas, 4 casillas cortas); sin semana tipo, 19 casillas cortas en vez de
+    32 y 114 turnos de apoyos en vez de 125, con Victoria en 31 turnos y Juani en 15 (los «25 y 13» de más abajo son
+    de antes de las fases 6 y 7). La Cobertura de Iván no cambia. **Diego: confírmalo** (es reversible).
+  - **Vacaciones «solo de tarde» de quien solo trabaja tardes = días enteros.** Las de Iván del 2 al 4 contaban 1,5
+    días en Horas; ahora 3, como las de Susana Capón que puso el cierre.
+  - **Quién abre, bien guardado en las semanas ya volcadas.** La versión de antes, al quitar a quien abría de una
+    casilla (unas vacaciones, un día libre), dejaba la casilla marcada «abre a mano» sin nadie que abriera: Hoy decía
+    que Mari Luz abría Pasarela el 20/10 a las 16:00 y su app, que entraba a las 21:00. Al abrir la app se limpian
+    (nueve casillas en la base de producción) de hoy en adelante; con la cocina, igual, salvo la que quitó el
+    encargado a propósito.
+  - **Dos dispositivos a la vez.** Si mientras editabas otro dispositivo cambiaba las reglas del grupo, «Visible para
+    el equipo», una entrevista o el historial, tu guardado lo pisaba sin avisar (volvía a encender «Mínimos»). Ahora
+    manda el servidor y te avisa, como con la planilla.
+  - **La pestaña que quedó abierta con la versión de antes ya no estropea nada.** Tras desplegar, una pestaña vieja
+    seguía guardando (volvía a llenar el Mónaco cerrado, perdía semanas de «libra otro día»…). Ahora, en cuanto la
+    app nueva ha guardado una vez, el servidor no le acepta nada: le pide recargar y su cambio se envía al recargar.
+    **Diego: después de desplegar, que Aroa y José recarguen la app.**
+  - **Horas de un mes cerrado dice qué ha cambiado, con las dos cifras.** Agosto (cerrado) decía «La tabla coincide
+    con la copia guardada» aunque los partidos de Noe habían bajado de 8 a 4: desde el 24/09 un turno continuo (mañana
+    y tarde seguidas) ya no cuenta como partido. Ahora lo dice («Noe: partidos 8 → 4»). **Diego: los partidos de
+    agosto y septiembre bajan por eso** (Noe 8 → 4 y 10 → 5; Victoria 9 → 8 en septiembre); lo demás no cambia.
+  - **El empleado no ve las parejas «nunca con» de sus compañeros** en los avisos de una casilla forzada (ni la marca
+    «flexible» de antes que aún llevaba su ficha mientras nadie guardaba con la versión nueva), su app no
+    recalcula por su cuenta quién abre, y en un mes que aún no es visible dice «El encargado aún no ha publicado este
+    mes» (antes: «Este mes no tienes turnos»).
+  - **Textos.** El Generador en «Periodo libre» se titula con las fechas elegidas («Del 01/10 al 31/10»); «Compartir»
+    ya no promete un pie de descansos que la imagen no lleva desde el 18/09; los avisos del Generador, la Cobertura y
+    las ausencias dicen «1 plaza aplicada» / «3 huecos» (sin «(s)») y «las reglas» en vez de «la puerta»; y la
+    condición de El 33 dice que se acordó el 17/09 (la de Pasarela, el 15/09).
+  - En el plan con las reglas de la Cobertura, el hueco del domingo 4 dice «dejaría la casilla solo con apoyos: Dulce»
+    y a Cristian lo pone en «no hace partido los domingos» (más abajo se cita como «Dulce, Cristian»).
+
 - **El motor «Núcleo Shiftia» ya funciona con el núcleo de verdad y no deja más huecos que el generador local
   (25/09, revisión).** Se ha probado contra el optimizador de verdad, no solo contra uno de pruebas. Lo que se nota:
   - **Antes no generaba nada:** el núcleo no aceptaba los datos y salía un aviso rojo lleno de «[object Object]».

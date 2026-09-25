@@ -687,6 +687,12 @@ const server = http.createServer(async (req, res) => {
         if (!bien) { json(res, 400, { error: 'estado inválido: alguna lista no tiene la forma esperada' }); return; }
       }
       const actual = leerEstado();
+      // 25/09 (revisión final): la pestaña abierta con una versión anterior de la app no escribe sobre una planilla
+      // que ya guardó la de ahora (su código no sabe de lo nuevo y lo estropea: volvía a llenar el Mónaco cerrado,
+      // perdía semanas de «libra otro día»…). 426: su cambio se queda en su bandeja de salida y, al recargar, la app
+      // nueva lo reenvía migrado. Mientras nadie guarde con la de ahora, se acepta (el despliegue no bloquea a nadie)
+      const esquemaDe = e => (e && Number.isFinite(+e.esquema) ? +e.esquema : 0);
+      if (esquemaDe(estado) < esquemaDe(actual.estado) && esquemaDe(actual.estado) >= M.ESQUEMA_PLANILLA) { json(res, 426, { error: 'Esta pestaña tiene una versión anterior de la app: recárgala para guardar (el cambio sigue guardado en este dispositivo)', recargar: true }); return; }
       if (+baseVersion !== actual.version) { json(res, 409, { error: 'conflicto', version: actual.version }); return; }
       // 18/09: quien no ve el contenido de las entrevistas recibe las fichas vacías, así
       // que al guardar un cambio de turno las devolvería vacías y borraría lo de José. Las

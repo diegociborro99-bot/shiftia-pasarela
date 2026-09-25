@@ -51,8 +51,10 @@ function renderGenerador() {
     </div>
     <div class="genres" id="genRes">${GEN.previa ? htmlPrevia(GEN.previa) : `<div class="genvacio">Elige el periodo y pulsa <b>Generar vista previa</b>. Verás cada plaza con su razón, los turnos que se quedan cortos y por qué, y podrás aplicarlo todo o solo parte.</div>`}</div>
   </div>`;
-  root.querySelector('#genD1').addEventListener('change', e => { GEN.desde = e.target.value || GEN.desde; GEN.previa = null; renderGenerador(); });
-  root.querySelector('#genD2').addEventListener('change', e => { GEN.hasta = e.target.value || GEN.hasta; GEN.previa = null; renderGenerador(); });
+  // (revisión final, 25/09) con las fechas a mano, el título dice el periodo (antes seguía «Generar esta semana»)
+  const tituloPeriodo = () => { GEN.titulo = `Del ${fmtDDMM(GEN.desde)} al ${fmtDDMM(GEN.hasta)}`; };
+  root.querySelector('#genD1').addEventListener('change', e => { GEN.desde = e.target.value || GEN.desde; tituloPeriodo(); GEN.previa = null; renderGenerador(); });
+  root.querySelector('#genD2').addEventListener('change', e => { GEN.hasta = e.target.value || GEN.hasta; tituloPeriodo(); GEN.previa = null; renderGenerador(); });
   root.querySelector('#genDesdeHoy').addEventListener('change', e => { GEN.opts.desdeHoy = e.target.checked; });
   root.querySelector('#genPatron').addEventListener('change', e => { GEN.opts.sinPatron = !e.target.checked; });
   root.querySelector('#genPartido').addEventListener('change', e => { GEN.opts.permitirPartido = e.target.checked; });
@@ -77,8 +79,18 @@ function renderGenerador() {
     // como puesta a mano y nadie la retira en automático (24/09, revisión). Se pone con lo que la propuesta
     // relaja (RELAJABLE del modelo, revisión de la fase 6): antes la pareja «nunca con» flexible se proponía y al
     // pulsar «Aplicar» salía «nunca con Mari Luz». (revisión de la fase 7) «Pueden entrar»: quien entra sin aviso
-    // en un hueco que el núcleo dejó corto se pone tal cual, sin relajar nada
-    if (ap) { const [iso, tid, pid, limpio] = ap.dataset.aplicaruno.split('|'); pushUndo(`poner a ${nombrePid(pid)}`); const r = asignarUI(iso, tid, pid, limpio ? { origen: 'manual', razon: 'elegido en la vista previa del Generador' } : Object.assign({ origen: 'manual', razon: 'propuesta con aviso aceptada' }, RELAJABLE)); if (r.ok) { toast(r.avisos.length ? `${nombrePid(pid)} añadido con aviso: ${r.avisos.join(', ')}` : `${nombrePid(pid)} añadido`, r.avisos.length ? 'warn' : 'ok'); GEN.previa = null; renderGenerador(); } else { undoStack.pop(); actualizarUndoBtn(); toast(r.motivo, 'bad'); } return; }
+    // en un hueco que el núcleo dejó corto se pone tal cual, sin relajar nada.
+    // 25/09 (revisión final): se pone con su fila de la propuesta, como el selector y la ★ de Hoy (ponerRecomendadoUI):
+    // su «por», el partido autorizado para cubrir a quien falta (D1) y su puesto. Antes iba sin nada de eso: Mari Luz
+    // «cubre a Iván» entraba el domingo 4 sin «por Iván», con «partido no declarado los domingos» y la Revisión lo
+    // daba como aviso en vez de como partido autorizado
+    if (ap) {
+      const [iso, tid, pid, limpio] = ap.dataset.aplicaruno.split('|');
+      const e = (GEN.previa && GEN.previa.meses && GEN.previa.meses[iso.slice(0, 7)]) || estadoDeIso(iso);
+      const fila = (limpio ? candidatosPara(S, S.staff, e, iso, tid) : candidatosConAviso(S, S.staff, e, iso, tid)).find(c => c.pid === pid);
+      if (ponerRecomendadoUI(iso, tid, pid, fila, !limpio).ok) { GEN.previa = null; renderGenerador(); }
+      return;
+    }
     const ir = e.target.closest('[data-irdia]');
     if (ir) irAIso(ir.dataset.irdia);
   }, { once: false });
@@ -163,7 +175,7 @@ function lineaNucleo(p) {
   const partes = [`Núcleo Shiftia: ${ESTADO_NUCLEO[n.status] || 'ha respondido'}${s}`];
   const saltadas = (n.relaxations || []).map(x => `«${x.rule_id}»`);
   if (saltadas.length) partes.push(`para dar una planilla se ha saltado ${saltadas.join(', ')}`);
-  if (n.vueltas > 1) partes.push(`${VUELTA_TXT[n.vueltas] || n.vueltas + '.ª'} vuelta: volvió a resolver sin ${pl(n.vetadas, 'propuesta', 'propuestas')} que la puerta no dejaba poner`);
+  if (n.vueltas > 1) partes.push(`${VUELTA_TXT[n.vueltas] || n.vueltas + '.ª'} vuelta: volvió a resolver sin ${pl(n.vetadas, 'propuesta', 'propuestas')} que las reglas no dejaban poner`);
   const cortas = p.huecos.length;
   if (cortas) partes.push(`${pl(cortas, 'casilla se queda corta', 'casillas se quedan cortas')}: abajo, con el porqué`);
   return partes.join(' · ');
@@ -235,10 +247,10 @@ function aplicarPrevia() {
   // generador le retiraba su propia plaza
   const r = volcarPrevia(S, S.staff, iso => estadoDeIso(iso, true), p, { desde: GEN.desde, hasta: GEN.hasta, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, previaDe: iso => p.meses[iso.slice(0, 7)] });
   const n = r.aplicadas, fallos = r.fallos, nRet = r.retiradas;
-  registrarCambio(`Generador (${p.motor === 'nucleo' ? 'núcleo Shiftia' : 'local'}): ${n} plaza(s) aplicadas del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}${nRet ? ` · ${nRet} retirada(s) que ya no valían` : ''}${r.relevos ? ` · ${pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : ''}${p.huecos.length ? ` · ${p.huecos.length} casilla(s) siguen cortas` : ''}${fallos ? ` · ${fallos} no se pudieron poner` : ''}`, 'ia');
+  registrarCambio(`Generador (${p.motor === 'nucleo' ? 'núcleo Shiftia' : 'local'}): ${pl(n, 'plaza aplicada', 'plazas aplicadas')} del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}${nRet ? ` · ${pl(nRet, 'retirada que ya no valía', 'retiradas que ya no valían')}` : ''}${r.relevos ? ` · ${pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : ''}${p.huecos.length ? ` · ${pl(p.huecos.length, 'casilla sigue corta', 'casillas siguen cortas')}` : ''}${fallos ? ` · ${fallos} no se pudieron poner` : ''}`, 'ia');
   saveState();
   GEN.previa = null;
-  toast(`${n} plaza(s) aplicadas${nRet ? ` · ${pl(nRet, 'retirada', 'retiradas')}` : ''}${r.relevos ? ` · ${pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : ''}${p.huecos.length ? ` · ${p.huecos.length} casilla(s) cortas por cubrir` : ''} · ${comoDeshacer()} para deshacer`, p.huecos.length ? 'warn' : 'ok');
+  toast(`${pl(n, 'plaza aplicada', 'plazas aplicadas')}${nRet ? ` · ${pl(nRet, 'retirada', 'retiradas')}` : ''}${r.relevos ? ` · ${pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : ''}${p.huecos.length ? ` · ${pl(p.huecos.length, 'casilla corta', 'casillas cortas')} por cubrir` : ''} · ${comoDeshacer()} para deshacer`, p.huecos.length ? 'warn' : 'ok');
   renderGenerador(); pintaRevDot();
 }
 function vaciarGenerado() {
@@ -255,9 +267,9 @@ function vaciarGenerado() {
     }
     if (e.asig[iso] && !Object.keys(e.asig[iso]).length) delete e.asig[iso];
   }
-  registrarCambio(`Vaciado lo generado del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}: ${n} plaza(s)`, 'cambio');
+  registrarCambio(`Vaciado lo generado del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}: ${pl(n, 'plaza', 'plazas')}`, 'cambio');
   saveState(); GEN.previa = null; renderGenerador();
-  toast(`${n} plaza(s) retiradas · Ctrl+Z para deshacer`, 'warn');
+  toast(`${pl(n, 'plaza retirada', 'plazas retiradas')} · Ctrl+Z para deshacer`, 'warn');
 }
 
 
@@ -342,9 +354,9 @@ function aplicarSemana() {
   const real = estadoSemana(GEN.lunes, true);
   const res = generarSemana(S, S.staff, real, GEN.lunes, opcionesSemana());
   const rel = res.relevos ? `, ${pl(res.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : '';
-  registrarCambio(`Generador semanal: semana del ${fmtDM(GEN.lunes)} al ${fmtDM(addDias(GEN.lunes, 6))} — ${res.aplicados} plaza(s) nuevas${res.retirados.length ? `, ${res.retirados.length} retirada(s) (${res.retirados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${rel}, ${res.huecos.length} hueco(s) disponibles, ${res.resumen.condicionesRotas} condición(es) sin cumplir`, 'ia');
+  registrarCambio(`Generador semanal: semana del ${fmtDM(GEN.lunes)} al ${fmtDM(addDias(GEN.lunes, 6))} — ${pl(res.aplicados, 'plaza nueva', 'plazas nuevas')}${res.retirados.length ? `, ${pl(res.retirados.length, 'retirada', 'retiradas')} (${res.retirados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${rel}, ${pl(res.huecos.length, 'hueco disponible', 'huecos disponibles')}, ${pl(res.resumen.condicionesRotas, 'condición sin cumplir', 'condiciones sin cumplir')}`, 'ia');
   saveState(); GEN.previa = null;
-  toast(`${res.aplicados} plaza(s) aplicadas${res.retirados.length ? ` · ${res.retirados.length} retirada(s)` : ''}${rel ? ' ·' + rel.slice(1) : ''}${res.huecos.length ? ` · ${res.huecos.length} hueco(s) quedan disponibles` : ''} · Ctrl+Z para deshacer`, res.huecos.length ? 'warn' : 'ok');
+  toast(`${pl(res.aplicados, 'plaza aplicada', 'plazas aplicadas')}${res.retirados.length ? ` · ${pl(res.retirados.length, 'retirada', 'retiradas')}` : ''}${rel ? ' ·' + rel.slice(1) : ''}${res.huecos.length ? ` · ${pl(res.huecos.length, 'hueco queda disponible', 'huecos quedan disponibles')}` : ''} · Ctrl+Z para deshacer`, res.huecos.length ? 'warn' : 'ok');
   renderGeneradorSemana(); pintaRevDot();
 }
 function htmlSemanaGenerada(res) {

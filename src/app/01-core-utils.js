@@ -58,7 +58,6 @@ function fmtDDMM(iso) { return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`; }   // 
 // decían Ctrl+Z también en el teléfono). La misma consulta que oculta esa barra en los estilos.
 function comoDeshacer() { return matchMedia('(max-width:640px), ((max-height:520px) and (pointer:coarse))').matches ? '«Más → Deshacer»' : 'Ctrl+Z'; }
 function fmtLargo(iso) { return `${DIAS_L[isoDow(iso)]} ${+iso.slice(8, 10)} de ${MESES[+iso.slice(5, 7) - 1].toLowerCase()}`; }
-function fmtCorto(iso) { return `${DOW_C[isoDow(iso)]} ${+iso.slice(8, 10)}`; }
 // «ayer», «hace 12 días», «dentro de 2 meses»: para que se vea cuándo lo que hay en
 // pantalla no es hoy y nadie lea una fecha vieja como si fuera la de hoy
 function distanciaHoy(iso) {

@@ -42,10 +42,12 @@ function renderMes() {
   // «De baja» = de baja todo el mes que se mira (24/09: antes, quien lo estaba HOY); una baja de
   // unos días se ve en su fila, día a día
   const bajaMes = p => est.days.every(d => deBaja(p, d.iso));
-  for (const l of S.locales) grupos.push([l.nombre, S.staff.filter(p => !bajaMes(p) && (p.locales || [])[0] === l.id), l.color]);
+  // (revisión final, 25/09) con su local habitual (localHabitualDe, fase 6: el elegido en la ficha o el primero), el
+  // mismo que suma en el Generador; antes, el primero de su lista: Roberto, habitual de Pasarela, salía en Zapatillera
+  for (const l of S.locales) grupos.push([l.nombre, S.staff.filter(p => !bajaMes(p) && localHabitualDe(p) === l.id), l.color]);
   grupos.push(['Sin local fijo y varios locales', S.staff.filter(p => !bajaMes(p) && !(p.locales || []).length), 'var(--ink3)']);
   grupos.push(['De baja', S.staff.filter(bajaMes), 'var(--bad)']);
-  // los que tienen varios locales van con su local principal (el primero); se listan ahí
+  // los que tienen varios locales van con su local habitual; se listan ahí
   for (const [nombre, gente, color] of grupos) {
     if (!gente.length) continue;
     h += `<tr class="ghdr"><td colspan="${est.days.length + 1}"><span class="ghl"><span class="lp" style="background:${esc(color)};display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px"></span>${esc(nombre)}</span></td></tr>`;

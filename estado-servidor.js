@@ -15,7 +15,9 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
   // 24/09 (fase 6, S21): de su propia ficha, sin las parejas «nunca con»: desde que la pareja está en las dos fichas,
   // la suya llevaría también las que declaró un compañero («Leo, nunca con Susana Capón»), y no le hacen falta
   // para leer su planilla. Copia: el estado del servidor no se toca.
-  const propia = p => { const c = Object.assign({}, p); delete c.nuncaCon; delete c.nuncaConFlex; delete c.nuncaConOff; return c; };
+  // (revisión final, 25/09) y la marca de antes de la fase 6 (nuncaConFlexible), que llega mientras el encargado no
+  // haya guardado con la versión nueva: decía que tenía una pareja flexible
+  const propia = p => { const c = Object.assign({}, p); delete c.nuncaCon; delete c.nuncaConFlex; delete c.nuncaConOff; delete c.nuncaConFlexible; return c; };
   const staff = estado.staff.map(p => p.id === pid ? propia(p) : ({
     id: p.id, nombre: p.nombre, color: p.color, puesto: p.puesto, locales: p.locales,
   }));
@@ -35,12 +37,16 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
   // 24/09 (revisión F3b, D13): la casilla sigue diciendo «por Iván» (lo necesita para leerla), pero no la
   // marca interna `porDesignacion`, que dice que un compañero tiene la designación de cubrir a otro (lo
   // mismo que se le oculta de las fichas). Copia: el estado del servidor no se toca.
+  // 25/09 (revisión final): ni los avisos guardados al forzar una entrada («nunca con Lavinia», «nunca con Susana
+  // Capón»), que dicen las parejas «nunca con» de los compañeros, lo mismo que se le quita de su ficha. Su vista no
+  // los usa; la marca `forzado` se queda.
+  const sinInterno = e => { if (!e || (!e.porDesignacion && !e.avisos)) return e; const c = Object.assign({}, e); delete c.porDesignacion; delete c.avisos; return c; };
   const meses = {};
   for (const [k, v] of Object.entries(mesesVisibles(estado, hoy))) {
     const asig = {};
     for (const [iso, porT] of Object.entries((v && v.asig) || {})) {
       asig[iso] = {};
-      for (const [tid, lista] of Object.entries(porT || {})) asig[iso][tid] = (lista || []).map(e => { if (!e || !e.porDesignacion) return e; const c = Object.assign({}, e); delete c.porDesignacion; return c; });
+      for (const [tid, lista] of Object.entries(porT || {})) asig[iso][tid] = (lista || []).map(sinInterno);
     }
     meses[k] = Object.assign({}, v, { asig });
   }

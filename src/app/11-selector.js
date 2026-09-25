@@ -111,7 +111,9 @@ function conSuRegla(avisos, inc) { return (avisos || []).map(t => { const x = (i
 // entra llevando la cocina, con el puesto de cocina. 24/09 (fase 6, S24): «con aviso» es también la pareja «nunca
 // con» flexible (entra con su aviso); antes el selector no la ofrecía y, si se elegía, se rechazaba.
 function ponerRecomendadoUI(iso, tid, pid, c, conAviso) {
-  pushUndo(`poner a ${nombrePid(pid)}`);
+  // (revisión final, 25/09) el paso de Ctrl+Z guarda el mes de la casilla: desde el Generador (Periodo) se pone en un
+  // mes que puede no ser el de la pantalla, y el paso solo guardaba el de la pantalla (Ctrl+Z no la quitaba)
+  pushUndo(`poner a ${nombrePid(pid)}`, iso.slice(0, 7) !== mesKey(S.y, S.m) ? { otrosMeses: true } : undefined);
   const cub = c && c.cubre ? { por: c.cubre, cubrePor: c.cubre } : {};
   const puesto = c && c.cocina ? { puesto: 'cocina', cocina: true } : { puesto: 'sala' };
   // (revisión de la fase 6) lo que relaja «con aviso» es la lista del modelo (RELAJABLE), la misma que al aplicar la

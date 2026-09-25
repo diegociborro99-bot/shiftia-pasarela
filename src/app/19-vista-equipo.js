@@ -59,13 +59,6 @@ function alternarParejaUI(pid, otro, activa, quien) {
   saveState();
   return true;
 }
-// Cómo se dice que un interruptor está apagado (24/09, fase 6, S20): en la ficha o para todo el grupo. Lo usan la
-// tarjeta de Equipo y la ficha, con estadoInterruptor del modelo (lo mismo que aplica la puerta)
-function textoApagada(estado, k) {
-  if (estado === 'apagada-grupo') return `${lblCaracteristica(k)}: apagada para todo el grupo (Equipo → Condiciones); no la mira nadie`;
-  if (estado === 'apagada-ficha') return `${lblCaracteristica(k)}: desactivada en la ficha, el generador no la tiene en cuenta`;
-  return '';
-}
 
 // Todas las condiciones de una persona como chips. Es la «hoja de condiciones»
 // que el encargado revisa antes de generar: si algo no está aquí, el generador
@@ -272,7 +265,7 @@ function altaAusenciaUI(pid, aus, hecho) {
     const quien = r.puestos.concat(r.relevos);
     // las fechas en orden (revisión F3b: salían en el orden en que se cubrían: «20/9, 15/9, 22/9…»)
     const cubren = [...new Set(quien.map(x => x.pid))].map(q => `${nombrePid(q)} le cubre ${listaY([...new Set(quien.filter(x => x.pid === q).map(x => x.iso))].sort().map(fmtDM))}`);
-    registrarCambio(`${(AUS_LBL[a.tipo] || { label: a.tipo }).label}: ${p.nombre} ${a.hasta ? (a.hasta !== a.desde ? `del ${fmtDM(a.desde)} al ${fmtDM(a.hasta)}` : `el ${fmtDM(a.desde)}`) : `desde el ${fmtDM(a.desde)} (sin fecha de fin)`}${a.franjas ? ` por la ${FRANJA_LBL[a.franjas[0]].toLowerCase()}` : ''}${r.quitados.length ? ` · sale de ${r.quitados.length} turno(s)` : ''}${r.pasados.length ? ` (${r.pasados.length} ya pasado(s), sin poner a nadie)` : ''}${cubren.length ? ` · ${cubren.join('; ')} (cubre a)` : ''}${r.sinCubrir.length ? ` · ${r.sinCubrir.length} sin quien le cubra` : ''}${r.huecos.length ? ` · ${r.huecos.length} hueco(s)` : ''}${a.detalle ? ' · ' + a.detalle : ''}`, 'aus');
+    registrarCambio(`${(AUS_LBL[a.tipo] || { label: a.tipo }).label}: ${p.nombre} ${a.hasta ? (a.hasta !== a.desde ? `del ${fmtDM(a.desde)} al ${fmtDM(a.hasta)}` : `el ${fmtDM(a.desde)}`) : `desde el ${fmtDM(a.desde)} (sin fecha de fin)`}${a.franjas ? ` por la ${FRANJA_LBL[a.franjas[0]].toLowerCase()}` : ''}${r.quitados.length ? ` · sale de ${pl(r.quitados.length, 'turno', 'turnos')}` : ''}${r.pasados.length ? ` (${pl(r.pasados.length, 'ya pasado', 'ya pasados')}, sin poner a nadie)` : ''}${cubren.length ? ` · ${cubren.join('; ')} (cubre a)` : ''}${r.sinCubrir.length ? ` · ${r.sinCubrir.length} sin quien le cubra` : ''}${r.huecos.length ? ` · ${pl(r.huecos.length, 'hueco', 'huecos')}` : ''}${a.detalle ? ' · ' + a.detalle : ''}`, 'aus');
     if (r.quitados.some(x => mesCerrado(x.iso))) registrarCambio(`Cambio en un mes cerrado (${a.desde.slice(0, 7)})`, 'aviso');
     saveState();
     const falta = r.pendiente ? r.pendiente.dejadas.length : 0;

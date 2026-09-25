@@ -120,6 +120,37 @@ test('estado: versión 0 al inicio, PUT sube, PUT desfasado → 409', async () =
   assert.equal(stale.datos.version, 1);
 });
 
+// 25/09 (revisión final, datos de producción): la pestaña que quedó abierta con la versión de antes seguía escribiendo
+// tras el despliegue (el aviso de versión nueva se cierra con «Ahora no») y su código no sabe de los cierres por fechas
+// ni de la lista de días libres puntuales: volvía a llenar el Mónaco cerrado, perdía semanas de «libra otro día» y
+// resucitaba parejas «nunca con». La app de ahora guarda `esquema: 2`; en cuanto el servidor tiene un guardado así, un
+// PUT de un esquema anterior se rechaza con 426 («recarga la app») y la pestaña vieja deja el cambio en su bandeja de
+// salida, que la app nueva reenvía (migrado) al recargar. Mientras nadie haya guardado con la nueva, se acepta.
+// Servidor propio: el resto de pruebas guarda estados sin esquema.
+test('PUT /api/estado: tras el primer guardado con el esquema de ahora, el de una pestaña de antes se rechaza (426, recarga)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shiftia-esquema-'));
+  const srv = await arrancar(dir);
+  try {
+    const yo = cliente(srv.base);
+    assert.equal((await yo('POST', '/api/login', { usuario: 'oficina', password: ADMIN_PASS })).status, 200);
+    const est = e => ({ staff: [{ id: 'lola', nombre: 'Lola', puesto: 'sala', locales: ['PASARELA'] }], locales: [], meses: {}, peticiones: [], avisos: [], ...e });
+    // lo que hay en producción: guardados de la versión de antes (esquema 1) — se siguen aceptando
+    let r = await yo('PUT', '/api/estado', { baseVersion: 0, estado: est({ esquema: 1 }) });
+    assert.equal(r.status, 200);
+    r = await yo('PUT', '/api/estado', { baseVersion: 1, estado: est({ esquema: 2 }) });
+    assert.equal(r.status, 200, 'la app de ahora guarda');
+    for (const viejo of [est({ esquema: 1 }), est({})]) {
+      const x = await yo('PUT', '/api/estado', { baseVersion: 2, estado: viejo });
+      assert.equal(x.status, 426, JSON.stringify(x.datos));
+      assert.match(x.datos.error, /rec[aá]rga/i);
+      assert.equal(x.datos.recargar, true);
+    }
+    const g = await yo('GET', '/api/estado');
+    assert.equal(g.datos.version, 2, 'no se guardó nada');
+    assert.equal((await yo('PUT', '/api/estado', { baseVersion: 2, estado: est({ esquema: 2 }) })).status, 200);
+  } finally { await srv.parar(); rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('PUT /api/estado: la forma se comprueba (staff, locales, listas y meses)', async () => {
   const cur = await admin('GET', '/api/estado');
   const base = cur.datos.estado, v = cur.datos.version;

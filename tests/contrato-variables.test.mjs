@@ -805,8 +805,12 @@ test('auditoría S14 (disponibilidad D7, interruptores H3) · «Preferencias» a
   const { cfg, st } = semilla(); const p = M.personaDe(st, 'cristian'); p.prefs = { evitaDows: [1] }; p.inactivas = ['prefs']; const e = semana(LUNES);
   // con Jenny en la cocina: desde la revisión F3 (S33) un apoyo no entra solo en una casilla vacía, y la auditoría es de antes
   assert.ok(M.asignar(e, cfg, st, LUNES, 'MONACO_M', 'jenny', { cocina: true, puesto: 'cocina' }).ok);
-  assert.equal(M.candidatosPara(cfg, st, e, LUNES, 'MONACO_M')[0].pid, 'cristian');
-  assert.equal(M.candidatosCobertura(cfg, st, e, LUNES, 'MONACO_M', 'cris')[0].pid, 'cristian');
+  // apagada pesa lo mismo que no tenerla: el mismo orden y los mismos puntos (antes se veía en que Cristian salía el
+  // primero, cuando ser apoyo sumaba; desde la revisión final, 25/09, resta: José 18/09)
+  const foto = () => [M.candidatosPara(cfg, st, e, LUNES, 'MONACO_M'), M.candidatosCobertura(cfg, st, e, LUNES, 'MONACO_M', 'cris')].map(l => l.map(c => c.pid + ' ' + c.score));
+  const apagada = foto(); p.prefs = {}; delete p.inactivas;
+  assert.deepEqual(apagada, foto());
+  p.prefs = { evitaDows: [1] }; p.inactivas = ['prefs'];
   assert.deepEqual(M.toProblem(cfg, st, e, LUNES, LUNES, { conPatron: false }).workers.find(w => w.id === 'cristian').preferences, []);
 });
 test('auditoría S17 (interruptores H4, reescrita según D6) · «Contrato» deja de ser un interruptor y Horas sigue comparando', () => {
@@ -890,7 +894,12 @@ test('auditoría S19 (interruptores H8/H9, lugar L9) · con «Sale el primero» 
   // y la auditoría es de antes (Yilian, apoyo, salía la primera en la tarde vacía del Mónaco)
   const { cfg, st } = semilla(); cfg.reglas = { abre: false }; const e = semana(LUNES);
   assert.ok(M.asignar(e, cfg, st, '2026-09-30', 'MONACO_T', 'hojan', { cocina: true, puesto: 'cocina' }).ok);
-  assert.equal(M.candidatosPara(cfg, st, e, '2026-09-30', 'MONACO_T', { primero: true })[0].pid, 'yilian');
+  // Susana Capón, la fija de la tarde del Mónaco, no suma lo de «sale el primero» (antes se veía en que ganaba Yilian,
+  // cuando ser apoyo sumaba; desde la revisión final, 25/09, resta: José 18/09)
+  const scapon = () => M.candidatosPara(cfg, st, e, '2026-09-30', 'MONACO_T', { primero: true }).find(c => c.pid === 'scapon');
+  const apagada = scapon(); cfg.reglas = {}; const encendida = scapon(); cfg.reglas = { abre: false };
+  assert.equal(apagada.score, encendida.score - M.PESOS.saleElPrimero);
+  assert.ok(!apagada.razones.includes('sale el primero') && encendida.razones.includes('sale el primero'));
   const c2 = semilla(); M.personaDe(c2.st, 'lola').inactivas = ['abre']; const e2 = semana(LUNES);
   M.asignar(e2, c2.cfg, c2.st, LUNES, 'PASARELA_M', 'tere', {}); M.asignar(e2, c2.cfg, c2.st, LUNES, 'PASARELA_M', 'lola', {});
   assert.equal(M.primeroDe(c2.cfg, c2.st, e2, LUNES, 'PASARELA_M'), 'tere');

@@ -70,6 +70,8 @@ function activarModoEmpleado() {
   }
   const locs = (p.locales || []).map(id => nombreLocal(id)).join(', ') || 'todos los locales';
   // 24/09: los cambios de día libre de las semanas de este mes, como en la Cobertura
+  // (revisión final, 25/09) un mes que el encargado aún no ha hecho visible no llega (el servidor no lo manda): no es
+  // que no tenga turnos. La semana del 28/09 que se comparte llega al 04/10 y el perfil decía «no tienes turnos»
   const lpMes = activa(S, p, 'libra') ? librasPuntuales(p).filter(x => x.dias.length && est.days.some(d => lunesDe(d.iso) === x.semana)) : [];
   sec.innerHTML = `<div class="fichead" style="margin-top:6px"><span class="fichav" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span>
       <span><h2>${esc(p.nombre)}</h2><span class="sub">${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${esc(locs)}${p.libra && p.libra.length ? ' · libra ' + p.libra.map(d => DIAS_L[d].toLowerCase()).join(' y ') : ''}${esc(lpMes.map(x => ` (semana del ${fmtDDMM(x.semana)}: ${textoCambioLibre(p, x, true)})`).join(''))}</span></span>
@@ -80,7 +82,7 @@ function activarModoEmpleado() {
       <div class="kpi"><div class="micro">Horas del mes</div><div class="knum">${fmtHoras(h.minutos / 60)}</div><div class="kcap">${h.extrasMin ? '+ ' + fmtHoras(h.extrasMin / 60) + ' extra' : 'según horario de cada local'}</div></div>
       <div class="kpi"><div class="micro">Domingos y festivos</div><div class="knum">${h.domingos + h.festivas}</div><div class="kcap">${fmtHoras((h.domingosMin + h.festivasMin) / 60)}</div></div>
     </div>
-    ${dias || '<div class="festvacio">Este mes no tienes turnos en la planilla.</div>'}
+    ${dias || `<div class="festvacio">${mesPublicado(mesKey(S.y, S.m)) ? 'Este mes no tienes turnos en la planilla.' : 'El encargado aún no ha publicado este mes.'}</div>`}
     <p class="revsub" style="margin-top:14px">Si algo no cuadra, díselo al encargado: solo él puede cambiar la planilla.</p>`;
   const mueve = dir => { if (shiftMonth(dir)) activarModoEmpleado(); };
   sec.querySelector('#perfPrev').addEventListener('click', () => mueve(-1));

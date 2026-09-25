@@ -273,7 +273,8 @@ try {
   await pg.click('#topHist');
   await pg.waitForSelector('#histOvl', { timeout: 4000 });
   const hist = await pg.$$eval('#histOvl .histrow', x => x.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
-  ok('el historial (#topHist) registra la generación', hist.some(h => /GENERADOR/.test(h) && /plaza\(s\) aplicadas/.test(h)), hist.slice(0, 3).join(' | '));
+  // (revisión final, 25/09) con su plural, sin «(s)»
+  ok('el historial (#topHist) registra la generación', hist.some(h => /GENERADOR/.test(h) && /\d+ plazas? aplicadas?/.test(h) && !/\(s\)/.test(h)), hist.slice(0, 3).join(' | '));
   ok('y también el vaciado previo', hist.some(h => /Vaciado lo generado/.test(h)));
   await pg.click('#histOvl [data-ovx]');
   ok('el historial se cierra', await llega(pg, () => !document.querySelector('#histOvl'), null, 2000) >= 0);

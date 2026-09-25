@@ -2029,8 +2029,11 @@ function puedePrimero(cfg, staff, est, iso, tid, pid, opts) {
 }
 // 15/09, reunión con el cliente: en Pasarela, si Iván libra, la tarde la hace Mari Luz en
 // partido y no hace falta cobertura entera. Donde el local lo permite (l.partidoAbre[franja]),
-// quien hace partido DECLARADO ese día puede abrir la tarde. El 33 no lo permite (José da
-// el martes por insalvable).
+// quien hace partido DECLARADO ese día puede abrir la tarde: Pasarela desde el 15/09 y El 33
+// desde el 17/09 (los martes, Noe viniendo de la mañana).
+// Cuándo se acordó con el grupo, por local (revisión final, 25/09): Pasarela con la encargada el 15/09 y El 33 con José
+// y Aroa el 17/09 (Noe abre la tarde de los martes viniendo de la mañana). La condición del Generador decía 15/09 en los dos
+const FECHA_PARTIDO_ABRE = { PASARELA: '15/09', EL33: '17/09' };
 function partidoAbre(cfg, l, p, iso, franja) {
   if (!(l && l.partidoAbre && l.partidoAbre[franja])) return false;
   return partidoEn(cfg, p, iso);   // con el partido trasladado la semana de un cambio de día libre
@@ -2740,6 +2743,44 @@ function migrarMarcasAutomaticas(estado, hoyIso) {
   estado.migraciones.marcasAuto2409 = 1;
   return r;
 }
+// Migración (una vez, 25/09, revisión final con los datos de producción): marcas «a mano» sin nadie marcado. El
+// código de antes, al quitar de una casilla ya volcada a quien abría (apuntar unas vacaciones o un día libre),
+// dejaba la marca «abre a mano» de la casilla sin nadie con «abre»; migrarMarcasAutomaticas las cuenta como
+// «quedan» (no hay a quién pasarle la preferencia) y desde entonces nadie volvía a calcular quién abre: Hoy
+// (primeroDe) decía que Mari Luz abría Pasarela a las 16:00 el 20/10 y su app, con lo guardado, que entraba a las
+// 21:00. Nueve casillas así en la base de producción. Con la cocina, lo mismo (las vacaciones de Esmeralda el 27/10),
+// salvo la que el encargado quitó a propósito («Quitar la marca de cocina» deja la línea «X deja la cocina de L del
+// d/m» en el historial). De hoy en adelante: lo pasado es lo que se trabajó. El código de ahora ya no las crea
+// (retirarEntrada y cubrirAusencia quitan la marca con la persona). Va después de migrarMarcasAutomaticas y antes
+// de refrescarMarcas. Devuelve { abre, cocina }.
+function migrarMarcasHuerfanas(estado, hoyIso) {
+  const r = { abre: 0, cocina: 0 };
+  if (!estado || !estado.meses || typeof estado.meses !== 'object' || !Array.isArray(estado.staff) || !Array.isArray(estado.locales) || !hoyIso) return r;
+  estado.migraciones = estado.migraciones || {};
+  if (estado.migraciones.huerfanas2509) return r;
+  const cfg = estado, staff = estado.staff;
+  const hist = (Array.isArray(estado.historial) ? estado.historial : []).map(h => String((h && h.txt) || ''));
+  const dm = iso => `${+iso.slice(8, 10)}/${+iso.slice(5, 7)}`;
+  const laQuitoElEncargado = (iso, tid) => { const l = localDe(cfg, partirTurno(tid).localId); const txt = ` deja la cocina de ${l ? l.nombre : partirTurno(tid).localId} del ${dm(iso)}`; return hist.some(h => h.endsWith(txt) || h.includes(txt + ' ')); };
+  for (const k of Object.keys(estado.meses).sort()) {
+    if (!/^\d{4}-\d{2}$/.test(k) || k < hoyIso.slice(0, 7)) continue;
+    const est = estadoDesde(estado.meses, estado.festivos || [], +k.slice(0, 4), +k.slice(5, 7));
+    for (const [iso, porT] of Object.entries(est.manual || {})) {
+      if (iso < hoyIso || !porT) continue;
+      for (const [tid, man] of Object.entries(porT)) {
+        if (!man || typeof man !== 'object') continue;
+        const lista = asignados(est, iso, tid);
+        let toca = false;
+        if (man.abre && !lista.some(e => e.abre)) { delete man.abre; r.abre++; toca = true; }
+        if (man.cocina && !lista.some(e => e.cocina) && !laQuitoElEncargado(iso, tid)) { delete man.cocina; r.cocina++; toca = true; }
+        if (!Object.keys(man).length) delete porT[tid];
+        if (toca && lista.length) normalizarCasilla(est, cfg, staff, iso, tid);
+      }
+    }
+  }
+  estado.migraciones.huerfanas2509 = 1;
+  return r;
+}
 
 // ---------- candidatos y generador ----------
 function turnosMes(est, pid) { let n = 0; for (const porT of Object.values(est.asig)) for (const lista of Object.values(porT)) if (lista.some(x => x.pid === pid)) n++; return n; }
@@ -2793,8 +2834,14 @@ const PESOS = {
   saleElPrimero: 25,      // buscando quién abre: el fijo del local o de su ficha (abreFijo)
   cocinaMax: 40, cocinaTopeRango: 30,   // cocina: 40 menos su rango (titular 0, 1, 2…; reserva, el tope)
   cubreA: 60,             // «cubre a» en la casilla de quien falta; en la Cobertura, además, va delante (D2)
-  apoyoCierre: 45,        // apoya por el cierre de su local «donde haga falta» (D11)
-  sinLocalFijo: 30, apoyo: 15,   // lo que es (nada si la casilla se quedaría solo con apoyos, S33)
+  apoyoCierre: 45,        // apoya por el cierre de su local «donde haga falta» (D11); además va delante en su franja (candidatos)
+  // lo que es. 25/09 (revisión final; decisiones.md, principio 6; José, 18/09: «hasta Navidad tenemos que tirar de
+  // plantilla todo lo que podamos y apoyos ir a lo justo», «los apoyos son los extras que hay que pagarle»): ser apoyo
+  // RESTA, también al apoyo sin local fijo (Leo, Cristian). Hasta hoy sumaba (+15, y +30 sin local fijo: el orden del
+  // 15/09, «comodines y apoyos», que José cambió el 18/09) y el relleno ponía a Cristian por delante de Victoria a igual
+  // carga. Con −30 un apoyo solo entra por delante de alguien de plantilla que puede si esa persona lleva unos diez
+  // turnos más ese mes (la carga, abajo). «Sin local fijo» solo suma a la plantilla (nadie en la semilla, hoy)
+  sinLocalFijo: 30, apoyo: -30,
   localHabitual: 10,
   libre: 20,              // Cobertura: libre ese día (no haría partido)
   turnoSemana: -4,        // la carga: cada turno de esa semana
@@ -2809,12 +2856,13 @@ const PESOS = {
   continuo: -25,
   evitado: -1000,         // el plan B busca otra persona si la hay
 };
-// Lo que suma por lo que es: sin local fijo (comodín) o apoyo. Nada si con ella la casilla se
-// quedaría solo con apoyos (S33): ahí no se prefiere a un apoyo.
+// Lo que suma (o resta) por lo que es: apoyo (resta, José 18/09; revisión final) o, en la plantilla, sin local
+// fijo. Lo del apoyo va primero y siempre: antes, con la casilla que se quedaría solo con apoyos (S33) no contaba,
+// lo que con un peso negativo le quitaría la resta justo donde menos conviene; ese caso ya lleva su aviso.
 function puntosPuesto(p, soloApoyos) {
+  if (p.puesto === 'apoyo') return { puntos: PESOS.apoyo, razon: 'apoyo' };
   if (soloApoyos) return null;
   if (esComodin(p)) return { puntos: PESOS.sinLocalFijo, razon: 'sin local fijo' };
-  if (p.puesto === 'apoyo') return { puntos: PESOS.apoyo, razon: 'apoyo' };
   return null;
 }
 // puntuar(ctx, p, iso, tid, opts) → { score, razones, turnosSemana, turnosMes, libre }. opts: { modo: 'relleno' |
@@ -2853,7 +2901,7 @@ function puntuar(ctx, p, iso, tid, opts) {
   if (o.continuo) suma(PESOS.continuo, 'turno continuo (mañana y tarde de corrido)');
   if ((o.avisos || []).length) { score += PESOS.aviso; razones.push(...o.avisos); }
   if (o.evitado) score += PESOS.evitado;
-  return { score, razones, turnosSemana: ns, turnosMes: nm, libre };
+  return { score, razones, turnosSemana: ns, turnosMes: nm, libre, apoyoCierre: !!pc };
 }
 // Los candidatos de una casilla, ordenados: la puerta (evaluarPlaza) dice quién puede y puntuar() en qué
 // orden. opts: { modo: 'relleno' | 'cobertura', faltaPid (la Cobertura: quien falta), puesto: 'sala' |
@@ -2862,10 +2910,18 @@ function puntuar(ctx, p, iso, tid, opts) {
 // casilla ya tiene quien cubre a X: el resto entra para llegar al mínimo), soloCubre (solo la designada,
 // D13), faltaCocina (X llevaba la cocina ahí), descartes (una lista donde se apunta de quien no sale por
 // qué, con el motivo de la puerta) }.
-// Devuelve [{ pid, nombre, score, razones, avisos, autorizados, cubre, libre, turnosSemana, turnosMes, n, evitado }].
-// El orden: en la Cobertura, (no evitada) → «cubre a» quien falta (D2) → puntos → menos turnos esa semana;
-// en el relleno, puntos → menos turnos esa semana («cubre a» es un peso, y solo en la casilla de quien
-// falta y para su puesto).
+// Devuelve [{ pid, nombre, score, razones, avisos, autorizados, cubre, libre, turnosSemana, turnosMes, n, evitado,
+// apoyoCierre, escalon }].
+// El orden: en la Cobertura, (no evitada) → «cubre a» quien falta (D2) → apoyo por un cierre → puntos → menos turnos
+// esa semana; en el relleno, «cubre a» (solo en la casilla de quien falta y para su puesto) → apoyo por un cierre →
+// puntos → menos turnos esa semana.
+// 25/09 (revisión final; requisito 6 del cierre: «a quien apoya lo ponen donde falte»): quien apoya por el cierre de
+// su local «donde haga falta» va DELANTE en las franjas de su cierre, como «cubre a» (D2), y no solo con sus 45
+// puntos: con Dulce fuera de standby, la carga de Yilian («25 este mes») pesaba más y el martes 29 el relleno ponía a
+// Dulce en Pasarela y dejaba a Yilian «aún sin sitio». Buscando la cocina no: ahí manda el orden de la cocina del
+// local (titular, reserva), y el apoyo del cierre sigue siendo un peso. «Cubre a» va antes (principio 6).
+// escalon: lo que rompe la plaza (0 nada; 1 un partido no declarado; 2 dejar la casilla solo con apoyos; 3 la pareja
+// «nunca con» flexible), para ordenar «con aviso» (porEscalones).
 function candidatos(ctx, iso, tid, opts) {
   const { cfg, staff, est } = ctx;
   const o = opts || {};
@@ -2896,12 +2952,22 @@ function candidatos(ctx, iso, tid, opts) {
     const pu = puntuar(ctx, p, iso, tid, { modo: o.modo, cubre, primero: !!o.primero, pr: ev.primero, cocina, solo, avisos: r.avisos, evitado, delMes, continuo });
     // en el relleno la razón dice también lo autorizado (el partido para cubrir a X); la Cobertura lo pinta aparte
     const razones = cob ? pu.razones : pu.razones.concat(r.autorizados.filter(a => !a.continuo).map(a => a.texto));
-    out.push({ pid: p.id, nombre: p.nombre, score: pu.score, razones, avisos: r.avisos, autorizados: r.autorizados, cubre: cubre || null, libre: pu.libre, turnosSemana: pu.turnosSemana, turnosMes: pu.turnosMes, n: pu.turnosSemana, evitado });
+    const ks = ev.avisos.filter(a => !a.autorizado).map(a => a.k);
+    const escalon = ks.includes('nuncaCon') ? 3 : ks.includes('soloApoyos') ? 2 : ks.length ? 1 : 0;
+    out.push({ pid: p.id, nombre: p.nombre, score: pu.score, razones, avisos: r.avisos, autorizados: r.autorizados, cubre: cubre || null, libre: pu.libre, turnosSemana: pu.turnosSemana, turnosMes: pu.turnosMes, n: pu.turnosSemana, evitado, apoyoCierre: pu.apoyoCierre && !cocina, escalon });
   }
-  if (cob) out.sort((a, b) => (a.evitado - b.evitado) || (!!b.cubre - !!a.cubre) || b.score - a.score || a.turnosSemana - b.turnosSemana || (a.pid < b.pid ? -1 : 1));
-  else out.sort((a, b) => b.score - a.score || a.n - b.n || (a.pid < b.pid ? -1 : 1));
+  const prioridad = (a, b) => (!!b.cubre - !!a.cubre) || (b.apoyoCierre - a.apoyoCierre);
+  if (cob) out.sort((a, b) => (a.evitado - b.evitado) || prioridad(a, b) || b.score - a.score || a.turnosSemana - b.turnosSemana || (a.pid < b.pid ? -1 : 1));
+  else out.sort((a, b) => prioridad(a, b) || b.score - a.score || a.n - b.n || (a.pid < b.pid ? -1 : 1));
   return out;
 }
+// «Con aviso» por escalones (25/09, revisión final; José, 17/09: la pareja «nunca con» flexible «se respeta si hay
+// gente suficiente; si no, se relaja»; y «dos apoyos no se quedan solos»): primero quien solo hace un partido no
+// declarado, luego quien además deja la casilla solo con apoyos y, la última, la pareja flexible; dentro de cada
+// escalón, el orden de siempre. Antes se ordenaba solo por puntos: el domingo 4 en Pasarela por la tarde el selector
+// y el «Con aviso» del Generador ofrecían primero a Mari Luz con Lavinia, cuando Equipo, la Cobertura y el relleno
+// relajado ponían a Roberto. La usan el selector (gruposSelector) y los huecos del Generador (candidatosConAviso).
+function porEscalones(lista) { return lista.slice().sort((a, b) => a.escalon - b.escalon); }
 // El relleno (Generador, selector, ★ de Hoy): candidatos en modo relleno. opts: { cocina, primero,
 // permitirPartido, relajarNuncaCon, soloApoyos, meses (la planilla de los otros meses: la carga de la
 // semana que cruza de mes, revisión F4) }. Devuelve `cubre` (a quién cubre, para el «por», S11).
@@ -2959,9 +3025,9 @@ function gruposSelector(cfg, staff, est, iso, tid, opts) {
   for (const c of pueden) ya.add(c.pid);
   // «con aviso»: lo que solo rompe algo relajable (un partido no declarado, dejar la casilla solo con apoyos o,
   // desde la fase 6 (S24), la pareja «nunca con» flexible)
-  const conAvisoCocina = sinCocina ? candidatos(ctx, iso, tid, Object.assign({ modo: 'relleno', cocina: true }, RELAJABLE)).filter(c => !ya.has(c.pid)).map(deCocina) : [];
+  const conAvisoCocina = sinCocina ? porEscalones(candidatos(ctx, iso, tid, Object.assign({ modo: 'relleno', cocina: true }, RELAJABLE)).filter(c => !ya.has(c.pid))).map(deCocina) : [];
   for (const c of conAvisoCocina) ya.add(c.pid);
-  const conAvisoSala = candidatos(ctx, iso, tid, Object.assign({ modo: 'relleno', soloApoyos: true }, RELAJABLE)).filter(c => !ya.has(c.pid));
+  const conAvisoSala = porEscalones(candidatos(ctx, iso, tid, Object.assign({ modo: 'relleno', soloApoyos: true }, RELAJABLE)).filter(c => !ya.has(c.pid)));
   for (const c of conAvisoSala) ya.add(c.pid);
   const conAviso = conAvisoCocina.concat(conAvisoSala);
   const noPueden = [];
@@ -3228,8 +3294,13 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
         // y queda el aviso») primero sin relajar; si no hay nadie y el modo es el relajado, relajando solo las parejas
         // flexibles (buscarRelajando: la misma escalera que la Cobertura; revisión de la fase 6)
         const { r: cs, relajaPareja: relajar } = buscarRelajando(x => candidatosPara(cfg, staff, target, iso, t.id, Object.assign({ permitirPartido: !!o.permitirPartido }, ms, x)), !!o.permitirPartido);
-        const c = cs[0];
+        let c = cs[0];
         if (!c) { r.huecos.push(huecoFaltan(cfg, staff, target, iso, t.id, rev)); break; }
+        // 25/09 (revisión final): la sala tampoco se lleva a quien hace falta para una cocina obligatoria de ese día
+        // que aún no la tiene, si hay otra persona (la misma guarda que la cocina no obligatoria, arriba). Desde que
+        // ser apoyo resta (José, 18/09), la sala tira antes de la plantilla y en octubre sin semana tipo Jenny se
+        // quedaba de sala en la mañana del Mónaco y la cocina de la tarde del domingo, sin nadie que pudiera llevarla
+        if (!c.cubre && !c.apoyoCierre) { const guarda = paraObligatorias(t.id); if (guarda.has(c.pid)) c = cs.find(x => !guarda.has(x.pid)) || c; }
         const a = asignar(target, cfg, staff, iso, t.id, c.pid, { origen: 'generador', razon: c.razones.join(' · '), permitirPartido: !!o.permitirPartido, relajarNuncaCon: relajar, puesto: 'sala', por: c.cubre || undefined, porDesignacion: !!c.cubre, cubrePor: c.cubre || undefined });
         if (!a.ok) { r.huecos.push(huecoFaltan(cfg, staff, target, iso, t.id, rev)); break; }
         r.aplicados.push({ iso, turnoId: t.id, pid: c.pid, origen: 'generador', razon: a.entry.razon, avisos: a.avisos });
@@ -3290,9 +3361,10 @@ function huecosDeCasilla(cfg, staff, est, iso, tid) {
 // candidatos que solo romperían reglas blandas (partido no declarado) para un hueco
 // (y, desde la revisión F3, el apoyo que dejaría la casilla solo con apoyos: el encargado decide)
 // (fase 6, S24) y la pareja «nunca con» flexible
+// (revisión final, 25/09) por escalones, como el selector: la pareja flexible, la última
 function candidatosConAviso(cfg, staff, est, iso, tid) {
   const sin = new Set(candidatosPara(cfg, staff, est, iso, tid).map(c => c.pid));
-  return candidatosPara(cfg, staff, est, iso, tid, Object.assign({ soloApoyos: true }, RELAJABLE)).filter(c => !sin.has(c.pid));
+  return porEscalones(candidatosPara(cfg, staff, est, iso, tid, Object.assign({ soloApoyos: true }, RELAJABLE)).filter(c => !sin.has(c.pid)));
 }
 
 
@@ -3494,7 +3566,7 @@ const VARIABLES = [
     verificar: (ctx, l, iso, mis, c) => { const tid = turnoId(c.localId, c.franja); if (!pidsEn(ctx.est, iso, tid).includes(c.pid)) return fallos([]); const s = ctx.slots(iso, tid).find(x => x.pid === c.pid); return fallos(s && s.pos !== 1 ? [`${diaV(iso)}: ${enPosicion(s.pos)}`] : []); } },
   { campo: 'local.partidoAbre', ambito: 'local', clave: null, trato: 'relajable', lbl: 'Quien hace partido puede abrir la tarde', alFinal: true,
     // (fase 6, S22) es una casilla de Ajustes del local, no una regla del grupo: su botón lleva allí
-    texto: (ctx, l) => FRANJAS.filter(f => l.partidoAbre && l.partidoAbre[f]).map(f => ({ id: `loc:${l.id}:partidoAbre:${f}`, texto: `En ${l.nombre}, quien hace partido puede abrir la ${FRANJA_LBL[f].toLowerCase()}: no hace falta una cobertura entera (acordado con el grupo el 15/09)`, tipo: 'local', k: 'partidoAbre', localId: l.id, franja: f, nueva: true })) },
+    texto: (ctx, l) => FRANJAS.filter(f => l.partidoAbre && l.partidoAbre[f]).map(f => ({ id: `loc:${l.id}:partidoAbre:${f}`, texto: `En ${l.nombre}, quien hace partido puede abrir la ${FRANJA_LBL[f].toLowerCase()}: no hace falta una cobertura entera${FECHA_PARTIDO_ABRE[l.id] ? ` (acordado con el grupo el ${FECHA_PARTIDO_ABRE[l.id]})` : ''}`, tipo: 'local', k: 'partidoAbre', localId: l.id, franja: f, nueva: true })) },
   // los horarios: no deciden quién va dónde; los lee Horas (y lo que se imprime)
   ...['horario', 'horarioSupuesto', 'cierreAprox', 'horarioPartido', 'horarioPartidoSupuesto', 'duracion', 'duracionSupuesta', 'descansoMin'].map(k => ({ campo: 'local.' + k, ambito: 'local', clave: null, trato: 'info', lbl: 'Horas: ' + k })),
 ];
@@ -4382,14 +4454,22 @@ function diasAusenciaMes(p, y, m, tipo) {
 // 24/09 (revisión F3, D10): las fechas de ese mes en que la ausencia es solo de media jornada, con su
 // franja ({ '2026-09-28': ['T'] }), y los días que cuentan: media jornada = medio día. Al cerrar el
 // Mónaco, Hojan coge vacaciones solo de la tarde y la nómina se las contaba como un día entero.
+// 25/09 (revisión final): media jornada es faltar a UNA de las franjas en que trabaja. Quien solo hace tardes (Iván)
+// y coge vacaciones «solo de tarde» no trabaja nada ese día: es un día entero, como las que pone el cierre (VAC de
+// día entero cuando el turno cerrado era el único del día). Antes Horas le contaba 1,5 días por tres tardes, y a
+// Susana Capón, en el mismo caso pero puestas por el cierre, 3.
 function mediasAusenciaMes(p, y, m, tipo) {
   const out = {};
   for (const iso of diasAusenciaMes(p, y, m, tipo)) {
     const fs = FRANJAS.filter(f => ausenciaEn(p, iso, f, tipo));
-    if (fs.length && fs.length < FRANJAS.length) out[iso] = fs;
+    if (esMediaJornada(p, fs)) out[iso] = fs;
   }
   return out;
 }
+// Las franjas en que trabaja (su ficha; sin franjas, las dos) y si faltar a `fs` es media jornada: falta a alguna,
+// pero no a todas las suyas. Una sola lectura para las vacaciones del mes y del año y para el contrato de Horas.
+function franjasDeTrabajo(p) { const fs = ((p && p.franjas) || []).filter(f => FRANJAS.includes(f)); return fs.length ? fs : FRANJAS.slice(); }
+function esMediaJornada(p, fs) { return fs.length > 0 && !franjasDeTrabajo(p).every(f => fs.includes(f)); }
 function jornadasAusencia(dias, medias) { return dias.length - Object.keys(medias || {}).length / 2; }
 // Las vacaciones de toda la plantilla en un año, mes a mes, para pasarlas a nómina. `meses` son las
 // fechas de cada mes y `dias` lo que cuentan (media jornada = 0,5); `medias`, las de media jornada.
@@ -4448,12 +4528,14 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
       if (e.origen === 'refuerzo') out.refuerzos++;
       if (e.forzado) out.forzados++;
     }
-    // 24/09 (D10): una ausencia de media jornada es media jornada (descuenta medio día del contrato)
-    const ausM = p ? ausenciaEn(p, iso, 'M') : null, ausT = p ? ausenciaEn(p, iso, 'T') : null;
+    // 24/09 (D10): una ausencia de media jornada es media jornada (descuenta medio día del contrato). (revisión final,
+    // 25/09) Media jornada de SU jornada: las tardes de vacaciones de quien solo hace tardes son días enteros
+    const fsAus = p ? FRANJAS.filter(f => ausenciaEn(p, iso, f)) : [];
+    const media = !!p && esMediaJornada(p, fsAus);
     // (fase 6, S40 y D4) un turno continuo no es un partido: cuenta en «continuos», no en «Partidos» (antes, en los dos)
     if (mias.length) { out.dias++; if (partido && !continuo) out.partidos++; if (festivo) { out.festivas++; out.festivasMin += minDia; } if (dow === 7) { out.domingos++; out.domingosMin += minDia; } }
-    else if (ausM && ausT) out.ausencias++;
-    if (!!ausM !== !!ausT) out.ausenciasMedias++;
+    else if (fsAus.length && !media) out.ausencias++;
+    if (media) out.ausenciasMedias++;
   }
   if (p) {
     // media jornada = medio día (revisión F3, D10); las fechas siguen todas, y las medias con su franja
@@ -4478,6 +4560,32 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
   return out;
 }
 function horasEquipoMes(cfg, staff, meses, y, m) { return staff.map(p => horasPersonaMes(cfg, staff, meses, p.id, y, m)); }
+// Qué ha cambiado en Horas desde que se cerró el mes para la nómina: la copia guardada (S.cierres[k].tabla) frente
+// a la tabla de ahora, columna a columna. 25/09 (revisión final): antes se comparaban solo días, turnos, minutos y
+// extras, y en agosto (cerrado) la pantalla decía «La tabla coincide con la copia guardada» con los partidos de Noe
+// de 8 a 4 (D4: un turno continuo ya no es un partido). Una columna que la copia no tiene (guardada antes de que
+// existiera) no cuenta. Las de minutos salen en horas. Devuelve [{ pid, nombre, campo, etiqueta, antes, ahora }].
+const CAMPOS_HORAS = [['dias', 'días'], ['turnos', 'turnos'], ['mananas', 'mañanas'], ['tardes', 'tardes'], ['partidos', 'partidos'], ['continuos', 'continuos'],
+  ['minutos', 'horas', true], ['extrasMin', 'horas extra', true], ['vacaciones', 'vacaciones'], ['libres', 'días libres'], ['festivas', 'festivos'], ['domingos', 'domingos'], ['nocturnosMin', 'horas nocturnas', true]];
+function diferenciasHoras(guardada, ahora) {
+  const out = [];
+  const porPid = new Map((ahora || []).map(f => [f.pid, f]));
+  const vistos = new Set();
+  const val = (v, horas) => horas ? Math.round((+v || 0) / 0.6) / 100 : (+v || 0);
+  for (const g of guardada || []) {
+    if (!g || !g.pid) continue;
+    vistos.add(g.pid);
+    const a = porPid.get(g.pid) || {};
+    for (const [k, etiqueta, horas] of CAMPOS_HORAS) {
+      if (g[k] === undefined) continue;
+      const antes = val(g[k], horas), ahora2 = val(a[k], horas);
+      if (antes !== ahora2) out.push({ pid: g.pid, nombre: g.nombre || a.nombre || g.pid, campo: k, etiqueta, antes, ahora: ahora2 });
+    }
+  }
+  // alguien que no estaba en la copia y ahora tiene horas ese mes
+  for (const a of ahora || []) if (a && !vistos.has(a.pid) && (a.turnos || a.extrasMin)) out.push({ pid: a.pid, nombre: a.nombre || a.pid, campo: 'turnos', etiqueta: 'turnos', antes: 0, ahora: a.turnos || 0 });
+  return out;
+}
 function horasLocalMes(cfg, staff, meses, y, m) {
   const out = {};
   for (const l of cfg.locales) out[l.id] = { localId: l.id, nombre: l.nombre, turnos: 0, horas: 0, personas: 0 };
@@ -4797,7 +4905,7 @@ function* flujoNucleo(cfg, staff, meses, desde, hasta, opts) {
     if (!rech.length) break;
     const p2 = vetarRechazos(problema, rech);
     const r2 = yield { problem: p2, config: Object.assign({}, CONFIG_NUCLEO) };
-    if (!sirve(r2)) { total.avisos.push({ texto: 'El núcleo no respondió a la vuelta siguiente: se vuelca lo de la anterior, y lo que la puerta no deja poner queda como hueco.' }); break; }
+    if (!sirve(r2)) { total.avisos.push({ texto: 'El núcleo no respondió a la vuelta siguiente: se vuelca lo de la anterior, y lo que las reglas no dejan poner queda como hueco.' }); break; }
     problema = p2; sol = r2.datos; vetadas.push(...rech); vueltas++;
   }
   for (const e of lista) {
@@ -4817,13 +4925,29 @@ const CLAVES_PLANILLA = ['meses', 'staff', 'locales', 'patron', 'eventos', 'equi
 // Una clave que falta vale lo mismo que vacía ([] o {}): el primer 409 tras desplegar una clave nueva
 // (cierresPuntuales) no es un conflicto (24/09, revisión F2)
 const vacioHuella = v => v === undefined || v === null || (Array.isArray(v) ? !v.length : typeof v === 'object' && !Object.keys(v).length);
-const huellaPlanillaDe = e => JSON.stringify(CLAVES_PLANILLA.map(k => vacioHuella(e[k]) ? null : e[k]));
+// El esquema de la planilla que escribe esta versión de la app (estado.esquema; lo pone migrarEstado). 25/09
+// (revisión final): 2 desde los cambios del 24/09 (cierres por fechas, días libres puntuales por semanas, «nunca con»
+// en las dos fichas, marcas automáticas). El servidor no acepta un guardado de un esquema anterior cuando ya tiene
+// uno de este (la pestaña que quedó abierta con la versión de antes: 426, «recarga la app»).
+const ESQUEMA_PLANILLA = 2;
+// Lo único que escriben los empleados (los deltas del servidor: sus peticiones y los avisos que ocultan), y la
+// navegación de cada dispositivo (viaja con el estado, pero no es un cambio de nadie)
+const CLAVES_DELTA = ['peticiones', 'avisos'];
+const CLAVES_NAV = ['y', 'm', 'day', 'semLunes', 'guiaOff', 'hY', 'hM'];
 // 409 del servidor: si entre `base` (lo que teníamos) y `servidor` solo cambiaron
 // peticiones o avisos (deltas de empleados), se funden con la edición local; si
-// cambió la planilla, manda el servidor.
+// cambió cualquier otra cosa, manda el servidor.
+// 25/09 (revisión final): «cualquier otra cosa» es TODO lo demás, no solo CLAVES_PLANILLA. Antes un cambio de otro
+// dispositivo en las reglas del grupo (apagar «Mínimos»), «Visible para el equipo» (mesesPublicados), una entrevista
+// o el historial pasaba por «solo peticiones» y la edición local lo pisaba sin avisar: el servidor volvía a tener
+// «Mínimos» encendida y noviembre dejaba de verse. Ahora es un conflicto y manda el servidor (con su aviso).
 function fusionarEstado(base, servidor, local) {
   if (!base || !servidor || !local) return { ok: false, motivo: 'faltan datos' };
-  if (huellaPlanillaDe(base) !== huellaPlanillaDe(servidor)) return { ok: false, motivo: 'planilla-cambiada' };
+  const valor = (e, k) => vacioHuella(e[k]) ? null : e[k];
+  for (const k of new Set([...Object.keys(base), ...Object.keys(servidor)])) {
+    if (CLAVES_DELTA.includes(k) || CLAVES_NAV.includes(k)) continue;
+    if (JSON.stringify(valor(base, k)) !== JSON.stringify(valor(servidor, k))) return { ok: false, motivo: 'planilla-cambiada' };
+  }
   const estado = Object.assign({}, local);
   const porId = xs => { const m = new Map(); for (const x of xs || []) m.set(x.id, x); return m; };
   const pl = porId(local.peticiones), ps = porId(servidor.peticiones), pb = porId(base.peticiones);
@@ -5108,7 +5232,7 @@ if (typeof module !== 'undefined') {
     turnoAbierto, toggleApertura, abrirCasilla, motivoCerrado, turnosAbiertosSemana, turnosAbiertosMes, turnosConSupuesto, eventosDe, minimoDe,
     nuevoEstado, estadoDesde, clonarEstado, asignados, pidsEn, casillasDe, manualDe, marcarManual, quitarMarcaManual, primerDiaPlanificable,
     ausenciaEn, quitarDiaDeAusencia, anadirAusencia, deBaja,
-    localTieneCocina, puedeCocina, rangoCocina, cocinaDe, nuncaCocina, cocinaExigida, cocinaObligatoriaEn, razonCocina, ponerCocinaFicha, ponerCocinaLocal, migrarCocinaLocales, migrarAbrePatron, migrarMarcasAutomaticas, cocinaQueCrea, fichaImpideAbrir, quitarAbreAMano, quienAbreFijo, razonPrimero,
+    localTieneCocina, puedeCocina, rangoCocina, cocinaDe, nuncaCocina, cocinaExigida, cocinaObligatoriaEn, razonCocina, ponerCocinaFicha, ponerCocinaLocal, migrarCocinaLocales, migrarAbrePatron, migrarMarcasAutomaticas, migrarMarcasHuerfanas, cocinaQueCrea, fichaImpideAbrir, quitarAbreAMano, quienAbreFijo, razonPrimero,
     puedeEstar, ordenarCasilla, normalizarCasilla, asignar, desasignar, moverEnCasilla, marcarCocina, marcarAbre,
     revisarTurno, revisionMes,
     plazasDe, instanciarPatron, patronDesdeSemana,
@@ -5119,9 +5243,9 @@ if (typeof module !== 'undefined') {
     plazasDelDia, esAutomatica, retirarQueIncumplen, moverDiaLibre, porDe, retirarEntrada, motivoLibra,
     LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, fechaCandidato, ORDENES_CAND, ordenarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos, fundirSemillaEntrevistas, textoCampo,
-    diasAusenciaMes, mediasAusenciaMes, jornadasAusencia, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes, cierreDe, tramoDe, registroApoyos,
+    diasAusenciaMes, mediasAusenciaMes, jornadasAusencia, franjasDeTrabajo, esMediaJornada, vacacionesAno, horasPersonaMes, horasEquipoMes, diferenciasHoras, horasLocalMes, cierreDe, tramoDe, registroApoyos,
     toProblem, desdeSolucion, CONFIG_NUCLEO, VUELTAS_NUCLEO, rechazosDelNucleo, vetarRechazos, flujoNucleo, desdeEfectivo,
-    fusionarEstado, sembrarDemo, migrarHorarios, navVigente, refrescarCasillas, refrescarMarcas, seBuscaCocina, diaDeLaSemanaTipo,
+    fusionarEstado, CLAVES_NAV, ESQUEMA_PLANILLA, sembrarDemo, migrarHorarios, navVigente, refrescarCasillas, refrescarMarcas, seBuscaCocina, diaDeLaSemanaTipo,
     CARACTERISTICAS, REGLAS, REGLA_NOMBRE, nombreRegla, regla, caracteristicaActiva, avisosVigentes, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
     resumenMinimos, descripcionCocina, condicionesDe, verificarSemana, generarSemana, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
     MOTIVOS_CIERRE, DECISIONES_CIERRE, cierresDe, diasDeCierre, cierreEn, textoCierre, etiquetaCierre, hastaCierre, motivoCierreTxt, motivoSinTrabajo, fechaCortaCierre, validarCierre,

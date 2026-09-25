@@ -20,7 +20,7 @@ function freshState() {
   return Object.assign(semillaPasarela(), {
     y: +hoy.slice(0, 4), m: +hoy.slice(5, 7), day: +hoy.slice(8, 10),
     meses: {}, nextId: 1, peticiones: [], avisos: [], historial: [], mesesPublicados: [],
-    semLunes: mondayOf(hoy), guiaOff: false, esquema: 1,
+    semLunes: mondayOf(hoy), guiaOff: false, esquema: ESQUEMA_PLANILLA,
   });
 }
 function mesKey(y, m) { return claveMes(y, m); }
@@ -151,10 +151,18 @@ function migrarEstado(estado) {
   migrarCocinaLocales(estado);
   // 24/09 (revisión de la fase 5): en la planilla ya volcada, quién abre y la cocina que dejó «a mano» la
   // versión de antes pasan a ser de lo automático (lo que puso el encargado se queda); antes que las «a» de la
-  // semana tipo, que las mira. Y de hoy en adelante se recalculan con la configuración de ahora
-  const mm = migrarMarcasAutomaticas(estado, isoHoy());
-  migrarAbrePatron(estado, isoHoy());
-  if (mm.abre || mm.cocina) refrescarMarcas(estado, estado.staff, estado.meses, isoHoy());
+  // semana tipo, que las mira. Y de hoy en adelante se recalculan con la configuración de ahora.
+  // 25/09 (revisión final): también las marcas «a mano» que la versión de antes dejó sin nadie marcado (al quitar
+  // de la casilla a quien abría o llevaba la cocina). Y no en la app del empleado: recibe la planilla recortada (sin
+  // las fichas de los compañeros, sin historial ni migraciones) y las volvía a pasar sobre su copia; quien escribe
+  // la planilla es el encargado
+  const empleado = typeof SRV !== 'undefined' && SRV.on && !SRV.esAdmin;
+  if (!empleado) {
+    const mm = migrarMarcasAutomaticas(estado, isoHoy());
+    migrarAbrePatron(estado, isoHoy());
+    const mh = migrarMarcasHuerfanas(estado, isoHoy());
+    if (mm.abre || mm.cocina || mh.abre || mh.cocina) refrescarMarcas(estado, estado.staff, estado.meses, isoHoy());
+  }
   // 17/09: la base de entrevistas de Notion (entrevistas + alerta interna)
   if (!Array.isArray(estado.entrevistas) || !estado.entrevistas.length) estado.entrevistas = JSON.parse(JSON.stringify(ENTREVISTAS_SEMILLA));
   // 17/09: las 150 entrevistas que estaban en papel. A quien ya tenía la app en marcha no
@@ -167,7 +175,9 @@ function migrarEstado(estado) {
   migrarCandidatos(estado);   // 17/09: el puesto del candidato pasa de uno suelto a una lista
   limpiarLibrePuntual(estado.staff, isoHoy());   // los días libres puntuales caducan solos
   asignarColores(estado.staff);
-  estado.esquema = 1;
+  // 25/09 (revisión final): el esquema de esta versión (ESQUEMA_PLANILLA, 2). Con él el servidor sabe que la planilla
+  // ya la guardó la app de ahora y deja de aceptar lo que mande una pestaña abierta con la de antes (que lo ponía a 1)
+  estado.esquema = ESQUEMA_PLANILLA;
 }
 
 // ---------- sincronización entre pestañas del mismo navegador ----------

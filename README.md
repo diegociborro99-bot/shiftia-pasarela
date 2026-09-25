@@ -28,8 +28,11 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   propone quién viene).
 - **Equipo**: ficha de cada persona con todas sus condiciones editables
   (locales, franjas, días que libra, partidos, cocina titular o reserva, quién
-  abre, «nunca con», «cubre a», vetos, «no sale nunca el primero», contrato,
-  ausencias, notas), cada una **activable o desactivable** por el administrador,
+  abre, «nunca con» por pareja —estricta o flexible—, «cubre a» hasta nueva orden,
+  vetos con su día, «no sale nunca el primero», standby, **esta semana libra otro
+  día**, contrato, ausencias de día entero o de media jornada, notas); las reglas se
+  pueden **activar o desactivar** por persona (el contrato no: solo lo compara
+  Horas, y las ausencias siempre cuentan),
   las reglas del grupo con interruptor, el catálogo numerado de condiciones que
   comprueba el generador, y los ajustes de cada local (aperturas, mínimos,
   cocina, horarios, quién abre).
@@ -53,6 +56,13 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   quién sale → quién entra (o el hueco y por qué nadie puede); confirmar registra
   la ausencia, retira a la persona y pone a quien cubre con «por X», con deshacer.
   En un cambio de turno propone también el intercambio.
+- **Cerrar un local unos días** (Equipo → Ajustes de los locales → Cierres por
+  fechas, o desde Hoy): del día y la franja de inicio al de fin, con motivo, y un
+  visor para decidir qué hace cada persona (apoyo en otros locales, sin trabajo,
+  vacaciones o día libre); al pasar las fechas el local vuelve solo a su horario.
+- **El Generador retira lo automático que ya no vale** (nunca lo puesto a mano):
+  al cambiar el día libre de una semana, una ausencia, un cierre o una ficha, lo
+  dice en «Qué ha cambiado» y se deshace con Ctrl+Z.
 - **Visible para el equipo**: cada mes se hace visible a los trabajadores cuando
   la planilla está lista (el mes en curso siempre lo ven).
 - **Vaciar la semana o el mes** (en Semana y Mes) respetando bajas, vacaciones y

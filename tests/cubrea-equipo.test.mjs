@@ -29,3 +29,20 @@ test('el empleado ve «por Iván» en la casilla, pero no la marca de que venía
   // no se toca el estado del servidor: el encargado la sigue teniendo
   assert.equal(src.meses['2026-10'].asig['2026-10-02'].PASARELA_T[1].porDesignacion, true);
 });
+
+// 25/09 (revisión final, datos de producción): los avisos que se guardan en una entrada forzada («nunca con Lavinia»,
+// «nunca con Susana Capón») dicen las parejas «nunca con» de los compañeros, que al empleado se le quitan de las
+// fichas (fase 6). Viajaban en la casilla: Lola, Iván o Susana Capón recibían «nunca con Lavinia» de Mari Luz. La
+// vista del empleado no los usa (su casilla dice quién está, «por» quién y el tramo); la marca `forzado` se queda.
+test('el empleado no recibe los avisos de las entradas (dicen las parejas «nunca con» de los compañeros)', () => {
+  const src = estado();
+  src.meses['2026-10'].asig['2026-10-07'] = { PASARELA_M: [{ pid: 'mariluz', origen: 'manual', forzado: true, avisos: ['nunca con Lavinia'] }, { pid: 'lavinia', origen: 'patron' }] };
+  const e = estadoParaEmpleado(src, 'dulce', '2026-10');
+  assert.ok(!/nunca con/.test(JSON.stringify(e)), JSON.stringify(e.meses['2026-10'].asig['2026-10-07']));
+  const en = e.meses['2026-10'].asig['2026-10-07'].PASARELA_M[0];
+  assert.deepEqual([en.pid, en.forzado], ['mariluz', true]);
+  assert.deepEqual(src.meses['2026-10'].asig['2026-10-07'].PASARELA_M[0].avisos, ['nunca con Lavinia'], 'el estado del servidor no se toca');
+  // ni la marca «flexible» de antes de la fase 6 en su propia ficha (llega mientras nadie guarde con la versión nueva)
+  src.staff.find(p => p.id === 'dulce').nuncaConFlexible = true;
+  assert.equal(estadoParaEmpleado(src, 'dulce', '2026-10').staff.find(p => p.id === 'dulce').nuncaConFlexible, undefined);
+});

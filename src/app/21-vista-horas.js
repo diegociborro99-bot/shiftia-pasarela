@@ -31,8 +31,9 @@ function ordenPersonasMes(isoRef) {
   return out;
 }
 // huella de una tabla de horas: para saber si ha cambiado algo desde el cierre
-function huellaHoras(tabla) { return JSON.stringify((tabla || []).map(f => [f.pid, f.dias, f.turnos, Math.round(f.minutos || 0), f.extrasMin || 0])); }
 
+// una cifra de la comparación con la copia guardada: con coma decimal, como el resto de Horas
+function fmtNumDif(v) { return String(Math.round(v * 100) / 100).replace('.', ','); }
 function renderHoras() {
   const { y, m, k, nombre } = mesHoras();
   const n = diasDelMes(y, m), finMes = isoDe(y, m, n);
@@ -75,8 +76,13 @@ function renderHoras() {
     h += `<div class="haviso info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11.3v5"/><circle fill="currentColor" stroke="none" cx="12" cy="8" r="1.05"/></svg><span><b>Se cuentan ${dur ? esc(fmtHoras(dur)) : 'las horas de apertura'} por turno.</b> El local abre ${esc(horarioTxt(l0, 'M'))} por la mañana y ${esc(horarioTxt(l0, 'T'))} por la tarde, pero cada persona hace su turno${dur ? ' de ' + esc(fmtHoras(dur)) : ''}.${tp ? ` Un <b>partido</b> son las mismas horas repartidas entre las dos franjas: entre semana ${esc(tramoTxt(tp))}${tpFin ? `, y el fin de semana ${esc(tramoTxt(tpFin))}` : ''}; quien abre una franja entra a la hora de abrir. Un <b>continuo</b> es un turno seguido y se cuenta una vez.` : ''}${cierreAp.length ? ' La hora de cierre es aproximada.' : ''} Se ajusta en Equipo → Ajustes de los locales, o casilla a casilla desde Hoy.</span></div>`;
   }
   if (cierre) {
-    const cambiado = huellaHoras(cierre.tabla) !== huellaHoras(filas);
-    h += `<div class="haviso ${cambiado ? 'warn' : 'ok'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2.2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg><span><b>${esc(nombre)} está cerrado para la nómina</b> desde el ${new Date(cierre.ts).toLocaleDateString('es-ES')}${cierre.usuario ? ' (' + esc(cierre.usuario) + ')' : ''}.${cambiado ? ' <b>Ha cambiado algo después del cierre</b>: revisa el historial antes de pagar.' : ' La tabla coincide con la copia guardada.'}</span><button class="btn-mini ghost" type="button" data-reabrir>Reabrir</button></div>`;
+    // 25/09 (revisión final): la fila entera (diferenciasHoras, del modelo), no solo días, turnos y horas; y lo que ha
+    // cambiado se dice con las dos cifras: la copia guardada es la que se pagó
+    const difs = diferenciasHoras(cierre.tabla, filas);
+    const cambiado = difs.length > 0;
+    const fmtDif = x => `${esc(x.nombre)}: ${esc(x.etiqueta)} ${esc(fmtNumDif(x.antes))} → ${esc(fmtNumDif(x.ahora))}`;
+    const lineasDif = cambiado ? ` <span class="hdifs">${difs.slice(0, 6).map(fmtDif).join(' · ')}${difs.length > 6 ? ` · y ${pl(difs.length - 6, 'cambio más', 'cambios más')}` : ''} (antes → ahora; la copia guardada es la de antes).</span>` : '';
+    h += `<div class="haviso ${cambiado ? 'warn' : 'ok'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2.2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg><span><b>${esc(nombre)} está cerrado para la nómina</b> desde el ${new Date(cierre.ts).toLocaleDateString('es-ES')}${cierre.usuario ? ' (' + esc(cierre.usuario) + ')' : ''}.${cambiado ? ' <b>Ha cambiado algo después del cierre</b>: revisa el historial antes de pagar.' + lineasDif : ' La tabla coincide con la copia guardada.'}</span><button class="btn-mini ghost" type="button" data-reabrir>Reabrir</button></div>`;
   }
 
   // ---- tabla persona × columnas ----

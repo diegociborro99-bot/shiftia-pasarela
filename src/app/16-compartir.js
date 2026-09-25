@@ -102,6 +102,7 @@ async function compartirSemana(localId) {
 }
 
 // ---------- popover de elección: toda la semana o un solo local ----------
+// (revisión final, 25/09) sin «pie de descansos»: la imagen no lo lleva desde el 18/09 y el menú lo seguía prometiendo
 // En escritorio anclado al botón; en el móvil, hoja inferior (colocarPop).
 function abrirPopCompartir(anchor) {
   cerrarPops();
@@ -110,8 +111,8 @@ function abrirPopCompartir(anchor) {
   pop.className = 'pop popcompartir'; pop.id = 'sharePop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Compartir la semana');
   pop.innerHTML = `<div class="ph">Compartir la semana</div>
     <div class="pd">Semana ${rangoSemanaTxt(lunes)} · elige qué planilla va en la imagen</div>
-    <button class="popb shareopt" data-share=""><i class="shdot todos"></i><span>Toda la semana<small>los ${S.locales.length} locales · mañana y tarde · pie de descansos</small></span></button>
-    ${S.locales.map(l => `<button class="popb shareopt" data-share="${esc(l.id)}" style="--lc:${esc(l.color)}"><i class="shdot"></i><span>${esc(l.nombre)}<small>su planilla y el pie de descansos de su plantilla</small></span></button>`).join('')}
+    <button class="popb shareopt" data-share=""><i class="shdot todos"></i><span>Toda la semana<small>los ${S.locales.length} locales · mañana y tarde</small></span></button>
+    ${S.locales.map(l => `<button class="popb shareopt" data-share="${esc(l.id)}" style="--lc:${esc(l.color)}"><i class="shdot"></i><span>${esc(l.nombre)}<small>solo su planilla de la semana</small></span></button>`).join('')}
     <p class="sharepie">Se genera una imagen PNG de la planilla. En el móvil se abre la hoja de compartir (WhatsApp, correo…); en el ordenador se descarga.</p>`;
   document.body.appendChild(pop);
   colocarPop(pop, anchor);

@@ -302,12 +302,12 @@ function hacerCobertura(res, plan, root, modo) {
   const real = estadoRango(rg.desde, rg.hasta, true);
   const r = aplicarCobertura(S, S.staff, real, inc, plan);
   const huecos = plan ? plan.huecos.length : 0;
-  registrarCambio(`Cobertura (${plan ? 'plan ' + plan.id : 'solo ausencia'}): ${COB_TIPO_LBL[inc.tipo] || inc.tipo} de ${nombre} ${cuando} — ${r.quitados} turno(s) retirados, ${resumenCubiertos(r, nombre)}${r.intercambios.length ? `, ${r.intercambios.length} intercambio(s)` : ''}${huecos ? `, ${huecos} hueco(s)` : ''}${r.asignados.length ? ': ' + r.asignados.map(x => `${nombrePid(x.pid)}${x.yaEstaba ? ' (ya estaba)' : ''} ${fmtDM(x.iso)} ${nombreLocal(partirTurno(x.tid).localId)} ${FRANJA_LBL[partirTurno(x.tid).franja].toLowerCase()}`).join(', ') : ''}`, 'cobertura');
+  registrarCambio(`Cobertura (${plan ? 'plan ' + plan.id : 'solo ausencia'}): ${COB_TIPO_LBL[inc.tipo] || inc.tipo} de ${nombre} ${cuando} — ${pl(r.quitados, 'turno retirado', 'turnos retirados')}, ${resumenCubiertos(r, nombre)}${r.intercambios.length ? `, ${pl(r.intercambios.length, 'intercambio', 'intercambios')}` : ''}${huecos ? `, ${pl(huecos, 'hueco', 'huecos')}` : ''}${r.asignados.length ? ': ' + r.asignados.map(x => `${nombrePid(x.pid)}${x.yaEstaba ? ' (ya estaba)' : ''} ${fmtDM(x.iso)} ${nombreLocal(partirTurno(x.tid).localId)} ${FRANJA_LBL[partirTurno(x.tid).franja].toLowerCase()}`).join(', ') : ''}`, 'cobertura');
   if (mesCerrado(inc.desde)) registrarCambio(`Cambio en un mes cerrado (${inc.desde.slice(0, 7)})`, 'aviso');
   saveState();
   COB.aplicado = { plan: plan ? plan.id : null, inc, res: r, huecos };
   COB.res = null;
-  toast(`${resumenCubiertos(r, nombre)}${r.rechazados.length ? ` · ${pl(r.rechazados.length, 'no se pudo hacer', 'no se pudieron hacer')}` : ''}${huecos ? `, ${huecos} hueco(s) quedan` : ''} · Ctrl+Z para deshacer`, huecos || r.rechazados.length ? 'warn' : 'ok');
+  toast(`${resumenCubiertos(r, nombre)}${r.rechazados.length ? ` · ${pl(r.rechazados.length, 'no se pudo hacer', 'no se pudieron hacer')}` : ''}${huecos ? `, ${pl(huecos, 'hueco queda', 'huecos quedan')}` : ''} · Ctrl+Z para deshacer`, huecos || r.rechazados.length ? 'warn' : 'ok');
   if (typeof pintaRevDot === 'function') pintaRevDot();
   if (modo === 'ovl' && COB.ovl) { COB.ovl.remove(); COB.ovl = null; renderVistaActiva(); return; }   // desde la planilla: se vuelve a ella con los cambios a la vista
   pintaCob(root, modo);

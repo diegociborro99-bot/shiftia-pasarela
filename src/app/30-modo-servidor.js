@@ -122,6 +122,9 @@ async function empujarEstado() {
     else if (r.status === 401) { sesionPerdida(); resultado = 'sesion'; }
     else if (r.status === 403 && datos && datos.cambiar) resultado = 'sesion';
     else if (r.status === 413) { toast('La planilla es demasiado grande para el servidor: avisa a soporte', 'bad'); resultado = 'sesion'; }
+    // 25/09 (revisión final): el servidor ya tiene la planilla guardada por una versión más nueva de la app. No se
+    // reintenta (no pasaría nunca): el cambio sigue en la bandeja de salida y, al recargar, se reenvía migrado
+    else if (r.status === 426) { toast((datos && datos.error) || 'Hay una versión nueva de la app: recarga para guardar', 'bad'); resultado = 'sesion'; }
     else { if (reintentoMs === 2000) toast(`El servidor no pudo guardar (${r.status}): se reintenta solo`, 'warn'); }
   } catch (e) {
     if (reintentoMs === 2000) toast('Sin conexión: el cambio queda guardado en este dispositivo y se enviará al recuperar la red', 'warn');
@@ -263,6 +266,9 @@ async function reenviarPendiente() {
   try { pend = JSON.parse(localStorage.getItem(PEND_KEY) || 'null'); } catch (e) {}
   if (!pend || !pend.estado || !Array.isArray(pend.estado.staff)) { borrarPendiente(); return; }
   if (pend.usuario && pend.usuario !== SRV.usuario) { borrarPendiente(); return; }   // de otro usuario en este navegador: no es suyo
+  // 25/09 (revisión final): lo que dejó en la bandeja una pestaña con la versión de antes (el servidor se lo rechazó
+  // con 426) se pasa por las migraciones de ahora antes de enviarlo, como todo lo que llega de fuera
+  if ((+pend.estado.esquema || 0) < ESQUEMA_PLANILLA) { pend.estado = Object.assign(freshState(), pend.estado); migrarEstado(pend.estado); }
   const enviar = async () => {
     const r = await api('PUT', '/api/estado', { baseVersion: SRV.version, estado: pend.estado });
     if (r.ok) { borrarPendiente(); recibirEstado({ version: r.datos.version, estado: r.datos.estado || pend.estado }); toast('Enviados al servidor los cambios que quedaron pendientes en este dispositivo', 'ok'); }
