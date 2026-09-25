@@ -2471,7 +2471,8 @@ function plazasDelDia(cfg, staff, iso) {
 // «martes 6»: un día concreto, en los avisos
 const diaYNum = iso => `${DOW_LBL[isoDow(iso)]} ${+iso.slice(8, 10)}`;
 // opts.soloPid: solo las plazas de esa persona y las de quien la cubre; opts.soloDias: solo esas
-// fechas (moverDiaLibre toca los días que cambian, nada más: 24/09, revisión)
+// fechas (moverDiaLibre toca los días que cambian, nada más: 24/09, revisión). opts.sinSupuestos (25/09, fase
+// 7): sin las plazas supuestas (la «s» de la semana tipo), que el motor Núcleo deja libres para decidirlas él
 function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
   const o = opts || {};
   const r = { aplicados: [], rechazados: [], coberturas: [], ausentes: [], avisos: [] };
@@ -2506,12 +2507,12 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
     }
     // quien esta semana libra este día: su plaza se cubre como la de un ausente
     for (const pl of libres) {
-      if (!toca(pl)) continue;
+      if (!toca(pl) || (o.sinSupuestos && pl.s)) continue;
       ausentes.push({ pl, p: personaDe(staff, pl.p) });
       r.ausentes.push({ iso, turnoId: pl.t, pid: pl.p, tipo: 'libraPuntual' });
     }
     for (const pl of plazas) {
-      if (!toca(pl)) continue;
+      if (!toca(pl) || (o.sinSupuestos && pl.s)) continue;
       const p = personaDe(staff, pl.p);
       if (!p) { r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: 'no existe' }); continue; }
       const aus = ausenciaEn(p, iso, partirTurno(pl.t).franja);   // por franja (D10)
@@ -3175,6 +3176,9 @@ function retirarQueIncumplen(cfg, staff, est, desde, hasta, opts) {
 // mano o forzado no se toca nunca. opts.simular trabaja sobre una copia y devuelve el estado
 // propuesto para la vista previa. opts.meses (revisión F4): la planilla de los otros meses, para que la
 // carga («N turnos esa semana») cuente la semana entera cuando cruza de mes (Generador → Periodo).
+// «Solo desde hoy»: el primer día que se toca de un periodo (el más tarde de los dos). La usan el generador local y
+// el problema del núcleo (toProblem; revisión de la fase 7: el núcleo no lo sabía)
+function desdeEfectivo(desde, desdeIso) { return desdeIso && desdeIso > desde ? desdeIso : desde; }
 function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
   const o = opts || {};
   const ms = o.meses ? { meses: o.meses } : {};
@@ -3182,14 +3186,10 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
   const r = { aplicados: [], huecos: [], coberturas: [], rechazados: [], retirados: [], avisos: [], estado: target };
   if (!o.sinRetirar) r.retirados = retirarQueIncumplen(cfg, staff, target, desde, hasta, { desdeIso: o.desdeIso });
   // (revisión de la fase 5) quién abre y la cocina de lo que ya estaba, con la configuración de ahora
-  r.marcas = refrescarCasillas(cfg, staff, target, o.desdeIso && o.desdeIso > desde ? o.desdeIso : desde, hasta);
-  if (!o.sinPatron) {
-    const p = instanciarPatron(cfg, staff, target, desde, hasta, { desdeIso: o.desdeIso, meses: o.meses });
-    r.aplicados.push(...p.aplicados); r.coberturas.push(...p.coberturas); r.rechazados.push(...p.rechazados); r.avisos.push(...p.avisos);
-  }
-  // quien apoya por el cierre de su local vuelve a su destino (sobrevive a «Vaciar lo generado»)
-  const ci = instanciarCierres(cfg, staff, target, desde, hasta, { desdeIso: o.desdeIso });
-  r.aplicados.push(...ci.aplicados); r.rechazados.push(...ci.rechazados);
+  r.marcas = refrescarCasillas(cfg, staff, target, desdeEfectivo(desde, o.desdeIso), hasta);
+  // paso 1: lo fijo (la semana tipo y quien apoya por un cierre en su destino), el mismo que el del núcleo
+  const fijo = instanciarFijo(cfg, staff, target, desde, hasta, { sinPatron: !!o.sinPatron, desdeIso: o.desdeIso, meses: o.meses });
+  r.aplicados.push(...fijo.aplicados); r.coberturas.push(...fijo.coberturas); r.rechazados.push(...fijo.rechazados); r.avisos.push(...fijo.avisos);
   for (const iso of rangoIso(desde, hasta)) {
     if (o.desdeIso && iso < o.desdeIso) continue;
     // primero las casillas con menos candidatos (difícil primero)
@@ -3229,16 +3229,16 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
         // flexibles (buscarRelajando: la misma escalera que la Cobertura; revisión de la fase 6)
         const { r: cs, relajaPareja: relajar } = buscarRelajando(x => candidatosPara(cfg, staff, target, iso, t.id, Object.assign({ permitirPartido: !!o.permitirPartido }, ms, x)), !!o.permitirPartido);
         const c = cs[0];
-        if (!c) { r.huecos.push({ iso, turnoId: t.id, faltan: rev.faltan, minimo: rev.minimo, supuesto: rev.supuesto, porQueNadie: porQueNadie(cfg, staff, target, iso, t.id) }); break; }
+        if (!c) { r.huecos.push(huecoFaltan(cfg, staff, target, iso, t.id, rev)); break; }
         const a = asignar(target, cfg, staff, iso, t.id, c.pid, { origen: 'generador', razon: c.razones.join(' · '), permitirPartido: !!o.permitirPartido, relajarNuncaCon: relajar, puesto: 'sala', por: c.cubre || undefined, porDesignacion: !!c.cubre, cubrePor: c.cubre || undefined });
-        if (!a.ok) { r.huecos.push({ iso, turnoId: t.id, faltan: rev.faltan, minimo: rev.minimo, supuesto: rev.supuesto, porQueNadie: porQueNadie(cfg, staff, target, iso, t.id) }); break; }
+        if (!a.ok) { r.huecos.push(huecoFaltan(cfg, staff, target, iso, t.id, rev)); break; }
         r.aplicados.push({ iso, turnoId: t.id, pid: c.pid, origen: 'generador', razon: a.entry.razon, avisos: a.avisos });
         rev = revisarTurno(cfg, staff, target, iso, t.id);
       }
       // 24/09 (fase 5, S37): una cocina obligatoria que nadie puede llevar es un hueco, con su porqué. Antes el
       // Periodo no la contaba entre las casillas cortas y la Semana no la listaba en «Huecos» (solo la
       // condición ✗), mientras la Revisión la daba en rojo y la Cobertura sí la contaba como hueco
-      if (rev.sinCocina && rev.cocinaObligatoria) r.huecos.push({ iso, turnoId: t.id, tipo: 'cocina', faltan: 0, minimo: rev.minimo, supuesto: rev.supuesto, motivo: 'sin cocina (obligatoria)', porQueNadie: porQueNadie(cfg, staff, target, iso, t.id, { cocina: true }) });
+      if (rev.sinCocina && rev.cocinaObligatoria) r.huecos.push(huecoCocina(cfg, staff, target, iso, t.id, rev));
     }
     // el primero de cada casilla hace turno completo: si nadie de los puestos puede abrir se
     // busca a alguien que pueda; si no lo hay, la 1.ª posición queda como hueco disponible
@@ -3249,10 +3249,43 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
         const a = asignar(target, cfg, staff, iso, t.id, c.pid, { origen: 'generador', razon: c.razones.join(' · '), permitirPartido: !!o.permitirPartido, puesto: 'sala', por: c.cubre || undefined, porDesignacion: !!c.cubre, cubrePor: c.cubre || undefined });
         if (a.ok) { r.aplicados.push({ iso, turnoId: t.id, pid: c.pid, origen: 'generador', razon: a.entry.razon, avisos: a.avisos }); continue; }
       }
-      r.huecos.push({ iso, turnoId: t.id, pos: 1, tipo: 'primero', faltan: 0, minimo: minimoDe(cfg, iso, t.id, target).min, motivo: motivoSinPrimero(cfg, staff, target, iso, t.id), porQueNadie: porQueNadiePrimero(cfg, staff, target, iso, t.id) });
+      r.huecos.push(huecoPrimero(cfg, staff, target, iso, t.id));
     }
   }
   return r;
+}
+// Paso 1 de todo generador: lo fijo del periodo, por la puerta (asignar): la semana tipo (instanciarPatron, con sus
+// cambios de día libre, sus «cubre a» y sus relevos) y quien apoya por el cierre de su local en su destino
+// (instanciarCierres; así sobrevive a «Vaciar lo generado»). 25/09 (fase 7, S25; decisiones.md, principio 1): lo
+// usan el generador local (generarPlanilla), el problema del núcleo (toProblem: lo que pone es lo fijo del
+// problema) y el volcado de su solución (desdeSolucion). Antes el núcleo leía la semana tipo por su cuenta
+// (plazasDelDia, sin la puerta): fijaba plazas que la puerta no dejaba poner y no sabía de «cubre a».
+// opts: { sinPatron, sinSupuestos, desdeIso, meses }
+function instanciarFijo(cfg, staff, est, desde, hasta, opts) {
+  const o = opts || {};
+  const r = { aplicados: [], coberturas: [], rechazados: [], avisos: [] };
+  if (!o.sinPatron) {
+    const p = instanciarPatron(cfg, staff, est, desde, hasta, { desdeIso: o.desdeIso, meses: o.meses, sinSupuestos: !!o.sinSupuestos });
+    r.aplicados.push(...p.aplicados); r.coberturas.push(...p.coberturas); r.rechazados.push(...p.rechazados); r.avisos.push(...p.avisos);
+  }
+  const ci = instanciarCierres(cfg, staff, est, desde, hasta, { desdeIso: o.desdeIso });
+  r.aplicados.push(...ci.aplicados); r.rechazados.push(...ci.rechazados);
+  return r;
+}
+// Los huecos de una casilla, con su porqué, en la forma que enseña el Generador (faltan gente, falta la cocina
+// obligatoria, nadie puede abrir). Una sola forma para el relleno (generarPlanilla) y el volcado del núcleo
+// (desdeSolucion, huecosDeCasilla; 25/09, fase 7: antes la pantalla del Generador los sacaba por su cuenta, solo los
+// de «faltan»).
+function huecoFaltan(cfg, staff, est, iso, tid, rev) { return { iso, turnoId: tid, faltan: rev.faltan, minimo: rev.minimo, supuesto: rev.supuesto, porQueNadie: porQueNadie(cfg, staff, est, iso, tid) }; }
+function huecoCocina(cfg, staff, est, iso, tid, rev) { return { iso, turnoId: tid, tipo: 'cocina', faltan: 0, minimo: rev.minimo, supuesto: rev.supuesto, motivo: 'sin cocina (obligatoria)', porQueNadie: porQueNadie(cfg, staff, est, iso, tid, { cocina: true }) }; }
+function huecoPrimero(cfg, staff, est, iso, tid) { return { iso, turnoId: tid, pos: 1, tipo: 'primero', faltan: 0, minimo: minimoDe(cfg, iso, tid, est).min, motivo: motivoSinPrimero(cfg, staff, est, iso, tid), porQueNadie: porQueNadiePrimero(cfg, staff, est, iso, tid) }; }
+function huecosDeCasilla(cfg, staff, est, iso, tid) {
+  const rev = revisarTurno(cfg, staff, est, iso, tid);
+  const out = [];
+  if (rev.faltan > 0) out.push(huecoFaltan(cfg, staff, est, iso, tid, rev));
+  if (rev.sinCocina && rev.cocinaObligatoria) out.push(huecoCocina(cfg, staff, est, iso, tid, rev));
+  if (rev.sinAbre) out.push(huecoPrimero(cfg, staff, est, iso, tid));
+  return out;
 }
 // candidatos que solo romperían reglas blandas (partido no declarado) para un hueco
 // (y, desde la revisión F3, el apoyo que dejaría la casilla solo con apoyos: el encargado decide)
@@ -4457,15 +4490,72 @@ function horasLocalMes(cfg, staff, meses, y, m) {
 // de un día; el código de turno es el local. El núcleo no conoce locales ni posición
 // en la casilla: cobertura y cocina van como reglas, y el orden, quién abre y la
 // cocina se ponen al volcar la solución (desdeSolucion). Ver ARQUITECTURA.md.
+//
+// 25/09 (fase 7, S25; reunión del 24/09: «que lea todas las variables»; decisiones.md, principios 1 y 2): el
+// problema sale de la MISMA puerta que el resto de caminos, no de una lectura propia de la ficha. Antes toProblem
+// miraba p.libra, p.vetos y p.locales a pelo, sin interruptores ni standby, y el optimizador trabajaba con otra
+// disponibilidad: dejaba fija a Mari Luz el martes que libraba, contaba con Dulce en standby, ataba lo apagado en
+// Equipo y no sabía los días de partido de cada persona. Ahora:
+//  · quién puede estar en cada local cada medio día (allowed_shifts y unavailable) es lo que dice la puerta
+//    (evaluarPlaza) con la planilla vacía, de sala o de cocina; quien no puede ningún medio día (standby, una baja)
+//    sigue en el problema con todo a ['*'] —lo que se le ponga a mano cuenta— y fuera del reparto equilibrado;
+//  · lo fijo es lo ya puesto en la planilla del periodo y el paso 1 de todo generador (instanciarFijo: la semana
+//    tipo, con sus «cubre a», y quien apoya por un cierre en su destino), por la puerta;
+//  · «nunca con» con incompatibles(): la pareja flexible es blanda solo en el modo relajado del Generador
+//    («Permitir partidos no declarados»; decisiones.md, principio 6), dura en el estricto, como en el relleno;
+//  · el partido con partidoEn(): quien no puede hacerlo ningún día del periodo lo tiene como regla (dura en el
+//    estricto, blanda en el relajado). El núcleo no tiene una regla «por persona y día»: a quien solo lo hace unos
+//    días lo limitan la puerta con lo ya fijo (revisión, abajo) y las vueltas de flujoNucleo; lo que aun así no
+//    entra lo decide el volcado (desdeSolucion) con el modo del Generador;
+//  · la cocina con puedeCocina() de ese local ese día (skillCocina) y solo donde se exige (cocinaExigida), por
+//    medio día abierto; la cobertura con la regla «Mínimos» (D5); las preferencias con evita().
+// Lo que ya está puesto a mano y rompe una regla dura del problema (una pareja «nunca con» junta, un partido de
+// quien no lo hace) pasa esa regla a blanda para esa pareja o persona: lo puesto a mano no lo quita nadie
+// (principio 4) y el problema no se vuelve imposible.
+// opts: { conPatron (por defecto sí), permitirPartido (el modo relajado), meses (la planilla de todos los meses,
+// { 'aaaa-mm': { asig, apertura, manual } }: el periodo puede cruzar de mes; sin ella, est para todo el periodo; el
+// mes del propio est se lee siempre de est, que es la copia del Generador, como en turnosSemanaDe), desdeIso («Solo
+// desde hoy»: el problema empieza ese día; null si todo el periodo ya ha pasado) }.
+// También toProblem(ctx, desde, hasta, opts), con el contexto de crearContexto (sus meses, si no se pasan otros).
+// 25/09 (revisión de la fase 7, con el núcleo de verdad: shiftia-core y su CP-SAT):
+//  · «ningún local ese medio día» va como la lista ['*'] (el esquema del servicio: unavailable: dict[str, list[str]]);
+//    como texto, el servicio rechazaba el problema entero (422) y el Generador no daba nada;
+//  · los mínimos son una regla BLANDA, la primera (tier 3: el núcleo la optimiza antes que el resto), y solo las
+//    casillas cerradas van en una regla dura (a 0). El núcleo relaja reglas enteras: con los mínimos como una sola
+//    regla dura, un medio día imposible (la mañana del lunes en Pasarela sin Dulce) le hacía relajar los mínimos de
+//    todo el periodo y dejaba casillas cortas que sí se podían cubrir (7 en la semana del 5/10 frente a 1 del
+//    generador local; 32 frente a 4 en octubre). Cada regla dura lleva su propio nombre (el núcleo relaja por
+//    nombre): la cocina de cada medio día, con su fecha;
+//  · «sin partido» dura solo para quien no tiene fijos dos medios días seguidos (también una tarde y la mañana
+//    siguiente: la ventana de dos medios días del núcleo lo prohíbe, y la semana tipo de Yilian lo tiene);
+//  · con una mitad del día fija, la otra no está disponible si ese día no hace partido (la puerta con lo fijo, en
+//    el modo estricto); y lo que la puerta no deja poner de lo que propone el núcleo se veta en otra vuelta
+//    (flujoNucleo).
+const skillCocina = (localId, iso) => `coc_${localId}_${iso}`;
 function toProblem(cfg, staff, est, desde, hasta, opts) {
+  if (cfg && cfg.cfg && !Array.isArray(cfg.locales)) { const ctx = cfg; return toProblem(ctx.cfg, ctx.staff, ctx.est, staff, est, Object.assign({ meses: ctx.meses || undefined }, desde)); }
   const o = opts || {};
-  const activos = staff.filter(p => !(p.ausencias || []).some(a => a.tipo === 'BAJ' && !a.hasta));
-  const days = [], indices = [];
+  const relajado = !!o.permitirPartido;
+  // «Solo desde hoy» (revisión de la fase 7): los días pasados no entran en el problema (antes el núcleo proponía y
+  // contaba huecos en ellos, y el volcado los descartaba después)
+  desde = desdeEfectivo(desde, o.desdeIso);
+  if (desde > hasta) return null;
+  const mesEst = est && !est.virtual && est.y ? claveMes(est.y, est.m) : null;
+  const clon = x => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
+  const days = [], indices = [], isos = [...rangoIso(desde, hasta)];
+  // la planilla del periodo (lo ya puesto, de cada mes) y la misma sin nadie puesto (la de la puerta)
+  const vista = () => ({ y: +desde.slice(0, 4), m: +desde.slice(5, 7), days: [], asig: {}, apertura: {}, manual: {}, festivos: [], virtual: true });
+  const periodo = vista(), vacio = vista();
   let idx = 0;
-  for (const iso of rangoIso(desde, hasta)) {
+  for (const iso of isos) {
     const dow = isoDow(iso);
+    const me = (iso.slice(0, 7) === mesEst ? est : o.meses && o.meses[iso.slice(0, 7)]) || est || {};
+    const dia = { d: +iso.slice(8, 10), iso, dow, festivo: (cfg.festivos || []).includes(iso) };
+    for (const e of [periodo, vacio]) { e.days.push(dia); e.apertura[iso] = clon((me.apertura && me.apertura[iso]) || {}); e.asig[iso] = {}; e.manual[iso] = {}; }
+    periodo.asig[iso] = clon((me.asig && me.asig[iso]) || {});
+    periodo.manual[iso] = clon((me.manual && me.manual[iso]) || {});
     for (const f of FRANJAS) {
-      days.push({ index: idx, date: iso, dow: dow - 1, is_weekend: dow >= 6, is_holiday: (cfg.festivos || []).includes(iso), tags: [f, 'd' + dow, iso, iso + '_' + f] });
+      days.push({ index: idx, date: iso, dow: dow - 1, is_weekend: dow >= 6, is_holiday: dia.festivo, tags: [f, 'd' + dow, iso, iso + '_' + f] });
       indices.push({ iso, franja: f, dow });
       idx++;
     }
@@ -4473,107 +4563,252 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
   const shifts = cfg.locales.map(l => ({ code: l.id, label: l.nombre, hours: 7, period: 'morning', tags: [] }));
   shifts.push({ code: 'OFF', label: 'Libre', hours: 0, is_work: false, is_rest: true });
   const todosLocales = cfg.locales.map(l => l.id);
-  const skillDe = (localId, dow) => `coc_${localId}${activos.some(p => Array.isArray(p.cocina && p.cocina.soloDias) && p.cocina.soloDias.length && ((p.cocina.titular || []).includes(localId) || (p.cocina.reserva || []).includes(localId))) ? '_d' + dow : ''}`;
-  const workers = activos.map(p => {
-    const w = { id: p.id, name: p.nombre, allowed_shifts: (p.locales || []).length ? p.locales.slice() : todosLocales.slice(), skills: [], unavailable: {}, fixed: {}, preferences: [] };
-    const apoyo = new Set();   // medios días en que apoya por el cierre de su local (24/09, D11)
-    indices.forEach((x, i) => {
-      // el día libre de ESA semana (libraEn): el cambio puntual bloquea el martes y deja el miércoles (24/09)
-      const bloqueada = ausenciaEn(p, x.iso, x.franja) || libraEn(p, x.iso) || ((p.franjas || []).length && !p.franjas.includes(x.franja));   // la ausencia, por medio día (D10)
-      if (bloqueada) { w.unavailable[i] = '*'; return; }
-      // sin trabajo por el cierre de su local: ese medio día no está (el núcleo no redistribuye a nadie solo)
-      const dc = decisionCierre(cfg, p.id, x.iso, x.franja);
-      if (dc && dc.tipo !== 'REFUERZA') { w.unavailable[i] = '*'; return; }
-      if (dc) apoyo.add(i);
-      const vet = (p.vetos || []).filter(v => v.franja === x.franja && (dowsVeto(v) === null || dowsVeto(v).includes(x.dow))).map(v => v.localId);
-      if (vet.length) w.unavailable[i] = vet;
+  // ¿puede estar en ese local ese medio día? La puerta con la planilla vacía, de sala o, si de sala no (solo hace
+  // cocina), de cocina: la misma pregunta que puedeEstar
+  const ctx = crearContexto(cfg, staff, vacio);
+  const entra = (iso, tid, pid) => {
+    const sala = evaluarPlaza(ctx, iso, tid, pid, { puesto: 'sala', corto: true });
+    if (sala.ok) return true;
+    return sala.bloqueos.some(b => b.k === 'cocina' && !b.forzado) && evaluarPlaza(ctx, iso, tid, pid, { puesto: 'cocina', corto: true }).ok;
+  };
+  const cocinas = cfg.locales.filter(l => FRANJAS.some(f => cocinaExigida(cfg, staff, l, f)));
+  const libres = {};   // pid → por índice, los locales donde puede estar
+  const workers = staff.map(p => {
+    const w = { id: p.id, name: p.nombre, allowed_shifts: [], skills: [], unavailable: {}, fixed: {}, preferences: [] };
+    const ls = libres[p.id] = indices.map(x => todosLocales.filter(id => entra(x.iso, turnoId(id, x.franja), p.id)));
+    w.allowed_shifts = todosLocales.filter(id => ls.some(l => l.includes(id)));
+    ls.forEach((l, i) => {
+      if (!l.length) { w.unavailable[i] = ['*']; return; }
+      const fuera = w.allowed_shifts.filter(id => !l.includes(id));
+      if (fuera.length) w.unavailable[i] = fuera;
     });
-    // quien apoya puede ir a cualquier local esos medios días; el resto del horizonte sigue atado a
-    // sus locales (allowed_shifts es de todo el horizonte, así que se ata medio día a medio día)
-    if (apoyo.size && (p.locales || []).length) {
-      const fuera = todosLocales.filter(id => !p.locales.includes(id));
-      w.allowed_shifts = todosLocales.slice();
-      indices.forEach((x, i) => { if (apoyo.has(i) || w.unavailable[i] === '*') return; w.unavailable[i] = [...new Set([...(w.unavailable[i] || []), ...fuera])]; });
-    }
-    for (const l of cfg.locales) for (const dow of TODOS) if (puedeCocina(cfg, p, l.id, isoDe(2026, 10, 4 + dow))) { const s = skillDe(l.id, dow); if (!w.skills.includes(s)) w.skills.push(s); }
-    // (fase 6, S14) con su interruptor «Preferencias» (evita), como la puntuación y la Cobertura
+    for (const l of cocinas) for (const iso of isos) if (puedeCocina(cfg, p, l.id, iso)) w.skills.push(skillCocina(l.id, iso));
     indices.forEach((x, i) => { if (evita(cfg, p, x.dow)) w.preferences.push({ day: i, shift: 'OFF', weight: 3 }); });
     return w;
   });
-  // cobertura por medio día y local; cerrados a 0
-  const by_day = {};
+  const porId = new Map(workers.map(w => [w.id, w]));
+  // lo fijo: lo ya puesto y el paso 1 (la semana tipo sin sus plazas supuestas, que las decide el núcleo), sobre la
+  // planilla del periodo; solo en casillas abiertas (una cerrada tiene cobertura 0/0 y fijar ahí lo haría imposible)
+  instanciarFijo(cfg, staff, periodo, desde, hasta, { sinPatron: o.conPatron === false, sinSupuestos: true, meses: o.meses });
   indices.forEach((x, i) => {
-    by_day[i] = {};
-    for (const l of cfg.locales) {
-      const tid = turnoId(l.id, x.franja);
-      if (!turnoAbierto(cfg, est, x.iso, tid)) { by_day[i][l.id] = { min: 0, max: 0 }; continue; }
-      // (fase 6, S16 y D5) con la regla del grupo «Mínimos» apagada, tampoco los pide el núcleo
-      by_day[i][l.id] = { min: regla(cfg, 'minimos') ? minimoDe(cfg, x.iso, tid, est).min : 0 };
+    for (const t of turnosDe(cfg)) {
+      if (t.franja !== x.franja || !turnoAbierto(cfg, periodo, x.iso, t.id)) continue;
+      for (const pid of pidsEn(periodo, x.iso, t.id)) { const w = porId.get(pid); if (w) { w.fixed[i] = t.local.id; delete w.unavailable[i]; } }
     }
   });
-  const rules = [{ type: 'coverage', mode: 'hard', tier: 3, id: 'mínimos por local, día y franja', params: { demand: {}, by_day } }];
-  // cocina: obligatoria = dura; con titulares definidos = blanda. Por medio día ABIERTO (turnoAbierto),
-  // no por día de la semana (24/09, D11 y S27): un medio día cerrado por fechas o a mano tiene cobertura
-  // 0/0 y una regla dura de cocina ahí lo hacía imposible.
-  // (fase 5, D5: con la regla del grupo «Cocina» apagada, el núcleo tampoco la pide; cocinaExigida)
-  for (const l of cfg.locales) for (const f of FRANJAS) {
+  // (revisión de la fase 7) el partido de ESE día con lo que ya va fijo, por la puerta: quien tiene fija una mitad del
+  // día y ese día no hace partido no está disponible en la otra mitad (en el modo estricto: en el relajado el partido
+  // no declarado entra con aviso). El núcleo no tiene una regla «esta persona, este día»: sin esto proponía la otra
+  // mitad (Hojan, la mañana del jueves con su tarde del Mónaco fija), la puerta la rechazaba y la casilla se quedaba
+  // corta. Lo que no se sabe hasta resolver (las dos mitades libres) lo veta la vuelta siguiente (flujoNucleo)
+  if (!relajado) {
+    const ctxFijo = crearContexto(cfg, staff, periodo);
+    for (const w of workers) isos.forEach((iso, k) => {
+      if (!w.fixed[2 * k] === !w.fixed[2 * k + 1]) return;
+      const j = w.fixed[2 * k] ? 2 * k + 1 : 2 * k, u = w.unavailable[j] || [];
+      if (u.includes('*')) return;
+      const libresJ = w.allowed_shifts.filter(id => !u.includes(id));
+      const veto = libresJ.filter(id => evaluarPlaza(ctxFijo, iso, turnoId(id, indices[j].franja), w.id, { puesto: 'sala' }).bloqueos.some(b => b.k === 'partido' && !b.forzado && !b.extra));
+      if (veto.length) w.unavailable[j] = veto.length === libresJ.length ? ['*'] : u.concat(veto);
+    });
+  }
+  // cobertura por medio día y local. (fase 6, S16 y D5) con la regla «Mínimos» apagada, sin mínimos. (revisión de la
+  // fase 7) los mínimos, blandos y lo primero (tier 3: el objetivo por niveles los optimiza antes que nada): lo que no
+  // se puede cubrir queda corto sin arrastrar al resto. Las casillas cerradas, en su propia regla dura (a 0)
+  const minimos = {}, cerradas = {};
+  indices.forEach((x, i) => {
+    for (const l of cfg.locales) {
+      const tid = turnoId(l.id, x.franja);
+      if (!turnoAbierto(cfg, periodo, x.iso, tid)) { (cerradas[i] = cerradas[i] || {})[l.id] = { min: 0, max: 0 }; continue; }
+      const min = regla(cfg, 'minimos') ? minimoDe(cfg, x.iso, tid, periodo).min : 0;
+      if (min > 0) (minimos[i] = minimos[i] || {})[l.id] = { min };
+    }
+  });
+  const rules = [];
+  if (Object.keys(minimos).length) rules.push({ type: 'coverage', mode: 'soft', weight: 100, tier: 3, id: 'mínimos por local, día y franja', params: { demand: {}, by_day: minimos } });
+  if (Object.keys(cerradas).length) rules.push({ type: 'coverage', mode: 'hard', tier: 3, id: 'casillas cerradas', params: { demand: {}, by_day: cerradas } });
+  // cocina: obligatoria = dura; con titulares definidos = blanda. Por medio día ABIERTO (turnoAbierto): un medio día
+  // cerrado por fechas o a mano tiene cobertura 0/0 y una regla dura de cocina ahí lo hacía imposible (24/09, D11,
+  // S27). Con la regla del grupo «Cocina» apagada, nadie la pide (fase 5, D5: cocinaExigida)
+  for (const l of cocinas) for (const f of FRANJAS) {
     if (!cocinaExigida(cfg, staff, l, f)) continue;
     const dura = cocinaObligatoriaEn(cfg, l, f);
     indices.forEach(x => {
-      if (x.franja !== f || !turnoAbierto(cfg, est, x.iso, turnoId(l.id, f))) return;
-      rules.push({ type: 'skill_coverage', mode: dura ? 'hard' : 'soft', weight: 5, tier: dura ? 3 : 1, id: `cocina ${l.nombre} ${FRANJA_LBL[f].toLowerCase()} del ${DOW_LBL[x.dow]} ${+x.iso.slice(8, 10)}`, params: { requirements: [{ shift: l.id, skill: skillDe(l.id, x.dow), min: 1 }] }, scope: { day_tags: [x.iso + '_' + f] } });
+      if (x.franja !== f || !turnoAbierto(cfg, periodo, x.iso, turnoId(l.id, f))) return;
+      rules.push({ type: 'skill_coverage', mode: dura ? 'hard' : 'soft', weight: 5, tier: dura ? 3 : 1, id: `cocina ${l.nombre} ${FRANJA_LBL[f].toLowerCase()} del ${DOW_LBL[x.dow]} ${+x.iso.slice(8, 10)}/${+x.iso.slice(5, 7)}`, params: { requirements: [{ shift: l.id, skill: skillCocina(l.id, x.iso), min: 1 }] }, scope: { day_tags: [x.iso + '_' + f] } });
     });
   }
-  // «nunca con»: mismo local y misma franja
-  const pares = new Set();
-  for (const p of activos) for (const q of p.nuncaCon || []) if (activos.some(x => x.id === q)) pares.add([p.id, q].sort().join('|'));
-  if (pares.size) rules.push({ type: 'same_shift_forbidden', mode: 'hard', tier: 3, id: 'nunca con', params: { pairs: [...pares].map(s => s.split('|')), shifts: todosLocales.slice() } });
-  // quien no hace partido nunca y tiene las dos franjas: como mucho un medio día por ventana de dos
-  const sinPartido = activos.filter(p => (p.franjas || []).length !== 1 && !indices.some(x => partidoEn(cfg, p, x.iso))).map(p => p.id);
-  if (sinPartido.length) rules.push({ type: 'max_hours_in_window', mode: 'hard', tier: 2, id: 'sin partido', params: { days: 2, max_hours: 7 }, scope: { workers: sinPartido } });
-  rules.push({ type: 'balance', mode: 'soft', weight: 2, tier: 1, id: 'reparto equilibrado', params: { dimension: 'work' } });
+  // «nunca con» (mismo local y misma franja): incompatibles, con sus interruptores
+  const juntos = (a, b) => indices.some((x, i) => a.fixed[i] && a.fixed[i] === b.fixed[i]);
+  const pares = { hard: [], soft: [] };
+  for (let a = 0; a < staff.length; a++) for (let b = a + 1; b < staff.length; b++) {
+    const inc = incompatibles(cfg, staff[a], staff[b]);
+    if (!inc) continue;
+    pares[(inc.flexible && relajado) || juntos(porId.get(staff[a].id), porId.get(staff[b].id)) ? 'soft' : 'hard'].push([staff[a].id, staff[b].id].sort());
+  }
+  if (pares.hard.length) rules.push({ type: 'same_shift_forbidden', mode: 'hard', tier: 3, id: 'nunca con', params: { pairs: pares.hard, shifts: todosLocales.slice() } });
+  if (pares.soft.length) rules.push({ type: 'same_shift_forbidden', mode: 'soft', weight: 10, tier: 2, id: 'nunca con (se junta solo si no hay nadie más)', params: { pairs: pares.soft, shifts: todosLocales.slice() } });
+  // el partido (partidoEn, con su interruptor): quien podría trabajar mañana y tarde algún día del periodo y no puede
+  // hacer partido ninguno de esos días, como mucho un medio día por ventana de dos
+  const sinPartido = { hard: [], soft: [] };
+  for (const p of staff) {
+    const w = porId.get(p.id), ls = libres[p.id];
+    const ambos = isos.filter((iso, k) => ls[2 * k].length && ls[2 * k + 1].length);
+    if (!ambos.length || ambos.some(iso => partidoEn(cfg, p, iso))) continue;
+    // dos medios días seguidos fijos (mañana y tarde, o una tarde y la mañana siguiente): la ventana de dos medios
+    // días del núcleo prohíbe los dos casos, y con la regla dura el problema sería imposible (revisión de la fase 7:
+    // la semana tipo de Yilian, lunes por la tarde y martes por la mañana)
+    const fijoPartido = indices.some((x, i) => i + 1 < indices.length && w.fixed[i] && w.fixed[i + 1]);
+    sinPartido[relajado || fijoPartido ? 'soft' : 'hard'].push(p.id);
+  }
+  if (sinPartido.hard.length) rules.push({ type: 'max_hours_in_window', mode: 'hard', tier: 2, id: 'sin partido', params: { days: 2, max_hours: 7 }, scope: { workers: sinPartido.hard } });
+  if (sinPartido.soft.length) rules.push({ type: 'max_hours_in_window', mode: 'soft', weight: 10, tier: 2, id: 'sin partido', params: { days: 2, max_hours: 7 }, scope: { workers: sinPartido.soft } });
+  // el reparto, entre quien puede trabajar algo en el periodo (quien no puede nada no baja el mínimo a 0)
+  rules.push({ type: 'balance', mode: 'soft', weight: 2, tier: 1, id: 'reparto equilibrado', params: { dimension: 'work' }, scope: { workers: workers.filter(w => w.allowed_shifts.length).map(w => w.id) } });
   rules.push({ type: 'preferences', mode: 'soft', weight: 1, tier: 1, id: 'criterios personales', params: {} });
-  // plazas fijas de la semana tipo (no supuestas) como asignaciones fijas, con los cambios de
-  // día libre de cada semana (plazasDelDia, la misma lectura que la semana tipo del generador)
-  if (o.conPatron !== false) {
-    indices.forEach((x, i) => {
-      for (const pl of plazasDelDia(cfg, staff, x.iso).plazas) {
-        if (pl.s) continue;
-        const { localId, franja } = partirTurno(pl.t);
-        if (franja !== x.franja) continue;
-        const w = workers.find(z => z.id === pl.p);
-        if (!w || w.unavailable[i]) continue;
-        // una casilla cerrada ese medio día (por fechas, a mano o por «Cuándo abre») tiene cobertura
-        // 0/0: fijar ahí a alguien (quien apoya por el cierre no está «no disponible») hacía el
-        // problema imposible (24/09, revisión F2)
-        if (!turnoAbierto(cfg, est, x.iso, pl.t)) continue;
-        w.fixed[i] = localId;
-      }
-    });
-  }
-  return { horizon_days: indices.length, shifts, workers, days, rules, rest_code: 'OFF', meta: { indices, desde, hasta, app: 'shiftia-pasarela', weekend_dows: [5, 6] } };
+  return { horizon_days: indices.length, shifts, workers, days, rules, rest_code: 'OFF', meta: { indices, desde, hasta, app: 'shiftia-pasarela', weekend_dows: [5, 6], conPatron: o.conPatron !== false, permitirPartido: relajado } };
 }
+// Vuelca la solución del núcleo en la planilla (est: un mes o un estado del periodo), como el generador local: primero
+// lo fijo (instanciarFijo, lo mismo que el problema dio por fijo, con su «por», su nota y sus relevos «cubre a») y
+// luego lo que propone el núcleo, por la puerta y con el modo del Generador. 25/09 (fase 7, S25): antes lo volcaba
+// todo con permitirPartido fijo (un partido que el encargado no había permitido entraba con aviso) y en el orden de
+// la solución (un partido no declarado dejaba fuera la plaza de la semana tipo). Lo que la puerta no deja poner se
+// rechaza (con su regla) y, si la casilla se queda corta, es un hueco con su porqué y lo que el núcleo proponía.
+// opts: { permitirPartido (el modo relajado del Generador), meses, razon, desdeIso («Solo desde hoy»: nada antes),
+// vetadas (lo que la puerta rechazó en la primera vuelta y se vetó en la segunda: si su casilla sigue corta, el hueco
+// lo dice) }. Devuelve { aplicados, rechazados, coberturas, avisos, huecos }.
 function desdeSolucion(cfg, staff, est, problema, sol, opts) {
   const o = opts || {};
-  const r = { aplicados: [], rechazados: [] };
-  const indices = (problema.meta && problema.meta.indices) || [];
-  // la plaza fija de la semana tipo que el núcleo ha respetado se vuelca con su «por» y su nota
-  // (24/09, revisión): sin ellos, un cambio de día libre no sabía que Lavinia cubría a Mari Luz
+  const meta = problema.meta || {};
+  const indices = meta.indices || [];
+  const r = { aplicados: [], rechazados: [], coberturas: [], avisos: [], huecos: [] };
+  // los días del periodo que están en este estado (el Periodo se vuelca mes a mes)
+  const ds = (est.days || []).map(d => d.iso);
+  const d1 = [meta.desde || (indices[0] || {}).iso, ds[0], o.desdeIso].filter(Boolean).sort().pop();
+  const d2 = [meta.hasta || (indices[indices.length - 1] || {}).iso, ds[ds.length - 1]].filter(Boolean).sort()[0];
+  if (!d1 || !d2 || d1 > d2) return r;
+  const f = instanciarFijo(cfg, staff, est, d1, d2, { sinPatron: meta.conPatron === false, sinSupuestos: true, meses: o.meses });
+  r.aplicados.push(...f.aplicados); r.coberturas.push(...f.coberturas); r.rechazados.push(...f.rechazados); r.avisos.push(...f.avisos);
+  const modo = o.permitirPartido ? RELAJABLE : {};
+  // la plaza de la semana tipo que el núcleo ha elegido por su cuenta (una supuesta) lleva su «por» y su nota
   const fijas = {};
-  const fijaDe = (iso, tid, pid) => (fijas[iso] || (fijas[iso] = plazasDelDia(cfg, staff, iso).plazas)).find(pl => pl.t === tid && pl.p === pid) || null;
+  const plazaDe = (iso, tid, pid) => (fijas[iso] || (fijas[iso] = plazasDelDia(cfg, staff, iso).plazas)).find(pl => pl.t === tid && pl.p === pid) || null;
+  const propuso = {};   // por casilla, lo que el núcleo proponía y la puerta no dejó poner
   for (const [pid, porIdx] of Object.entries(sol.schedule || {})) {
     for (const [i, code] of Object.entries(porIdx)) {
       if (!code || code === (problema.rest_code || 'OFF')) continue;
-      const x = indices[+i]; if (!x) continue;
+      const x = indices[+i]; if (!x || x.iso < d1 || x.iso > d2) continue;
       const tid = turnoId(code, x.franja);
       if (pidsEn(est, x.iso, tid).includes(pid)) continue;
-      const pl = fijaDe(x.iso, tid, pid);
-      const a = asignar(est, cfg, staff, x.iso, tid, pid, { origen: 'nucleo', razon: o.razon || 'propuesto por el núcleo Shiftia (CP-SAT)', permitirPartido: true, por: pl ? pl.por : undefined, nota: pl ? pl.n : undefined });
-      if (a.ok) r.aplicados.push({ iso: x.iso, turnoId: tid, pid, origen: 'nucleo', razon: a.entry.razon, avisos: a.avisos });
-      else r.rechazados.push({ iso: x.iso, turnoId: tid, pid, motivo: a.motivo });
+      const pl = plazaDe(x.iso, tid, pid);
+      const base = Object.assign({ origen: 'nucleo', razon: o.razon || 'propuesto por el núcleo Shiftia (CP-SAT)', por: pl ? pl.por : undefined, nota: pl ? pl.n : undefined, supuesto: pl && pl.s ? true : undefined }, modo);
+      // de sala o, si de sala no (solo hace cocina, o ya lleva una cocina ese día), de cocina: lo mismo que el problema
+      // (revisión de la fase 7) si tampoco entra de cocina, el porqué es el de la cocina: «solo hace cocina» escondía
+      // el de verdad (Hojan, «no hace partido los miércoles») y la pista de cómo dejarlo entrar
+      let a = asignar(est, cfg, staff, x.iso, tid, pid, Object.assign({ puesto: 'sala' }, base));
+      if (!a.ok && a.regla === 'cocina') a = asignar(est, cfg, staff, x.iso, tid, pid, Object.assign({ puesto: 'cocina', cocina: true }, base));
+      if (a.ok) { r.aplicados.push({ iso: x.iso, turnoId: tid, pid, origen: 'nucleo', razon: a.entry.razon, avisos: a.avisos }); continue; }
+      const rech = { iso: x.iso, turnoId: tid, pid, motivo: a.motivo, regla: a.regla || null, nucleo: true };
+      r.rechazados.push(rech);
+      (propuso[x.iso + '|' + tid] = propuso[x.iso + '|' + tid] || []).push({ pid, motivo: a.motivo, regla: rech.regla });
     }
   }
+  for (const v of o.vetadas || []) {
+    if (v.iso < d1 || v.iso > d2) continue;
+    const k = v.iso + '|' + v.turnoId, l = propuso[k] = propuso[k] || [];
+    if (!l.some(y => y.pid === v.pid)) l.push({ pid: v.pid, motivo: v.motivo, regla: v.regla || null });
+  }
+  for (const iso of rangoIso(d1, d2)) for (const t of turnosDe(cfg)) {
+    if (!turnoAbierto(cfg, est, iso, t.id)) continue;
+    const hs = huecosDeCasilla(cfg, staff, est, iso, t.id);
+    if (hs.length && propuso[iso + '|' + t.id]) hs[0].nucleo = propuso[iso + '|' + t.id];
+    r.huecos.push(...hs);
+  }
   return r;
+}
+
+// ---------- el camino del motor Núcleo: dos vueltas como mucho (revisión de la fase 7, 25/09) ----------
+// La petición que se manda al servicio shiftia-core (/v1/solve): 20 s, determinista, objetivo por niveles (primero
+// los mínimos, tier 3; luego lo demás) y, si algo duro no se puede, que relaje la regla y lo diga
+const CONFIG_NUCLEO = { time_limit_s: 20, deterministic: true, objective: 'lexicographic', explain_infeasible: true, relax_on_infeasible: true };
+// Lo que la puerta no dejaría poner de la solución del núcleo (sus rechazos, con su regla), probándolo sobre copias
+// de los meses: la planilla no se toca. opts: los de desdeSolucion
+function rechazosDelNucleo(cfg, staff, meses, problema, sol, opts) {
+  const o = opts || {};
+  const copias = {};
+  for (const [k, e] of Object.entries(meses)) copias[k] = clonarEstado(e);
+  const todos = Object.assign({}, o.meses || {}, copias);
+  const out = [];
+  for (const e of Object.values(copias)) out.push(...desdeSolucion(cfg, staff, e, problema, sol, Object.assign({}, o, { meses: todos })).rechazados.filter(x => x.nucleo));
+  return out;
+}
+// El problema de la segunda vuelta: el de la primera con lo rechazado vetado (unavailable) para que el núcleo busque
+// otra cosa. El núcleo no puede decir «esta persona no hace partido ESTE día» (sus ventanas valen para todo el
+// periodo): quien hace partido solo unos días (Mari Luz, Cristian) podía salir de partido el día que no lo hace, la
+// puerta lo rechazaba y la casilla se quedaba corta (14 casillas cortas en octubre en el modo estricto, frente a 4
+// del generador local). Un partido rechazado veta ese medio día entero (en cualquier local sería partido); otra
+// regla, solo ese local. Lo fijo no se veta nunca (lo puesto no lo quita nadie). No cambia el problema que recibe
+function vetarRechazos(problema, rechazados) {
+  const p = JSON.parse(JSON.stringify(problema));
+  const indices = (p.meta && p.meta.indices) || [];
+  for (const r of rechazados || []) {
+    const { localId, franja } = partirTurno(r.turnoId);
+    const i = indices.findIndex(x => x.iso === r.iso && x.franja === franja);
+    const w = p.workers.find(x => x.id === r.pid);
+    if (i < 0 || !w || w.fixed[i]) continue;
+    const u = w.unavailable[i] || [];
+    if (u.includes('*')) continue;
+    w.unavailable[i] = r.regla === 'partido' ? ['*'] : [...new Set(u.concat(localId))];
+  }
+  return p;
+}
+// Las vueltas como mucho: cada una solo añade vetos, así que se acaba; con tres, octubre entero queda como el
+// generador local (en las pruebas con el núcleo de verdad, la tercera casi nunca hace falta)
+const VUELTAS_NUCLEO = 3;
+// El camino entero del motor Núcleo (Generador → Periodo), sin salir del modelo: el núcleo va por fuera. Es un
+// generador: cada `yield` es la petición que hay que mandar al servicio ({ problem, config }) y se le devuelve la
+// respuesta tal cual ({ ok, status, datos }, lo que da api() en la app). Lo usan la pantalla (22-generador.js) y la
+// batería contra el núcleo de verdad (tests/e2e-nucleo-real.mjs), con el mismo orden:
+//  1) se retira lo automático que ya no vale (como el generador local), lo manual o forzado se queda;
+//  2) el problema (toProblem) con el modo del Generador y «Solo desde hoy»; si no queda ningún día, no se llama;
+//  3) si lo que propone el núcleo choca con la puerta, otra vuelta con eso vetado (vetarRechazos), hasta
+//     VUELTAS_NUCLEO;
+//  4) el volcado mes a mes (desdeSolucion): lo fijo y lo que propone, por la puerta; lo vetado que deja la casilla
+//     corta sale en su hueco («El núcleo proponía a …») y entre lo que no se pudo poner.
+// Devuelve lo mismo que el generador local (aplicados, huecos, coberturas, rechazados, retirados, avisos) más
+// `nucleo` (estado, relajaciones, vueltas, vetadas), o { error } con la respuesta que no sirvió.
+// opts: { permitirPartido, conPatron, desdeIso, meses (los de fuera del periodo: S.meses) }
+function* flujoNucleo(cfg, staff, meses, desde, hasta, opts) {
+  const o = opts || {};
+  const modo = { permitirPartido: !!o.permitirPartido, meses: Object.assign({}, o.meses || {}, meses) };
+  const total = { aplicados: [], huecos: [], coberturas: [], rechazados: [], retirados: [], avisos: [], permitirPartido: modo.permitirPartido, nucleo: null };
+  const lista = Object.values(meses);
+  const tramo = e => [desde > e.days[0].iso ? desde : e.days[0].iso, hasta < e.days[e.days.length - 1].iso ? hasta : e.days[e.days.length - 1].iso];
+  for (const e of lista) { const [d1, d2] = tramo(e); if (d1 <= d2) total.retirados.push(...retirarQueIncumplen(cfg, staff, e, d1, d2, { desdeIso: o.desdeIso })); }
+  let problema = lista.length ? toProblem(cfg, staff, lista[0], desde, hasta, { conPatron: o.conPatron !== false, permitirPartido: modo.permitirPartido, meses: modo.meses, desdeIso: o.desdeIso }) : null;
+  if (!problema) return total;
+  const sirve = r => !!(r && r.ok && r.datos && r.datos.schedule && r.datos.feasible !== false);
+  const r1 = yield { problem: problema, config: Object.assign({}, CONFIG_NUCLEO) };
+  if (!sirve(r1)) return { error: r1 || { ok: false, status: 0, datos: null } };
+  let sol = r1.datos, vueltas = 1;
+  const vetadas = [];
+  while (vueltas < VUELTAS_NUCLEO) {
+    const rech = rechazosDelNucleo(cfg, staff, meses, problema, sol, Object.assign({ desdeIso: o.desdeIso }, modo));
+    if (!rech.length) break;
+    const p2 = vetarRechazos(problema, rech);
+    const r2 = yield { problem: p2, config: Object.assign({}, CONFIG_NUCLEO) };
+    if (!sirve(r2)) { total.avisos.push({ texto: 'El núcleo no respondió a la vuelta siguiente: se vuelca lo de la anterior, y lo que la puerta no deja poner queda como hueco.' }); break; }
+    problema = p2; sol = r2.datos; vetadas.push(...rech); vueltas++;
+  }
+  for (const e of lista) {
+    const x = desdeSolucion(cfg, staff, e, problema, sol, Object.assign({ vetadas, desdeIso: o.desdeIso }, modo));
+    total.aplicados.push(...x.aplicados); total.rechazados.push(...x.rechazados); total.coberturas.push(...x.coberturas); total.huecos.push(...x.huecos);
+    for (const a of x.avisos) if (!total.avisos.some(y => y.pid === a.pid && y.semana === a.semana)) total.avisos.push(a);
+  }
+  const corta = new Set(total.huecos.map(h => h.iso + '|' + h.turnoId));
+  for (const v of vetadas) if (corta.has(v.iso + '|' + v.turnoId) && !total.rechazados.some(y => y.pid === v.pid && y.iso === v.iso && y.turnoId === v.turnoId)) total.rechazados.push(Object.assign({ vetada: true }, v));
+  total.nucleo = { status: sol.status, feasible: sol.feasible, objective: sol.objective, stats: sol.stats, violations: sol.violations || [], relaxations: sol.relaxations || [], vueltas, vetadas: vetadas.length };
+  return total;
 }
 
 // ---------- sincronización (servidor) ----------
@@ -4885,7 +5120,7 @@ if (typeof module !== 'undefined') {
     LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, fechaCandidato, ORDENES_CAND, ordenarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos, fundirSemillaEntrevistas, textoCampo,
     diasAusenciaMes, mediasAusenciaMes, jornadasAusencia, vacacionesAno, horasPersonaMes, horasEquipoMes, horasLocalMes, cierreDe, tramoDe, registroApoyos,
-    toProblem, desdeSolucion,
+    toProblem, desdeSolucion, CONFIG_NUCLEO, VUELTAS_NUCLEO, rechazosDelNucleo, vetarRechazos, flujoNucleo, desdeEfectivo,
     fusionarEstado, sembrarDemo, migrarHorarios, navVigente, refrescarCasillas, refrescarMarcas, seBuscaCocina, diaDeLaSemanaTipo,
     CARACTERISTICAS, REGLAS, REGLA_NOMBRE, nombreRegla, regla, caracteristicaActiva, avisosVigentes, puedePrimero, partidoAbre, primeroDe, posicionesDe, motivoSinPrimero, porQueNadiePrimero, esContinuo,
     resumenMinimos, descripcionCocina, condicionesDe, verificarSemana, generarSemana, mesVisibleParaPersonal, mesesVisibles, destinatariosAviso, avisoEsPara,
@@ -4901,5 +5136,6 @@ if (typeof module !== 'undefined') {
     estadoInterruptor, parejasNuncaCon, ponerNuncaCon, quitarNuncaCon, migrarNuncaCon, migrarComodin, migrarInactivas,
     localHabitualDe, alternarLocal, ponerLocalHabitual, vetoRepetido, seriaContinuo, textoVeto, dowsVeto,
     RELAJABLE, buscarRelajando, TEXTO_PAREJA_FLEXIBLE,
+    skillCocina, instanciarFijo, huecosDeCasilla,
   };
 }

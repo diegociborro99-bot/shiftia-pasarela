@@ -82,6 +82,8 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   (programador, admin, empleado), versionado de la planilla, SSE, proxy al
   núcleo. Tests en `tests/`.
 - `npm run build` · `npm test` · `npm run test:e2e` (Playwright, se salta sin Chromium) · `npm start`.
+  `SHIFTIA_CORE_REAL=http://… node tests/e2e-nucleo-real.mjs` prueba el motor Núcleo contra un servicio
+  shiftia-core de verdad (sin la variable, se salta).
 
 Sin servidor, `index.html` funciona solo (los datos viven en el navegador;
 contraseña inicial del modo local: `pasarela2026`). Con `?demo=1` el mes en

@@ -12,6 +12,8 @@
 //   R22–R26, R28–R29  asignaciones fijas de la semana tipo (el patrón)
 const assert = require('assert');
 const M = require(process.env.MODELO || './modelo.js');
+// 25/09 (revisión de la fase 7): el esquema del núcleo (lo que el servicio acepta) y cómo leer el problema
+const NE = require('./tests/nucleo-esquema.cjs');
 
 let n = 0;
 function ok(name, fn) { n++; fn(); console.log(`  ✓ ${name}`); }
@@ -503,7 +505,11 @@ ok('toProblem produce un problema del núcleo en medios días: turnos por local,
   const pr = M.toProblem(cfg, st, e, '2026-10-05', '2026-10-11');
   assert.strictEqual(pr.horizon_days, 14, '7 días × 2 franjas');
   assert.deepStrictEqual(pr.shifts.map(s => s.code).sort(), ['EL33', 'MONACO', 'OFF', 'PASARELA', 'ZAPA']);
-  assert.strictEqual(pr.workers.length, 21, 'las dos bajas no entran');
+  // 25/09 (fase 7, S25; disponibilidad D6 con la corrección del verificador): todas las personas entran en el
+  // problema; quien no puede trabajar (las tres bajas, Dulce en standby) va con todos los medios días a «*». Antes
+  // se quedaban fuera, y lo que el encargado les ponía a mano no contaba para el núcleo
+  assert.strictEqual(pr.workers.length, 24, 'todas las personas');
+  for (const id of ['laura', 'maydeth', 'susi', 'dulce']) assert.ok(pr.meta.indices.every((x, i) => NE.todoFuera(pr.workers.find(w => w.id === id).unavailable[i])), id);
   const jac = pr.workers.find(w => w.id === 'jacquelin');
   assert.deepStrictEqual(jac.allowed_shifts, ['ZAPA']);
   assert.ok(Object.values(jac.unavailable).length >= 7, 'tardes y domingo bloqueados');
@@ -517,7 +523,9 @@ ok('toProblem produce un problema del núcleo en medios días: turnos por local,
 
 ok('desdeSolucion vuelca la planilla del núcleo en casillas ordenadas con cocina y quién abre', () => {
   const cfg = cfgBase(), st = staffDe(cfg), e = estadoOct();
-  const pr = M.toProblem(cfg, st, e, '2026-10-06', '2026-10-06');
+  // (fase 7) sin semana tipo: esta solución hecha a mano deja libres las plazas fijas, y el volcado pone primero
+  // la semana tipo (como el generador local), así que con ella la casilla tendría más gente
+  const pr = M.toProblem(cfg, st, e, '2026-10-06', '2026-10-06', { conPatron: false });
   const sol = { status: 'OPTIMAL', feasible: true, schedule: {} };
   for (const w of pr.workers) sol.schedule[w.id] = { 0: 'OFF', 1: 'OFF' };
   sol.schedule.scapon = { 0: 'OFF', 1: 'MONACO' };
@@ -1637,7 +1645,7 @@ ok('núcleo (toProblem): bloquea el día libre puntual y no el habitual, y fija 
   const i = (iso, f) => pb.meta.indices.findIndex(x => x.iso === iso && x.franja === f);
   const w = id => pb.workers.find(x => x.id === id);
   for (const f of ['M', 'T']) {
-    assert.strictEqual(w('mariluz').unavailable[i(LP_MAR, f)], '*', `Mari Luz libra el martes (${f})`);
+    assert.deepStrictEqual(w('mariluz').unavailable[i(LP_MAR, f)], ['*'], `Mari Luz libra el martes (${f})`);
     assert.strictEqual(w('mariluz').fixed[i(LP_MAR, f)], undefined, 'y no se le fija la plaza del martes');
     assert.strictEqual(w('mariluz').unavailable[i(LP_MIE, f)], undefined, 'el miércoles puede');
     assert.strictEqual(w('mariluz').fixed[i(LP_MIE, f)], 'PASARELA', 'y se le fija lo del martes');
@@ -1645,7 +1653,7 @@ ok('núcleo (toProblem): bloquea el día libre puntual y no el habitual, y fija 
   }
   const pb2 = M.toProblem(cfg, st, e, '2026-10-12', '2026-10-18', {});
   const i2 = (iso, f) => pb2.meta.indices.findIndex(x => x.iso === iso && x.franja === f);
-  assert.strictEqual(pb2.workers.find(x => x.id === 'mariluz').unavailable[i2('2026-10-14', 'M')], '*', 'la semana siguiente vuelve a librar el miércoles');
+  assert.deepStrictEqual(pb2.workers.find(x => x.id === 'mariluz').unavailable[i2('2026-10-14', 'M')], ['*'], 'la semana siguiente vuelve a librar el miércoles');
 });
 
 ok('libraPuntual es una lista por semanas: se leen las dos formas, se migra el objeto y caducan las semanas pasadas', () => {
@@ -1806,7 +1814,9 @@ ok('revisión F1 · núcleo: desdeSolucion copia el «por» y la nota de la plaz
   const en = M.asignados(e, LP_MIE, 'PASARELA_M').find(x => x.pid === 'lavinia');
   assert.ok(en, 'la pone el núcleo');
   assert.strictEqual(en.por, 'mariluz', 'con el «por» de su plaza fija: así un cambio de día libre sabe a quién cubría');
-  assert.strictEqual(en.origen, 'nucleo');
+  // (fase 7) la plaza fija la vuelca la semana tipo, por el mismo camino que el generador local (instanciarFijo):
+  // es «de la semana tipo» en la vista previa, no «rellenada por el núcleo»
+  assert.strictEqual(en.origen, 'patron');
 });
 
 ok('revisión F1 · al retirar a quien llevaba la cocina se recalcula quién la lleva (Adrián cambia su día y vuelve)', () => {
@@ -2331,7 +2341,7 @@ ok('cierre puntual · núcleo (toProblem): cocina por medio día abierto, SIN no
   assert.ok(!cocinaDura(idx(CIE_LUN, 'T')) && !cocinaDura(idx(CIE_MAR, 'T')), 'cocina dura en una tarde con cobertura máx. 0');
   assert.ok(cocinaDura(idx(CIE_LUN, 'M')), 'la mañana abierta sí la pide');
   const w = id => pr.workers.find(x => x.id === id);
-  assert.strictEqual(w('cristian').unavailable[idx(CIE_MAR, 'T')], '*');
+  assert.deepStrictEqual(w('cristian').unavailable[idx(CIE_MAR, 'T')], ['*']);
   assert.ok(w('yilian').allowed_shifts.includes('PASARELA'), JSON.stringify(w('yilian').allowed_shifts));
   assert.ok((w('yilian').unavailable[idx(CIE_LUN, 'M')] || []).includes('PASARELA'), 'fuera del cierre sigue atada al Mónaco');
   assert.ok(!Array.isArray(w('yilian').unavailable[idx(CIE_LUN, 'T')]) || !w('yilian').unavailable[idx(CIE_LUN, 'T')].includes('PASARELA'), 'la tarde del cierre puede ir a Pasarela');
@@ -2345,7 +2355,7 @@ ok('cierre puntual · «abrir hoy» (S28) pide el mínimo y se guarda con la ape
   assert.strictEqual(M.minimoDe(cfg, CIE_LUN, 'EL33_T').min, 0, 'sin estado, la tabla del local');
   assert.strictEqual(M.revisarTurno(cfg, st, e, CIE_LUN, 'EL33_T').faltan, 2);
   const pr = M.toProblem(cfg, st, e, CIE_LUN, CIE_LUN, {});
-  assert.strictEqual(pr.rules.find(r => r.type === 'coverage').params.by_day[1].EL33.min, 2, 'el núcleo también lo lee');
+  assert.strictEqual(NE.demanda(pr, 1, 'EL33').min, 2, 'el núcleo también lo lee');
   M.toggleApertura(e, CIE_DOM, 'EL33_T', cfg);
   assert.ok(M.revisionMes(cfg, st, e, { desde: CIE_DOM, hasta: CIE_DOM }).some(x => x.tipo === 'abierta-vacia' && x.turnoId === 'EL33_T'), 'abierta con mínimo 0 y nadie: se avisa');
   cfg.cierresPuntuales = [cierreTardes()];
@@ -3034,7 +3044,7 @@ ok('F3 · D10 ausencias por franja: el permiso solo de mañana que apunta la Cob
   assert.ok(pm.regla === 'ausencia' && /por la mañana/.test(pm.motivo), JSON.stringify(pm));
   // núcleo: por medio día
   const w = M.toProblem(cfg, st, M.nuevoEstado(2026, 10), MAR, MAR, {}).workers.find(x => x.id === 'mariluz');
-  assert.strictEqual(w.unavailable[0], '*'); assert.notStrictEqual(w.unavailable[1], '*');
+  assert.deepStrictEqual(w.unavailable[0], ['*']); assert.ok(!NE.todoFuera(w.unavailable[1]));
   // horas: medio día de ausencia, no un día entero; las vistas lo dicen
   const h = M.horasPersonaMes(cfg, st, { '2026-10': e }, 'mariluz', 2026, 10);
   assert.strictEqual(h.ausencias, 0); assert.strictEqual(h.ausenciasMedias, 1);
@@ -4719,7 +4729,7 @@ ok('F6 · S16 (D5) con «Mínimos» apagado nadie los exige (Revisión, Generado
   const pc = M.planesCobertura(c2, c2.staff, e2, { pid: 'ivan', tipo: 'LD', desde: '2026-10-02', hasta: '2026-10-02' });
   assert.ok(pc.afectados.every(a => !a.faltan) && pc.planes.every(p => !p.huecos.some(h => h.tipo === 'faltan')), JSON.stringify(pc.afectados));
   // el núcleo
-  assert.strictEqual(M.toProblem(cfg, st, f6Sem(), L, L, { conPatron: false }).rules[0].params.by_day[0].MONACO.min, 0);
+  assert.strictEqual(NE.demanda(M.toProblem(cfg, st, f6Sem(), L, L, { conPatron: false }), 0, 'MONACO').min, 0);
   // la interfaz lo dice al apagarla (REGLAS, como «Cocina»)
   assert.match(M.REGLAS.find(x => x.k === 'minimos').apagada, /nadie/);
 });
@@ -4947,4 +4957,275 @@ ok('F6 rev · los textos de la pareja flexible dicen cuándo se junta: con aviso
   assert.ok(c && /pareja flexible: si no hay nadie más, se puede juntar con aviso/.test(c.texto), JSON.stringify(c));
 });
 
+// ---------- F7 (25/09): el motor Núcleo lee la ficha por la misma puerta (S25) ----------
+const f7Oct = () => M.nuevoEstado(2026, 10, { festivos: [] });
+const f7i = (pb, iso, f) => pb.meta.indices.findIndex(x => x.iso === iso && x.franja === f);
+ok('F7 · toProblem: quien no puede trabajar ningún medio día va con todo a «*» y fuera del reparto equilibrado; una baja desde el jueves no quita el lunes', () => {
+  const cfg = cfgBase(), st = cfg.staff;
+  M.personaDe(st, 'tere').ausencias = [{ tipo: 'BAJ', desde: '2026-10-08' }];
+  const pb = M.toProblem(cfg, st, f7Oct(), '2026-10-05', '2026-10-11', { conPatron: false });
+  const bal = pb.rules.find(r => r.type === 'balance');
+  assert.ok(bal.scope && ['laura', 'maydeth', 'susi', 'dulce'].every(id => !bal.scope.workers.includes(id)) && bal.scope.workers.includes('tere'), JSON.stringify(bal.scope));
+  const tere = pb.workers.find(w => w.id === 'tere');
+  assert.strictEqual(tere.unavailable[f7i(pb, '2026-10-05', 'M')], undefined, 'el lunes trabaja');
+  assert.deepStrictEqual(tere.unavailable[f7i(pb, '2026-10-08', 'M')], ['*'], 'el jueves ya está de baja');
+});
+ok('F7 · toProblem cruza de mes con la planilla de cada mes (opts.meses): el cierre a mano y lo ya puesto de octubre', () => {
+  const cfg = cfgBase(), st = cfg.staff;
+  const sep = M.nuevoEstado(2026, 9, { festivos: [] }), oct = f7Oct();
+  oct.apertura['2026-10-01'] = { EL33_M: false };
+  assert.ok(M.asignar(oct, cfg, st, '2026-10-02', 'PASARELA_M', 'tere', { forzar: true }).ok);
+  const pb = M.toProblem(cfg, st, sep, '2026-09-28', '2026-10-04', { conPatron: false, meses: { '2026-09': sep, '2026-10': oct } });
+  assert.deepStrictEqual(NE.demanda(pb, f7i(pb, '2026-10-01', 'M'), 'EL33'), { min: 0, max: 0 }, 'El 33 cerrado a mano el jueves 1');
+  assert.strictEqual(pb.workers.find(w => w.id === 'tere').fixed[f7i(pb, '2026-10-02', 'M')], 'PASARELA', 'lo ya puesto en octubre va fijo');
+});
+ok('F7 · lo ya puesto en la planilla va fijo en el problema (lo hace el modelo, no la pantalla), también lo forzado', () => {
+  const cfg = cfgBase(), st = cfg.staff, e = f7Oct();
+  assert.ok(M.asignar(e, cfg, st, '2026-10-10', 'PASARELA_M', 'tere', { forzar: true }).ok, 'Tere libra los sábados: forzada');
+  const pb = M.toProblem(cfg, st, e, '2026-10-05', '2026-10-11', { conPatron: false });
+  const i = f7i(pb, '2026-10-10', 'M'), tere = pb.workers.find(w => w.id === 'tere');
+  assert.strictEqual(tere.fixed[i], 'PASARELA');
+  assert.strictEqual(tere.unavailable[i], undefined, 'lo fijo manda: no está además «no disponible»');
+});
+ok('F7 · «nunca con» en el núcleo: la pareja flexible es dura en el modo estricto y blanda en el relajado; la que ya se juntó a mano no hace imposible el problema', () => {
+  const cfg = cfgBase(), st = cfg.staff;
+  const reglas = (pb, modo) => pb.rules.filter(r => r.type === 'same_shift_forbidden' && r.mode === modo).flatMap(r => r.params.pairs.map(q => q.slice().sort().join('+')));
+  const est = M.toProblem(cfg, st, f7Oct(), '2026-10-05', '2026-10-11', { conPatron: false });
+  assert.ok(reglas(est, 'hard').includes('lavinia+mariluz') && !reglas(est, 'soft').length, JSON.stringify(est.rules.filter(r => r.type === 'same_shift_forbidden')));
+  const rel = M.toProblem(cfg, st, f7Oct(), '2026-10-05', '2026-10-11', { conPatron: false, permitirPartido: true });
+  assert.ok(reglas(rel, 'soft').includes('lavinia+mariluz') && !reglas(rel, 'hard').includes('lavinia+mariluz'), JSON.stringify(rel.rules.filter(r => r.type === 'same_shift_forbidden')));
+  // una pareja estricta que el encargado ya puso junta a mano: en el problema, blanda (si no, sería imposible)
+  const c2 = cfgBase(); M.ponerNuncaCon(c2.staff, 'ivan', 'lola', {});
+  const e2 = f7Oct();
+  assert.ok(M.asignar(e2, c2, c2.staff, '2026-10-06', 'PASARELA_T', 'ivan', {}).ok && M.asignar(e2, c2, c2.staff, '2026-10-06', 'PASARELA_T', 'lola', { forzar: true }).ok);
+  const pb2 = M.toProblem(c2, c2.staff, e2, '2026-10-05', '2026-10-11', { conPatron: false });
+  assert.ok(!reglas(pb2, 'hard').includes('ivan+lola') && reglas(pb2, 'soft').includes('ivan+lola'), JSON.stringify(pb2.rules.filter(r => r.type === 'same_shift_forbidden')));
+});
+ok('F7 · «sin partido» en el núcleo: un partido que ya está puesto a mano no hace imposible el problema', () => {
+  const cfg = cfgBase(), st = cfg.staff, e = f7Oct();
+  assert.ok(M.asignar(e, cfg, st, '2026-10-07', 'MONACO_M', 'yilian', {}).ok);
+  assert.ok(M.asignar(e, cfg, st, '2026-10-07', 'MONACO_T', 'scapon', {}).ok && M.asignar(e, cfg, st, '2026-10-07', 'MONACO_T', 'yilian', { forzar: true, permitirPartido: true }).ok);
+  const pb = M.toProblem(cfg, st, e, '2026-10-05', '2026-10-11', { conPatron: false });
+  const dura = pb.rules.find(r => r.id === 'sin partido' && r.mode === 'hard'), blanda = pb.rules.find(r => r.id === 'sin partido' && r.mode === 'soft');
+  assert.ok(!(dura && dura.scope.workers.includes('yilian')) && blanda && blanda.scope.workers.includes('yilian'), JSON.stringify(pb.rules.filter(r => r.id === 'sin partido')));
+});
+ok('F7 · la cocina del núcleo es puedeCocina de ese local ese día (con sus interruptores)', () => {
+  const cfg = cfgBase(), st = cfg.staff;
+  const dias = pb => pb.workers.find(w => w.id === 'scapon').skills.filter(s => s.startsWith('coc_MONACO_')).map(s => M.isoDow(s.slice(-10)));
+  assert.deepStrictEqual(dias(M.toProblem(cfg, st, f7Oct(), '2026-10-05', '2026-10-11', { conPatron: false })), [2], 'Susana Capón, cocina solo los martes');
+  M.personaDe(st, 'scapon').inactivas = ['cocina'];
+  assert.deepStrictEqual(dias(M.toProblem(cfg, st, f7Oct(), '2026-10-05', '2026-10-11', { conPatron: false })), [1, 2, 3, 4, 5, 6, 7], '«Cocina» apagada en su ficha: todos los días');
+  const pb = M.toProblem(cfg, st, f7Oct(), '2026-10-05', '2026-10-11', { conPatron: false });
+  assert.ok(pb.rules.some(r => r.type === 'skill_coverage' && r.params.requirements[0].skill === M.skillCocina('MONACO', '2026-10-06')));
+  cfg.reglas = { cocina: false };
+  const pc = M.toProblem(cfg, st, f7Oct(), '2026-10-05', '2026-10-11', { conPatron: false });
+  assert.ok(!pc.rules.some(r => r.type === 'skill_coverage') && pc.workers.every(w => !w.skills.length), 'regla «Cocina» apagada: nadie la pide ni la lleva');
+});
+ok('F7 · la semana tipo entra en el núcleo por la misma puerta: Roberto «cubre a Iván» el domingo va fijo y se vuelca con su «por»', () => {
+  const cfg = cfgBase(), st = cfg.staff, e = f7Oct(), DOM = '2026-10-11';
+  M.personaDe(st, 'roberto').cubreA = [{ pid: 'ivan' }];
+  M.personaDe(st, 'ivan').ausencias = [{ tipo: 'VAC', desde: DOM, hasta: DOM }];
+  const pb = M.toProblem(cfg, st, e, '2026-10-05', DOM, {});
+  const i = f7i(pb, DOM, 'T');
+  assert.strictEqual(pb.workers.find(w => w.id === 'roberto').fixed[i], 'PASARELA', 'en el sitio de Iván (su partido del domingo, autorizado por cubrirle: D1)');
+  const sol = { schedule: {} };
+  for (const w of pb.workers) for (const [k, c] of Object.entries(w.fixed)) (sol.schedule[w.id] = sol.schedule[w.id] || {})[k] = c;
+  const r = M.desdeSolucion(cfg, st, e, pb, sol, {});
+  const en = M.asignados(e, DOM, 'PASARELA_T').find(x => x.pid === 'roberto');
+  assert.ok(en && en.por === 'ivan' && en.porDesignacion && !(en.avisos || []).length, JSON.stringify(M.asignados(e, DOM, 'PASARELA_T')));
+  assert.ok(!r.rechazados.some(x => x.pid === 'roberto'), JSON.stringify(r.rechazados));
+});
+ok('F7 · desdeSolucion pone primero lo fijo y luego lo que propone el núcleo, en el modo del Generador: la plaza de la semana tipo no se pierde', () => {
+  const cfg = cfgBase(), st = cfg.staff, e = f7Oct(), VIE = '2026-10-09';
+  const pb = M.toProblem(cfg, st, e, VIE, VIE, {});
+  assert.strictEqual(pb.workers.find(w => w.id === 'lavinia').fixed[1], 'ZAPA', 'Lavinia, fija el viernes por la tarde en Zapatillera');
+  const sol = { schedule: { lavinia: { 0: 'PASARELA', 1: 'ZAPA' } } };
+  const r = M.desdeSolucion(cfg, st, e, pb, sol, { permitirPartido: false });
+  assert.ok(M.pidsEn(e, VIE, 'ZAPA_T').includes('lavinia') && !M.pidsEn(e, VIE, 'PASARELA_M').includes('lavinia'), 'la tarde de la semana tipo se queda; la mañana (partido no declarado) no entra');
+  assert.ok(r.rechazados.some(x => x.pid === 'lavinia' && x.turnoId === 'PASARELA_M' && x.regla === 'partido'), JSON.stringify(r.rechazados));
+  // con «Permitir partidos no declarados», entra con su aviso
+  const e2 = f7Oct(), pb2 = M.toProblem(cfg, st, e2, VIE, VIE, { permitirPartido: true });
+  M.desdeSolucion(cfg, st, e2, pb2, sol, { permitirPartido: true });
+  const m = M.asignados(e2, VIE, 'PASARELA_M').find(x => x.pid === 'lavinia');
+  assert.ok(m && (m.avisos || []).some(t => /partido no declarado/.test(t)), JSON.stringify(M.asignados(e2, VIE, 'PASARELA_M')));
+});
+
+ok('F7 · toProblem(ctx, desde, hasta): con el contexto de la puerta (crearContexto) sale el mismo problema', () => {
+  const cfg = cfgBase(), st = cfg.staff, sep = M.nuevoEstado(2026, 9, { festivos: [] }), oct = f7Oct();
+  oct.apertura['2026-10-01'] = { EL33_M: false };
+  const meses = { '2026-09': sep, '2026-10': oct };
+  const a = M.toProblem(M.crearContexto(cfg, st, sep, { meses }), '2026-09-28', '2026-10-04', { permitirPartido: true });
+  const b = M.toProblem(cfg, st, sep, '2026-09-28', '2026-10-04', { permitirPartido: true, meses });
+  assert.deepStrictEqual(a, b);
+  assert.deepStrictEqual(NE.demanda(a, f7i(a, '2026-10-01', 'M'), 'EL33'), { min: 0, max: 0 }, 'con los meses del contexto');
+});
+ok('F7 · las plazas supuestas de la semana tipo las decide el núcleo (no van fijas); si las elige, se vuelcan como supuestas', () => {
+  const cfg = cfgBase(), st = cfg.staff, e = f7Oct(), MAR = '2026-10-06';
+  const pb = M.toProblem(cfg, st, e, MAR, MAR, {});
+  assert.strictEqual(pb.workers.find(w => w.id === 'tere').fixed[0], undefined, 'Tere (supuesta los martes en Pasarela por la mañana): libre para el núcleo');
+  M.desdeSolucion(cfg, st, e, pb, { schedule: { tere: { 0: 'PASARELA' } } }, {});
+  const en = M.asignados(e, MAR, 'PASARELA_M').find(x => x.pid === 'tere');
+  assert.ok(en && en.supuesto && en.origen === 'nucleo', JSON.stringify(en));
+});
+// ---------- F7 rev (25/09): revisión de la fase 7 con el núcleo DE VERDAD (shiftia-core y su CP-SAT) ----------
+// Los dos revisores pasaron el problema por el servicio real: lo rechazaba (422) y, arreglada la forma, con un medio
+// día imposible relajaba los mínimos de todo el periodo y dejaba más casillas cortas que el generador local
+const f7Vuelta = (pb, extra, ignorarVetos) => {
+  // un núcleo de pega sin CP-SAT: lo fijo, más lo que se le pida (si el problema no lo veta, como el de verdad)
+  const sched = {};
+  for (const w of pb.workers) sched[w.id] = Object.assign({}, w.fixed);
+  for (const [pid, i, code] of extra || []) { const w = pb.workers.find(x => x.id === pid); const u = w.unavailable[i]; if (ignorarVetos || (!NE.todoFuera(u) && !(u || []).includes(code))) sched[pid][i] = code; }
+  return { ok: true, status: 200, datos: { status: 'OPTIMAL', feasible: true, objective: 0, schedule: sched, relaxations: [], violations: [], stats: { wall_time_s: 0.1 } } };
+};
+const f7Flujo = (cfg, st, meses, desde, hasta, opts, nucleo) => {
+  const peticiones = [];
+  const it = M.flujoNucleo(cfg, st, meses, desde, hasta, opts);
+  let paso = it.next();
+  while (!paso.done) { peticiones.push(paso.value); paso = it.next(nucleo(paso.value)); }
+  return { r: paso.value, peticiones };
+};
+ok('F7 rev · el problema cumple el esquema del núcleo (SolveRequest de shiftia-core): «ningún local ese medio día» es la lista ["*"], no el texto «*» (el núcleo respondía 422)', () => {
+  const cfg = cfgBase(), st = cfg.staff, sep = M.nuevoEstado(2026, 9, { festivos: [] }), oct = f7Oct();
+  M.ponerLibraPuntual(M.personaDe(st, 'mariluz'), '2026-09-28', [2]);
+  const pb = M.toProblem(cfg, st, sep, '2026-09-28', '2026-10-04', { meses: { '2026-09': sep, '2026-10': oct } });
+  assert.deepStrictEqual(NE.erroresPeticion({ problem: pb }).slice(0, 3), []);
+  const dulce = pb.workers.find(w => w.id === 'dulce');
+  assert.ok(pb.meta.indices.every((x, i) => Array.isArray(dulce.unavailable[i]) && dulce.unavailable[i].join() === '*'), JSON.stringify(dulce.unavailable));
+});
+ok('F7 rev · un medio día imposible no arrastra a los demás: los mínimos son blandos y lo primero (tier 3), las casillas cerradas duras a 0 y cada regla dura, con su nombre', () => {
+  const cfg = cfgBase(), st = cfg.staff, e = f7Oct();
+  e.apertura['2026-10-08'] = { EL33_M: false };
+  const pb = M.toProblem(cfg, st, e, '2026-10-05', '2026-10-11', {});
+  const cov = pb.rules.filter(r => r.type === 'coverage');
+  // antes, una sola regla dura para todo el periodo: con Dulce en standby la mañana del lunes 5 en Pasarela no se
+  // puede cubrir, el núcleo relajaba la regla entera y ya no tenía por qué llenar ninguna otra casilla
+  const piden = r => Object.values(r.params.by_day).some(d => Object.values(d).some(s => s.min > 0));
+  assert.ok(!cov.some(r => r.mode === 'hard' && piden(r)), JSON.stringify(cov.map(r => [r.id, r.mode])));
+  const min = cov.find(r => r.mode === 'soft' && piden(r));
+  assert.ok(min && min.tier === 3 && pb.rules.filter(r => r.mode === 'soft' && r !== min).every(r => r.tier < 3), 'los mínimos, antes que cualquier otra regla blanda');
+  assert.deepStrictEqual(NE.demanda(pb, f7i(pb, '2026-10-05', 'M'), 'PASARELA'), { min: 3, max: null });
+  assert.deepStrictEqual(NE.demanda(pb, f7i(pb, '2026-10-08', 'M'), 'EL33'), { min: 0, max: 0 }, 'la cerrada, a 0');
+  assert.ok(cov.some(r => r.mode === 'hard' && ((r.params.by_day[f7i(pb, '2026-10-08', 'M')] || {}).EL33 || {}).max === 0), 'y dura');
+  assert.ok(pb.rules.filter(r => r.type === 'skill_coverage' && r.mode === 'hard').every(r => r.scope.day_tags.length === 1), 'la cocina obligatoria, una regla por medio día');
+  // el núcleo relaja por nombre de regla: dos reglas duras con el mismo nombre se relajaban juntas (febrero y marzo
+  // de 2027 empiezan el mismo día de la semana: «cocina … del viernes 5» salía dos veces)
+  const fm = M.toProblem(cfg, st, M.nuevoEstado(2027, 2, { festivos: [] }), '2027-02-01', '2027-03-31', { conPatron: false });
+  const duras = fm.rules.filter(r => r.mode === 'hard').map(r => r.id);
+  assert.strictEqual(new Set(duras).size, duras.length, duras.filter((x, i) => duras.indexOf(x) !== i).slice(0, 3).join(' | '));
+});
+ok('F7 rev · «sin partido» dura: quien tiene fijos dos medios días seguidos (la tarde y la mañana siguiente, Yilian) no entra en ella', () => {
+  const cfg = cfgBase(), st = cfg.staff;
+  const pb = M.toProblem(cfg, st, f7Oct(), '2026-10-05', '2026-10-11', {});
+  const y = pb.workers.find(w => w.id === 'yilian');
+  assert.ok(y.fixed[f7i(pb, '2026-10-05', 'T')] && y.fixed[f7i(pb, '2026-10-06', 'M')], 'su semana tipo: el lunes por la tarde y el martes por la mañana en el Mónaco');
+  // la ventana de dos medios días del núcleo también prohíbe «tarde y mañana siguiente»: con ella dura, el problema
+  // era imposible por construcción y el núcleo relajaba «sin partido» para todo el grupo
+  const dura = pb.rules.find(r => r.id === 'sin partido' && r.mode === 'hard');
+  for (const id of dura ? dura.scope.workers : []) {
+    const w = pb.workers.find(x => x.id === id);
+    assert.ok(!pb.meta.indices.some((x, i) => w.fixed[i] && w.fixed[i + 1]), `${id}: ${JSON.stringify(w.fixed)}`);
+  }
+  assert.ok(pb.rules.some(r => r.id === 'sin partido' && r.mode === 'soft' && r.scope.workers.includes('yilian')), JSON.stringify(pb.rules.filter(r => r.id === 'sin partido')));
+});
+ok('F7 rev · el volcado dice por qué no entra quien solo hace cocina: el motivo de la cocina (Hojan, «no hace partido los miércoles»), no «solo hace cocina»', () => {
+  const cfg = cfgBase(), st = cfg.staff, X = '2026-10-07';
+  const e = f7Oct(), pb = M.toProblem(cfg, st, e, X, X, {});
+  assert.strictEqual(pb.workers.find(w => w.id === 'hojan').fixed[1], 'MONACO', 'la tarde del Mónaco, de su semana tipo');
+  const r = M.desdeSolucion(cfg, st, e, pb, { schedule: { hojan: { 0: 'EL33', 1: 'MONACO' } } }, {});
+  const x = r.rechazados.find(z => z.pid === 'hojan');
+  assert.ok(x && x.regla === 'partido' && /no hace partido los miércoles/.test(x.motivo), JSON.stringify(r.rechazados));
+  // y con «Permitir partidos no declarados», entra de cocina con su aviso
+  const e2 = f7Oct(), pb2 = M.toProblem(cfg, st, e2, X, X, { permitirPartido: true });
+  M.desdeSolucion(cfg, st, e2, pb2, { schedule: { hojan: { 0: 'EL33', 1: 'MONACO' } } }, { permitirPartido: true });
+  const en = M.asignados(e2, X, 'EL33_M').find(z => z.pid === 'hojan');
+  assert.ok(en && en.cocina && (en.avisos || []).length, JSON.stringify(M.asignados(e2, X, 'EL33_M')));
+});
+ok('F7 rev · toProblem lee el mes del propio estado del estado (la copia del Generador) y los otros meses de opts.meses, como turnosSemanaDe', () => {
+  const cfg = cfgBase(), st = cfg.staff, copia = f7Oct(), guardado = f7Oct();
+  assert.ok(M.asignar(copia, cfg, st, '2026-10-10', 'PASARELA_M', 'tere', { forzar: true }).ok);
+  const pb = M.toProblem(cfg, st, copia, '2026-10-05', '2026-10-11', { conPatron: false, meses: { '2026-10': guardado } });
+  assert.strictEqual(pb.workers.find(w => w.id === 'tere').fixed[f7i(pb, '2026-10-10', 'M')], 'PASARELA', 'Tere, forzada en la copia');
+  const sep = M.nuevoEstado(2026, 9, { festivos: [] });
+  const pc = M.toProblem(cfg, st, sep, '2026-09-28', '2026-10-11', { conPatron: false, meses: { '2026-10': copia } });
+  assert.strictEqual(pc.workers.find(w => w.id === 'tere').fixed[f7i(pc, '2026-10-10', 'M')], 'PASARELA', 'y el otro mes, de opts.meses');
+});
+ok('F7 rev · «Solo desde hoy» llega al núcleo: el problema empieza hoy y el volcado no propone ni cuenta huecos en los días pasados', () => {
+  const cfg = cfgBase(), st = cfg.staff, HOY = '2026-10-08';
+  const e = f7Oct(), pb = M.toProblem(cfg, st, e, '2026-10-05', '2026-10-11', { desdeIso: HOY });
+  assert.ok(pb && pb.meta.desde === HOY && pb.horizon_days === 8 && pb.meta.indices.every(x => x.iso >= HOY), pb && JSON.stringify(pb.meta.indices.slice(0, 2)));
+  const r = M.desdeSolucion(cfg, st, e, pb, f7Vuelta(pb).datos, { desdeIso: HOY });
+  assert.ok(r.aplicados.length && r.aplicados.every(a => a.iso >= HOY) && r.huecos.every(h => h.iso >= HOY), JSON.stringify(r.huecos.map(h => h.iso)));
+  assert.ok(Object.keys(e.asig).every(iso => iso >= HOY), 'los días pasados, sin tocar');
+  // aunque el problema traiga días pasados, el volcado no los toca
+  const e2 = f7Oct(), p2 = M.toProblem(cfg, st, e2, '2026-10-05', '2026-10-11', {});
+  const r2 = M.desdeSolucion(cfg, st, e2, p2, f7Vuelta(p2).datos, { desdeIso: HOY });
+  assert.ok(r2.aplicados.every(a => a.iso >= HOY) && r2.huecos.every(h => h.iso >= HOY) && Object.keys(e2.asig).every(iso => iso >= HOY));
+  assert.strictEqual(M.toProblem(cfg, st, f7Oct(), '2026-10-05', '2026-10-07', { desdeIso: HOY }), null, 'todo el periodo ya ha pasado: no hay nada que resolver');
+});
+ok('F7 rev · el partido de ESE día en el núcleo: con una mitad del día fija, la otra no está disponible si ese día no hace partido (modo estricto)', () => {
+  const cfg = cfgBase(), st = cfg.staff, VIE = '2026-10-09';
+  const pb = M.toProblem(cfg, st, f7Oct(), VIE, VIE, {});
+  const lav = pb.workers.find(w => w.id === 'lavinia');
+  assert.strictEqual(lav.fixed[1], 'ZAPA', 'Lavinia, fija el viernes por la tarde en Zapatillera (semana tipo)');
+  assert.deepStrictEqual(lav.unavailable[0], ['*'], 'y los viernes no hace partido: la mañana, en ningún local');
+  const rel = M.toProblem(cfg, st, f7Oct(), VIE, VIE, { permitirPartido: true });
+  assert.strictEqual(rel.workers.find(w => w.id === 'lavinia').unavailable[0], undefined, 'en el modo relajado su partido entra con aviso');
+  // Hojan (solo cocina) con la tarde del Mónaco fija el miércoles: la mañana, tampoco
+  const X = '2026-10-07', ph = M.toProblem(cfg, st, f7Oct(), X, X, {});
+  assert.deepStrictEqual(ph.workers.find(w => w.id === 'hojan').unavailable[0], ['*'], JSON.stringify(ph.workers.find(w => w.id === 'hojan')));
+  // quien lo hace ese día (Mari Luz el viernes, con la mañana y la tarde de Pasarela en su semana tipo), sin tocar
+  assert.deepStrictEqual(Object.values(pb.workers.find(w => w.id === 'mariluz').fixed), ['PASARELA', 'PASARELA']);
+});
+ok('F7 rev · otra vuelta: lo que la puerta no deja poner se veta en el problema (unavailable) sin tocar lo fijo ni el problema de la vuelta anterior', () => {
+  const cfg = cfgBase(), st = cfg.staff, VIE = '2026-10-09', meses = { '2026-10': f7Oct() };
+  const pb = M.toProblem(cfg, st, meses['2026-10'], VIE, VIE, { meses });
+  // lo que no se sabe hasta resolver: Cristian, libre todo el viernes (no hace partido los viernes), de mañana y de tarde
+  const cr0 = pb.workers.find(w => w.id === 'cristian');
+  assert.ok(!cr0.fixed[0] && !cr0.fixed[1] && cr0.unavailable[1] === undefined, JSON.stringify(cr0));
+  const sol = f7Vuelta(pb, [['cristian', 0, 'MONACO'], ['cristian', 1, 'PASARELA']]).datos;
+  const rech = M.rechazosDelNucleo(cfg, st, meses, pb, sol, { permitirPartido: false });
+  assert.deepStrictEqual(rech.map(x => `${x.pid} ${x.turnoId} ${x.regla}`), ['cristian PASARELA_T partido']);
+  assert.ok(!Object.keys(meses['2026-10'].asig).length, 'lo prueba sobre una copia: la planilla no se toca');
+  const pb2 = M.vetarRechazos(pb, rech);
+  assert.deepStrictEqual(pb2.workers.find(w => w.id === 'cristian').unavailable[1], ['*'], 'un partido que no hace: ese medio día, ningún local');
+  assert.strictEqual(pb.workers.find(w => w.id === 'cristian').unavailable[1], undefined, 'el problema de la vuelta anterior no cambia');
+  assert.deepStrictEqual(NE.erroresPeticion({ problem: pb2 }), []);
+  // por otra regla (una pareja «nunca con», la casilla): solo ese local ese medio día
+  assert.deepStrictEqual(cr0.unavailable[0], ['PASARELA'], 'Cristian, el viernes por la mañana: todo menos Pasarela (su veto)');
+  const pb3 = M.vetarRechazos(pb, [{ iso: VIE, turnoId: 'ZAPA_M', pid: 'cristian', regla: 'nuncaCon', motivo: 'nunca con X' }]);
+  assert.deepStrictEqual(pb3.workers.find(w => w.id === 'cristian').unavailable[0], ['PASARELA', 'ZAPA']);
+  // lo fijo no se veta nunca (lo puesto no lo quita nadie)
+  const pb4 = M.vetarRechazos(pb, [{ iso: VIE, turnoId: 'ZAPA_T', pid: 'lavinia', regla: 'partido' }]);
+  assert.strictEqual(pb4.workers.find(w => w.id === 'lavinia').unavailable[1], undefined);
+});
+ok('F7 rev · flujoNucleo: el camino del motor Núcleo con el núcleo por fuera (una vuelta si todo entra; si la puerta rechaza algo, otra sin ello) y el hueco dice lo que proponía', () => {
+  const cfg = cfgBase(), st = cfg.staff, VIE = '2026-10-09';
+  const partido = [['cristian', 0, 'MONACO'], ['cristian', 1, 'PASARELA']];
+  const meses = { '2026-10': f7Oct() };
+  const a = f7Flujo(cfg, st, meses, VIE, VIE, { permitirPartido: false }, pet => f7Vuelta(pet.problem, partido));
+  assert.strictEqual(a.peticiones.length, 2, 'la puerta rechazó la tarde de Cristian (no hace partido los viernes): otra vuelta sin ella');
+  for (const p of a.peticiones) assert.deepStrictEqual(NE.erroresPeticion(p), [], 'la petición entera (problema y configuración) la acepta el núcleo');
+  assert.deepStrictEqual(a.peticiones[1].problem.workers.find(w => w.id === 'cristian').unavailable[1], ['*']);
+  assert.ok(M.pidsEn(meses['2026-10'], VIE, 'MONACO_M').includes('cristian') && !M.pidsEn(meses['2026-10'], VIE, 'PASARELA_T').includes('cristian'), 'vuelca lo de la última vuelta: la mañana, sin el partido');
+  assert.strictEqual(a.r.nucleo.vueltas, 2);
+  const h = a.r.huecos.find(x => x.iso === VIE && x.turnoId === 'PASARELA_T');
+  assert.ok(h && (h.nucleo || []).some(x => x.pid === 'cristian' && x.regla === 'partido' && /no hace partido los viernes/.test(x.motivo)), JSON.stringify(a.r.huecos));
+  assert.ok(a.r.rechazados.some(x => x.pid === 'cristian' && x.nucleo && x.vetada), 'y sale entre lo que no se pudo poner');
+  // en el modo relajado entra con su aviso: una sola vuelta
+  const m2 = { '2026-10': f7Oct() };
+  const b = f7Flujo(cfg, st, m2, VIE, VIE, { permitirPartido: true }, pet => f7Vuelta(pet.problem, partido));
+  assert.strictEqual(b.peticiones.length, 1);
+  assert.ok(M.pidsEn(m2['2026-10'], VIE, 'PASARELA_T').includes('cristian') && b.r.nucleo.vueltas === 1);
+  // como mucho VUELTAS_NUCLEO, aunque el núcleo insista
+  const c = f7Flujo(cfg, st, { '2026-10': f7Oct() }, VIE, VIE, {}, pet => f7Vuelta(pet.problem, partido, true));
+  assert.strictEqual(c.peticiones.length, M.VUELTAS_NUCLEO);
+  assert.ok(M.VUELTAS_NUCLEO >= 2);
+  // si el núcleo no acepta la petición, no se vuelca nada y se devuelve el error tal cual (lo cuenta la pantalla)
+  const m3 = { '2026-10': f7Oct() };
+  const d = f7Flujo(cfg, st, m3, VIE, VIE, {}, () => ({ ok: false, status: 422, datos: { detail: [{ type: 'list_type' }] } }));
+  assert.ok(d.r.error && d.r.error.status === 422 && !Object.keys(m3['2026-10'].asig).length, JSON.stringify(d.r));
+  // «Solo desde hoy» con el periodo ya pasado: ni se llama al núcleo
+  const e = f7Flujo(cfg, st, { '2026-10': f7Oct() }, '2026-10-05', '2026-10-07', { desdeIso: '2026-10-08' }, () => { throw new Error('no debía llamar'); });
+  assert.ok(!e.peticiones.length && !e.r.error && !e.r.aplicados.length);
+});
 console.log(`\n${n} tests OK`);

@@ -2,6 +2,54 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **El motor «Núcleo Shiftia» ya funciona con el núcleo de verdad y no deja más huecos que el generador local
+  (25/09, revisión).** Se ha probado contra el optimizador de verdad, no solo contra uno de pruebas. Lo que se nota:
+  - **Antes no generaba nada:** el núcleo no aceptaba los datos y salía un aviso rojo lleno de «[object Object]».
+    Ahora los acepta. Y si alguna vez no los acepta, el aviso lo dice en palabras («El núcleo no ha aceptado los
+    datos… Avisa a Diego»).
+  - **Una casilla imposible ya no deja cortas las demás.** Si una casilla no se puede cubrir (la mañana del lunes
+    en Pasarela, con Dulce en standby), queda como hueco y el núcleo sigue cubriendo el resto. Antes se rendía con
+    todos los mínimos del periodo: en la semana del 5 de octubre dejaba 7 casillas cortas y el generador local 1;
+    en octubre, 32 frente a 4. Ahora deja las mismas que el generador local, y en la semana del cierre del Mónaco
+    con «Permitir partidos no declarados», menos (1 frente a 3).
+  - **Los partidos de quien solo los hace unos días.** Si el núcleo propone un partido que esa persona no hace ese
+    día, la app se lo quita y le pide otra solución sin él (como mucho tres vueltas). Y ya no le propone la otra
+    mitad del día a quien tiene una mitad fija y ese día no hace partido (Hojan el jueves, Lavinia el viernes).
+  - **Yilian**, con la tarde del lunes y la mañana del martes fijas en el Mónaco, ya no hace que el núcleo se salte
+    la regla del partido para todo el equipo.
+  - **«Solo desde hoy» se cumple también con el Núcleo:** no propone nada ni cuenta huecos en días ya pasados.
+  - **En cada hueco, quién puede entrar sin aviso** («Pueden entrar: Yilian», con un botón que la pone), además
+    de quién entraría con aviso.
+  - **La línea del núcleo, en palabras:** «la mejor planilla posible con estas reglas · en menos de un segundo ·
+    3 casillas se quedan cortas: abajo, con el porqué», sin códigos. Si ha tenido que saltarse una regla, dice cuál; si ha
+    tenido que dar otra vuelta, también.
+  - **El porqué de cada hueco se lee seguido**, en el color del texto; antes cada motivo salía en rojo en su
+    propia línea.
+  - **Si el núcleo propone a quien solo hace cocina y no puede entrar, dice el motivo de verdad** («no hace
+    partido los miércoles», con la pista de cómo dejarle entrar), no «solo hace cocina».
+
+- **El motor «Núcleo Shiftia» del Generador lee Equipo igual que todo lo demás (25/09).** En Generador → Periodo,
+  el optimizador ya trabaja con la misma disponibilidad que el generador local, la Cobertura y el selector. Lo que
+  se nota:
+  - **Respeta el día libre de esa semana, el standby, las ausencias de media jornada, los cierres por fechas y lo
+    que apagues en Equipo.** Antes dejaba a Mari Luz fija el martes que libraba y no la dejaba trabajar el
+    miércoles, contaba con Dulce aunque está en standby, y lo apagado en Equipo (días que libra, locales, franjas,
+    vetos, «nunca con») le seguía atando.
+  - **Los días de partido de cada persona.** Con «Permitir partidos no declarados» apagado, lo que proponga el
+    núcleo y la persona no tenga declarado no entra: el núcleo busca otra solución sin ello (revisión, arriba) y,
+    si aun así la casilla se queda corta, el hueco dice a quién proponía y por qué («no hace partido los lunes»).
+    Con la casilla marcada entra con su aviso, como en el generador local. Antes entraba siempre, con aviso, sin que lo hubieras permitido.
+  - **«Nunca con» flexible:** el núcleo solo junta a Mari Luz y Lavinia (o a Leo y Susana Capón) con «Permitir
+    partidos no declarados» marcado, y solo si no hay otra forma. Sin marcarlo, nunca.
+  - **La semana tipo va primero, igual que en el generador local**, con sus «cubre a» (si Iván falta, quien le
+    cubre entra en su sitio) y sin perder ninguna plaza fija por un partido que proponga el núcleo. En la vista
+    previa cuenta como «de la semana tipo».
+  - **La cocina, por día:** Susana Capón («cocina solo los martes») solo la lleva los martes, y con «Cocina»
+    apagada en su ficha, cualquier día.
+  - **Lo que pusiste a mano nunca hace fallar al núcleo:** si juntaste a mano a dos que «nunca coinciden» o le
+    pusiste un partido a quien no lo hace, se queda así y el núcleo busca la mejor solución alrededor.
+  - **Un periodo que cruza de mes** mira el cierre a mano y lo ya puesto de cada mes (antes solo los del primero).
+
 - **Lo que se acepta «con aviso» llega de verdad a la planilla, y todos los sitios dicen lo mismo (24/09,
   revisión).** Repaso de lo de Equipo con el caso de Iván delante. Lo que se nota:
   - **El domingo de las vacaciones de Iván, Mari Luz no hace la tarde con Lavinia** («el domingo haría mañana»,

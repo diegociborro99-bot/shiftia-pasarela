@@ -27,7 +27,9 @@ push*.js                   notificaciones push sin dependencias (del piloto; fas
 tools/build.mjs            ensambla src/ → index.html + login.html (embebe el logo)
 tools/check-parity.mjs     el modelo embebido === modelo.js
 tests/                     tests del servidor y de seguridad (node:test) y baterías
-                           e2e-*.mjs (Playwright; se saltan sin Chromium)
+                           e2e-*.mjs (Playwright; se saltan sin Chromium); e2e-nucleo-real.mjs,
+                           contra el núcleo de verdad (solo con SHIFTIA_CORE_REAL); nucleo-esquema.cjs,
+                           el esquema del servicio del núcleo para las pruebas
 tools/comprobar-despliegue.mjs  verifica un despliegue desde fuera (salud, volumen, acceso, versión)
 assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 ```
@@ -49,7 +51,7 @@ assets/                    logos (shiftia-logo.svg; pasarela-logo.png si existe)
 | `18-eventos.js` | Evento con refuerzo (partidos y otros): refuerzo por local, equipos editables, detalle del evento de un día (quitar el aviso). |
 | `19-vista-equipo.js` · `20-ficha-persona.js` | Equipo: personas, altas y bajas, ficha con todas las condiciones editables, ajustes de los locales. |
 | `21-vista-horas.js` | Contador de horas: tabla del mes, horas extra, cierre y reapertura del mes. |
-| `22-generador.js` | Generador: periodo, opciones, motor local o núcleo, vista previa, aplicar, vaciar lo generado. |
+| `22-generador.js` | Generador: periodo, opciones, motor local o núcleo (todo el camino del núcleo lo hace el modelo, `flujoNucleo`; la pantalla solo manda cada petición al servidor), vista previa, aplicar, vaciar lo generado. |
 | `23-revision.js` | Revisión del mes y punto rojo de avisos. |
 | `26-cobertura.js` | Gestor de cobertura: la hoja «quién sale → quién entra» (persona, qué le pasa, tira de días con sus turnos, plan A y plan B por día, confirmar con deshacer); en la pestaña Cobertura y como capa desde Hoy, Semana y Mes. |
 | `27-actividad.js` | Actividad (visor del programador): qué hace el encargado con la app. Fusiona el historial de la planilla con la auditoría del servidor (`GET /api/auditoria`) traducida al español; tarjetas resumen, filtros por usuario y tipo, buscador. Solo con `body.rol-programador` (sin servidor también, para probar). |
@@ -81,7 +83,9 @@ Desde el 24/09 (fase 4) hay **una sola puerta** y **una sola puntuación**: `eva
 
 `turnosAfectados` / `candidatosCobertura` / `planesCobertura` / `aplicarCobertura` son el gestor de cobertura: para una incidencia (`{pid, tipo, desde, hasta, franjas?, sinFin?}`) calculan los turnos de la persona, cómo queda cada casilla sin ella (faltan, sin cocina, nadie que abra), y dos planes (estricto, alternativo con otras personas, y relajado con partidos no declarados avisados; se quedan los dos mejores como A y B) con sus asignaciones razonadas, huecos con «por qué nadie» e intercambio en un cambio de turno. `vaciarPlanilla` quita las plazas y marcas de un rango sin tocar las ausencias.
 
-`generarPlanilla` es aditivo y determinista: instancia la semana tipo (saltando ausentes, con «cubre a» como primera alternativa), y rellena los mínimos con `candidatosPara` (puntuación con razones). Devuelve aplicados, huecos con `porQueNadie`, coberturas y rechazados. `toProblem` / `desdeSolucion` traducen al formato del núcleo Shiftia (CP-SAT) y de vuelta.
+`generarPlanilla` es aditivo y determinista: primero lo fijo (`instanciarFijo`: la semana tipo, saltando ausentes y con «cubre a» como primera alternativa, y quien apoya por un cierre en su destino) y luego rellena los mínimos con `candidatosPara` (puntuación con razones). Devuelve aplicados, huecos con `porQueNadie` (`huecoFaltan`, `huecoCocina`, `huecoPrimero`), coberturas y rechazados.
+
+`toProblem` / `desdeSolucion` traducen al formato del núcleo Shiftia (CP-SAT) y de vuelta, y desde el 25/09 (fase 7) leen la ficha por la misma puerta que el resto: quién puede estar en cada local cada medio día es lo que dice `evaluarPlaza` con la planilla vacía (de sala o de cocina); lo fijo del problema es lo ya puesto en la planilla del periodo (de cada mes, con `opts.meses`) más `instanciarFijo`; «nunca con» sale de `incompatibles` (la pareja flexible, blanda solo en el modo relajado del Generador, `opts.permitirPartido`), el partido de `partidoEn`, la cocina de `puedeCocina` por local y día (`skillCocina`), los mínimos con su regla y las preferencias con `evita`. `desdeSolucion` vuelca como el generador local: primero `instanciarFijo` y luego lo que propone el núcleo, por la puerta y con el modo del Generador; lo que no entra sale en `rechazados` (con su regla) y, si deja la casilla corta, en `huecos` (`huecosDeCasilla`) con lo que el núcleo proponía. `toProblem` también acepta `(ctx, desde, hasta, opts)` con el contexto de `crearContexto`. Desde la revisión de la fase 7 (probada con el servicio de verdad): `unavailable[i]` es siempre una lista (`["*"]` = ningún local), los mínimos son una regla blanda de tier 3 y las casillas cerradas una dura aparte, la otra mitad del día de quien tiene una mitad fija y ese día no hace partido no está disponible (modo estricto), y «Solo desde hoy» recorta el problema (`desdeEfectivo`). `flujoNucleo` es el camino entero como generador de JavaScript: retira lo que ya no vale, monta el problema y cede cada petición (`{ problem, config: CONFIG_NUCLEO }`) a quien habla con el servicio (la pantalla o `tests/e2e-nucleo-real.mjs`); si la puerta rechaza algo de la solución (`rechazosDelNucleo`, sobre copias), lo veta (`vetarRechazos`) y vuelve a pedir, hasta `VUELTAS_NUCLEO`; y vuelca con `desdeSolucion`. `tests/nucleo-esquema.cjs` repite el esquema del servicio para las pruebas.
 
 ## Flujo de trabajo
 

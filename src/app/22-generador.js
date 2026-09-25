@@ -76,8 +76,9 @@ function renderGenerador() {
     // la propuesta «con aviso» la acepta el encargado con un clic: es decisión suya, así que se guarda
     // como puesta a mano y nadie la retira en automático (24/09, revisión). Se pone con lo que la propuesta
     // relaja (RELAJABLE del modelo, revisión de la fase 6): antes la pareja «nunca con» flexible se proponía y al
-    // pulsar «Aplicar» salía «nunca con Mari Luz»
-    if (ap) { const [iso, tid, pid] = ap.dataset.aplicaruno.split('|'); pushUndo(`poner a ${nombrePid(pid)}`); const r = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', razon: 'propuesta con aviso aceptada' }, RELAJABLE)); if (r.ok) { toast(r.avisos.length ? `${nombrePid(pid)} añadido con aviso: ${r.avisos.join(', ')}` : `${nombrePid(pid)} añadido`, r.avisos.length ? 'warn' : 'ok'); GEN.previa = null; renderGenerador(); } else { undoStack.pop(); actualizarUndoBtn(); toast(r.motivo, 'bad'); } return; }
+    // pulsar «Aplicar» salía «nunca con Mari Luz». (revisión de la fase 7) «Pueden entrar»: quien entra sin aviso
+    // en un hueco que el núcleo dejó corto se pone tal cual, sin relajar nada
+    if (ap) { const [iso, tid, pid, limpio] = ap.dataset.aplicaruno.split('|'); pushUndo(`poner a ${nombrePid(pid)}`); const r = asignarUI(iso, tid, pid, limpio ? { origen: 'manual', razon: 'elegido en la vista previa del Generador' } : Object.assign({ origen: 'manual', razon: 'propuesta con aviso aceptada' }, RELAJABLE)); if (r.ok) { toast(r.avisos.length ? `${nombrePid(pid)} añadido con aviso: ${r.avisos.join(', ')}` : `${nombrePid(pid)} añadido`, r.avisos.length ? 'warn' : 'ok'); GEN.previa = null; renderGenerador(); } else { undoStack.pop(); actualizarUndoBtn(); toast(r.motivo, 'bad'); } return; }
     const ir = e.target.closest('[data-irdia]');
     if (ir) irAIso(ir.dataset.irdia);
   }, { once: false });
@@ -127,42 +128,45 @@ async function generarPrevia() {
   finally { GEN.ocupado = false; renderGenerador(); }
 }
 async function generarConNucleo(meses) {
-  // el núcleo trabaja sobre el periodo entero; después se vuelca mes a mes
-  const est0 = Object.values(meses)[0];
-  // 24/09: antes de pasar lo ya asignado como fijo, se retira lo automático que ya no vale (un
-  // día libre cambiado), igual que en el generador local; lo manual o forzado se queda
-  const retirados = [];
-  for (const e of Object.values(meses)) {
-    const d1 = GEN.desde > e.days[0].iso ? GEN.desde : e.days[0].iso, d2 = GEN.hasta < e.days[e.days.length - 1].iso ? GEN.hasta : e.days[e.days.length - 1].iso;
-    if (d1 <= d2) retirados.push(...retirarQueIncumplen(S, S.staff, e, d1, d2, { desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined }));
-  }
-  const problema = toProblem(S, S.staff, est0, GEN.desde, GEN.hasta, { conPatron: !GEN.opts.sinPatron });
-  // lo ya asignado en el periodo va como fijo: el generador es aditivo también con el núcleo
-  for (const e of Object.values(meses)) for (const [iso, porT] of Object.entries(e.asig)) {
-    if (iso < GEN.desde || iso > GEN.hasta) continue;
-    for (const [tid, lista] of Object.entries(porT)) for (const x of lista) {
-      const w = problema.workers.find(z => z.id === x.pid); if (!w) continue;
-      const i = problema.meta.indices.findIndex(z => z.iso === iso && z.franja === partirTurno(tid).franja);
-      if (i >= 0) { w.fixed[i] = partirTurno(tid).localId; delete w.unavailable[i]; }
-    }
-  }
+  // 25/09 (fase 7, S25; revisión de la fase 7): todo el camino vive en el modelo (flujoNucleo), aquí solo se habla
+  // con el servidor. Lo automático que ya no vale se retira antes; el problema sale de la misma puerta que el
+  // generador local, con la planilla de cada mes, el modo del Generador («Permitir partidos no declarados») y
+  // «Solo desde hoy» (antes el núcleo no lo sabía y proponía y contaba huecos en días pasados); si lo que propone el
+  // núcleo choca con la puerta, otra vuelta con eso vetado; y el volcado, mes a mes, por la puerta
   toast('Enviando al núcleo Shiftia…', 'ok');
-  const r = await api('POST', '/api/nucleo/solve', { problem: problema, config: { time_limit_s: 20, deterministic: true, objective: 'lexicographic', explain_infeasible: true, relax_on_infeasible: true } });
-  if (!r.ok) { toast((r.datos && (r.datos.error || r.datos.detail)) || `El núcleo respondió ${r.status}`, 'bad'); return null; }
-  const sol = r.datos;
-  if (!sol || !sol.schedule) { toast('El núcleo no devolvió una planilla' + (sol && sol.conflict ? ': ' + JSON.stringify(sol.conflict).slice(0, 200) : ''), 'bad'); return null; }
-  const total = { aplicados: [], huecos: [], coberturas: [], rechazados: [], retirados, avisos: [], nucleo: { status: sol.status, feasible: sol.feasible, objective: sol.objective, stats: sol.stats, violations: sol.violations, relaxations: sol.relaxations } };
-  for (const e of Object.values(meses)) {
-    const d1 = GEN.desde > e.days[0].iso ? GEN.desde : e.days[0].iso;
-    const d2 = GEN.hasta < e.days[e.days.length - 1].iso ? GEN.hasta : e.days[e.days.length - 1].iso;
-    const sub = { schedule: {} };
-    for (const [pid, porIdx] of Object.entries(sol.schedule)) for (const [i, code] of Object.entries(porIdx)) { const x = problema.meta.indices[+i]; if (x && x.iso >= d1 && x.iso <= d2) (sub.schedule[pid] = sub.schedule[pid] || {})[i] = code; }
-    const rr = desdeSolucion(S, S.staff, e, problema, sub);
-    total.aplicados.push(...rr.aplicados); total.rechazados.push(...rr.rechazados);
-    // lo que el núcleo no cubrió sigue siendo un hueco explicado
-    for (const iso of rangoIso(d1, d2)) for (const t of turnosDe(S)) { if (!turnoAbierto(S, e, iso, t.id)) continue; const rv = revisarTurno(S, S.staff, e, iso, t.id); if (rv.faltan) total.huecos.push({ iso, turnoId: t.id, faltan: rv.faltan, minimo: rv.minimo, supuesto: rv.supuesto, porQueNadie: porQueNadie(S, S.staff, e, iso, t.id) }); }
-  }
-  return total;
+  const it = flujoNucleo(S, S.staff, meses, GEN.desde, GEN.hasta, { permitirPartido: !!GEN.opts.permitirPartido, conPatron: !GEN.opts.sinPatron, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, meses: S.meses });
+  let paso = it.next();
+  while (!paso.done) paso = it.next(await api('POST', '/api/nucleo/solve', paso.value));
+  if (paso.value.error) { toast(mensajeErrorNucleo(paso.value.error), 'bad'); return null; }
+  return paso.value;
+}
+// lo que dice la pantalla cuando el núcleo no sirve: en palabras (revisión de la fase 7: un 422 trae en `detail` una
+// lista de objetos y el aviso salía como «[object Object],[object Object],…»); el detalle, a la consola
+function mensajeErrorNucleo(r) {
+  const d = (r && r.datos) || {};
+  if (Array.isArray(d.detail)) { console.warn('El núcleo no ha aceptado la petición:', d.detail); return `El núcleo no ha aceptado los datos (${d.detail.length} con formato incorrecto). Avisa a Diego.`; }
+  if (Array.isArray(d.errors) && d.errors.length) { console.warn('El núcleo no ha aceptado el problema:', d.errors); return `El núcleo no ha aceptado el problema (${pl(d.errors.length, 'error', 'errores')}: ${d.errors[0]}). Avisa a Diego.`; }
+  if (d.feasible === false) return 'El núcleo no ha encontrado ninguna planilla, ni saltándose reglas. Prueba con el generador local: deja los huecos a la vista.';
+  if (typeof d.error === 'string') return d.error;
+  if (typeof d.detail === 'string') return d.detail;
+  if (r && r.ok) return 'El núcleo no devolvió una planilla.';
+  return `El núcleo respondió ${r && r.status ? r.status : 'con un error'}`;
+}
+// la línea del núcleo en la vista previa, en palabras (revisión de la fase 7: salía «FEASIBLE_RELAXED · 1 regla(s)
+// blanda(s) relajada(s) · relajaciones: [{"rule_id":…», que además contaba el reparto como regla relajada)
+const ESTADO_NUCLEO = { OPTIMAL: 'la mejor planilla posible con estas reglas', FEASIBLE: 'una planilla válida (se acabó el tiempo antes de asegurar que es la mejor)', FEASIBLE_RELAXED: 'no ha podido cumplir todas las reglas a la vez' };
+const VUELTA_TXT = ['', '', 'segunda', 'tercera', 'cuarta'];
+function lineaNucleo(p) {
+  const n = p.nucleo;
+  const t = n.stats && n.stats.wall_time_s;
+  const s = t ? (t < 0.95 ? ' · en menos de un segundo' : ` · en ${Math.round(t)} s`) : '';
+  const partes = [`Núcleo Shiftia: ${ESTADO_NUCLEO[n.status] || 'ha respondido'}${s}`];
+  const saltadas = (n.relaxations || []).map(x => `«${x.rule_id}»`);
+  if (saltadas.length) partes.push(`para dar una planilla se ha saltado ${saltadas.join(', ')}`);
+  if (n.vueltas > 1) partes.push(`${VUELTA_TXT[n.vueltas] || n.vueltas + '.ª'} vuelta: volvió a resolver sin ${pl(n.vetadas, 'propuesta', 'propuestas')} que la puerta no dejaba poner`);
+  const cortas = p.huecos.length;
+  if (cortas) partes.push(`${pl(cortas, 'casilla se queda corta', 'casillas se quedan cortas')}: abajo, con el porqué`);
+  return partes.join(' · ');
 }
 // «Mari Luz en Pasarela mañana y tarde el 29/9: libra el martes esta semana»: una línea por persona,
 // local, día y motivo, con sus franjas (24/09, revisión: se repetía la misma línea por la mañana y
@@ -187,13 +191,21 @@ function htmlPrevia(p) {
   const nRelevos = (p.coberturas || []).filter(c => c.yaEstaba && c.nuevo).length;
   const lp = tid => { const { localId } = partirTurno(tid); return `<span class="lpill" style="--lc:${colorLocal(localId)}">${esc((localDe(S, localId) || {}).corto || localId)}·${partirTurno(tid).franja}</span>`; };
   const fila = a => `<div class="genrow"><span class="av" style="background:${avColor(a.pid)}">${esc(initials(nombrePid(a.pid)))}</span><span class="gtxt"><b>${esc(nombrePid(a.pid))}</b><small>${esc(a.razon || '')}${a.avisos && a.avisos.length ? ' · <span style="color:var(--warn)">' + esc(a.avisos.join(', ')) + '</span>' : ''}${a.supuesto ? ' · <span style="color:var(--warn)">supuesto</span>' : ''}</small></span>${lp(a.turnoId)}</div>`;
+  // 25/09 (fase 7): lo que propuso el núcleo y la puerta no dejó poner va aparte de la semana tipo, y en su hueco
+  const rechST = p.rechazados.filter(r => !r.nucleo), rechNuc = p.rechazados.filter(r => r.nucleo);
+  const lineaRech = r => `${esc(nombrePid(r.pid))} en ${esc(nombreLocal(partirTurno(r.turnoId).localId))} el ${fmtDM(r.iso)}: ${esc(r.motivo)}`;
   const hueco = h => {
     const e = p.meses[h.iso.slice(0, 7)];
     const alt = h.tipo === 'cocina' ? [] : candidatosConAviso(S, S.staff, e, h.iso, h.turnoId).slice(0, 3);
+    // (revisión de la fase 7) quien puede entrar sin aviso: el núcleo puede dejar corta una casilla aunque alguien
+    // pudiera (su ventana de dos medios días es más estricta que la puerta) y antes solo se ofrecía «con aviso»
+    const limpios = h.tipo ? [] : candidatosPara(S, S.staff, e, h.iso, h.turnoId).slice(0, 3);
+    const boton = (c, limpio) => `<button class="btn-mini ghost" data-aplicaruno="${h.iso}|${h.turnoId}|${c.pid}${limpio ? '|limpio' : ''}" title="${esc(c.razones.join(' · '))}">${esc(nombreCorto(c.nombre))}</button>`;
     const pq = Object.entries(h.porQueNadie || {}).slice(0, 5).map(([m, quienes]) => `<b>${esc(m)}</b>: ${esc(quienes.slice(0, 4).join(', '))}${quienes.length > 4 ? ` +${quienes.length - 4}` : ''}`).join(' · ');
     // (fase 5, S37) qué le falta a la casilla: gente, quien abra o la cocina obligatoria
     const titulo = h.tipo === 'cocina' ? 'Sin cocina (obligatoria)' : h.tipo === 'primero' ? 'Nadie puede abrir (1.ª posición)' : `Faltan ${h.faltan} de ${h.minimo}${h.supuesto ? ' (mínimo supuesto)' : ''}`;
-    return `<div class="genrow hueco"><span class="av" style="background:var(--bad)">!</span><span class="gtxt"><b>${titulo}</b><small class="pqn">${pq || 'nadie disponible'}</small>${alt.length ? `<small>Con aviso: ${alt.map(c => `<button class="btn-mini ghost" data-aplicaruno="${h.iso}|${h.turnoId}|${c.pid}" title="${esc(c.razones.join(' · '))}">${esc(nombreCorto(c.nombre))}</button>`).join(' ')}</small>` : ''}</span>${lp(h.turnoId)}</div>`;
+    const nuc = (h.nucleo || []).map(x => `${esc(nombrePid(x.pid))} (${esc(x.motivo)})`).join(', ');
+    return `<div class="genrow hueco" data-hueco="${h.iso}|${h.turnoId}|${h.tipo || 'faltan'}"><span class="av" style="background:var(--bad)">!</span><span class="gtxt"><b>${titulo}</b>${nuc ? `<small class="gnuc">El núcleo proponía a ${nuc}</small>` : ''}<small class="pqn">${pq || 'nadie disponible'}</small>${limpios.length ? `<small>Pueden entrar: ${limpios.map(c => boton(c, true)).join(' ')}</small>` : ''}${alt.length ? `<small>Con aviso: ${alt.map(c => boton(c, false)).join(' ')}</small>` : ''}</span>${lp(h.turnoId)}</div>`;
   };
   return `<div class="genkpis">
       <div class="genk ok"><b>${p.aplicados.length}</b><span>plazas propuestas</span></div>
@@ -203,10 +215,11 @@ function htmlPrevia(p) {
       ${conAviso ? `<div class="genk warn"><b>${conAviso}</b><span>con aviso</span></div>` : ''}
       ${p.coberturas.length ? `<div class="genk"><b>${p.coberturas.length}</b><span>coberturas «cubre a»</span></div>` : ''}
     </div>
-    ${p.nucleo ? `<p class="revsub">Núcleo Shiftia: ${esc(p.nucleo.status || '')}${p.nucleo.stats && p.nucleo.stats.wall_time_s ? ` · ${Math.round(p.nucleo.stats.wall_time_s * 10) / 10} s` : ''}${p.nucleo.violations && p.nucleo.violations.length ? ` · ${p.nucleo.violations.length} regla(s) blanda(s) relajada(s)` : ''}${p.nucleo.relaxations && p.nucleo.relaxations.length ? ` · relajaciones: ${esc(JSON.stringify(p.nucleo.relaxations).slice(0, 160))}` : ''}</p>` : ''}
+    ${p.nucleo ? `<p class="revsub">${esc(lineaNucleo(p))}</p>` : ''}
     ${(p.retirados || []).length ? `<div class="warnbanner gretlist"><b>${pl(p.retirados.length, 'plaza puesta en automático se retira', 'plazas puestas en automático se retiran')} (lo puesto a mano o forzado se queda)</b>${lineasRetirados(p.retirados).slice(0, 8).join(' · ')}${lineasRetirados(p.retirados).length > 8 ? ` · y ${lineasRetirados(p.retirados).length - 8} más` : ''}</div>` : ''}
     ${(p.avisos || []).map(a => `<div class="warnbanner">${esc(a.texto)}</div>`).join('')}
-    ${p.rechazados.length ? `<div class="warnbanner"><b>${pl(p.rechazados.length, 'plaza de la semana tipo no se pudo poner', 'plazas de la semana tipo no se pudieron poner')}</b>${p.rechazados.slice(0, 5).map(r => `${esc(nombrePid(r.pid))} en ${esc(nombreLocal(partirTurno(r.turnoId).localId))} el ${fmtDM(r.iso)}: ${esc(r.motivo)}`).join(' · ')}</div>` : ''}
+    ${rechST.length ? `<div class="warnbanner"><b>${pl(rechST.length, 'plaza de la semana tipo no se pudo poner', 'plazas de la semana tipo no se pudieron poner')}</b>${rechST.slice(0, 5).map(lineaRech).join(' · ')}</div>` : ''}
+    ${rechNuc.length ? `<div class="warnbanner"><b>${pl(rechNuc.length, 'propuesta del núcleo no se pudo poner', 'propuestas del núcleo no se pudieron poner')}</b>${rechNuc.slice(0, 5).map(lineaRech).join(' · ')}${rechNuc.some(r => r.vetada) ? ' · <i>el núcleo volvió a resolver sin ellas y la casilla sigue corta</i>' : ''}${!p.permitirPartido && rechNuc.some(r => r.regla === 'partido' || r.regla === 'nuncaCon') ? ' · <i>con «Permitir partidos no declarados» marcado, los partidos no declarados y las parejas «nunca con» flexibles entran con aviso</i>' : ''}</div>` : ''}
     ${!p.aplicados.length && !p.huecos.length && !(p.retirados || []).length ? '<div class="genvacio">Nada que proponer: el periodo ya está completo (o queda fuera de «solo desde hoy»).</div>' : ''}
     ${dias.map(iso => `<div class="gendia"><div class="gdh">${fmtLargo(iso)}<small>${pl(porDia[iso].ap.length, 'plaza', 'plazas')}${porDia[iso].hu.length ? ` · ${pl(porDia[iso].hu.length, 'casilla corta', 'casillas cortas')}` : ''} · <button class="glink" data-irdia="${iso}">ver el día</button></small></div>${porDia[iso].hu.map(hueco).join('')}${porDia[iso].ap.map(fila).join('')}</div>`).join('')}
     <div class="genbar"><button class="btn btn-cta" id="genAplicar" ${p.aplicados.length || (p.retirados || []).length || nRelevos ? '' : 'disabled'}>${p.aplicados.length || (p.retirados || []).length || nRelevos ? `Volcar a la planilla (${[p.aplicados.length ? pl(p.aplicados.length, 'plaza', 'plazas') : '', (p.retirados || []).length ? pl(p.retirados.length, 'retirada', 'retiradas') : '', nRelevos ? pl(nRelevos, 'relevo «cubre a»', 'relevos «cubre a»') : ''].filter(Boolean).join(', ')})` : 'Nada nuevo que volcar'}</button><span class="revsub" style="margin:0">Se puede deshacer con Ctrl+Z. Las casillas cortas quedan marcadas en rojo en Hoy, Semana y Mes.</span></div>`;

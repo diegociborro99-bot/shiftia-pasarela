@@ -8,15 +8,16 @@
 //  (b) matriz: para cada variable, una persona con esa variable en una casilla conocida (la mañana de
 //      Pasarela del miércoles 30/09) recorrida por todos los caminos (puerta, semana tipo, relleno,
 //      Generador semanal, verificación, Cobertura con el estado de la pestaña, Revisión, condiciones,
-//      selector y hoja impresa), con el trato esperado de la tabla de la auditoría; y con la regla del
+//      selector, hoja impresa y, desde la fase 7, el motor Núcleo: el problema que se le manda y el volcado
+//      de su solución), con el trato esperado de la tabla de la auditoría; y con la regla del
 //      grupo apagada o con p.inactivas = [k], el resultado idéntico al de la misma persona sin la variable;
 //  (c) lint: fuera de la capa de lectura y del editor de la ficha nadie lee a pelo p.libra, .nuncaCon,
 //      .cubreA, .partido.dias, .prefs, .cocina.*, .abre[ ni .vetos (lista blanca explícita);
 //  (d) reloj: el resultado no cambia con el reloj puesto en dos fechas distintas.
 // Y las pruebas en rojo de la auditoría que siguen pendientes, como casos (con la fase que las arregla).
-// Las celdas que arregla una fase posterior van con `todo` y el hueco (F7 núcleo; las de la F5, cocina y
-// quién abre, y las de la F6, interruptores y textos de Equipo, ya no tienen `todo`): salen en el informe de
-// node --test sin tumbar npm test, y la fase que las arregla les quita el `todo`.
+// Las celdas que arregla una fase posterior van con `todo` y el hueco: salen en el informe de node --test sin
+// tumbar npm test, y la fase que las arregla les quita el `todo`. (25/09, fase 7: la última, el núcleo S25, ya
+// no lo tiene; ninguna celda queda pendiente.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -28,6 +29,8 @@ import vm from 'node:vm';
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const M = require(process.env.MODELO ? resolve(process.env.MODELO) : join(RAIZ, 'modelo.js'));
+// 25/09 (revisión de la fase 7): el esquema del núcleo (lo que acepta el servicio) y cómo leer el problema
+const NE = require('./nucleo-esquema.cjs');
 
 // ---------------------------------------------------------------------------------------------
 // el mundo de la matriz: los cuatro locales de la semilla, sin semana tipo y con un mínimo solo en
@@ -171,7 +174,51 @@ const CAMINOS = {
   },
   // quién abre: la búsqueda del 1.º (candidatos con opts.primero)
   primero(w) { const e = planilla(w); return M.candidatosPara(w.cfg, w.st, e, ISO, w.tid, { primero: true }).map(c => c.pid); },
+  // 25/09 (fase 7, S25): el motor Núcleo (Generador → Periodo). Lo que el problema dice de Xavi en la casilla
+  // (si puede estar, si se le fija, si lleva esa cocina, sus preferencias, sus parejas «nunca con» y lo que pide
+  // la casilla) y el volcado de una solución que le pone en ella, en el modo estricto del Generador y en el
+  // relajado («Permitir partidos no declarados»). La semana tipo del escenario, si la tiene, entra como fija
+  nucleo(w) {
+    const pb = problemaNucleo(w, false);
+    const i = pb.meta.indices.findIndex(z => z.iso === ISO && z.franja === w.franja);
+    const wx = pb.workers.find(z => z.id === 'x');
+    const cov = NE.demanda(pb, i, w.localId);
+    // (revisión de la fase 7) el problema entero, con la forma que acepta el núcleo de verdad
+    const esquema = NE.erroresPeticion({ problem: pb });
+    assert.deepEqual(esquema.slice(0, 3), [], 'el núcleo de verdad no aceptaría el problema');
+    return {
+      disp: NE.libreEnIndice(pb, 'x', i, w.localId),
+      fijo: wx.fixed[i] || null,
+      cocina: wx.skills.includes(M.skillCocina(w.localId, ISO)),
+      prefs: wx.preferences.filter(p => p.day === i).map(p => `${p.shift}:${p.weight}`),
+      pareja: parejasDeX(pb),
+      min: cov.min, max: cov.max,
+      vuelca: volcadoNucleo(w, false), relajado: volcadoNucleo(w, true),
+    };
+  },
 };
+// el problema del núcleo de la semana de la matriz, con la semana tipo del escenario (si la tiene)
+function problemaNucleo(w, relajado) {
+  const e = planilla(w);
+  w.cfg.patron = w.esc.patron ? { [DOW]: clon(w.esc.patron) } : {};
+  w.e = e;
+  return M.toProblem(w.cfg, w.st, e, LUNES, M.addDias(LUNES, 6), { permitirPartido: relajado });
+}
+const parejasDeX = pb => pb.rules.filter(r => r.type === 'same_shift_forbidden' && r.params.pairs.some(q => q.includes('x'))).map(r => r.mode);
+// una solución que respeta lo fijo del problema y pone a Xavi en la casilla, volcada con desdeSolucion en el
+// modo del Generador: ¿entra?, ¿con avisos?, ¿quién abre? (cada volcado en su mundo: la planilla es otra)
+function volcadoNucleo(w0, relajado) {
+  const w = mundo(w0.esc, w0.variante);
+  const pb = problemaNucleo(w, relajado);
+  const i = pb.meta.indices.findIndex(z => z.iso === ISO && z.franja === w.franja);
+  const sol = { schedule: {} };
+  for (const t of pb.workers) for (const [k, code] of Object.entries(t.fixed)) (sol.schedule[t.id] = sol.schedule[t.id] || {})[k] = code;
+  (sol.schedule.x = sol.schedule.x || {})[i] = w.localId;
+  const r = M.desdeSolucion(w.cfg, w.st, w.e, pb, sol, { permitirPartido: relajado });
+  const ent = M.asignados(w.e, ISO, w.tid).find(y => y.pid === 'x');
+  const rech = r.rechazados.find(z => z.pid === 'x' && z.iso === ISO && z.turnoId === w.tid);
+  return { ok: !!ent, regla: rech ? rech.regla || null : null, avisos: ent ? (ent.avisos || []).length : 0, pareja: parejasDeX(pb), en: M.pidsEn(w.e, ISO, w.tid).slice().sort(), huecos: r.huecos.filter(h => h.iso === ISO && h.turnoId === w.tid).map(h => h.tipo || 'faltan') };
+}
 const obs = (esc, camino, variante) => CAMINOS[camino](mundo(esc, variante));
 
 // ---------- qué quiere decir cada trato en cada camino ----------
@@ -188,6 +235,8 @@ const COMPROBAR = {
       case 'verificar': return c.conds.some(k => k.endsWith(':KO') && !s.conds.includes(k));
       case 'revision': return c.lineas.some(l => !s.lineas.includes(l));
       case 'primero': return !c.includes('x') && s.includes('x');
+      // (fase 7) el núcleo no puede ponerla ahí: no está disponible o la pareja «nunca con» es dura
+      case 'nucleo': return ((!c.disp && s.disp) || (c.pareja.includes('hard') && !s.pareja.length)) && !c.vuelca.ok && s.vuelca.ok;
     }
     return false;
   },
@@ -198,6 +247,10 @@ const COMPROBAR = {
       case 'relleno': case 'semana': return !c.en.includes('x') && !!c.motivoX && c.relajado && c.relajado.en.includes('x') && c.relajado.x && c.relajado.x.avisos;
       case 'cobertura': return c.planes.some(p => p.relajado && p.asig.some(a => a.includes('|x|aviso'))) && c.planes.filter(p => !p.relajado).every(p => !p.asig.some(a => a.includes('|x')));
       case 'selector': return c.grupo === 'conAviso';
+      // (fase 7) el volcado del modo estricto la rechaza por la regla; el del relajado la pone con aviso. La pareja
+      // «nunca con» flexible es dura en el problema del modo estricto y blanda en el del relajado (decisiones.md)
+      case 'nucleo': return !c.vuelca.ok && c.vuelca.regla === esc.regla && c.relajado.ok && c.relajado.avisos > 0 && s.vuelca.ok && s.relajado.ok
+        && (esc.regla !== 'nuncaCon' || (c.vuelca.pareja.join() === 'hard' && c.relajado.pareja.join() === 'soft'));
     }
     return false;
   },
@@ -207,16 +260,20 @@ const COMPROBAR = {
     if (camino === 'cobertura') return JSON.stringify(c.planes[0] && c.planes[0].asig) !== JSON.stringify(s.planes[0] && s.planes[0].asig);
     if (camino === 'selector') return c.grupo === s.grupo && c.pos !== s.pos;
     if (camino === 'primero') return c.indexOf('x') !== s.indexOf('x');
+    // (fase 7) en el núcleo lo que solo ordena es una preferencia (blanda) de ese medio día
+    if (camino === 'nucleo') return JSON.stringify(c.prefs) !== JSON.stringify(s.prefs) && c.disp === s.disp;
     return false;
   },
   // la designación «cubre a»: con ella entra en el sitio de quien falta; sin ella, nadie
-  cubre(camino, c, s) { return c.en.includes('x') && !s.en.includes('x'); },
+  cubre(camino, c, s) { if (camino === 'nucleo') return !!c.fijo && !s.fijo; return c.en.includes('x') && !s.en.includes('x'); },
   // solo le impide salir el primero: entra, pero la 1.ª posición se queda como hueco
   primero(camino, c, s) {
     if (camino === 'relleno' || camino === 'semana') return c.en.includes('x') && c.huecos.includes('primero') && !s.huecos.includes('primero');
     if (camino === 'cobertura') return c.planes[0].asig.some(a => a.includes('|x')) && c.planes[0].huecos.includes('primero') && !s.planes[0].huecos.includes('primero');
     // (fase 5, S18) la semana tipo la pone, pero no la deja abrir
     if (camino === 'patron') return c.en.includes('x') && c.abre !== 'x' && s.abre === 'x';
+    // (fase 7) el núcleo no decide quién abre: lo decide el volcado (primeroDe), igual que en el relleno
+    if (camino === 'nucleo') return c.vuelca.en.includes('x') && c.vuelca.huecos.includes('primero') && !s.vuelca.huecos.includes('primero');
     return false;
   },
   // la cocina: con la variable la lleva; sin ella, no
@@ -225,11 +282,15 @@ const COMPROBAR = {
     if (camino === 'cobertura') return c.planes[0].asig.some(a => a.includes('|x') && a.endsWith('|c')) && !s.planes[0].asig.some(a => a.includes('|x') && a.endsWith('|c'));
     if (camino === 'selector') return c.grupo === 'cocina' && s.grupo !== 'cocina';
     if (camino === 'patron') return c.xCocina === true && s.xCocina !== true;
+    // (fase 7) en el núcleo, llevar la cocina de ese local ese día es su «skill» (puedeCocina)
+    if (camino === 'nucleo') return c.cocina && !s.cocina;
     return false;
   },
   noCocina(camino, c, s) { return COMPROBAR.cocina(camino, s, c); },
   habilita(camino, c, s, esc) { return c.ok && !s.ok && s.regla === esc.regla; },
   cerrado(camino, c) { return !c.en.includes('x') && !c.huecos.length; },
+  // (fase 7) la casilla pide gente en el problema del núcleo (su mínimo)
+  pide(camino, c, s) { return c.min > s.min; },
   llena(camino, c, s) { return COMPROBAR.cubre(camino, c.planes ? { en: (c.planes[0] || { asig: [] }).asig.map(a => a.split('|')[1]) } : c, s.planes ? { en: (s.planes[0] || { asig: [] }).asig.map(a => a.split('|')[1]) } : s); },
   // se cumple: la condición existe y la planilla (con Xavi puesto a mano) la cumple
   cumple(camino, c, s, esc) { return c.conds.some(k => k.startsWith(esc.cond) && k.endsWith(':ok')); },
@@ -241,8 +302,8 @@ const COMPROBAR = {
 };
 
 // ---------- las variables (la tabla de la auditoría, res2/tabla.md, con los huecos de la fase 4 arreglados) ----------
-const TODAS = ['puedeEstar', 'patron', 'relleno', 'semana', 'verificar', 'cobertura', 'revision', 'condiciones', 'selector', 'destrapa'];
-const duro = extra => Object.assign({ puedeEstar: 'bloquea', patron: 'bloquea', relleno: 'bloquea', semana: 'bloquea', verificar: 'bloquea', cobertura: 'bloquea', revision: 'bloquea', condiciones: 'lista', selector: 'bloquea', destrapa: 'pista' }, extra || {});
+const TODAS = ['puedeEstar', 'patron', 'relleno', 'semana', 'verificar', 'cobertura', 'revision', 'condiciones', 'selector', 'destrapa', 'nucleo'];
+const duro = extra => Object.assign({ puedeEstar: 'bloquea', patron: 'bloquea', relleno: 'bloquea', semana: 'bloquea', verificar: 'bloquea', cobertura: 'bloquea', revision: 'bloquea', condiciones: 'lista', selector: 'bloquea', destrapa: 'pista', nucleo: 'bloquea' }, extra || {});
 const nada = extra => Object.assign(Object.fromEntries(TODAS.map(k => [k, 'nada'])), extra || {});
 const conA = { otros: { a: { locales: ['PASARELA'] } }, min: 2, planilla: (e, w) => assert.ok(M.asignar(e, w.cfg, w.st, ISO, w.tid, 'a', {}).ok) };
 const mCocina = { tid: 'MONACO_M', opts: { puesto: 'cocina' }, cfg: cfg => { M.localDe(cfg, 'MONACO').cocina.obligatoria = { M: true, T: false }; },
@@ -268,7 +329,7 @@ const ESCENARIOS = [
   { id: 'partido', campo: 'partido.dias', clave: 'partido', regla: 'partido', trato: 'relajable', cond: 'p:x:partido', relaja: { permitirPartido: true },
     planilla: (e, w) => assert.ok(M.asignar(e, w.cfg, w.st, ISO, 'ZAPA_T', 'x', {}).ok),
     con: x => { x.partido = { dias: [5] }; }, sin: x => { x.partido = { siempre: true }; },
-    celdas: duro({ puedeEstar: 'relaja', relleno: 'relaja', semana: 'relaja', cobertura: 'relaja', selector: 'relaja' }) },
+    celdas: duro({ puedeEstar: 'relaja', relleno: 'relaja', semana: 'relaja', cobertura: 'relaja', selector: 'relaja', nucleo: 'relaja' }) },
   // (fase 6) S13: la Revisión obedece el interruptor (incompatibles). S21: el de la ficha es el de la pareja
   // (ponerNuncaCon con activa: false), no la característica entera en cascada; los datos de antes con la
   // pareja en una sola ficha siguen valiendo (el segundo escenario)
@@ -284,14 +345,14 @@ const ESCENARIOS = [
   // en el estricto queda el hueco (Aroa, 24/09: el domingo de Iván, Mari Luz no hace la tarde con Lavinia)
   Object.assign({ id: 'nuncaConFlexible', campo: 'nuncaConFlex', clave: 'nuncaCon', regla: 'nuncaCon', trato: 'relajable', cond: 'p:x:nuncaCon:a', relaja: { relajarNuncaCon: true, permitirPartido: true },
     con: (x, st) => { M.ponerNuncaCon(st, 'x', 'a', { flexible: true }); },
-    celdas: duro({ puedeEstar: 'relaja', relleno: 'relaja', semana: 'relaja', cobertura: 'relaja', selector: 'relaja', condiciones: 'lista', destrapa: 'pista', verificar: 'bloquea', revision: 'bloquea' }),
+    celdas: duro({ puedeEstar: 'relaja', relleno: 'relaja', semana: 'relaja', cobertura: 'relaja', selector: 'relaja', condiciones: 'lista', destrapa: 'pista', verificar: 'bloquea', revision: 'bloquea', nucleo: 'relaja' }),
     apagarEnFicha: st => M.ponerNuncaCon(st, 'x', 'a', { activa: false }) }, conA),
   // la designación «cubre a» (D1, D2, D13): prioridad en el sitio de quien falta
   { id: 'cubreA', campo: 'cubreA', clave: 'cubreA', trato: 'punt', cond: 'p:x:cubre:f:',
     otros: { b: {}, f: { locales: ['PASARELA'], franjas: ['M'], ausencias: [{ tipo: 'VAC', desde: ISO, hasta: ISO }] } },
     con: x => { x.cubreA = [{ pid: 'f' }]; }, patron: [{ t: 'PASARELA_M', p: 'f' }],
     coberturaPrep: (w, e) => { M.personaDe(w.st, 'f').ausencias = []; assert.ok(M.asignar(e, w.cfg, w.st, ISO, w.tid, 'f', {}).ok); },
-    celdas: nada({ patron: 'cubre', relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena', verificar: 'cumple', condiciones: 'lista' }) },
+    celdas: nada({ patron: 'cubre', relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena', verificar: 'cumple', condiciones: 'lista', nucleo: 'cubre' }) },
   // S34: quien solo hace cocina no refuerza la sala
   // (revisión F4) y el Generador la enseña y la comprueba («Hojan solo hace cocina»)
   { id: 'soloCocina', campo: 'soloCocina', clave: 'cocina', regla: 'cocina', trato: 'forzable', cond: 'p:x:soloCocina', opts: { puesto: 'sala' }, con: x => { x.soloCocina = true; },
@@ -304,30 +365,30 @@ const ESCENARIOS = [
   //    se miran los límites. Apagada, ser titular no cambia nada: igual que la misma persona sin serlo y con
   //    la regla también apagada (apagadaRef 'sinReglaOff'), y los límites, igual que sin ellos.
   Object.assign({ id: 'cocina (titular)', campo: 'cocina.titular', clave: 'cocina', regla: 'cocina', trato: 'forzable', con: x => { x.cocina.titular = ['MONACO']; },
-    celdas: { puedeEstar: 'habilita', relleno: 'cocina', semana: 'cocina', cobertura: 'cocina', selector: 'cocina', condiciones: 'nada' },
+    celdas: { puedeEstar: 'habilita', relleno: 'cocina', semana: 'cocina', cobertura: 'cocina', selector: 'cocina', condiciones: 'nada', nucleo: 'cocina' },
     apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
   Object.assign({ id: 'cocina (reserva)', campo: 'cocina.reserva', clave: 'cocina', regla: 'cocina', trato: 'forzable', con: x => { x.cocina.reserva = ['MONACO']; },
-    celdas: { puedeEstar: 'habilita', relleno: 'cocina', selector: 'cocina' }, apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
+    celdas: { puedeEstar: 'habilita', relleno: 'cocina', selector: 'cocina', nucleo: 'cocina' }, apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
   Object.assign({ id: 'cocina (solo unos días)', campo: 'cocina.soloDias', clave: 'cocina', regla: 'cocina', trato: 'forzable', cond: 'p:x:cocina', base: { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] } },
     con: x => { x.cocina.soloDias = [2]; }, forzarOpts: { puesto: 'cocina', cocina: true }, patron: [{ t: 'MONACO_M', p: 'x', c: 1 }],
-    celdas: { puedeEstar: 'bloquea', relleno: 'noCocina', semana: 'noCocina', cobertura: 'noCocina', selector: 'noCocina', condiciones: 'lista', verificar: 'bloquea', patron: 'noCocina' },
+    celdas: { puedeEstar: 'bloquea', relleno: 'noCocina', semana: 'noCocina', cobertura: 'noCocina', selector: 'noCocina', condiciones: 'lista', verificar: 'bloquea', patron: 'noCocina', nucleo: 'noCocina' },
     apagadaRef: { reglaOff: 'sinReglaOff' } }, mCocina),
   Object.assign({ id: 'cocina (nunca)', campo: 'cocina.nunca', clave: 'cocina', regla: 'cocina', trato: 'forzable', cond: 'p:x:cocina', base: { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] } },
-    con: x => { x.cocina.nunca = true; }, celdas: { puedeEstar: 'bloquea', relleno: 'noCocina', selector: 'noCocina', condiciones: 'lista' }, apagadaRef: { reglaOff: 'sinReglaOff' } }, mCocina),
+    con: x => { x.cocina.nunca = true; }, celdas: { puedeEstar: 'bloquea', relleno: 'noCocina', selector: 'noCocina', condiciones: 'lista', nucleo: 'noCocina' }, apagadaRef: { reglaOff: 'sinReglaOff' } }, mCocina),
   // S36 (fase 5): quien figura en la cocina de un local en Ajustes puede llevarla, en todos los caminos. Por
   // Ajustes (ponerCocinaLocal, que escribe también la ficha) y en datos de antes que solo la tenían en la
   // lista del local (el Generador ya la anunciaba y nadie le daba la cocina)
   Object.assign({ id: 'cocina titular en Ajustes del local', campo: 'local.cocina.titulares', ambito: 'local', clave: 'cocina', regla: 'cocina', trato: 'forzable',
     con: (x, st, cfg) => { M.ponerCocinaLocal(cfg, st, 'MONACO', { lista: 'titulares', franja: 'M', pid: 'x', pos: 0 }); },
-    celdas: { puedeEstar: 'habilita', relleno: 'cocina', semana: 'cocina', cobertura: 'cocina', selector: 'cocina', patron: 'cocina' }, patron: [{ t: 'MONACO_M', p: 'x', c: 1 }],
+    celdas: { puedeEstar: 'habilita', relleno: 'cocina', semana: 'cocina', cobertura: 'cocina', selector: 'cocina', patron: 'cocina', nucleo: 'cocina' }, patron: [{ t: 'MONACO_M', p: 'x', c: 1 }],
     apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
   Object.assign({ id: 'cocina titular solo en la lista del local (datos de antes)', campo: 'local.cocina.titulares', ambito: 'local', clave: 'cocina', regla: 'cocina', trato: 'forzable',
     con: (x, st, cfg) => { M.localDe(cfg, 'MONACO').cocina.titulares.M.unshift('x'); },
-    celdas: { puedeEstar: 'habilita', relleno: 'cocina', semana: 'cocina', cobertura: 'cocina', selector: 'cocina' },
+    celdas: { puedeEstar: 'habilita', relleno: 'cocina', semana: 'cocina', cobertura: 'cocina', selector: 'cocina', nucleo: 'cocina' },
     apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
   // S33 (José, 17/09): dos apoyos no se quedan solos
   { id: 'puesto apoyo', campo: 'puesto', clave: null, regla: 'soloApoyos', trato: 'relajable', con: x => { x.puesto = 'apoyo'; },
-    celdas: duro({ puedeEstar: 'nada', patron: 'nada', selector: 'relaja', condiciones: 'nada' }) },
+    celdas: duro({ puedeEstar: 'nada', patron: 'nada', selector: 'relaja', condiciones: 'nada', nucleo: 'nada' }) },
   // (fase 6, S29 y D7) «sin local fijo» es no tener locales (la marca p.comodin se borra): suma en el relleno, la
   // Cobertura y el selector. El interruptor «Locales» de la ficha apaga el límite (no poder ir a otro local), no
   // quién es de qué local: apagado, igual que encendido. Las condiciones y su verificación son las de «Locales»
@@ -345,18 +406,18 @@ const ESCENARIOS = [
     con: (x, st, cfg) => { M.localDe(cfg, 'PASARELA').primero.M = 'x'; },
     celdas: { primero: 'ordena', condiciones: 'lista', verificar: 'cumple', puedeEstar: 'nada', destrapa: 'nada' } },
   { id: 'noPrimero', campo: 'noPrimero', clave: 'noPrimero', regla: 'noPrimero', trato: 'forzable', cond: 'p:x:noPrimero', huecoPrimero: true, con: x => { x.noPrimero = ['M']; },
-    celdas: { puedeEstar: 'nada', patron: 'primero', relleno: 'primero', semana: 'primero', cobertura: 'primero', verificar: 'cumple', revision: 'bloquea', condiciones: 'lista', selector: 'nada', destrapa: 'pista', primero: 'bloquea' } },
+    celdas: { puedeEstar: 'nada', patron: 'primero', relleno: 'primero', semana: 'primero', cobertura: 'primero', verificar: 'cumple', revision: 'bloquea', condiciones: 'lista', selector: 'nada', destrapa: 'pista', primero: 'bloquea', nucleo: 'primero' } },
   { id: 'noAbre', campo: 'noAbre', clave: 'noAbre', regla: 'noAbre', trato: 'forzable', cond: 'p:x:noAbre:PASARELA', huecoPrimero: true, con: x => { x.noAbre = ['PASARELA']; },
-    celdas: { puedeEstar: 'nada', patron: 'primero', relleno: 'primero', semana: 'primero', cobertura: 'primero', verificar: 'cumple', revision: 'bloquea', condiciones: 'lista', selector: 'nada', destrapa: 'pista', primero: 'bloquea' } },
+    celdas: { puedeEstar: 'nada', patron: 'primero', relleno: 'primero', semana: 'primero', cobertura: 'primero', verificar: 'cumple', revision: 'bloquea', condiciones: 'lista', selector: 'nada', destrapa: 'pista', primero: 'bloquea', nucleo: 'primero' } },
   { id: 'prefs', campo: 'prefs.evitaDows', clave: 'prefs', trato: 'punt', otros: { y: {} }, con: x => { x.prefs = { evitaDows: [DOW] }; },
-    celdas: nada({ relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena' }) },
+    celdas: nada({ relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena', nucleo: 'ordena' }) },
   // (fase 6, S17 y D6) el contrato no es un interruptor: lo compara Horas y no decide nada de la planilla
   { id: 'contrato', campo: 'contrato.horasSemana', clave: null, trato: 'info', con: x => { x.contrato = { horasSemana: 8 }; }, celdas: nada() },
   // el local
   { id: 'Cuándo abre (local)', campo: 'local.abre', ambito: 'local', clave: null, regla: 'cerrado', trato: 'duro', con: (x, st, cfg) => { const l = M.localDe(cfg, 'PASARELA'); l.abre.M = l.abre.M.filter(d => d !== DOW); },
-    celdas: { puedeEstar: 'bloquea', patron: 'bloquea', relleno: 'cerrado', semana: 'cerrado', selector: 'bloquea', destrapa: 'sinPista' } },
+    celdas: { puedeEstar: 'bloquea', patron: 'bloquea', relleno: 'cerrado', semana: 'cerrado', selector: 'bloquea', destrapa: 'sinPista', nucleo: 'bloquea' } },
   { id: 'mínimos (local)', campo: 'local.minimos', ambito: 'local', clave: 'minimos', trato: 'duro', sin: (x, st, cfg) => { M.localDe(cfg, 'PASARELA').minimos.M[DOW] = 0; },
-    celdas: { relleno: 'cubre', semana: 'cubre', cobertura: 'llena' } },
+    celdas: { relleno: 'cubre', semana: 'cubre', cobertura: 'llena', nucleo: 'pide' } },
 ];
 const REGLAS_GRUPO = new Set(M.REGLAS.map(r => r.k));
 const CARACT = new Set(M.CARACTERISTICAS.map(c => c.k));
@@ -432,7 +493,7 @@ test('matriz · cubreA × partido: autorizado en la casilla de quien falta; no e
 // lo que es solo texto no decide nada (ni el nombre de una nota ni el día libre variable)
 test('matriz · lo que es solo texto (nota, supuestos, libre variable, color, nota de preferencias) no cambia ninguna decisión', () => {
   const esc = { id: 'texto', con: x => { x.nota = 'de prueba'; x.supuestos = ['uno']; x.libreVariable = true; x.color = '#123456'; x.prefs = { nota: 'prefiere mañanas' }; } };
-  for (const camino of ['puedeEstar', 'relleno', 'semana', 'cobertura', 'selector', 'destrapa', 'revision']) assert.deepEqual(obs(esc, camino, 'con'), obs(esc, camino, 'sin'), camino);
+  for (const camino of ['puedeEstar', 'relleno', 'semana', 'cobertura', 'selector', 'destrapa', 'revision', 'nucleo']) assert.deepEqual(obs(esc, camino, 'con'), obs(esc, camino, 'sin'), camino);
 });
 
 // ---------- (a) inventario ----------
@@ -498,8 +559,6 @@ const PERMITIDOS = {
     // lectura y una sola escritura de cada una
     parejasNuncaCon: 'capa', ponerNuncaCon: 'capa (escribe las dos fichas)', quitarNuncaCon: 'capa (escribe las dos fichas)', migrarNuncaCon: 'migración: parejas mutuas, flexibles y apagadas por pareja',
     localHabitualDe: 'capa', alternarLocal: 'capa (escribe la ficha sin cambiar el habitual)', ponerLocalHabitual: 'capa', vetoRepetido: 'capa',
-    // el núcleo: fase 7 (S25)
-    toProblem: 'F7 · S25',
     // los datos de partida
     semillaPasarela: 'semilla',
   },
@@ -822,7 +881,7 @@ test('auditoría S16 (interruptores H6, lugar L2) · con «Mínimos» apagados n
   const c2 = semilla(); c2.cfg.reglas = { minimos: false, cocina: false };
   assert.equal(M.generarSemana(c2.cfg, c2.st, semana(LUNES), LUNES, { sinPatron: true }).aplicados, 0);
   const pr = M.toProblem(c2.cfg, c2.st, semana(LUNES), LUNES, LUNES, { conPatron: false });
-  assert.equal(pr.rules[0].params.by_day[0].MONACO.min, 0);
+  assert.equal(NE.demanda(pr, 0, 'MONACO').min, 0);
   // y la interfaz dice la consecuencia al apagarla (la lee de REGLAS, como la de «Cocina»)
   assert.ok(/nadie/.test((M.REGLAS.find(x => x.k === 'minimos') || {}).apagada || ''), 'REGLAS: el texto de lo que pasa con «Mínimos» apagado');
 });
@@ -1061,22 +1120,170 @@ test('matriz · turno continuo (D4): no es un partido en la puerta, el selector,
   const r2 = M.puedeEstar(w2.cfg, w2.st, e2, ISO, 'PASARELA_T', 'x', { puesto: 'sala' });
   assert.ok(!r2.ok && r2.regla === 'partido', JSON.stringify(r2));
 });
-test('auditoría S25 (disponibilidad D6, interruptores H7, lugar L11, relaciones-rol «H-nucleo-nuncaCon») · el núcleo lee la ficha por la misma puerta', { todo: 'F7 · S25' }, () => {
+// ---------------------------------------------------------------------------------------------
+// S25 (fase 7): el motor Núcleo (Generador → Periodo, toProblem y desdeSolucion) lee la ficha por la misma
+// puerta que el resto. Las pruebas en rojo de la auditoría: disponibilidad D6 (con la corrección del
+// verificador: Dulce, en standby, sigue en el problema con todos los medios días a «*»), lugar L11,
+// relaciones-rol «H-nucleo-nuncaCon» y «H-nucleo-partido», interruptores H7 y, como prueba de coincidencia,
+// revision-disponibilidad/r06-toProblem.js ($A = scratchpad/auditoria)
+// ---------------------------------------------------------------------------------------------
+const idxDe = (pb, iso, f) => pb.meta.indices.findIndex(x => x.iso === iso && x.franja === f);
+// ¿El problema deja a esa persona en ese local ese medio día? (allowed_shifts y unavailable)
+function libreEn(pb, pid, iso, f, localId) {
+  return NE.libreEnIndice(pb, pid, idxDe(pb, iso, f), localId);
+}
+test('auditoría S25 (disponibilidad D6, interruptores H7, lugar L11, relaciones-rol «H-nucleo-nuncaCon») · el núcleo lee la ficha por la misma puerta', () => {
   const { cfg, st } = semilla(); cfg.reglas = { nuncaCon: false };
   const pb = M.toProblem(cfg, st, M.nuevoEstado(2026, 10, { festivos: [] }), '2026-10-02', '2026-10-04');
-  assert.ok(!pb.rules.some(r => r.id === 'nunca con'));
+  assert.ok(!pb.rules.some(r => r.id === 'nunca con' || r.type === 'same_shift_forbidden'), '«Nunca con» apagado en el grupo');
   const w = pb.workers.find(x => x.id === 'dulce');
-  assert.ok(w, 'Dulce sigue en el problema, con todos los medios días a «*» (standby)');
+  assert.ok(w, 'Dulce sigue en el problema');
+  assert.ok(pb.meta.indices.every((x, i) => NE.todoFuera(w.unavailable[i])), `con todos los medios días a ["*"] (standby): ${JSON.stringify(w.unavailable)}`);
   // (interruptores H7, lugar L11) lo apagado no entra como indisponible; ni cocina obligatoria en un medio día cerrado
   const c2 = semilla(); M.personaDe(c2.st, 'tere').inactivas = ['libra', 'locales']; const e2 = semana(LUNES);
   M.toggleApertura(e2, LUNES, 'MONACO_T', c2.cfg);
   const pr = M.toProblem(c2.cfg, c2.st, e2, LUNES, M.addDias(LUNES, 6), {});
   assert.equal(pr.workers.find(x => x.id === 'tere').allowed_shifts.length, 4, '«Locales» apagado');
-  const i = pr.meta.indices.findIndex(x => x.iso === LUNES && x.franja === 'T');
+  const i = idxDe(pr, LUNES, 'T');
   assert.ok(!pr.rules.some(r => r.type === 'skill_coverage' && r.mode === 'hard' && r.params.requirements[0].shift === 'MONACO' && r.scope.day_tags.every(tag => pr.days[i].tags.includes(tag))), 'cocina obligatoria en un medio día cerrado');
   // (disponibilidad D6) el día libre de ESA semana
   const c3 = semilla(); M.ponerLibraPuntual(M.personaDe(c3.st, 'mariluz'), '2026-10-05', [2]);
   const p3 = M.toProblem(c3.cfg, c3.st, M.nuevoEstado(2026, 10, { festivos: [] }), '2026-10-05', '2026-10-11', {});
-  const j = (iso, f) => p3.meta.indices.findIndex(x => x.iso === iso && x.franja === f);
-  assert.equal(p3.workers.find(x => x.id === 'mariluz').unavailable[j('2026-10-07', 'M')], undefined, 'el miércoles que trabaja esa semana');
+  assert.equal(p3.workers.find(x => x.id === 'mariluz').unavailable[idxDe(p3, '2026-10-07', 'M')], undefined, 'el miércoles que trabaja esa semana');
+});
+// disponibilidad D6, con la corrección del verificador (Dulce no sale del problema: si el encargado la pone a
+// mano, el núcleo tiene que contarla; generarConNucleo se saltaba lo ya puesto de quien no estaba)
+test('auditoría S25 · D6 (disponibilidad): el núcleo recibe la misma disponibilidad que puedeEstar', () => {
+  const LUN = '2026-10-05', MAR = '2026-10-06', MIE = '2026-10-07';
+  const { cfg, st } = semilla(); const e = M.nuevoEstado(2026, 10, { festivos: [] });
+  M.personaDe(st, 'mariluz').libraPuntual = { semana: LUN, dias: [2] };   // la forma de antes del 24/09, también
+  M.personaDe(st, 'ivan').inactivas = ['libra', 'franjas'];
+  const pb = M.toProblem(cfg, st, e, LUN, M.addDias(LUN, 6), {});
+  const w = id => pb.workers.find(x => x.id === id);
+  assert.deepEqual(w('mariluz').unavailable[idxDe(pb, MAR, 'T')], ['*'], 'Mari Luz libra el martes esta semana');
+  assert.equal(w('mariluz').fixed[idxDe(pb, MAR, 'T')], undefined, 'y no se le fija la plaza del martes');
+  assert.equal(w('mariluz').unavailable[idxDe(pb, MIE, 'M')], undefined, 'el miércoles puede');
+  assert.ok(w('dulce') && pb.meta.indices.every((x, i) => NE.todoFuera(w('dulce').unavailable[i])), 'Dulce, en standby: en el problema, con todo a ["*"]');
+  assert.equal(w('ivan').unavailable[idxDe(pb, LUN, 'T')], undefined, '«Días que libra» apagada en su ficha');
+  // (revisión de la fase 7) el martes Iván tiene fija la tarde de Pasarela (su semana tipo) y no hace partido: con lo
+  // fijo, la puerta no le deja la mañana (partido), y el problema tampoco. Sin semana tipo, la mañana está libre
+  // («Mañanas y tardes» apagada en su ficha)
+  assert.deepEqual(w('ivan').unavailable[idxDe(pb, MAR, 'M')], ['*'], 'con la tarde fija, la mañana sería un partido que no hace');
+  const sin = M.toProblem(cfg, st, M.nuevoEstado(2026, 10, { festivos: [] }), LUN, M.addDias(LUN, 6), { conPatron: false });
+  assert.equal(sin.workers.find(x => x.id === 'ivan').unavailable[idxDe(sin, MAR, 'M')], undefined, '«Mañanas y tardes» apagada en su ficha');
+});
+// lugar L11: con el Mónaco cerrado a mano el lunes 28 por la tarde no se pide su cocina (dura) ese medio día, y
+// «Locales» apagado en la ficha de Tere no la ata en el núcleo
+test('auditoría S25 · L11 (lugar): ni cocina obligatoria en un medio día cerrado ni lo apagado atando', () => {
+  const { cfg, st } = semilla(); const e = semana(LUNES);
+  M.toggleApertura(e, LUNES, 'MONACO_T', cfg);
+  const pr = M.toProblem(cfg, st, e, LUNES, M.addDias(LUNES, 6), {});
+  const i = idxDe(pr, LUNES, 'T');
+  assert.ok(!pr.rules.some(r => r.type === 'skill_coverage' && r.mode === 'hard' && r.params.requirements[0].shift === 'MONACO' && r.scope.day_tags.every(tag => pr.days[i].tags.includes(tag))));
+  assert.deepEqual(NE.demanda(pr, i, 'MONACO'), { min: 0, max: 0 });
+  M.personaDe(st, 'tere').inactivas = ['locales'];
+  assert.equal(M.toProblem(cfg, st, e, LUNES, M.addDias(LUNES, 6), {}).workers.find(w => w.id === 'tere').allowed_shifts.length, 4);
+});
+// interruptores H7: lo apagado (en el grupo o en la ficha) no entra como indisponible ni como regla
+test('auditoría S25 · H7 (interruptores): lo apagado no entra en el núcleo como indisponible ni como regla', () => {
+  const { cfg, st } = semilla(); cfg.reglas = { nuncaCon: false };
+  M.personaDe(st, 'tere').inactivas = ['libra', 'locales']; M.personaDe(st, 'cristian').inactivas = ['vetos'];
+  const pr = M.toProblem(cfg, st, semana(LUNES), LUNES, M.addDias(LUNES, 6), { conPatron: false });
+  const w = id => pr.workers.find(x => x.id === id);
+  assert.equal(w('tere').unavailable[idxDe(pr, '2026-10-03', 'M')], undefined, 'Tere el sábado por la mañana («Días que libra» apagada)');
+  assert.equal(w('tere').allowed_shifts.length, 4, 'Tere en cualquier local («Locales» apagado)');
+  assert.equal(w('cristian').unavailable[idxDe(pr, LUNES, 'M')], undefined, 'Cristian el lunes por la mañana (su veto, apagado)');
+  assert.ok(!pr.rules.some(r => r.type === 'same_shift_forbidden'), 'sin «nunca con»');
+  // y con TODO apagado, nadie queda atado por su ficha: solo por lo que no es de la ficha (las casillas cerradas por
+  // «Cuándo abre», que tampoco puede ocupar nadie)
+  const c2 = semilla();
+  c2.cfg.reglas = { libra: false, vetos: false, nuncaCon: false, partido: false, cocina: false, minimos: false, cubreA: false };
+  for (const p of c2.st) p.inactivas = ['locales', 'franjas', 'libra', 'vetos', 'partido', 'cocina', 'prefs'];
+  const p2 = M.toProblem(c2.cfg, c2.st, semana(LUNES), LUNES, M.addDias(LUNES, 6), { conPatron: false });
+  assert.ok(!p2.rules.some(r => r.id === 'sin partido' || r.type === 'same_shift_forbidden' || r.type === 'skill_coverage'), JSON.stringify(p2.rules.map(r => r.id)));
+  assert.ok(NE.demanda(p2, 0, 'PASARELA').min === 0, 'sin mínimos');
+  const cerrados = i => p2.shifts.filter(s => s.is_work !== false && NE.demanda(p2, i, s.code).max === 0).map(s => s.code).sort().join();
+  for (const x of p2.workers) if (!M.personaDe(c2.st, x.id).standby && !(M.personaDe(c2.st, x.id).ausencias || []).length) {
+    assert.ok(x.allowed_shifts.length === 4 && !x.preferences.length, `${x.id}: ${JSON.stringify(x)}`);
+    for (const [i, u] of Object.entries(x.unavailable)) assert.equal([].concat(u).sort().join(), cerrados(+i), `${x.id}, medio día ${i}: ${JSON.stringify(u)}`);
+  }
+});
+// relaciones-rol «H-nucleo-partido»: los días de partido de cada persona (partidoEn, con su interruptor). Quien
+// no puede hacer partido ningún día del periodo lo tiene como regla del problema (dura en el modo estricto,
+// blanda en el relajado); lo que el problema no puede decir (partido solo unos días del periodo: el núcleo no
+// tiene una regla «por persona y día») lo decide el volcado con el modo del Generador, y lo que no entra es hueco
+test('auditoría S25 · «H-nucleo-partido» (relaciones-rol): el núcleo limita el partido de Mari Luz a sus días declarados', () => {
+  const DOM = '2026-10-04';
+  const { cfg, st } = semilla();
+  const pb = M.toProblem(cfg, st, M.nuevoEstado(2026, 10, { festivos: [] }), DOM, DOM);
+  const sinP = pb.rules.find(r => r.id === 'sin partido');
+  assert.ok(sinP && sinP.mode === 'hard' && sinP.scope.workers.includes('mariluz'), 'el domingo no hace partido');
+  // en el modo relajado del Generador («Permitir partidos no declarados») es blanda
+  const pr = M.toProblem(cfg, st, M.nuevoEstado(2026, 10, { festivos: [] }), DOM, DOM, { permitirPartido: true });
+  assert.equal(pr.rules.find(r => r.id === 'sin partido').mode, 'soft');
+  // con «Días de partido» apagada en su ficha, no se la limita
+  const c2 = semilla(); M.personaDe(c2.st, 'mariluz').inactivas = ['partido'];
+  assert.ok(!(M.toProblem(c2.cfg, c2.st, M.nuevoEstado(2026, 10, { festivos: [] }), DOM, DOM).rules.find(r => r.id === 'sin partido') || { scope: { workers: [] } }).scope.workers.includes('mariluz'));
+  // la semana entera (partido martes, jueves, viernes y sábado): el volcado en modo estricto no le pone el partido
+  // del domingo, y lo que no entra es un hueco con el porqué; en el relajado entra, con su aviso. (Iván abre la
+  // tarde: sola y saliendo la primera en las dos sería un turno continuo, que no es un partido, D4)
+  const vuelca = relajado => {
+    const c = semilla(); c.cfg.patron = {};
+    const e = M.nuevoEstado(2026, 10, { festivos: [] });
+    assert.ok(M.asignar(e, c.cfg, c.st, DOM, 'PASARELA_T', 'ivan', {}).ok);
+    const p = M.toProblem(c.cfg, c.st, e, '2026-09-28', DOM, { permitirPartido: relajado });
+    const sol = { schedule: { mariluz: { [idxDe(p, DOM, 'M')]: 'PASARELA', [idxDe(p, DOM, 'T')]: 'PASARELA' } } };
+    return { r: M.desdeSolucion(c.cfg, c.st, e, p, sol, { permitirPartido: relajado }), e };
+  };
+  const a = vuelca(false);
+  assert.deepEqual(M.pidsEn(a.e, DOM, 'PASARELA_T'), ['ivan'], 'la tarde del domingo no se la pone');
+  const rech = a.r.rechazados.find(x => x.pid === 'mariluz' && x.turnoId === 'PASARELA_T');
+  assert.ok(rech && rech.regla === 'partido' && /no hace partido/.test(rech.motivo), JSON.stringify(a.r.rechazados));
+  const h = a.r.huecos.find(x => x.iso === DOM && x.turnoId === 'PASARELA_T');
+  assert.ok(h && h.faltan > 0 && (h.nucleo || []).some(x => x.pid === 'mariluz' && x.regla === 'partido'), `el rechazo cuenta como hueco: ${JSON.stringify(a.r.huecos)}`);
+  const b = vuelca(true);
+  const en = M.asignados(b.e, DOM, 'PASARELA_T').find(x => x.pid === 'mariluz');
+  assert.ok(en && (en.avisos || []).some(t => /partido no declarado/.test(t)), JSON.stringify(M.asignados(b.e, DOM, 'PASARELA_T')));
+});
+// revision-disponibilidad r06: lo que el núcleo cree que puede hacer cada persona, medio día a medio día y local a
+// local, es lo que dice la puerta (puedeEstar, de sala o de cocina) con la planilla vacía. Con cada variable de la
+// auditoría: el día libre de una semana, standby, los interruptores de la ficha y del grupo, una ausencia de media
+// jornada, un cierre por fechas con apoyo y sin trabajo, «Cuándo abre» y el Mónaco cerrado a mano
+test('auditoría S25 · r06 (revisión de disponibilidad): toProblem y puedeEstar coinciden medio día a medio día', () => {
+  const LUN = '2026-10-12', DOM = '2026-10-18';
+  const casos = {
+    'semilla': () => {},
+    'libraPuntual martes (Mari Luz)': (cfg, st) => { M.ponerLibraPuntual(M.personaDe(st, 'mariluz'), LUN, [2]); },
+    'Iván con «Días que libra» apagada': (cfg, st) => { M.personaDe(st, 'ivan').inactivas = ['libra']; },
+    'regla «libra» apagada': cfg => { cfg.reglas = { libra: false }; },
+    'Iván con «Mañanas y tardes» apagada': (cfg, st) => { M.personaDe(st, 'ivan').inactivas = ['franjas']; },
+    'Cristian con «Vetos» apagada': (cfg, st) => { M.personaDe(st, 'cristian').inactivas = ['vetos']; },
+    'regla «vetos» apagada': cfg => { cfg.reglas = { vetos: false }; },
+    'Lola con «Locales» apagada': (cfg, st) => { M.personaDe(st, 'lola').inactivas = ['locales']; },
+    'Hojan (solo cocina) con «Cocina» apagada': (cfg, st) => { M.personaDe(st, 'hojan').inactivas = ['cocina']; },
+    'regla «cocina» apagada': cfg => { cfg.reglas = { cocina: false }; },
+    'permiso de Mari Luz por la mañana': (cfg, st) => { M.personaDe(st, 'mariluz').ausencias = [{ tipo: 'PERM', desde: '2026-10-13', hasta: '2026-10-13', franjas: ['M'] }]; },
+    'Tere con baja desde el jueves': (cfg, st) => { M.personaDe(st, 'tere').ausencias = [{ tipo: 'BAJ', desde: '2026-10-15' }]; },
+    'Mónaco cerrado martes y miércoles por la tarde (Yilian apoya, Cristian sin trabajo)': cfg => {
+      cfg.cierresPuntuales = [{ id: 'c1', localId: 'MONACO', motivo: 'reforma', dias: { '2026-10-13': ['T'], '2026-10-14': ['T'] },
+        decisiones: { yilian: { tipo: 'REFUERZA', turnos: ['2026-10-13|T'] }, cristian: { tipo: 'SIN', turnos: ['2026-10-14|T'] } } }];
+    },
+    '«Cuándo abre» sin el lunes por la tarde en El 33': cfg => { const l = M.localDe(cfg, 'EL33'); l.abre.T = l.abre.T.filter(d => d !== 1); },
+    'Mónaco cerrado a mano el jueves por la mañana': (cfg, st, e) => { e.apertura['2026-10-15'] = { MONACO_M: false }; },
+  };
+  const malos = [];
+  for (const [nombre, mut] of Object.entries(casos)) {
+    const { cfg, st } = semilla(); const e = M.nuevoEstado(2026, 10, { festivos: [] });
+    mut(cfg, st, e);
+    const pb = M.toProblem(cfg, st, e, LUN, DOM, { conPatron: false });
+    // (revisión de la fase 7) y el núcleo de verdad lo acepta: antes «*» iba como texto y respondía 422
+    for (const er of NE.erroresPeticion({ problem: pb }).slice(0, 3)) malos.push(`${nombre} · esquema del núcleo: ${er.loc.join('.')} ${er.msg} (${JSON.stringify(er.input)})`);
+    for (const p of st) for (const x of pb.meta.indices) for (const l of cfg.locales) {
+      const tid = M.turnoId(l.id, x.franja);
+      const puerta = M.puedeEstar(cfg, st, e, x.iso, tid, p.id, { puesto: 'sala' }).ok || M.puedeEstar(cfg, st, e, x.iso, tid, p.id, { puesto: 'cocina' }).ok;
+      const nuc = libreEn(pb, p.id, x.iso, x.franja, l.id);
+      if (nuc !== puerta) malos.push(`${nombre} · ${p.id} ${x.iso.slice(5)} ${x.franja} ${l.id}: núcleo=${nuc} puerta=${puerta}`);
+    }
+  }
+  assert.deepEqual(malos.slice(0, 30), [], `${malos.length} medios días en desacuerdo`);
 });

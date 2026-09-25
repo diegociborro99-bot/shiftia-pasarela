@@ -175,6 +175,11 @@ tr.frow td.pname .lp{display:inline-block;width:8px;height:8px;border-radius:2px
 .genbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;bottom:0;background:color-mix(in srgb, var(--bg) 88%, transparent);backdrop-filter:blur(10px);padding:10px 0}
 .pqn{font-size:11px;color:var(--ink2);margin-top:3px}
 .pqn b{color:var(--ink)}
+/* 25/09 (fase 7): lo que el núcleo proponía para esa casilla y la puerta no dejó poner */
+.genrow .gtxt small.gnuc{color:var(--warn);font-weight:600;margin-top:2px}
+/* 25/09 (revisión de la fase 7): el porqué de cada hueco, seguido y en el color del texto. Las reglas de la fila
+   (.genrow .gtxt b: bloque; en el hueco, rojo) ponían cada motivo en su renglón, en rojo, y los nombres debajo */
+.genrow.hueco .gtxt .pqn b{display:inline;color:var(--ink);font-size:inherit;line-height:inherit}
 
 /* ============ revisión ============ */
 .revitem .lpill{flex:none;font-family:var(--mono);font-size:9px;font-weight:800;color:#fff;background:var(--lc);border-radius:5px;padding:2px 6px}
