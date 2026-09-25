@@ -30,39 +30,54 @@ function lblNoPrimero(fr) {
   if (f.includes('M') && f.includes('T')) return 'de mañana ni de tarde';
   return f.includes('M') ? 'de mañana' : f.includes('T') ? 'de tarde' : '';
 }
-// Enciende o apaga una característica en la ficha (p.inactivas). «Nunca con» es
-// mutua (el modelo bloquea si cualquiera de los dos la tiene activa), así que se
-// apaga o enciende también en la ficha de cada incompatible; devuelve sus nombres.
+// Enciende o apaga una característica en la ficha (p.inactivas). 24/09 (fase 6, S21): «Nunca con» ya no se
+// apaga entera ni en cascada (apagar Leo–Susana Capón apagaba también Leo–Lavinia y, en cadena, Lavinia–Mari
+// Luz): su interruptor es el de cada pareja (alternarParejaUI).
 function setCaracteristica(p, k, activa) {
-  const pon = x => {
-    x.inactivas = Array.isArray(x.inactivas) ? x.inactivas : [];
-    const i = x.inactivas.indexOf(k);
-    if (!activa && i < 0) x.inactivas.push(k);
-    if (activa && i >= 0) x.inactivas.splice(i, 1);
-    if (!x.inactivas.length) delete x.inactivas;
-  };
-  pon(p);
-  const otros = [];
-  if (k === 'nuncaCon') for (const q of p.nuncaCon || []) { const qp = personaDeId(q); if (qp && caracteristicaActiva(qp, k) !== activa) { pon(qp); otros.push(qp.nombre); } }
-  return otros;
+  p.inactivas = Array.isArray(p.inactivas) ? p.inactivas : [];
+  const i = p.inactivas.indexOf(k);
+  if (!activa && i < 0) p.inactivas.push(k);
+  if (activa && i >= 0) p.inactivas.splice(i, 1);
+  if (!p.inactivas.length) delete p.inactivas;
 }
 // desde la interfaz (panel de condiciones): deshacer, historial y guardado
 function alternarCaracteristicaUI(pid, k, activa) {
   const p = personaDeId(pid); if (!p) return false;
   pushUndo(`ficha de ${p.nombre}`, { staff: true });
-  const otros = setCaracteristica(p, k, activa);
-  registrarCambio(`Ficha de ${p.nombre}: «${lblCaracteristica(k)}» ${activa ? 'activada' : 'desactivada'}${otros.length ? ` (también en ${otros.join(', ')})` : ''}`, 'equipo');
+  setCaracteristica(p, k, activa);
+  registrarCambio(`Ficha de ${p.nombre}: «${lblCaracteristica(k)}» ${activa ? 'activada' : 'desactivada'}`, 'equipo');
   saveState();
   return true;
+}
+// El interruptor de una pareja «nunca con» (24/09, fase 6, S21): en las dos fichas a la vez (ponerNuncaCon del
+// modelo), con deshacer, historial y guardado. Lo usan el panel de condiciones y la ficha.
+function alternarParejaUI(pid, otro, activa, quien) {
+  const p = personaDeId(pid), q = personaDeId(otro); if (!p || !q) return false;
+  pushUndo(`ficha de ${(quien || p).nombre}`, { staff: true });
+  ponerNuncaCon(S.staff, p.id, q.id, { activa });
+  registrarCambio(`Ficha de ${(quien || p).nombre}: «nunca con» ${(quien && quien.id === q.id ? p : q).nombre} ${activa ? 'encendida' : 'apagada'} (la pareja, en las dos fichas)`, 'equipo');
+  saveState();
+  return true;
+}
+// Cómo se dice que un interruptor está apagado (24/09, fase 6, S20): en la ficha o para todo el grupo. Lo usan la
+// tarjeta de Equipo y la ficha, con estadoInterruptor del modelo (lo mismo que aplica la puerta)
+function textoApagada(estado, k) {
+  if (estado === 'apagada-grupo') return `${lblCaracteristica(k)}: apagada para todo el grupo (Equipo → Condiciones); no la mira nadie`;
+  if (estado === 'apagada-ficha') return `${lblCaracteristica(k)}: desactivada en la ficha, el generador no la tiene en cuenta`;
+  return '';
 }
 
 // Todas las condiciones de una persona como chips. Es la «hoja de condiciones»
 // que el encargado revisa antes de generar: si algo no está aquí, el generador
 // no lo sabe. Las características apagadas en la ficha salen tachadas.
+// 24/09 (fase 6, S20): lo apagado sale tachado tanto si se apagó en la ficha como para todo el grupo (antes, con
+// «Días que libra» apagada en Equipo → Condiciones, el chip de Mari Luz seguía sin tachar), y el título dice cuál.
+// (Autónoma: la prueba de contrato la carga sola, con el modelo)
 function chipsCondiciones(p) {
   const h = [];
-  const off = k => (caracteristicaActiva(p, k) ? '' : ' off');
-  const tc = (k, lbl, txt, cls, title) => tchip(lbl, txt, (cls || '') + off(k), caracteristicaActiva(p, k) ? title : `${lblCaracteristica(k)}: desactivada en la ficha, el generador no la tiene en cuenta`);
+  const est = k => estadoInterruptor(S, p, k);
+  const off = k => (est(k) === 'activa' ? '' : ' off');
+  const tc = (k, lbl, txt, cls, title) => tchip(lbl, txt, (cls || '') + off(k), est(k) === 'activa' ? title : est(k) === 'apagada-grupo' ? `${lblCaracteristica(k)}: apagada para todo el grupo (Equipo → Condiciones); no la mira nadie` : `${lblCaracteristica(k)}: desactivada en la ficha, el generador no la tiene en cuenta`);
   const locs = p.locales || [];
   if (locs.length) for (const id of locs) h.push(tc('locales', 'Local', chipLocal(id), 'loc'));
   else h.push(tchip('Local', 'cualquiera (sin local fijo)', 'teal'));
@@ -77,26 +92,32 @@ function chipsCondiciones(p) {
   const lunesHoy = lunesDe(isoHoy());
   for (const x of librasPuntuales(p).filter(x => x.dias.length && x.semana >= lunesHoy)) h.push(tc('libra', 'Libra', esc(`Semana del ${fmtDDMM(x.semana)}: ${textoCambioLibre(p, x)}`), 'warn'));
   // 24/09 (fase 5, S15): el interruptor «Cocina» de la ficha apaga sus límites (nunca, solo unos días, solo
-  // hace cocina), no que sea titular o reserva de un local: eso no se tacha, como no lo quita la puerta
+  // hace cocina), no que sea titular o reserva de un local: eso no se tacha, como no lo quita la puerta. Con la regla
+  // del GRUPO apagada (D5) nadie mira quién lleva la cocina: se tacha también, como dice la ficha (revisión de la fase 6)
   const c = p.cocina || {};
+  const cocGrupo = est('cocina') === 'apagada-grupo';
+  const tcoc = (txt, cls) => cocGrupo ? tc('cocina', 'Cocina', txt, cls) : tchip('Cocina', txt, cls);
   if (c.nunca) h.push(tc('cocina', 'Cocina', 'nunca', 'warn'));
-  for (const id of c.titular || []) h.push(tchip('Cocina', chipLocal(id, '· titular'), 'loc'));
-  for (const id of c.reserva || []) h.push(tchip('Cocina', chipLocal(id, '· reserva'), 'loc'));
-  if (p.puesto === 'cocina' && !(c.titular || []).length && !(c.reserva || []).length) h.push(tchip('Cocina', 'por su puesto'));
+  for (const id of c.titular || []) h.push(tcoc(chipLocal(id, '· titular'), 'loc'));
+  for (const id of c.reserva || []) h.push(tcoc(chipLocal(id, '· reserva'), 'loc'));
+  if (p.puesto === 'cocina' && !(c.titular || []).length && !(c.reserva || []).length) h.push(tcoc('por su puesto'));
   if ((c.soloDias || []).length) h.push(tc('cocina', 'Cocina', 'solo ' + esc(c.soloDias.map(lblDowPl).join(' y ')), 'warn'));
   if (p.soloCocina) h.push(tc('cocina', 'Cocina', 'solo hace cocina', 'warn', 'no refuerza la sala'));
   for (const [lid, fr] of Object.entries(p.abre || {})) if ((fr || []).length) h.push(tc('abre', 'Abre', chipLocal(lid, fr.map(f => FRANJA_LBL[f].toLowerCase()).join(' y ')), 'loc'));
   for (const lid of p.noAbre || []) h.push(tc('noAbre', 'No abre', chipLocal(lid), 'loc warn'));
   if ((p.noPrimero || []).length) h.push(tc('noPrimero', 'Nunca 1.º', esc(lblNoPrimero(p.noPrimero)), 'warn', 'no sale nunca el primero en esa franja: entra a partir del segundo puesto'));
-  if ((p.nuncaCon || []).length) h.push(tc('nuncaCon', 'Nunca con', esc(p.nuncaCon.map(nombrePid).join(', ')), 'warn'));
+  // (fase 6, S21 y S24) cada pareja una vez, también la que puso la otra ficha, con su «flexible» y su interruptor
+  for (const x of parejasNuncaCon(S, S.staff, p)) h.push(tchip('Nunca con', `${esc(x.nombre)}${x.flexible ? ' · flexible' : ''}`, 'warn' + (x.estado === 'activa' ? '' : ' off'), x.estado === 'apagada-grupo' ? '«Nunca con»: apagada para todo el grupo (Equipo → Condiciones); no la mira nadie' : x.estado === 'apagada-pareja' ? `«Nunca con» ${x.nombre}: apagada esta pareja, el generador no la tiene en cuenta` : x.flexible ? `pareja flexible: ${TEXTO_PAREJA_FLEXIBLE} (José, 17/09)` : 'no coinciden en la misma casilla'));
   // 24/09 (D13, Diego: «tal persona cubre a tal persona, hasta nueva orden»): la designación se dice igual
   // que en la ficha, y por los dos lados: en la de quien cubre «Cubre a Iván · siempre que falte · hasta que
   // lo quites»; en la de quien falta, «Si falta, le cubre Mari Luz». La designación le autoriza el partido
   // para cubrirle (D1, y solo eso)
   for (const cb of p.cubreA || []) h.push(tc('cubreA', 'Cubre a', `${esc(nombrePid(cb.pid))} · ${esc(cuandoCubre(S, cb))} · hasta que lo quites`, 'fix cubrea', `ocupa el sitio de ${nombrePid(cb.pid)} cuando falta, hasta que se quite en esta ficha; si hace falta, puede hacer partido para cubrirle`));
   for (const d of quienLeCubre(S, S.staff, p.id)) h.push(tchip('Si falta, le cubre', `${esc(d.nombre)}${d.cuando !== 'siempre que falte' ? ` <small>(${esc(d.cuando)})</small>` : ''}`, 'fix cubrea' + (d.activa ? '' : ' off'), d.activa ? `${d.nombre} ocupa su sitio cuando falta (se cambia en la ficha de ${d.nombre})` : `«Cubre a» está apagado en la ficha de ${d.nombre} o en las reglas del grupo: ahora no se aplica`));
-  for (const v of p.vetos || []) h.push(tc('vetos', 'No hace', chipLocal(v.localId, v.franja === 'M' ? 'mañanas' : 'tardes'), 'loc warn'));
-  if (p.contrato && +p.contrato.horasSemana > 0) h.push(tc('contrato', 'Contrato', `${+p.contrato.horasSemana} h/semana`));
+  // (fase 6, S30) con su día: el veto de Mari Luz es de los lunes, no de todos los días
+  for (const v of p.vetos || []) { const ds = dowsVeto(v); h.push(tc('vetos', 'No hace', chipLocal(v.localId, `${v.franja === 'M' ? 'mañanas' : 'tardes'}${ds ? ' · ' + ds.map(d => DOW_PL[d]).join(' y ') : ''}`), 'loc warn')); }
+  // (fase 6, S17 y D6) el contrato no se apaga: lo compara el contador de horas
+  if (p.contrato && +p.contrato.horasSemana > 0) h.push(tchip('Contrato', `${+p.contrato.horasSemana} h/semana`, '', 'el contador de horas compara con esto'));
   if (p.prefs && (p.prefs.evitaDows || []).length) h.push(tc('prefs', 'Prefiere no', esc(lblDows(p.prefs.evitaDows)), 'teal', 'criterio personal: no bloquea, el generador lo respeta al priorizar'));
   if (p.prefs && p.prefs.nota) h.push(tc('prefs', 'Criterio', esc(p.prefs.nota), 'teal'));
   for (const s of p.supuestos || []) h.push(tchip('Supuesto', esc(s), 'warn', 'decidido por Highkey, pendiente de confirmar con el grupo'));
@@ -383,7 +404,7 @@ function quitarPidDeTodo(pid) {
     for (const f of FRANJAS) if (l.primero && l.primero[f] === pid) l.primero[f] = null;
   }
   for (const q of S.staff) {
-    if (q.nuncaCon) q.nuncaCon = q.nuncaCon.filter(x => x !== pid);
+    quitarNuncaCon(S.staff, q.id, pid);   // (fase 6) la pareja, con su «flexible» y su interruptor
     if (q.cubreA) q.cubreA = q.cubreA.filter(x => x.pid !== pid);
   }
   return turnos;
@@ -727,18 +748,21 @@ function openAjustesLocales(localId, cambiosPrevios) {
 // característica de cada ficha (p.inactivas). Lo apagado se ve tachado y se
 // puede volver a encender desde aquí. Cada toque guarda y deja huella en el historial.
 // (fase 5: «Quién abre» de cada local es una condición, S18)
-const TIPO_COND = { minimos: 'Mínimos por local', cocina: 'Cocina de los locales', primero: 'Quién abre cada local', persona: 'Personas (sus fichas)', regla: 'Reglas del grupo' };
+// (fase 6, S22) «local»: lo que se decide en Ajustes del local sin ser mínimos, cocina ni quién abre («quien hace
+// partido puede abrir la tarde»); antes salía como regla del grupo con un botón que no llevaba a ninguna parte
+const TIPO_COND = { minimos: 'Mínimos por local', cocina: 'Cocina de los locales', primero: 'Quién abre cada local', persona: 'Personas (sus fichas)', regla: 'Reglas del grupo', local: 'Otros ajustes de los locales' };
 // a qué regla del grupo obedece cada condición (null: no depende de ninguna)
 function reglaDeCondicion(c) {
   if (c.tipo === 'minimos') return 'minimos';
   if (c.tipo === 'cocina') return 'cocina';
   if (c.tipo === 'primero') return 'abre';
   if (c.tipo === 'regla') return c.k;
+  if (c.tipo === 'local') return null;   // (fase 6, S22) un ajuste del local, sin regla del grupo
   return ['libra', 'partido', 'vetos', 'nuncaCon', 'cubreA', 'cocina', 'abre', 'noPrimero'].includes(c.k) ? c.k : null;
 }
-// el mismo catálogo con TODO encendido: de ahí salen los textos de lo apagado
+// el mismo catálogo con TODO encendido (también cada pareja «nunca con»): de ahí salen los textos de lo apagado
 function condicionesTodas() {
-  return condicionesDe(Object.assign({}, S, { reglas: {} }), S.staff.map(p => Object.assign({}, p, { inactivas: [] })));
+  return condicionesDe(Object.assign({}, S, { reglas: {} }), S.staff.map(p => Object.assign({}, p, { inactivas: [], nuncaConOff: [] })));
 }
 function htmlToggle(on, attrs, lbl) {
   return `<label class="tgl"><input type="checkbox" role="switch" aria-checked="${on ? 'true' : 'false'}" aria-label="${esc(lbl)}" data-libre ${attrs}${on ? ' checked' : ''}><span class="tglk"></span><span class="tgll">${on ? 'Activa' : 'Apagada'}</span></label>`;
@@ -782,11 +806,13 @@ function openCondiciones() {
       h += `<div class="condgrp" data-grp="${tipo}"><b>${esc(TIPO_COND[tipo])}</b> <span class="micro">${lista.length}</span></div>`;
       for (const c of lista) {
         let ctrl = '';
-        if (c.tipo === 'persona') {
+        if (c.tipo === 'persona' && c.k === 'nuncaCon' && c.otro) {
+          // (fase 6, S21) el interruptor de ESA pareja, en las dos fichas (antes apagaba la característica entera)
+          ctrl = htmlToggle(true, `data-par="${esc(c.pid)}|${esc(c.otro)}"`, `«Nunca con»: la pareja ${nombrePid(c.pid)} y ${nombrePid(c.otro)}`);
+        } else if (c.tipo === 'persona') {
           const p = personaDeId(c.pid);
-          const q = c.k === 'nuncaCon' && c.otro ? ` y ${nombrePid(c.otro)}` : '';
-          ctrl = htmlToggle(true, `data-car="${esc(c.pid)}|${esc(c.k)}"`, `«${lblCaracteristica(c.k)}» en la ficha de ${p ? p.nombre : c.pid}${q}`);
-        } else if (c.tipo === 'minimos' || c.tipo === 'cocina' || c.tipo === 'primero') ctrl = `<button type="button" class="condlnk" data-condlocal="${esc(c.localId)}">Ajustes del local</button>`;
+          ctrl = htmlToggle(true, `data-car="${esc(c.pid)}|${esc(c.k)}"`, `«${lblCaracteristica(c.k)}» en la ficha de ${p ? p.nombre : c.pid}`);
+        } else if (c.tipo === 'minimos' || c.tipo === 'cocina' || c.tipo === 'primero' || c.tipo === 'local') ctrl = `<button type="button" class="condlnk" data-condlocal="${esc(c.localId)}">Ajustes del local</button>`;
         else if (c.tipo === 'regla') ctrl = `<button type="button" class="condlnk" data-irregla="${esc(c.k)}">Regla del grupo ↑</button>`;
         h += fila(c, ctrl, { q: c.tipo === 'persona' ? nombrePid(c.pid) + ' ' + lblCaracteristica(c.k) : c.localId ? nombreLocal(c.localId) : '' });
       }
@@ -807,19 +833,28 @@ function openCondiciones() {
     }
     for (const o of off) o.nota = `apagada en la${o.fichas.length > 1 ? 's fichas' : ' ficha'} de ${o.fichas.join(' y ')}${o.porRegla ? ' · y la regla del grupo también' : ''}`;
     // lo que falta del catálogo porque su regla del grupo está apagada
+    let nParesOff = 0;
     for (const c of todas) {
       if (ids.has(c.id) || porId[c.id]) continue;
-      const rk = reglaDeCondicion(c); if (!rk || regla(S, rk)) continue;
+      const rk = reglaDeCondicion(c);
+      // (fase 6, S21) una pareja «nunca con» apagada (su interruptor, en las dos fichas): una vez, con el suyo
+      if (c.k === 'nuncaCon' && c.otro && (!rk || regla(S, rk))) {
+        const par = parejasNuncaCon(S, S.staff, personaDeId(c.pid)).find(x => x.pid === c.otro);
+        if (par && !par.activa) { nParesOff++; off.push(Object.assign({}, c, { id: `off:par:${c.id}`, par: [c.pid, c.otro], nota: 'apagada esta pareja (en las dos fichas)' })); }
+        continue;
+      }
+      if (!rk || regla(S, rk)) continue;
       if (c.tipo === 'persona' && off.some(o => o.pid === c.pid && o.k === c.k)) continue;
       off.push(Object.assign({}, c, { id: `off:regla:${c.id}`, rk, nota: `la regla «${lblRegla(rk)}» está apagada` }));
     }
-    const nOffFichas = S.staff.reduce((a, p) => a + (p.inactivas || []).length, 0);
+    const nOffFichas = S.staff.reduce((a, p) => a + (p.inactivas || []).length, 0) + nParesOff;
     h += `<div class="revgrp" style="margin-top:18px"><span class="dot" style="background:var(--ink3)"></span>APAGADAS · ${off.length}</div>`;
     if (!off.length) h += '<div class="festvacio">Nada apagado: el generador lo comprueba todo.</div>';
     else {
       h += '<p class="filltxt" style="margin:0 0 6px">Tachado lo que el generador no está mirando. Enciéndelo desde aquí cuando quieras.</p>';
       for (const c of off) {
-        const ctrl = c.tipo === 'persona' && !c.rk ? htmlToggle(false, `data-car="${esc(c.pid)}|${esc(c.k)}"`, `«${lblCaracteristica(c.k)}» en la ficha de ${nombrePid(c.pid)}`)
+        const ctrl = c.par ? htmlToggle(false, `data-par="${esc(c.par[0])}|${esc(c.par[1])}"`, `«Nunca con»: la pareja ${nombrePid(c.par[0])} y ${nombrePid(c.par[1])}`)
+          : c.tipo === 'persona' && !c.rk ? htmlToggle(false, `data-car="${esc(c.pid)}|${esc(c.k)}"`, `«${lblCaracteristica(c.k)}» en la ficha de ${nombrePid(c.pid)}`)
           : htmlToggle(false, `data-regla="${esc(c.rk)}"`, `Regla: ${lblRegla(c.rk)}`);
         h += fila(c, ctrl, { off: true, nota: c.nota, q: c.pid ? nombrePid(c.pid) + ' ' + lblCaracteristica(c.k) : '' });
       }
@@ -852,6 +887,10 @@ function openCondiciones() {
     if (ds.car) {
       const [pid, k] = ds.car.split('|');
       if (alternarCaracteristicaUI(pid, k, t.checked)) { renderVistaActiva(); pinta(); }
+    }
+    if (ds.par) {
+      const [a, b] = ds.par.split('|');
+      if (alternarParejaUI(a, b, t.checked)) { renderVistaActiva(); pinta(); }
     }
   });
   ov.addEventListener('click', e => {

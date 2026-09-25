@@ -2,6 +2,81 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Lo que se acepta «con aviso» llega de verdad a la planilla, y todos los sitios dicen lo mismo (24/09,
+  revisión).** Repaso de lo de Equipo con el caso de Iván delante. Lo que se nota:
+  - **El domingo de las vacaciones de Iván, Mari Luz no hace la tarde con Lavinia** («el domingo haría mañana»,
+    Aroa). El Generador ya no junta una pareja «nunca con» flexible por su cuenta: solo con «Permitir partidos no
+    declarados» marcado, y solo si no hay nadie más, igual que el plan con avisos de la Cobertura. Sin marcarlo, la
+    casilla queda como hueco y el propio hueco te ofrece a esa persona «con aviso», para que decidas tú. Así el
+    Generador, la confirmación de Equipo («el domingo 4 no puede: nunca con Lavinia») y los planes de la Cobertura
+    dicen lo mismo. La casilla «Permitir partidos no declarados» lo explica, y la ficha y la tarjeta de Equipo dicen
+    cuándo se junta una pareja flexible (antes: «si no, se relaja y queda el aviso»).
+  - **Lo que se propone con aviso se puede aplicar.** La pareja flexible que proponía el plan de la Cobertura, la
+    vista previa del Generador o la propuesta «con aviso» de un hueco salía en pantalla, pero al aplicarla decía
+    «Lavinia no se pudo poner: nunca con Mari Luz». Ahora entra con su aviso. Desde el Mes pasa lo mismo que en el
+    selector: entra con aviso, sin pedir que la fuerces.
+  - **Al quitar un cierre por fechas, vuelve también lo que pusiste a mano con aviso** (la pareja flexible). Antes
+    se quedaba fuera.
+  - **El turno continuo sale como C en el Mes y en la hoja impresa del mes** (Victoria el jueves 8 en El 33:
+    «C·33», no «P·33»), con su explicación en la leyenda. En la Cobertura ya no pone «ya trabaja ese día
+    (partido)» de quien haría un continuo.
+  - **Con «Mínimos» apagado, nadie cuenta faltas:** ni la fila «Turnos cortos» de la hoja impresa del mes, ni la
+    fila «Faltan» del Excel. En Hoy, una casilla por debajo del mínimo ya no sale en verde «Mínimo cubierto»: sale
+    sin color y dice «Mínimos apagados para todo el grupo». La Cobertura dice «la regla «Mínimos» está apagada: no
+    hace falta nadie (1 de 3)» en vez de «la casilla sigue completa».
+  - **Con la regla del grupo «Cocina» apagada, la tarjeta tacha también la cocina de titular y de reserva**, como
+    ya decía la ficha.
+  - **Con varios encargados o empleados conectados**, un aviso de otro dispositivo ya no cierra la ficha que tienes
+    abierta ni vacía el Ctrl+Z si lo que ha cambiado no es la planilla. Pasaba mientras el servidor guardaba las
+    fichas con la forma de antes de esta versión (hasta el primer cambio del encargado).
+
+- **Equipo dice lo que de verdad se aplica (24/09).** Lo que enseñan la tarjeta y la ficha de cada persona es lo
+  que hacen el Generador, la Cobertura, el selector de la casilla y la Revisión. Lo que cambia:
+  - **Una regla apagada para todo el grupo se ve en cada ficha.** Si apagas «Días que libra» en Equipo →
+    Condiciones, la ficha de Mari Luz la enseña apagada con «Apagada para todo el grupo (Equipo → Condiciones): no
+    la mira nadie», su interruptor no se puede tocar desde la ficha, y la tarjeta la tacha y lo dice al pasar por
+    encima. Antes la ficha la seguía enseñando encendida.
+  - **«Nunca coincide con» es cosa de dos.** Poner o quitar a Lavinia en la ficha de Mari Luz la pone o la quita
+    también en la de Lavinia, y lo mismo «flexible». El interruptor ya no es de la característica entera sino de
+    cada pareja: apagar Leo–Susana Capón deja activas las demás parejas de Leo. Se deshace con Ctrl+Z. Al abrir la
+    app, las parejas que estaban en una sola ficha pasan a las dos, sin cambiar a quién se aplicaba.
+  - **Con «Nunca coincide» apagado (para el grupo o esa pareja), la Revisión ya no dice «no pueden coincidir».**
+  - **La pareja «flexible» (José, 17/09) se relaja de verdad, y solo si no hay nadie más.** El Generador con
+    «Permitir partidos no declarados» la pone junta con el aviso «nunca con Lavinia (pareja flexible: se relaja si
+    no hay nadie más)»; sin esa casilla deja el hueco y la ofrece «con aviso» (ver arriba). El selector de la
+    casilla la ofrece «con aviso» y la Cobertura solo en el plan con avisos y como último recurso. La Revisión no
+    la marca como fallo grave. Antes «flexible» no cambiaba nada: nunca se juntaban.
+  - **«Preferencias» apagada en una ficha deja de restar** «prefiere no trabajar el …» en el Generador, la
+    Cobertura y el selector.
+  - **Con «Mínimos» apagado nadie pide mínimos:** la Revisión no dice «falta», el Generador no deja huecos por
+    mínimo y la Cobertura no busca a nadie para llegar a él. El mínimo de cada local sigue guardado en Ajustes y
+    vuelve al encenderla. La fila de la regla lo explica.
+  - **«Contrato» ya no es un interruptor** (no apagaba nada). La ficha dice «Horas de contrato: el contador de horas
+    compara con esto; el Generador no reparte según el contrato». Horas sigue comparando igual.
+  - **El standby va en su bloque, «Alta pendiente de confirmar»,** fuera de «Días que libra». Apagar «Días que
+    libra» en la ficha de Dulce ya no parece apagar su standby: se sigue aplicando.
+  - **La condición «En Pasarela, quien hace partido puede abrir la tarde»** sale en Condiciones como un ajuste del
+    local, con el botón «Ajustes del local», y no como una regla del grupo con un interruptor que no le tocaba.
+  - **«Sin local fijo» es no tener locales**, en todas partes (la tarjeta, el contador de Equipo, la planilla, el
+    Generador, la Cobertura y Horas). La marca que había aparte («comodín») se quita al abrir la app: Tere y
+    Lavinia, que tienen sus locales, dejan de salir como «sin local fijo»; Leo, sin locales, lo sigue siendo.
+  - **Los vetos llevan su día.** «No hace mañanas en Pasarela los lunes» se ve así en la tarjeta y en la ficha, el
+    alta tiene el día, y un veto de los martes ya no se rechaza como repetido de uno de los lunes. Se aplica solo ese
+    día.
+  - **El local habitual no cambia al quitar y volver a poner un local**, y quien tiene más de uno lo elige en su
+    ficha («Local habitual»). El Generador lo lee.
+  - **Quien hace mañana y tarde y no tiene ningún día de partido** tiene la condición «X no hace partido» en el
+    Generador, que la comprueba.
+  - **Un turno continuo no es un partido.** Mañana y tarde seguidas en el mismo local, de corrido (Victoria el
+    jueves en El 33), se admiten con la nota «turno continuo»: no salen como «no hace partido» en la Revisión ni en
+    las condiciones del Generador, y la columna «Partidos» de Horas y del Excel no los cuenta. El Generador solo
+    pone un continuo si no hay nadie mejor (resta 25 puntos) y nunca a quien entra de cocina.
+  - Con todo esto, las semanas generadas con la semana tipo salen igual que antes, casilla a casilla, y el plan A
+    de la Cobertura de Iván también. Octubre sin semana tipo sale con 566 plazas y 32 huecos (antes 559 y 40).
+  - **Para Diego (despliegue):** la versión nueva ordena al cargar las fichas guardadas (parejas «nunca con» en las
+    dos fichas, sin la marca «comodín» ni el interruptor de «Contrato»). El servidor comprueba la forma de esos
+    campos al guardar, y el empleado no recibe sus parejas «nunca con».
+
 - **Lo de la cocina y quién abre llega también a las semanas que ya estaban en la planilla (24/09).** Hasta
   ahora solo cambiaban las semanas que se generasen de nuevo. Lo que se nota:
   - **Al abrir la app con esta versión**, quién abre y quién lleva la cocina de la planilla que ya estaba dejan

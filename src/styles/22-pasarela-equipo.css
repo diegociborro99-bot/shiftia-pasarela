@@ -221,3 +221,25 @@
   .ausbar .btn{flex:1 1 100%;justify-content:center;min-height:44px}
   .ausconf .ausconfl{font-size:15px}
 }
+
+/* 24/09 (fase 6): lo que Equipo enseña es lo que se aplica.
+   · S20: la característica apagada para todo el grupo (Equipo → Condiciones) no se enciende desde la ficha;
+   · S21 y S24: «nunca con» pareja a pareja, con su «flexible» y su interruptor (en las dos fichas);
+   · S23 y S17: el standby y el contrato, bloques sin interruptor (no se apagan);
+   · S31: el local habitual se elige debajo de los locales. */
+.tgl.dis{cursor:not-allowed;opacity:.6}
+.tgl.dis .tglk{border-style:dashed}
+.fbloque{background:var(--surface2)}
+.parrow{flex-wrap:wrap}
+.parrow .festinfo{flex:1 1 180px;min-width:0}
+.parrow .festinfo small{display:block;color:var(--ink3);font-size:11px;line-height:1.35}
+.parrow.off{background:var(--surface3);border-style:dashed}
+.parrow.off .festinfo b{text-decoration:line-through;text-decoration-color:var(--ink3);color:var(--ink3)}
+.parflex{font-size:12px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.fhabitual{margin-top:8px}
+.fhabitual select{max-width:260px}
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  .parrow .tgl{margin-left:auto}
+  .parflex{min-height:44px;display:inline-flex;align-items:center}
+  .fhabitual select{max-width:none;min-height:44px}
+}

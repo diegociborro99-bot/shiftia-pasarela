@@ -63,27 +63,43 @@ function openFicha(pid, opts) {
   // Cada característica (CARACTERISTICAS del modelo) va en un bloque con su
   // interruptor arriba a la derecha: apagada, el generador no la mira, pero se
   // sigue editando. Escribe p.inactivas.
-  const act = k => caracteristicaActiva(p, k);
+  // 24/09 (fase 6, S20): el estado sale de estadoInterruptor, lo mismo que aplica la puerta. Con la regla apagada
+  // para todo el grupo (Equipo → Condiciones) el bloque lo dice y su interruptor no se toca desde aquí (antes decía
+  // «Activa: el generador la tiene en cuenta» mientras nadie la miraba). «Nunca con» no tiene interruptor de la
+  // característica entera: lo tiene cada pareja (porPareja, S21).
+  const estadoDe = k => estadoInterruptor(S, p, k);
+  const act = k => estadoDe(k) === 'activa';
   const car = (k, titulo, sub, html, opts) => {
-    const on = act(k), o = opts || {};
-    return `<div class="fcar${on ? '' : ' off'}" data-car="${k}">
+    const est = estadoDe(k), on = est === 'activa', grupo = est === 'apagada-grupo', o = opts || {};
+    const porPareja = !!(CARACTERISTICAS.find(c => c.k === k) || {}).porPareja;
+    const aviso = grupo ? 'Apagada para todo el grupo (Equipo → Condiciones): no la mira nadie.' : (o.apagada || 'Desactivada: el generador no la tiene en cuenta.');
+    const tgl = porPareja ? '' : `<label class="tgl${grupo ? ' dis' : ''}" title="${esc(on ? 'Activa: el generador la tiene en cuenta' : grupo ? 'Apagada para todo el grupo (Equipo → Condiciones): se enciende allí' : (o.apagada || 'Desactivada: el generador no la tiene en cuenta'))}"><input type="checkbox" role="switch" aria-checked="${caracteristicaActiva(p, k) ? 'true' : 'false'}" aria-label="«${esc(lblCaracteristica(k))}» activa" data-car-tgl="${k}" data-libre${caracteristicaActiva(p, k) ? ' checked' : ''}${grupo ? ' disabled' : ''}><span class="tglk"></span><span class="tgll">${on ? 'Activa' : grupo ? 'Apagada (grupo)' : 'Apagada'}</span></label>`;
+    return `<div class="fcar${on ? '' : ' off'}${grupo ? ' grupo' : ''}" data-car="${k}">
       <div class="fcarh"><span class="fcart">${titulo ? esc(titulo) : ''}${o.nueva ? ' <span class="condnew">NUEVA</span>' : ''}${sub ? ` <small>${sub}</small>` : ''}</span>
-        <label class="tgl" title="${on ? 'Activa: el generador la tiene en cuenta' : esc(o.apagada || 'Desactivada: el generador no la tiene en cuenta')}"><input type="checkbox" role="switch" aria-checked="${on ? 'true' : 'false'}" aria-label="«${esc(lblCaracteristica(k))}» activa" data-car-tgl="${k}" data-libre${on ? ' checked' : ''}><span class="tglk"></span><span class="tgll">${on ? 'Activa' : 'Apagada'}</span></label></div>
+        ${tgl}</div>
       <div class="fcarb">${html}</div>
-      ${on ? '' : `<p class="fcaroff">${o.apagada ? esc(o.apagada) : 'Desactivada: el generador no la tiene en cuenta.'} Se puede seguir editando y volver a activar cuando haga falta.</p>`}</div>`;
+      ${on ? '' : `<p class="fcaroff">${esc(aviso)} ${grupo ? 'Se puede seguir editando.' : 'Se puede seguir editando y volver a activar cuando haga falta.'}</p>`}</div>`;
   };
-  const subOff = (k, sub) => (act(k) ? '' : 'desactivada · ') + sub;
+  // un bloque sin interruptor (lo que no se apaga: el standby, el contrato)
+  const bloque = (id, titulo, sub, html) => `<div class="fcar fbloque" data-bloque="${id}"><div class="fcarh"><span class="fcart">${esc(titulo)}${sub ? ` <small>${sub}</small>` : ''}</span></div><div class="fcarb">${html}</div></div>`;
+  const subOff = (k, sub) => (act(k) ? '' : estadoDe(k) === 'apagada-grupo' ? 'apagada para el grupo · ' : 'desactivada · ') + sub;
 
   const pinta = () => {
     const abiertas = {}; body.querySelectorAll('details[data-sec]').forEach(d => { abiertas[d.dataset.sec] = d.open; });
     const c = p.cocina, pd = p.partido;
     let h = '';
+    // 24/09 (fase 6, S31): el local habitual se ve y se elige (antes era el orden de la lista, que no se veía y
+    // cambiaba al quitar y volver a poner un local)
+    const hab = localHabitualDe(p);
+    const selHab = p.locales.length > 1 ? `<label class="pinlbl fhabitual">Local habitual <small>(suma al elegir entre varias personas; no cambia al quitar y volver a poner un local)</small><select class="logininp" data-habitual data-libre>${p.locales.map(id => `<option value="${esc(id)}"${id === hab ? ' selected' : ''}>${esc(nombreLocal(id))}</option>`).join('')}</select></label>` : '';
     h += sec('donde', 'Dónde y cuándo', 'locales, franjas, libra y partido',
-      car('locales', 'Locales', '(ninguno = cualquiera, sin local fijo)', `<div class="locset">${locChips(p.locales, 'tloc')}</div>`) +
+      // (fase 6, S23) el standby no es de «Días que libra»: se aplica siempre, sin interruptor (antes iba dentro de
+      // ese bloque y, al apagarlo, parecía apagado mientras seguía sin entrar en la planilla)
+      bloque('standby', 'Alta pendiente de confirmar', '', chk('standby', !!p.standby, 'En standby: no entra en la planilla hasta confirmar sus condiciones')) +
+      car('locales', 'Locales', '(ninguno = cualquiera, sin local fijo)', `<div class="locset">${locChips(p.locales, 'tloc')}</div>${selHab}`) +
       car('franjas', 'Franjas', '', `<div class="segrow">${franjaChips(p.franjas, 'tfranja')}</div>`) +
       car('libra', 'Libra', '', `<div class="dowset">${dowSet(p.libra, 'tlibra')}</div>
        ${chk('libreVariable', !!p.libreVariable, 'Día libre variable (se decide cada semana)')}
-       ${chk('standby', !!p.standby, 'En standby: no entra en la planilla hasta confirmar sus condiciones')}
        <div class="lpunt">
          <div class="pinlbl">Esta semana libra otro día <small>(solo esa semana; después vuelve a su día de siempre. Si la semana ya está en la planilla, se cambia al momento)</small></div>
          <div class="lpsem"><button type="button" class="mbtn" data-lpsem="-1" aria-label="Semana anterior"${lpSem <= lpMin ? ' disabled title="Las semanas pasadas no se cambian"' : ''}>‹</button><b class="lpsemlbl" data-lunes="${lpSem}">Semana del ${fmtDDMM(lpSem)} al ${fmtDDMM(addDias(lpSem, 6))}</b><button type="button" class="mbtn" data-lpsem="1" aria-label="Semana siguiente">›</button></div>
@@ -113,17 +129,28 @@ function openFicha(pid, opts) {
     const bloqueLeCubre = `<div class="lecubre" data-lecubre>${leCubren.length
       ? `<b>Si falta, le cubre${leCubren.length > 1 ? 'n' : ''}</b> ${leCubren.map(d => { const nota = [d.cuando !== 'siempre que falte' ? d.cuando : '', d.activa ? '' : '«Cubre a» apagado: ahora no se aplica'].filter(Boolean).join(' · '); return `<button type="button" class="glink" data-irficha="${esc(d.pid)}">${esc(d.nombre)}</button>${nota ? ` <small>(${esc(nota)})</small>` : ''}`; }).join(' y ')}<small class="lecubrepie">Se pone y se quita en la ficha de quien cubre. Vale hasta que se quite.</small>`
       : `<b>Nadie le cubre en concreto.</b> <small>Si falta, se busca quién en la Cobertura. Para que alguien le cubra siempre, ponlo en la ficha de esa persona, en «Cubre a».</small>`}</div>`;
-    h += sec('reglas', 'Reglas con otras personas', `${p.nuncaCon.length ? p.nuncaCon.length + ' incompatibles' : 'sin incompatibles'} · cubre a ${p.cubreA.length}${leCubren.length ? ` · le cubre${leCubren.length > 1 ? 'n' : ''} ${leCubren.length}` : ''}`,
+    // 24/09 (fase 6, S21 y S24): cada pareja una vez, también la que puso la otra ficha, con su «flexible» y su
+    // interruptor; ponerla, quitarla, apagarla o hacerla flexible toca las dos fichas (ponerNuncaCon, quitarNuncaCon)
+    const parejas = parejasNuncaCon(S, S.staff, p), grupoNC = estadoDe('nuncaCon') === 'apagada-grupo';
+    const filaPar = x => `<div class="festrow parrow${x.estado === 'activa' ? '' : ' off'}" data-par="${esc(x.pid)}"><span class="festinfo"><b>${esc(x.nombre)}</b><small>${x.estado === 'apagada-grupo' ? 'apagada para todo el grupo' : x.activa ? (x.flexible ? esc('flexible: ' + TEXTO_PAREJA_FLEXIBLE) : 'nunca en la misma casilla') : 'apagada esta pareja: el generador no la tiene en cuenta'}</small></span>
+      <label class="singchk parflex" title="${esc('Flexible (José, 17/09): ' + TEXTO_PAREJA_FLEXIBLE)}"><input type="checkbox" data-parflex="${esc(x.pid)}" data-libre${x.flexible ? ' checked' : ''}> flexible</label>
+      <label class="tgl" title="${x.activa ? 'Encendida: no coinciden' : 'Apagada esta pareja'}"><input type="checkbox" role="switch" aria-checked="${x.activa ? 'true' : 'false'}" aria-label="«Nunca con» ${esc(x.nombre)}: encendida" data-partgl="${esc(x.pid)}" data-libre${x.activa ? ' checked' : ''}${grupoNC ? ' disabled' : ''}><span class="tglk"></span><span class="tgll">${x.activa ? 'Activa' : 'Apagada'}</span></label>
+      <button type="button" class="festrm" data-rmpar="${esc(x.pid)}" aria-label="Quitar la pareja con ${esc(x.nombre)}">✕</button></div>`;
+    h += sec('reglas', 'Reglas con otras personas', `${parejas.length ? parejas.length + ' incompatibles' : 'sin incompatibles'} · cubre a ${p.cubreA.length}${leCubren.length ? ` · le cubre${leCubren.length > 1 ? 'n' : ''} ${leCubren.length}` : ''}`,
       bloqueLeCubre +
-      car('nuncaCon', 'Nunca coincide con', '(es mutua: se apaga también en su ficha)', `<div class="chiprow">${p.nuncaCon.map((q, i) => `<span class="tchip warn"><i>${esc(nombrePid(q))}</i><button type="button" class="festrm" data-rmnunca="${i}" aria-label="Quitar">✕</button></span>`).join('') || '<span class="festvacio">Con nadie en especial.</span>'}</div>
-       <span class="addrow">${selPersonas('fNuncaSel', p.nuncaCon)}<button type="button" class="btn-mini" data-addnunca>Añadir</button></span>`) +
+      car('nuncaCon', 'Nunca coincide con', '(es de las dos: se pone, se quita y se apaga en las dos fichas)', `${parejas.map(filaPar).join('') || '<div class="festvacio">Con nadie en especial.</div>'}
+       <span class="addrow">${selPersonas('fNuncaSel', parejas.map(x => x.pid))}<label class="singchk parflex"><input type="checkbox" id="fNuncaFlex" data-libre> flexible</label><button type="button" class="btn-mini" data-addnunca>Añadir</button></span>`) +
       car('cubreA', 'Cubre a', '(ocupa su sitio cuando falta, hasta que lo quites, y si hace falta puede hacer partido para cubrirle; no se salta nada más)', `${p.cubreA.map((cb, i) => fila(`Cubre a ${esc(nombrePid(cb.pid))}`, `${esc(cuandoCubre(S, cb))} · hasta que lo quites`, `<span class="cubrectl">${selDia(`data-cubred="${i}"`, cb.dow)}${selTurno(`data-cubret="${i}"`, cb.turnoId)}</span>`, `data-rmcubre="${i}"`)).join('') || '<div class="festvacio">No cubre a nadie en concreto.</div>'}
        <span class="addrow addrow3">${selPersonas('fCubreP')}${selDia('id="fCubreD"')}${selTurno('id="fCubreT"')}<button type="button" class="btn-mini" data-addcubre>Añadir</button></span>`));
+    // 24/09 (fase 6, S30): el veto con su día («no hace mañanas los lunes») y el alta con el día; repetido es el mismo
+    // local, franja y día (vetoRepetido), o uno de todos los días que ya lo cubre
     h += sec('vetos', 'Vetos', subOff('vetos', p.vetos.length ? `${p.vetos.length} franja(s) que no hace` : 'ninguno'),
-      car('vetos', '', '', (p.vetos.map((v, i) => fila(`<i class="ldot" style="--lc:${esc(colorLocal(v.localId))}"></i>${esc(nombreLocal(v.localId))}`, `no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'}`, '', `data-rmveto="${i}"`)).join('') || '<div class="festvacio">Sin vetos: puede ir a cualquier franja de sus locales.</div>') +
-      `<span class="addrow"><select class="logininp" id="fVetoL" data-libre>${S.locales.map(l => `<option value="${esc(l.id)}">${esc(l.nombre)}</option>`).join('')}</select><select class="logininp" id="fVetoF" data-libre>${FRANJAS.map(f => `<option value="${f}">${FRANJA_LBL[f]}s</option>`).join('')}</select><button type="button" class="btn-mini" data-addveto>Añadir veto</button></span>`));
-    h += sec('contrato', 'Contrato', subOff('contrato', p.contrato.horasSemana ? `${+p.contrato.horasSemana} h/semana` : 'sin horas fijadas'),
-      car('contrato', '', '', `<label class="pinlbl">Horas por semana <small>(el contador de horas compara con esto)</small><input type="number" class="logininp" min="0" max="60" step="0.5" inputmode="decimal" data-num="horasSemana" data-libre value="${p.contrato.horasSemana !== null && p.contrato.horasSemana !== undefined ? esc(p.contrato.horasSemana) : ''}" placeholder="sin fijar"></label>`));
+      car('vetos', '', '', (p.vetos.map((v, i) => fila(`<i class="ldot" style="--lc:${esc(colorLocal(v.localId))}"></i>${esc(nombreLocal(v.localId))}`, esc(textoVeto(v)), '', `data-rmveto="${i}"`)).join('') || '<div class="festvacio">Sin vetos: puede ir a cualquier franja de sus locales.</div>') +
+      `<span class="addrow"><select class="logininp" id="fVetoL" data-libre>${S.locales.map(l => `<option value="${esc(l.id)}">${esc(l.nombre)}</option>`).join('')}</select><select class="logininp" id="fVetoF" data-libre>${FRANJAS.map(f => `<option value="${f}">${FRANJA_LBL[f]}s</option>`).join('')}</select>${selDia('id="fVetoD" aria-label="Qué día"')}<button type="button" class="btn-mini" data-addveto>Añadir veto</button></span>`));
+    // 24/09 (fase 6, S17 y D6): sin interruptor. Lo compara el contador de horas; el Generador no reparte según él
+    // (el interruptor prometía «el generador la tiene en cuenta» y nadie lo leía)
+    h += sec('contrato', 'Contrato', p.contrato.horasSemana ? `${+p.contrato.horasSemana} h/semana` : 'sin horas fijadas',
+      bloque('contrato', 'Horas de contrato', '', `<label class="pinlbl">Horas por semana <small>(el contador de horas compara con esto; el Generador no reparte según el contrato)</small><input type="number" class="logininp" min="0" max="60" step="0.5" inputmode="decimal" data-num="horasSemana" data-libre value="${p.contrato.horasSemana !== null && p.contrato.horasSemana !== undefined ? esc(p.contrato.horasSemana) : ''}" placeholder="sin fijar"></label>`));
     h += sec('prefs', 'Preferencias', subOff('prefs', 'no bloquean: el generador las respeta al priorizar'),
       car('prefs', '', '', `<div class="pinlbl">Prefiere no trabajar los…</div><div class="dowset">${dowSet(p.prefs.evitaDows || [], 'tevita')}</div>
        <label class="pinlbl">Criterio personal<input type="text" class="logininp" data-txt="prefsNota" data-libre value="${esc(p.prefs.nota || '')}" placeholder="p. ej. concilia los lunes"></label>`));
@@ -179,7 +206,7 @@ function openFicha(pid, opts) {
     // 24/09 (D13): el nombre de quien le cubre lleva a su ficha (donde se pone y se quita la designación)
     const irf = t.closest('[data-irficha]');
     if (irf) { const q = irf.dataset.irficha; cerrar(); openFicha(q); return; }
-    const el = t.closest('[data-tloc],[data-tfranja],[data-tlibra],[data-tlpunt],[data-lpoff],[data-lpsem],[data-lpir],[data-lpquita],[data-tpartido],[data-tcoct],[data-tcocr],[data-tcocd],[data-tabre],[data-tnoabre],[data-tnoprimero],[data-tevita],[data-rmnunca],[data-addnunca],[data-rmcubre],[data-addcubre],[data-rmveto],[data-addveto],[data-rmaus],[data-addaus],[data-rmsup],[data-addsup]');
+    const el = t.closest('[data-tloc],[data-tfranja],[data-tlibra],[data-tlpunt],[data-lpoff],[data-lpsem],[data-lpir],[data-lpquita],[data-tpartido],[data-tcoct],[data-tcocr],[data-tcocd],[data-tabre],[data-tnoabre],[data-tnoprimero],[data-tevita],[data-rmpar],[data-addnunca],[data-rmcubre],[data-addcubre],[data-rmveto],[data-addveto],[data-rmaus],[data-addaus],[data-rmsup],[data-addsup]');
     if (!el) return;
     const ds = el.dataset;
     if (ds.tnoprimero !== undefined) {
@@ -197,7 +224,8 @@ function openFicha(pid, opts) {
         for (const l of deFicha) { x.abre[l.id] = (x.abre[l.id] || []).filter(y => y !== f); if (!x.abre[l.id].length) delete x.abre[l.id]; }
       }, 'equipo'); pinta(); return;
     }
-    if (ds.tloc !== undefined) { guarda(`local ${nombreLocal(ds.tloc)} ${p.locales.includes(ds.tloc) ? 'quitado' : 'añadido'}`, x => alterna(x.locales, ds.tloc)); pinta(); return; }
+    // (fase 6, S31) alternarLocal no cambia el local habitual al quitar y volver a poner uno
+    if (ds.tloc !== undefined) { guarda(`local ${nombreLocal(ds.tloc)} ${p.locales.includes(ds.tloc) ? 'quitado' : 'añadido'}`, x => alternarLocal(x, ds.tloc)); pinta(); return; }
     if (ds.tfranja !== undefined) {
       if (p.franjas.length === 1 && p.franjas[0] === ds.tfranja) { toast('Tiene que hacer al menos una franja', 'warn'); return; }
       guarda(`franjas → ${lblFranjas(p.franjas.includes(ds.tfranja) ? p.franjas.filter(f => f !== ds.tfranja) : p.franjas.concat(ds.tfranja)).toLowerCase()}`, x => { alterna(x.franjas, ds.tfranja); x.franjas.sort(); }); pinta(); return;
@@ -236,10 +264,12 @@ function openFicha(pid, opts) {
     }
     if (ds.tnoabre !== undefined) { guarda(`no abre en ${nombreLocal(ds.tnoabre)} ${p.noAbre.includes(ds.tnoabre) ? 'quitado' : 'añadido'}`, x => alterna(x.noAbre, ds.tnoabre)); pinta(); return; }
     if (ds.tevita !== undefined) { guarda(`prefiere no ${lblDowPl(+ds.tevita)} ${(p.prefs.evitaDows || []).includes(+ds.tevita) ? 'quitado' : 'añadido'}`, x => { x.prefs.evitaDows = x.prefs.evitaDows || []; alterna(x.prefs.evitaDows, +ds.tevita); if (!x.prefs.evitaDows.length) delete x.prefs.evitaDows; }); pinta(); return; }
-    if (ds.rmnunca !== undefined) { const q = p.nuncaCon[+ds.rmnunca]; guarda(`ya puede coincidir con ${nombrePid(q)}`, x => x.nuncaCon.splice(+ds.rmnunca, 1)); pinta(); return; }
+    // (fase 6, S21) la pareja se quita y se pone en las dos fichas
+    if (ds.rmpar !== undefined) { const q = ds.rmpar; guarda(`ya puede coincidir con ${nombrePid(q)} (también en la ficha de ${nombrePid(q)})`, () => quitarNuncaCon(S.staff, p.id, q)); pinta(); return; }
     if (ds.addnunca !== undefined) {
       const q = ov.querySelector('#fNuncaSel').value; if (!q) { toast('Elige a alguien', 'warn'); return; }
-      guarda(`nunca con ${nombrePid(q)}`, x => { if (!x.nuncaCon.includes(q)) x.nuncaCon.push(q); }); pinta(); return;
+      const flex = !!(ov.querySelector('#fNuncaFlex') || {}).checked;
+      guarda(`nunca con ${nombrePid(q)}${flex ? ' (flexible)' : ''} (también en la ficha de ${nombrePid(q)})`, () => ponerNuncaCon(S.staff, p.id, q, { flexible: flex, activa: true })); pinta(); return;
     }
     if (ds.rmcubre !== undefined) {
       const cb = p.cubreA[+ds.rmcubre];
@@ -255,11 +285,12 @@ function openFicha(pid, opts) {
       const cb = { pid: q }; if (dow) cb.dow = dow; if (tid) cb.turnoId = tid;
       guarda(`cubre a ${nombrePid(q)}${dow ? ' ' + DOW_PL[dow] : ''}${tid ? ' en ' + lblTurno(tid) : ''}`, x => x.cubreA.push(cb)); pinta(); return;
     }
-    if (ds.rmveto !== undefined) { const v = p.vetos[+ds.rmveto]; guarda(`veto quitado: ${nombreLocal(v.localId)} ${v.franja === 'M' ? 'mañanas' : 'tardes'}`, x => x.vetos.splice(+ds.rmveto, 1)); pinta(); return; }
+    if (ds.rmveto !== undefined) { const v = p.vetos[+ds.rmveto]; guarda(`veto quitado: ${textoVeto(v, nombreLocal(v.localId))}`, x => x.vetos.splice(+ds.rmveto, 1)); pinta(); return; }
     if (ds.addveto !== undefined) {
-      const lid = ov.querySelector('#fVetoL').value, f = ov.querySelector('#fVetoF').value;
-      if (p.vetos.some(v => v.localId === lid && v.franja === f)) { toast('Ese veto ya está', 'warn'); return; }
-      guarda(`no hace ${f === 'M' ? 'mañanas' : 'tardes'} en ${nombreLocal(lid)}`, x => x.vetos.push({ localId: lid, franja: f })); pinta(); return;
+      const lid = ov.querySelector('#fVetoL').value, f = ov.querySelector('#fVetoF').value, dow = +((ov.querySelector('#fVetoD') || {}).value || 0);
+      const v = { localId: lid, franja: f }; if (dow) v.dow = dow;
+      if (vetoRepetido(p, v)) { toast('Ese veto ya está', 'warn'); return; }
+      guarda(textoVeto(v, nombreLocal(lid)), x => x.vetos.push(v)); pinta(); return;
     }
     if (ds.rmaus !== undefined) { const aviso = quitarAusenciaUI(p.id, +ds.rmaus); if (aviso) { tocada = true; pinta(); toast(aviso, 'warn'); } return; }
     if (ds.addaus !== undefined) {
@@ -279,13 +310,23 @@ function openFicha(pid, opts) {
   ov.addEventListener('change', e => {
     const t = e.target; const ds = t.dataset || {};
     if (ds.carTgl) {
-      // interruptor de una característica: escribe p.inactivas (y, en «nunca con», la de los incompatibles)
+      // interruptor de una característica: escribe p.inactivas («nunca con» va por pareja: data-partgl)
       const k = ds.carTgl, on = t.checked;
-      const otros = k === 'nuncaCon' ? p.nuncaCon.map(personaDeId).filter(q => q && caracteristicaActiva(q, k) !== on).map(q => q.nombre) : [];
-      guarda(`«${lblCaracteristica(k)}» ${on ? 'activada' : 'desactivada'}${otros.length ? ` (también en ${otros.join(', ')})` : ''}`, x => setCaracteristica(x, k, on), 'equipo');
-      if (otros.length) toast(`«${lblCaracteristica(k)}» ${on ? 'activada' : 'desactivada'} también en ${otros.join(', ')}: la regla es mutua`, on ? 'ok' : 'warn');
+      guarda(`«${lblCaracteristica(k)}» ${on ? 'activada' : 'desactivada'}`, x => setCaracteristica(x, k, on), 'equipo');
       pinta(); return;
     }
+    // (fase 6, S21 y S24) el interruptor y el «flexible» de una pareja «nunca con», en las dos fichas
+    if (ds.partgl) {
+      const q = ds.partgl, on = t.checked;
+      guarda(`«nunca con» ${nombrePid(q)} ${on ? 'encendida' : 'apagada'} (la pareja, en las dos fichas)`, () => ponerNuncaCon(S.staff, p.id, q, { activa: on }), 'equipo');
+      pinta(); return;
+    }
+    if (ds.parflex) {
+      const q = ds.parflex, on = t.checked;
+      guarda(`«nunca con» ${nombrePid(q)} ${on ? 'flexible' : 'estricta'} (la pareja, en las dos fichas)`, () => ponerNuncaCon(S.staff, p.id, q, { flexible: on }), 'equipo');
+      pinta(); return;
+    }
+    if (t.matches && t.matches('[data-habitual]')) { guarda(`local habitual: ${nombreLocal(t.value)}`, x => ponerLocalHabitual(x, t.value)); pinta(); return; }
     if (ds.chk) {
       const on = t.checked;
       if (ds.chk === 'libreVariable') guarda(`libre variable ${on ? 'sí' : 'no'}`, x => { if (on) x.libreVariable = true; else delete x.libreVariable; });

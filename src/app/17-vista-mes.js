@@ -1,5 +1,5 @@
 // ================= VISTA MES =================
-// Personas × días con una píldora por día (M, T o P = partido) en el color del
+// Personas × días con una píldora por día (M, T, P = partido o C = turno continuo) en el color del
 // local; ausencias; fila de control por local con los turnos cortos; y los
 // botones de fútbol en la cabecera para marcar refuerzos.
 function renderKPIs() {
@@ -20,7 +20,7 @@ function renderKPIs() {
 }
 function renderLegend() {
   $('#legend').innerHTML = S.locales.map(l => `<span class="lg"><span class="lp" style="background:${esc(l.color)}"></span>${esc(l.nombre)}</span>`).join('') +
-    `<span class="lg"><span class="lgd pill pM" style="--lc:var(--ink3)">M</span>mañana</span><span class="lg"><span class="lgd pill pT" style="--lc:var(--ink3)">T</span>tarde</span><span class="lg"><span class="lgd pill pP" style="--lc:var(--ink3)">P</span>partido</span><span class="lg"><span class="lgd striped a-VAC">VAC</span>ausencia</span><span class="lg"><span class="lgd striped a-CIE">CIE</span>sin trabajo por un cierre</span><span class="lg"><span class="lgd" style="background:var(--warn-bg);color:var(--warn)">n</span>faltan</span>`;
+    `<span class="lg"><span class="lgd pill pM" style="--lc:var(--ink3)">M</span>mañana</span><span class="lg"><span class="lgd pill pT" style="--lc:var(--ink3)">T</span>tarde</span><span class="lg"><span class="lgd pill pP" style="--lc:var(--ink3)">P</span>partido</span><span class="lg"><span class="lgd pill pC" style="--lc:var(--ink3)">C</span>turno continuo (de corrido)</span><span class="lg"><span class="lgd striped a-VAC">VAC</span>ausencia</span><span class="lg"><span class="lgd striped a-CIE">CIE</span>sin trabajo por un cierre</span><span class="lg"><span class="lgd" style="background:var(--warn-bg);color:var(--warn)">n</span>faltan</span>`;
 }
 function renderMes() {
   const kHoy = isoHoy().slice(0, 7), kMes = mesKey(S.y, S.m);
@@ -66,8 +66,11 @@ function renderMes() {
         }
         const m = cas.find(c => partirTurno(c.tid).franja === 'M'), t = cas.find(c => partirTurno(c.tid).franja === 'T');
         const lm = m && localDe(S, partirTurno(m.tid).localId), lt = t && localDe(S, partirTurno(t.tid).localId);
-        const cls = m && t ? 'pP' + (lm.id !== lt.id ? ' dobla' : '') : m ? 'pM' : 'pT';
-        const txt = m && t ? (lm.id !== lt.id ? `${lm.corto}+${lt.corto}` : `P·${lm.corto}`) : m ? `M·${lm.corto}` : `T·${lt.corto}`;
+        // D4 (24/09, revisión de la fase 6): mañana y tarde de corrido en el mismo local, saliendo la primera en las dos,
+        // es un turno continuo, no un partido (turnoDelDia, lo mismo que Hoy, la Semana y Horas): C·33, no P·33
+        const cont = m && t && lm.id === lt.id && !!turnoDelDia(S, est, d.iso, p.id).continuo;
+        const cls = cont ? 'pC' : m && t ? 'pP' + (lm.id !== lt.id ? ' dobla' : '') : m ? 'pM' : 'pT';
+        const txt = cont ? `C·${lm.corto}` : m && t ? (lm.id !== lt.id ? `${lm.corto}+${lt.corto}` : `P·${lm.corto}`) : m ? `M·${lm.corto}` : `T·${lt.corto}`;
         const forz = cas.some(c => c.entry.forzado);
         // (revisión de la fase 5) «Sale primero» a mano sobre quien no puede abrir: el aviso, como en Hoy y la Semana
         const noApto = c => c.entry.abre && manualDe(est, d.iso, c.tid).abre ? revisarEntrada(S, S.staff, est, d.iso, c.tid, p.id).abreNoApto : null;
@@ -147,11 +150,13 @@ function openDiaPersona(pid, iso, anchor) {
     if (pon) {
       pop.remove();
       const tid = pon.dataset.pon;
-      const r0 = puedeEstar(S, S.staff, e, iso, tid, pid, { permitirPartido: true });
-      let opts = { origen: 'manual', permitirPartido: true };
+      // (revisión de la fase 6) con aviso, lo mismo que el selector «con aviso» (RELAJABLE del modelo): el partido no
+      // declarado y la pareja «nunca con» flexible entran con su aviso; antes la pareja flexible pedía forzarla
+      const r0 = puedeEstar(S, S.staff, e, iso, tid, pid, RELAJABLE);
+      let opts = Object.assign({ origen: 'manual' }, RELAJABLE);
       // el aviso nombra la regla, no solo el motivo (Diego, 18/09); desde la revisión F4, TODAS las que se
       // incumplirían forzándola, cada una con la suya (siSeFuerza, como el selector)
-      const f = r0.ok ? null : siSeFuerza(S, S.staff, e, iso, tid, pid, { permitirPartido: true });
+      const f = r0.ok ? null : siSeFuerza(S, S.staff, e, iso, tid, pid, RELAJABLE);
       const inc = f && f.forzable && f.incumple.length ? f.incumple : (r0.ok ? [] : [{ k: r0.regla, motivo: r0.motivo }]);
       if (!r0.ok) { if (!confirm(`${p.nombre} incumpliría ${inc.length > 1 ? 'estas reglas' : 'esta regla'}:\n\n${lineasIncumple(inc)}\n\n¿Ponerlo de todas formas? Quedará constancia.`)) return; opts.forzar = true; opts.razon = `forzado desde el mes · ${inc.map(x => nombreRegla(x.k)).join(', ')}`; }
       pushUndo(`poner a ${p.nombre}`);

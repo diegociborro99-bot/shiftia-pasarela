@@ -140,6 +140,12 @@ function migrarEstado(estado) {
   migrarPuestos(estado);    // 17/09: el puesto «comodín» pasa a ser «apoyo»
   migrarAltas(estado);      // 17/09: Dulce y Susi, que entraron después del primer arranque
   for (const p of estado.staff) normalizarFicha(p);   // también las altas de arriba (revisión F3)
+  // 24/09 (fase 6): «sin local fijo» es no tener locales (D7: fuera la marca p.comodin); la pareja «nunca con» en las
+  // dos fichas, con «flexible» y el interruptor de cada pareja (S21, S24); y fuera los interruptores que ya no
+  // existen («Contrato», D6). Idempotentes: lo que ya está así no cambia (ni la huella de la planilla)
+  migrarComodin(estado);
+  migrarNuncaCon(estado);
+  migrarInactivas(estado);
   // 24/09 (fase 5): la cocina de Ajustes del local y la de la ficha, de acuerdo (S36); y de las «a» de la
   // semana tipo guardada, fuera las que solo repetían quién abría (S18). Una vez cada una (estado.migraciones)
   migrarCocinaLocales(estado);
@@ -205,7 +211,13 @@ function panelesVigilados(nuevo) {
 }
 const mesesConContenido = m => Object.fromEntries(Object.entries(m || {}).filter(([, v]) => v && (Object.keys(v.apertura || {}).length || Object.keys(v.asig || {}).length)));
 const huellaPlanilla = e => JSON.stringify([mesesConContenido(e.meses), e.staff || [], e.locales || [], e.patron || {}, e.eventos || [], e.extras || [], e.festivos || [], e.cierres || {}, e.cierresPuntuales || []]);
-function aplicarEstadoExterno(nuevo) {
+function aplicarEstadoExterno(recibido) {
+  // 24/09 (revisión de la fase 6): lo que llega se compara ya migrado, como está S. El servidor guarda el estado tal
+  // cual lo subió la versión de antes (la pareja «flexible» de la persona, la marca de comodín…) hasta que el encargado
+  // guarda algo; comparado sin migrar, cada aviso de versión (otro dispositivo, un empleado que pide un cambio)
+  // parecía un cambio de la planilla: vaciaba el deshacer y cerraba la ficha abierta de Mari Luz, Lavinia, Leo…
+  const nuevo = Object.assign(freshState(), recibido);
+  migrarEstado(nuevo);
   const suave = !!S && huellaPlanilla(nuevo) === huellaPlanilla(S);
   // los paneles que miran un registro concreto se juzgan por ese registro, cambie o no la
   // planilla: si sigue igual se repintan contra el estado nuevo, y si lo han tocado se
@@ -216,9 +228,8 @@ function aplicarEstadoExterno(nuevo) {
   for (const x of caen) { const o = document.getElementById(x.id); if (o) o.remove(); }
   if (!suave) { cerrarTransitorios(siguen.map(x => x.id)); undoStack.length = 0; actualizarUndoBtn(); }
   const nav = { y: S.y, m: S.m, day: S.day, semLunes: S.semLunes, guiaOff: S.guiaOff, hY: S.hY, hM: S.hM };
-  S = Object.assign(freshState(), nuevo);
+  S = nuevo;   // ya migrado (arriba)
   for (const k of Object.keys(nav)) if (nav[k] !== undefined) S[k] = nav[k];
-  migrarEstado(S);
   marcarHuellaConfig();   // lo que llega de otro dispositivo ya viene recalculado
   if (S.day > diasDelMes(S.y, S.m)) S.day = 1;
   cargarMes();

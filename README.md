@@ -41,7 +41,7 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   impresión y **cierre de mes** para la nómina.
 - **Generador semanal**: la planilla de la semana con las condiciones del cliente
   (semana tipo + fichas + ajustes de cada local): posiciones numeradas (1.º abre y
-  hace turno completo, ◆ cocina en su posición, P partido, C continuo, □ comodín),
+  hace turno completo, ◆ cocina en su posición, P partido, C continuo, □ sin local fijo),
   huecos disponibles con motivo cuando nadie puede ocupar una posición, qué ha
   cambiado, quién libra cada día y las condiciones comprobadas; vista previa,
   aplicar con deshacer e impresión de la planilla propuesta. Modo «Periodo libre»

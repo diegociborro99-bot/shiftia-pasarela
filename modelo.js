@@ -51,7 +51,7 @@ const TIPOS_AUSENCIA = [
 ];
 const AUS_LBL = {}; TIPOS_AUSENCIA.forEach(t => { AUS_LBL[t.id] = t; });
 // Los tres puestos del grupo (José, 17/09): el «comodín» desaparece y pasa a ser apoyo.
-// Quien no tiene local fijo se marca aparte (p.comodin), que es otra cosa.
+// Quien no tiene local fijo es quien no tiene locales (24/09, fase 6, D7: sin la marca p.comodin; esComodin).
 const PUESTOS = [
   { id: 'sala', label: 'Sala' }, { id: 'cocina', label: 'Cocina' }, { id: 'apoyo', label: 'Apoyo' },
 ];
@@ -63,9 +63,10 @@ function dowsVeto(v) { return v.dow === undefined || v.dow === null ? null : (Ar
 function vetoDe(p, localId, franja, dow) {
   return (p.vetos || []).find(v => v.localId === localId && v.franja === franja && (dowsVeto(v) === null || dowsVeto(v).includes(dow))) || null;
 }
+// (fase 6, S30: sin local, «no hace mañanas los lunes», para la fila de la ficha, que ya dice el local)
 function textoVeto(v, nombreLocal) {
   const dows = dowsVeto(v);
-  return `no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'} en ${nombreLocal}${dows ? ' ' + dows.map(d => DOW_PL[d]).join(' y ') : ''}`;
+  return `no hace ${v.franja === 'M' ? 'mañanas' : 'tardes'}${nombreLocal ? ' en ' + nombreLocal : ''}${dows ? ' ' + dows.map(d => DOW_PL[d]).join(' y ') : ''}`;
 }
 
 // ---------- entrevistas (José, 17/09) ----------
@@ -768,7 +769,7 @@ function quitarCierre(cfg, staff, est, id, opts) {
       const [iso, tid] = k.split('|');
       const e = asignados(est, iso, tid).find(x => x.pid === pid);
       if (!e || !esAutomatica(e)) continue;
-      if (e.origen !== 'cierre' && puedeEstar(cfg, staff, est, iso, tid, pid, { yaDentro: true, permitirPartido: true }).ok) continue;
+      if (e.origen !== 'cierre' && puedeEstar(cfg, staff, est, iso, tid, pid, Object.assign({ yaDentro: true }, RELAJABLE)).ok) continue;
       if (retirarEntrada(est, cfg, staff, iso, tid, pid)) res.apoyosQuitados.push({ iso, tid, pid });
     }
   }
@@ -788,7 +789,9 @@ function quitarCierre(cfg, staff, est, id, opts) {
   if (o.devolver) for (const r of c.retirados || []) {
     const e = r.entry;
     if (!e || !e.pid || pidsEn(est, r.iso, r.tid).includes(e.pid)) continue;
-    const pe = turnoAbierto(cfg, est, r.iso, r.tid) ? puedeEstar(cfg, staff, est, r.iso, r.tid, e.pid, { forzar: !!e.forzado, permitirPartido: true }) : { ok: false, motivo: motivoCerrado(cfg, r.iso, r.tid).motivo };
+    // (revisión de la fase 6, principio 4) con lo que se relajó al ponerla (RELAJABLE): lo puesto a mano «con aviso»
+    // (la pareja flexible desde el selector) vuelve igual que lo forzado; antes se quedaba fuera
+    const pe = turnoAbierto(cfg, est, r.iso, r.tid) ? puedeEstar(cfg, staff, est, r.iso, r.tid, e.pid, Object.assign({ forzar: !!e.forzado }, RELAJABLE)) : { ok: false, motivo: motivoCerrado(cfg, r.iso, r.tid).motivo };
     if (!pe.ok) { res.noDevueltos.push({ iso: r.iso, tid: r.tid, pid: e.pid, motivo: pe.motivo, entry: JSON.parse(JSON.stringify(e)) }); continue; }
     const lista = ((est.asig[r.iso] = est.asig[r.iso] || {})[r.tid] = est.asig[r.iso][r.tid] || []);
     lista.push(JSON.parse(JSON.stringify(e)));
@@ -1206,14 +1209,20 @@ function migrarCocinaLocales(estado) {
 // El encargado puede apagar una regla para todo el grupo (cfg.reglas[k] = false) o
 // una característica concreta de una ficha (p.inactivas = ['nuncaCon', …]). Lo
 // apagado no lo comprueba nadie: ni puedeEstar, ni el generador, ni la revisión.
+// 24/09 (fase 6):
+//  · «Nunca con» se apaga pareja a pareja (S21: p.nuncaConOff, en las dos fichas; porPareja), no la característica
+//    entera: apagar Leo–Susana Capón apagaba también Leo–Lavinia y, en cadena, Lavinia–Mari Luz;
+//  · «Contrato» deja de ser un interruptor (S17, D6): nadie lo leía para planificar y la ficha prometía «el
+//    generador la tiene en cuenta». Horas sigue comparando con el contrato; repartir según él es trabajo nuevo.
 const CARACTERISTICAS = [
   { k: 'locales', lbl: 'Locales donde trabaja' }, { k: 'franjas', lbl: 'Mañanas y tardes' }, { k: 'libra', lbl: 'Días que libra' },
-  { k: 'partido', lbl: 'Días de partido' }, { k: 'vetos', lbl: 'No hace (local y franja)' }, { k: 'nuncaCon', lbl: 'Nunca con' },
+  { k: 'partido', lbl: 'Días de partido' }, { k: 'vetos', lbl: 'No hace (local y franja)' }, { k: 'nuncaCon', lbl: 'Nunca con', porPareja: true },
   { k: 'cubreA', lbl: 'Cubre a' }, { k: 'cocina', lbl: 'Cocina' }, { k: 'abre', lbl: 'Sale el primero' }, { k: 'noAbre', lbl: 'No abre' },
-  { k: 'noPrimero', lbl: 'Nunca de primero' }, { k: 'prefs', lbl: 'Preferencias' }, { k: 'contrato', lbl: 'Contrato' },
+  { k: 'noPrimero', lbl: 'Nunca de primero' }, { k: 'prefs', lbl: 'Preferencias' },
 ];
 const REGLAS = [
-  { k: 'minimos', lbl: 'Mínimos por local, franja y día' },
+  // 24/09 (fase 6, S16 y D5): apagada, nadie pide mínimos; el mínimo sigue guardado y a la vista (n/mín)
+  { k: 'minimos', lbl: 'Mínimos por local, franja y día', apagada: 'Apagada: nadie pide mínimos: el Generador no rellena ni deja huecos por el mínimo, la Cobertura no busca quien entre por el mínimo y la Revisión no avisa de que falta gente. Los mínimos se siguen viendo en cada casilla (n/mín) y en Ajustes de los locales.' },
   // 24/09 (fase 5, D5): lo que pasa al apagarla, para que la interfaz lo diga (Equipo → Condiciones)
   { k: 'cocina', lbl: 'Cocina: quién la lleva y en qué posición', apagada: 'Apagada: nadie busca, exige ni marca la cocina (ni el Generador, ni la semana tipo, ni la Cobertura, ni la Revisión), y no se miran «solo estos días», «nunca cocina» ni «solo hace cocina». La cocina marcada a mano se queda.' },
   { k: 'nuncaCon', lbl: '«Nunca con»: no coinciden en la misma casilla' }, { k: 'libra', lbl: 'Días que libra cada persona' },
@@ -1239,6 +1248,13 @@ const REGLA_NOMBRE = {
 function nombreRegla(k) { return REGLA_NOMBRE[k] || k || ''; }
 function regla(cfg, k) { return !(cfg && cfg.reglas && cfg.reglas[k] === false); }
 function caracteristicaActiva(p, k) { return !(p && Array.isArray(p.inactivas) && p.inactivas.includes(k)); }
+// 24/09 (fase 6, S20): cómo está un interruptor para una ficha, tal como lo enseñan la tarjeta de Equipo y la
+// ficha: 'activa', 'apagada-ficha' o 'apagada-grupo' (manda el grupo). Es lo mismo que aplica la puerta (activa):
+// con «Días que libra» apagada en Equipo → Condiciones, la ficha decía «Activa: el generador la tiene en cuenta».
+function estadoInterruptor(cfg, p, k) {
+  if (!regla(cfg, k)) return 'apagada-grupo';
+  return caracteristicaActiva(p, k) ? 'activa' : 'apagada-ficha';
+}
 
 // ---------- capa de lectura de la ficha ----------
 // 24/09 (reunión: «que se hable bien equipo con el generador», «que lea todas las variables»):
@@ -1373,18 +1389,139 @@ function estadoDia(cfg, p, iso, franja) {
 // copiadas en la puerta, en el relleno, en la Cobertura, en la hoja impresa y en las condiciones del
 // Generador. Cada una en un solo sitio; los demás la llaman.
 // «Nunca con»: la pareja vale si la tiene cualquiera de las dos fichas, con sus interruptores (la regla del
-// grupo y la característica de cada ficha). null si pueden coincidir; si no, { flexible } (José, 17/09: la
-// pareja flexible «se respeta si hay gente suficiente; si no, se relaja y queda el aviso»).
-// (La Revisión aún marca la pareja sin mirar el interruptor: S13, fase 6.)
+// grupo, el de la pareja y, de antes de la fase 6, la característica de cada ficha). null si pueden coincidir;
+// si no, { flexible } (José, 17/09: la pareja flexible «se respeta si hay gente suficiente; si no, se relaja y
+// queda el aviso»). La leen todos los caminos: la puerta, la Revisión (S13, fase 6: marcaba «no pueden
+// coincidir» con el interruptor apagado), las condiciones del Generador y la hoja impresa.
+// 24/09 (fase 6, S21, S24): la pareja es UNA y está en las dos fichas: p.nuncaCon = [pid], «flexible» en
+// p.nuncaConFlex = [pid] y el interruptor en p.nuncaConOff = [pid] (lo escriben ponerNuncaCon y quitarNuncaCon).
+// Antes «flexible» era de la persona (nuncaConFlexible) y el interruptor apagaba la característica entera en
+// cascada; migrarNuncaCon pasa lo de antes a esta forma sin cambiar lo que se aplicaba.
+const enLista = (xs, id) => Array.isArray(xs) && xs.includes(id);
 function incompatibles(cfg, a, b) {
   if (!a || !b || a.id === b.id || !regla(cfg, 'nuncaCon')) return null;
-  const mio = caracteristicaActiva(a, 'nuncaCon') && (a.nuncaCon || []).includes(b.id);
-  const suyo = caracteristicaActiva(b, 'nuncaCon') && (b.nuncaCon || []).includes(a.id);
-  return mio || suyo ? { flexible: !!(a.nuncaConFlexible || b.nuncaConFlexible) } : null;
+  const mio = caracteristicaActiva(a, 'nuncaCon') && enLista(a.nuncaCon, b.id);
+  const suyo = caracteristicaActiva(b, 'nuncaCon') && enLista(b.nuncaCon, a.id);
+  if (!mio && !suyo) return null;
+  if (enLista(a.nuncaConOff, b.id) || enLista(b.nuncaConOff, a.id)) return null;
+  return { flexible: enLista(a.nuncaConFlex, b.id) || enLista(b.nuncaConFlex, a.id) };
 }
-// «Prefiere no trabajar ese día» (prefs.evitaDows): solo ordena. Pendiente de la fase 6 (S14): que el
-// interruptor «Preferencias» de la ficha lo apague (hoy la ficha lo ofrece y nadie lo mira).
-function evita(cfg, p, dow) { return !!(p && p.prefs && (p.prefs.evitaDows || []).includes(dow)); }
+// Las parejas de una persona, cada una una vez, también las que puso la otra ficha (la tarjeta de Equipo, la
+// ficha y el panel de condiciones): [{ pid, nombre, flexible, activa, estado: 'activa' | 'apagada-pareja' |
+// 'apagada-grupo' }]. activa = su interruptor de pareja.
+function parejasNuncaCon(cfg, staff, p) {
+  if (!p) return [];
+  const ids = [];
+  for (const q of p.nuncaCon || []) if (q !== p.id && !ids.includes(q)) ids.push(q);
+  for (const q of staff || []) if (q.id !== p.id && enLista(q.nuncaCon, p.id) && !ids.includes(q.id)) ids.push(q.id);
+  return ids.map(id => {
+    const q = personaDe(staff || [], id);
+    const flexible = enLista(p.nuncaConFlex, id) || (!!q && enLista(q.nuncaConFlex, p.id));
+    const activa = !enLista(p.nuncaConOff, id) && !(q && enLista(q.nuncaConOff, p.id));
+    return { pid: id, nombre: q ? q.nombre : id, flexible, activa, estado: !regla(cfg, 'nuncaCon') ? 'apagada-grupo' : activa ? 'activa' : 'apagada-pareja' };
+  });
+}
+// Pone (o cambia) la pareja «nunca con» en las DOS fichas. opts: { flexible, activa } (lo que no se diga, se
+// queda como estaba; una pareja nueva nace encendida y estricta). Devuelve la pareja (parejasNuncaCon) o null.
+function ponerNuncaCon(staff, aid, bid, opts) {
+  const a = personaDe(staff || [], aid), b = personaDe(staff || [], bid);
+  if (!a || !b || a.id === b.id) return null;
+  const o = opts || {};
+  // (si ya está como se pide, no se toca: ni el orden de la lista)
+  const pon = (x, k, id, si) => {
+    if (enLista(x[k], id) === si && (si || x[k] === undefined || Array.isArray(x[k]))) return;
+    const xs = Array.isArray(x[k]) ? x[k].filter(y => y !== id) : [];
+    if (si) xs.push(id);
+    if (xs.length || k === 'nuncaCon') x[k] = xs; else delete x[k];
+  };
+  for (const [x, y] of [[a, b], [b, a]]) {
+    if (!enLista(x.nuncaCon, y.id)) pon(x, 'nuncaCon', y.id, true);
+    if (o.flexible !== undefined) pon(x, 'nuncaConFlex', y.id, !!o.flexible);
+    if (o.activa !== undefined) pon(x, 'nuncaConOff', y.id, !o.activa);
+  }
+  // lo que no se ha dicho, igual en las dos fichas (una pareja de antes podía estar en una sola)
+  const flex = enLista(a.nuncaConFlex, b.id) || enLista(b.nuncaConFlex, a.id), off = enLista(a.nuncaConOff, b.id) || enLista(b.nuncaConOff, a.id);
+  for (const [x, y] of [[a, b], [b, a]]) { pon(x, 'nuncaConFlex', y.id, flex); pon(x, 'nuncaConOff', y.id, off); }
+  return parejasNuncaCon({}, staff, a).find(z => z.pid === b.id) || null;
+}
+// Quita la pareja de las DOS fichas (con su «flexible» y su interruptor). Antes la ficha la quitaba solo de la
+// abierta: el historial decía «ya puede coincidir con Lavinia» y el selector seguía con «nunca con Mari Luz».
+function quitarNuncaCon(staff, aid, bid) {
+  const a = personaDe(staff || [], aid), b = personaDe(staff || [], bid);
+  let n = 0;
+  for (const [x, y] of [[a, b], [b, a]]) {
+    if (!x || !y) continue;
+    for (const k of ['nuncaCon', 'nuncaConFlex', 'nuncaConOff']) {
+      if (!Array.isArray(x[k])) continue;
+      const antes = x[k].length; x[k] = x[k].filter(z => z !== y.id); n += antes - x[k].length;
+      if (!x[k].length && k !== 'nuncaCon') delete x[k];
+    }
+  }
+  return n > 0;
+}
+// De la forma de antes del 24/09 a la de ahora, sin cambiar lo que se aplicaba (al cargar, desde migrarEstado;
+// idempotente): la pareja pasa a las dos fichas; «flexible» de la persona (nuncaConFlexible), a cada pareja suya
+// (antes la pareja era flexible si lo era cualquiera de las dos); y «Nunca con» apagado en una ficha, a cada
+// pareja que por eso no se aplicaba (antes contaba si la tenía encendida cualquiera de las dos fichas que la
+// tuviera). Devuelve { cambios }.
+function migrarNuncaCon(estado) {
+  const st = (estado && estado.staff) || [];
+  const antes = JSON.stringify(st.map(p => [p.nuncaCon, p.nuncaConFlex, p.nuncaConOff, p.nuncaConFlexible, p.inactivas]));
+  const flexPersona = new Set(st.filter(p => p.nuncaConFlexible === true).map(p => p.id));
+  const apagadaFicha = new Set(st.filter(p => enLista(p.inactivas, 'nuncaCon')).map(p => p.id));
+  const vistas = new Set();
+  for (const p of st) for (const qid of (Array.isArray(p.nuncaCon) ? p.nuncaCon.slice() : [])) {
+    const q = personaDe(st, qid);
+    if (!q || q.id === p.id) continue;
+    const k = [p.id, q.id].sort().join('|');
+    if (vistas.has(k)) continue;
+    vistas.add(k);
+    const seAplicaba = (enLista(p.nuncaCon, q.id) && !apagadaFicha.has(p.id)) || (enLista(q.nuncaCon, p.id) && !apagadaFicha.has(q.id));
+    const flex = flexPersona.has(p.id) || flexPersona.has(q.id) || enLista(p.nuncaConFlex, q.id) || enLista(q.nuncaConFlex, p.id);
+    const off = !seAplicaba || enLista(p.nuncaConOff, q.id) || enLista(q.nuncaConOff, p.id);
+    ponerNuncaCon(st, p.id, q.id, { flexible: flex, activa: !off });
+  }
+  for (const p of st) {
+    if (p.nuncaConFlexible !== undefined) delete p.nuncaConFlexible;
+    if (Array.isArray(p.inactivas) && p.inactivas.includes('nuncaCon')) { p.inactivas = p.inactivas.filter(k => k !== 'nuncaCon'); if (!p.inactivas.length) delete p.inactivas; }
+  }
+  return { cambios: antes === JSON.stringify(st.map(p => [p.nuncaCon, p.nuncaConFlex, p.nuncaConOff, p.nuncaConFlexible, p.inactivas])) ? 0 : 1 };
+}
+// «Prefiere no trabajar ese día» (prefs.evitaDows): solo ordena. 24/09 (fase 6, S14): con el interruptor
+// «Preferencias» de la ficha (activa): la ficha decía «Desactivada: el generador no la tiene en cuenta» y la
+// preferencia seguía restando 40 puntos en el relleno, la Cobertura, el selector y el núcleo.
+function evita(cfg, p, dow) { return !!(p && p.prefs && activa(cfg, p, 'prefs') && (p.prefs.evitaDows || []).includes(dow)); }
+// El local habitual (24/09, fase 6, S31): el que se eligió en la ficha (p.localHabitual) mientras sea uno de sus
+// locales; si no, el primero de sus locales. null sin locales. Suma en la puntuación («su local habitual es…»).
+// Antes era solo el orden de p.locales, que la ficha no enseñaba y que cambiaba al quitar y volver a poner un
+// local (Roberto pasaba de Zapatillera a Pasarela sin que la ficha cambiara).
+function localHabitualDe(p) {
+  const ls = (p && Array.isArray(p.locales)) ? p.locales : [];
+  if (!ls.length) return null;
+  return p.localHabitual && ls.includes(p.localHabitual) ? p.localHabitual : ls[0];
+}
+// Pone o quita un local de la ficha sin cambiar el habitual: antes de tocar nada se apunta cuál es, así que quitarlo
+// y volver a ponerlo lo deja como estaba (mientras no está, el habitual es el primero de los que quedan).
+function alternarLocal(p, localId) {
+  if (!p || !localId) return false;
+  p.locales = Array.isArray(p.locales) ? p.locales : [];
+  if (!p.localHabitual && p.locales.length) p.localHabitual = p.locales[0];
+  const i = p.locales.indexOf(localId);
+  if (i >= 0) p.locales.splice(i, 1); else p.locales.push(localId);
+  return i < 0;
+}
+function ponerLocalHabitual(p, localId) {
+  if (!p || !(p.locales || []).includes(localId)) return false;
+  p.localHabitual = localId;
+  return true;
+}
+// ¿Ya tiene ese veto? (24/09, fase 6, S30) El mismo local, franja y días, o uno de todos los días de ese local y
+// franja, que ya lo cubre. Un veto de todos los días no está repetido con uno de los lunes (antes el alta
+// miraba solo local y franja y decía «Ese veto ya está»).
+function vetoRepetido(p, v) {
+  const dias = x => { const d = dowsVeto(x); return d === null ? null : [...new Set(d.map(Number))].sort((a, b) => a - b).join(','); };
+  return (p && Array.isArray(p.vetos) ? p.vetos : []).some(w => w.localId === v.localId && w.franja === v.franja && (dias(w) === null || dias(w) === dias(v)));
+}
 // «Sale el primero» fijo en ese local y franja: el del local («Quién abre» en Ajustes) o el de su ficha.
 // 24/09 (fase 5, S19): con sus interruptores (activa: la regla del grupo «Sale el primero» y la característica
 // de su ficha), en todos los sitios que lo miran: la puntuación, quién abre (primeroDe), la marca ▸ de la
@@ -1661,7 +1798,14 @@ function evaluarPlaza(ctx, iso, tid, pid, opts) {
   // (24/09, revisión F1: el aviso que importa es el del día libre): va como `extra`.
   if (!(libraHoy && o.corto)) {
     const tOtra = enOtra(franja === 'M' ? 'T' : 'M');
-    if (tOtra && !partidoEn(cfg, p, iso)) {
+    // D4 (24/09, fase 6, S40; Aroa, 18/09: «de corrido» no es «turno partido»): sale la primera por la mañana y
+    // por la tarde del mismo local (seriaContinuo) = un turno continuo, que no es un partido. Pasa con la nota
+    // «turno continuo» (informativa, como lo autorizado: no es un aviso de la puerta ni de la Revisión; al elegir,
+    // lo automático sí prefiere a otra persona si la hay, PESOS.continuo), y la planilla, el Generador, la Revisión y
+    // Horas lo tratan igual. Antes la puerta lo frenaba como partido no
+    // declarado mientras la planilla lo pintaba C y Horas lo contaba a la vez como continuo y como partido.
+    if (tOtra && !partidoEn(cfg, p, iso) && tOtra.local.id === localId && seriaContinuo(cfg, staff, est, iso, tid, pid, !!o.yaDentro, o.puesto === 'cocina' || !!o.cocina)) avisa('partido', 'turno continuo', Object.assign({ autorizado: true, continuo: true }, libraHoy ? { extra: true } : {}));
+    else if (tOtra && !partidoEn(cfg, p, iso)) {
       // D1: el partido para cubrir a X en SU casilla, mientras X falta, está autorizado. Vale para las dos
       // mitades de lo ya puesto: esta, si viene a cubrir a X, y la otra, si la otra es la que está «por
       // X». Para ponerla además en otra casilla, no (revisión F3: «solo en la casilla de X»)
@@ -1687,7 +1831,8 @@ function evaluarPlaza(ctx, iso, tid, pid, opts) {
     const inc = incompatibles(cfg, p, qp);
     if (!inc) continue;
     const extra = pareja ? { extra: true } : null;
-    if (o.relajarNuncaCon && inc.flexible) { avisa('nuncaCon', `nunca con ${qp.nombre}: no había nadie más`, extra); continue; }
+    // (fase 6, S24) el aviso lo dice igual en el relleno, el selector, la Cobertura y la Revisión
+    if (o.relajarNuncaCon && inc.flexible) { avisa('nuncaCon', `nunca con ${qp.nombre} (pareja flexible: se relaja si no hay nadie más)`, extra); continue; }
     bloquea('nuncaCon', `nunca con ${qp.nombre}`, Object.assign({ forzable: true, relajable: inc.flexible, otro: qp.id }, extra));
     pareja = true;
   }
@@ -1724,7 +1869,7 @@ function incumplidas(r) {
 function primerBloqueo(r) {
   const { manda, hasta, lista } = incumplidas(r);
   const antes = lista.map(x => x.motivo);
-  const autorizados = r.avisos.filter(a => a.autorizado && !a.extra && a.n < hasta).map(a => ({ k: a.k, texto: a.texto, autorizado: true, por: a.por }));
+  const autorizados = r.avisos.filter(a => a.autorizado && !a.extra && a.n < hasta).map(a => Object.assign({ k: a.k, texto: a.texto, autorizado: true, por: a.por }, a.continuo ? { continuo: true } : {}));
   if (!manda) return { ok: true, motivo: null, regla: null, avisos: antes, autorizados };
   const out = { ok: false, motivo: manda.motivo, regla: manda.k, avisos: antes, autorizados };
   if (manda.k === undefined) delete out.regla;
@@ -1752,6 +1897,33 @@ function siSeFuerza(cfg, staff, est, iso, tid, pid, opts) {
   const cab = manda || lista.find(x => !x.aviso) || lista[0] || null;
   return { forzable: !manda, regla: cab ? (cab.k || null) : null, motivo: cab ? cab.motivo : null, incumple: lista.map(x => ({ k: x.k || null, motivo: x.motivo })) };
 }
+// 24/09 (revisión de la fase 6; decisiones.md, principio 6: el plan relajado solo relaja los partidos no declarados
+// y las parejas «nunca con» flexibles). Lo que se relaja al PONER una plaza que ya se decidió con aviso: el plan
+// relajado de la Cobertura (ponerPlanCobertura), la vista previa del Generador (volcarPrevia), la propuesta «con
+// aviso» de un hueco, el selector «con aviso», el Mes y lo que vuelve a su casilla al quitar un cierre (quitarCierre).
+// Una sola lista: antes cada camino llevaba la suya (permitirPartido sin relajarNuncaCon) y la pareja flexible que
+// salía en el plan o en la vista previa se rechazaba al aplicarla («nunca con Mari Luz»), y lo puesto a mano con ese
+// aviso no volvía al quitar un cierre (principio 4).
+const RELAJABLE = Object.freeze({ permitirPartido: true, relajarNuncaCon: true });
+// Qué quiere decir «flexible» en una pareja «nunca con», dicho igual en la ficha, la tarjeta de Equipo y (en corto) la
+// condición del Generador: se junta con aviso solo en el modo relajado (buscarRelajando) o si la pone el encargado con
+// aviso. Antes decía «si no, se relaja y queda el aviso», y el Generador sin la casilla ya no la relaja (revisión F6)
+const TEXTO_PAREJA_FLEXIBLE = 'se respeta si hay gente suficiente; si no hay nadie más, se puede juntar con aviso (el Generador con «Permitir partidos no declarados», el plan con avisos de la Cobertura o tú desde el selector)';
+// La escalera del plan relajado para quien busca a alguien (el relleno del Generador y la Cobertura, una sola): primero
+// con las reglas del modo (el relajado ya lleva el partido no declarado, con aviso); si no hay nadie y el modo es el
+// relajado, la pareja «nunca con» flexible (José, 17/09: «se respeta si hay gente suficiente; si no, se relaja y queda
+// el aviso»). En el modo estricto (el Generador sin «Permitir partidos no declarados», el plan estricto de la
+// Cobertura, la confirmación de Equipo) no se relaja: queda el hueco y la propuesta «con aviso» la ofrece. Aroa, 24/09:
+// el domingo de las vacaciones de Iván, Mari Luz no hace la tarde con Lavinia («el domingo haría mañana»); la fase 6 la
+// relajaba en el relleno siempre que no había nadie, y el Generador la ponía mientras Equipo decía que no podía.
+// busca(extra) → una lista de candidatos o uno. Devuelve { r, relajaPareja }.
+function buscarRelajando(busca, relajado) {
+  const hay = x => Array.isArray(x) ? x.length > 0 : !!x;
+  const r = busca({});
+  if (hay(r) || !relajado) return { r, relajaPareja: false };
+  const r2 = busca({ relajarNuncaCon: true });
+  return { r: r2, relajaPareja: hay(r2) };
+}
 
 // ¿Qué reglas rompe AHORA MISMO tener a esta persona en esta casilla? El «forzado» que se
 // guarda al ponerla es historia, y la historia no cambia; pero la ficha y la semana sí —un
@@ -1769,7 +1941,8 @@ function siSeFuerza(cfg, staff, est, iso, tid, pid, opts) {
 // es lo que enseñan la casilla (posicionesDe), el menú y la Revisión (abre-no-apto). Antes nadie avisaba.
 function revisarEntrada(cfg, staff, est, iso, tid, pid, opts) {
   const e = asignados(est, iso, tid).find(x => x.pid === pid);
-  const o = Object.assign({ forzar: true, yaDentro: true, puesto: e && e.cocina ? 'cocina' : 'sala' }, opts || {});
+  // (fase 6, S13 y S24) la pareja «nunca con» flexible ya puesta es un aviso («… pareja flexible»), no un choque
+  const o = Object.assign({ forzar: true, yaDentro: true, relajarNuncaCon: true, puesto: e && e.cocina ? 'cocina' : 'sala' }, opts || {});
   const por = o.cubrePor || porDe(staff, e);
   // la casilla es la de X si lo sabe quien la puso (la Cobertura, el relevo) o si lo dice la semana
   // tipo o la planilla; el «por» de la regla de reserva no autoriza el partido (revisión F3)
@@ -1930,6 +2103,17 @@ function esContinuo(cfg, staff, est, iso, localId, pid) {
   const tm = turnoId(localId, 'M'), tt = turnoId(localId, 'T');
   return turnoAbierto(cfg, est, iso, tm) && turnoAbierto(cfg, est, iso, tt) && primeroDe(cfg, staff, est, iso, tm) === pid && primeroDe(cfg, staff, est, iso, tt) === pid;
 }
+// ¿Sería un turno continuo ponerla en esta casilla? (D4, fase 6) Ya está en la otra franja del mismo local y,
+// con ella dentro (sin tocar la planilla: una copia de la casilla), saldría la primera en las dos. Quien entra a
+// llevar la cocina no: la cocina solo sale la primera si no hay nadie más, así que en cuanto entrara alguien de
+// sala dejaría de abrir y le quedaría un partido que no tiene declarado (lo que ya está puesto se mira tal cual)
+function seriaContinuo(cfg, staff, est, iso, tid, pid, yaDentro, deCocina) {
+  const { localId } = partirTurno(tid);
+  if (yaDentro) return esContinuo(cfg, staff, est, iso, localId, pid);
+  if (deCocina) return false;
+  const dia = Object.assign({}, (est.asig && est.asig[iso]) || {}, { [tid]: asignados(est, iso, tid).concat([{ pid }]) });
+  return esContinuo(cfg, staff, Object.assign({}, est, { asig: Object.assign({}, est.asig, { [iso]: dia }) }), iso, localId, pid);
+}
 // ¿A quién cubre esta entrada? Su «por» y, si no lo lleva, la razón «cubre a X» con la que la
 // puso la semana tipo. Hasta el 24/09 el modo Periodo del Generador («Mes → Generar», «Completar
 // este día»), y el núcleo, volcaban sin el «por»: esas semanas ya guardadas solo tienen la razón.
@@ -1958,7 +2142,7 @@ function posicionesDe(cfg, staff, est, iso, tid) {
     const por = porDe(staff, e);
     const { avisos, autorizados, abreNoApto } = revisarEntrada(cfg, staff, est, iso, tid, e.pid);
     // (fase 5, S18) abreNoApto: el porqué, si sale primero porque se marcó a mano y no puede abrir
-    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && fijo, abreNoApto: abreNoApto ? abreNoApto.motivo : null, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: !(p.locales || []).length, por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, autorizados, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null };
+    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && fijo, abreNoApto: abreNoApto ? abreNoApto.motivo : null, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: esComodin(p), por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, autorizados, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null };
   });
 }
 // recalcula cocina, abre y orden salvo lo que el encargado haya fijado a mano
@@ -2158,8 +2342,13 @@ function revisarTurno(cfg, staff, est, iso, tid) {
   const rev = pid => { if (!cache.has(pid)) cache.set(pid, revisarEntrada(cfg, staff, est, iso, tid, pid)); return cache.get(pid); };
   // los avisos de cada entrada sin el del 1.º (ese sale aparte, abreNoApto)
   const vigentes = pid => { const r = rev(pid); return r.abreNoApto ? r.avisos.slice(0, -1) : r.avisos; };
+  const autDe = pid => rev(pid).autorizados.filter(a => !a.continuo);
+  // (fase 6, S16 y D5) con la regla del grupo «Mínimos» apagada nadie pide el mínimo: no faltan. El mínimo sigue
+  // siendo el que es (minimo, la cabecera n/mín), y de faltan salen el relleno, la Cobertura y la Revisión
   const out = {
-    abierto, n, minimo: m.min, supuesto: m.supuesto, refuerzo: m.refuerzo, faltan: abierto ? Math.max(0, m.min - n) : 0,
+    abierto, n, minimo: m.min, supuesto: m.supuesto, refuerzo: m.refuerzo, faltan: abierto && regla(cfg, 'minimos') ? Math.max(0, m.min - n) : 0,
+    // (revisión de la fase 6) para que la cabecera n/mín de Hoy y la Cobertura digan por qué no falta nadie
+    minimosApagados: !regla(cfg, 'minimos'),
     sinCocina: !!(abierto && tieneCocina && !coc),
     cocinaObligatoria: cocinaObligatoriaEn(cfg, l, franja),
     cocinaNoApta: !!(coc && regla(cfg, 'cocina') && !puedeCocina(cfg, personaDe(staff, coc.pid), localId, iso)),
@@ -2171,16 +2360,21 @@ function revisarTurno(cfg, staff, est, iso, tid) {
     avisos: lista.filter(e => vigentes(e.pid).length).map(e => `${nombreDe(staff, e.pid)}: ${vigentes(e.pid).join(', ')}`),
     // 24/09 (fase 5, S18): el 1.º puesto a mano que no puede abrir (va aparte: la Revisión lo dice como abre-no-apto)
     abreNoApto: (() => { const e = lista.find(x => rev(x.pid).abreNoApto); return e ? Object.assign({ pid: e.pid }, rev(e.pid).abreNoApto) : null; })(),
-    // lo autorizado (D1: el partido para cubrir a X): informativo, no es un aviso
-    autorizados: lista.filter(e => rev(e.pid).autorizados.length).map(e => `${nombreDe(staff, e.pid)}: ${rev(e.pid).autorizados.map(a => a.texto).join(', ')}`),
-    autorizadosPor: lista.filter(e => rev(e.pid).autorizados.length).map(e => ({ pid: e.pid, textos: rev(e.pid).autorizados.map(a => a.texto) })),
+    // lo autorizado (D1: el partido para cubrir a X): informativo, no es un aviso. El turno continuo (D4) no es
+    // ni eso: no es un partido, y la Revisión no lo nombra (fase 6, S40)
+    autorizados: lista.filter(e => autDe(e.pid).length).map(e => `${nombreDe(staff, e.pid)}: ${autDe(e.pid).map(a => a.texto).join(', ')}`),
+    autorizadosPor: lista.filter(e => autDe(e.pid).length).map(e => ({ pid: e.pid, textos: autDe(e.pid).map(a => a.texto) })),
     incompatibles: [],
     // 24/09 (S26): gente puesta en una casilla que ya no abre ese día (plazas fantasma)
     enCerrado: abierto ? 0 : n,
   };
+  // «nunca con» (fase 6, S13): con la misma lectura que la puerta (incompatibles), así que con el interruptor
+  // apagado —el del grupo o el de la pareja— no hay choque. La pareja flexible (S24) no es «no pueden coincidir»
+  // de nivel alta: si se relajó porque no había nadie más, o se puso a mano, queda su aviso (media)
   for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
     const a = personaDe(staff, lista[i].pid), b = personaDe(staff, lista[j].pid);
-    if (a && b && ((a.nuncaCon || []).includes(b.id) || (b.nuncaCon || []).includes(a.id))) out.incompatibles.push([a.nombre, b.nombre]);
+    const inc = incompatibles(cfg, a, b);
+    if (inc && !inc.flexible) out.incompatibles.push([a.nombre, b.nombre]);
   }
   return out;
 }
@@ -2549,7 +2743,30 @@ function migrarMarcasAutomaticas(estado, hoyIso) {
 // ---------- candidatos y generador ----------
 function turnosMes(est, pid) { let n = 0; for (const porT of Object.values(est.asig)) for (const lista of Object.values(porT)) if (lista.some(x => x.pid === pid)) n++; return n; }
 // «sin local fijo»: puede ir a cualquier bar. No es un puesto, es una característica.
-function esComodin(p) { return !!(p.comodin || !(p.locales || []).length); }
+// 24/09 (fase 6, S29 y D7; José, 17/09: «Lavinia comodín lo vamos a quitar, se llama apoyo»): «sin local fijo» es
+// no tener locales, como dice la ficha («ninguno = cualquiera»), y es la misma en el generador, el selector, la
+// Cobertura, la planilla (□), Equipo y Horas. La marca p.comodin daba «sin local fijo» a Tere y Lavinia, que
+// tienen dos locales cada una (el selector recomendaba a Tere por delante de Yilian en el Mónaco); la borra
+// migrarComodin.
+function esComodin(p) { return !!p && !(p.locales || []).length; }
+function migrarComodin(estado) {
+  let quitadas = 0;
+  for (const p of (estado && estado.staff) || []) if ('comodin' in p) { delete p.comodin; quitadas++; }
+  return { quitadas };
+}
+// Interruptores de la ficha que ya no existen (24/09, fase 6): «Contrato» (S17, D6) —el apagado no hacía nada— y
+// «Nunca con» entero (S21), que migrarNuncaCon pasa antes a cada pareja. Sin esto el panel de condiciones los
+// seguía contando como apagados. Idempotente. Devuelve { quitadas }.
+function migrarInactivas(estado) {
+  let quitadas = 0;
+  for (const p of (estado && estado.staff) || []) {
+    if (!Array.isArray(p.inactivas)) continue;
+    const quedan = p.inactivas.filter(k => k !== 'contrato');
+    quitadas += p.inactivas.length - quedan.length;
+    if (quedan.length !== p.inactivas.length) { if (quedan.length) p.inactivas = quedan; else delete p.inactivas; }
+  }
+  return { quitadas };
+}
 // ¿Se quedaría la casilla solo con apoyos si entra esta persona? También con uno solo (S33; José,
 // 17/09: «dos apoyos no se quedan solos, hace falta un veterano»). La leen el relleno y la Cobertura.
 function quedariaSoloApoyos(staff, est, iso, tid, pid) {
@@ -2586,6 +2803,9 @@ const PESOS = {
   turnoMes: -3,           // y cada turno de ese mes
   evita: -40,             // prefiere no trabajar ese día
   aviso: -25,             // entra con aviso (partido no declarado, «nunca con» flexible, solo apoyos)
+  // (fase 6, D4) un turno continuo no es un partido ni un aviso, pero es un día largo de corrido: lo automático
+  // prefiere a otra persona si la hay, como con un aviso
+  continuo: -25,
   evitado: -1000,         // el plan B busca otra persona si la hay
 };
 // Lo que suma por lo que es: sin local fijo (comodín) o apoyo. Nada si con ella la casilla se
@@ -2620,14 +2840,16 @@ function puntuar(ctx, p, iso, tid, opts) {
   if (pc) suma(pc.puntos, pc.razon);
   const pp = puntosPuesto(p, !!o.solo);
   if (pp) suma(pp.puntos, pp.razon);
-  if ((p.locales || []).length && p.locales[0] === localId) suma(PESOS.localHabitual, `su local habitual es ${l.nombre}`);
+  if (localHabitualDe(p) === localId) suma(PESOS.localHabitual, `su local habitual es ${l.nombre}`);   // (fase 6, S31)
   let libre = null;
-  if (o.modo === 'cobertura') { libre = !turnosDe(cfg).some(t => pidsEn(est, iso, t.id).includes(p.id)); if (libre) suma(PESOS.libre, 'libre ese día'); else razones.push('ya trabaja ese día (partido)'); }
+  // (revisión de la fase 6, D4) quien haría un turno continuo no hace partido: lo dice su razón de después
+  if (o.modo === 'cobertura') { libre = !turnosDe(cfg).some(t => pidsEn(est, iso, t.id).includes(p.id)); if (libre) suma(PESOS.libre, 'libre ese día'); else razones.push(o.continuo ? 'ya trabaja ese día' : 'ya trabaja ese día (partido)'); }
   const ns = turnosSemanaDe(est, p.id, iso, ctx.meses);
   suma(PESOS.turnoSemana * ns, `${ns} turno${ns === 1 ? '' : 's'} esa semana`);
   const nm = o.delMes ? (o.delMes[p.id] || 0) : turnosMesDe(est, p.id, iso, ctx.meses);   // se lee «N turnos esa semana · M este mes»
   suma(PESOS.turnoMes * nm, `${nm} este mes`);
   if (evita(cfg, p, dow)) suma(PESOS.evita, `prefiere no trabajar ${DOW_PL[dow]}`);
+  if (o.continuo) suma(PESOS.continuo, 'turno continuo (mañana y tarde de corrido)');
   if ((o.avisos || []).length) { score += PESOS.aviso; razones.push(...o.avisos); }
   if (o.evitado) score += PESOS.evitado;
   return { score, razones, turnosSemana: ns, turnosMes: nm, libre };
@@ -2669,9 +2891,10 @@ function candidatos(ctx, iso, tid, opts) {
     if (!r.ok) { descarta(p, r.motivo); continue; }
     const solo = ev.avisos.some(a => a.k === 'soloApoyos');
     const evitado = cob && (o.evitar || []).includes(p.id);
-    const pu = puntuar(ctx, p, iso, tid, { modo: o.modo, cubre, primero: !!o.primero, pr: ev.primero, cocina, solo, avisos: r.avisos, evitado, delMes });
+    const continuo = r.autorizados.some(a => a.continuo);   // (fase 6, D4)
+    const pu = puntuar(ctx, p, iso, tid, { modo: o.modo, cubre, primero: !!o.primero, pr: ev.primero, cocina, solo, avisos: r.avisos, evitado, delMes, continuo });
     // en el relleno la razón dice también lo autorizado (el partido para cubrir a X); la Cobertura lo pinta aparte
-    const razones = cob ? pu.razones : pu.razones.concat(r.autorizados.map(a => a.texto));
+    const razones = cob ? pu.razones : pu.razones.concat(r.autorizados.filter(a => !a.continuo).map(a => a.texto));
     out.push({ pid: p.id, nombre: p.nombre, score: pu.score, razones, avisos: r.avisos, autorizados: r.autorizados, cubre: cubre || null, libre: pu.libre, turnosSemana: pu.turnosSemana, turnosMes: pu.turnosMes, n: pu.turnosSemana, evitado });
   }
   if (cob) out.sort((a, b) => (a.evitado - b.evitado) || (!!b.cubre - !!a.cubre) || b.score - a.score || a.turnosSemana - b.turnosSemana || (a.pid < b.pid ? -1 : 1));
@@ -2733,9 +2956,11 @@ function gruposSelector(cfg, staff, est, iso, tid, opts) {
   const ya = new Set(cocina.map(c => c.pid));
   const pueden = candidatos(ctx, iso, tid, { modo: 'relleno' }).filter(c => !ya.has(c.pid));
   for (const c of pueden) ya.add(c.pid);
-  const conAvisoCocina = sinCocina ? candidatos(ctx, iso, tid, { modo: 'relleno', cocina: true, permitirPartido: true }).filter(c => !ya.has(c.pid)).map(deCocina) : [];
+  // «con aviso»: lo que solo rompe algo relajable (un partido no declarado, dejar la casilla solo con apoyos o,
+  // desde la fase 6 (S24), la pareja «nunca con» flexible)
+  const conAvisoCocina = sinCocina ? candidatos(ctx, iso, tid, Object.assign({ modo: 'relleno', cocina: true }, RELAJABLE)).filter(c => !ya.has(c.pid)).map(deCocina) : [];
   for (const c of conAvisoCocina) ya.add(c.pid);
-  const conAvisoSala = candidatos(ctx, iso, tid, { modo: 'relleno', permitirPartido: true, soloApoyos: true }).filter(c => !ya.has(c.pid));
+  const conAvisoSala = candidatos(ctx, iso, tid, Object.assign({ modo: 'relleno', soloApoyos: true }, RELAJABLE)).filter(c => !ya.has(c.pid));
   for (const c of conAvisoSala) ya.add(c.pid);
   const conAviso = conAvisoCocina.concat(conAvisoSala);
   const noPueden = [];
@@ -2912,7 +3137,9 @@ function volcarPrevia(cfg, staff, estDe, previa, opts) {
     const rel = !!entry.relevo;
     // (fase 5, S18) el «abre» solo si en la vista previa estaba puesto a mano; la marca «a» de la semana tipo, como preferencia
     const abreMano = !!(entry.abre && pv && manualDe(pv, a.iso, a.turnoId).abre);
-    const res = asignar(e, cfg, staff, a.iso, a.turnoId, a.pid, { origen: a.origen, razon: a.razon, supuesto: !!a.supuesto || !!entry.supuesto, permitirPartido: true, cocina: entry.cocina ? true : undefined, abre: abreMano ? true : undefined, abrePatron: !!entry.abrePatron, por: rel ? undefined : (entry.por || a.por), porDesignacion: !rel && !!entry.porDesignacion, nota: entry.nota });
+    // (revisión de la fase 6) con lo que se relajó al decidirla en la vista previa (RELAJABLE): la pareja flexible
+    // también, no solo el partido no declarado (antes, «Volcar» daba un fallo y la plaza no entraba)
+    const res = asignar(e, cfg, staff, a.iso, a.turnoId, a.pid, Object.assign({ origen: a.origen, razon: a.razon, supuesto: !!a.supuesto || !!entry.supuesto, cocina: entry.cocina ? true : undefined, abre: abreMano ? true : undefined, abrePatron: !!entry.abrePatron, por: rel ? undefined : (entry.por || a.por), porDesignacion: !rel && !!entry.porDesignacion, nota: entry.nota }, RELAJABLE));
     if (res.ok) r.aplicadas++; else r.fallos++;
   }
   for (const c of previa.coberturas || []) {
@@ -2985,19 +3212,25 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
     for (const { t } of pendientes) {
       let rev = revisarTurno(cfg, staff, target, iso, t.id);
       if (rev.sinCocina && (rev.cocinaObligatoria || rev.faltan)) {
-        const cs = candidatosPara(cfg, staff, target, iso, t.id, Object.assign({ cocina: true, permitirPartido: !!o.permitirPartido }, ms));
+        // (fase 6, S24; revisión) si nadie más puede, y solo con «Permitir partidos no declarados» (el modo relajado), la
+        // pareja «nunca con» flexible se relaja (José, 17/09), con su aviso: la misma escalera que la Cobertura
+        const { r: cs, relajaPareja: relajar } = buscarRelajando(x => candidatosPara(cfg, staff, target, iso, t.id, Object.assign({ cocina: true, permitirPartido: !!o.permitirPartido }, ms, x)), !!o.permitirPartido);
         let c = cs[0];
         if (c && !rev.cocinaObligatoria) { const guarda = paraObligatorias(t.id); if (guarda.has(c.pid)) c = cs.find(x => !guarda.has(x.pid)) || c; }
         if (c) {
-          const a = asignar(target, cfg, staff, iso, t.id, c.pid, { origen: 'generador', razon: c.razones.join(' · '), cocina: true, permitirPartido: !!o.permitirPartido, puesto: 'cocina', por: c.cubre || undefined, porDesignacion: !!c.cubre, cubrePor: c.cubre || undefined });
+          const a = asignar(target, cfg, staff, iso, t.id, c.pid, { origen: 'generador', razon: c.razones.join(' · '), cocina: true, permitirPartido: !!o.permitirPartido, relajarNuncaCon: relajar, puesto: 'cocina', por: c.cubre || undefined, porDesignacion: !!c.cubre, cubrePor: c.cubre || undefined });
           if (a.ok) r.aplicados.push({ iso, turnoId: t.id, pid: c.pid, origen: 'generador', razon: a.entry.razon, avisos: a.avisos });
         }
       }
       rev = revisarTurno(cfg, staff, target, iso, t.id);
       while (rev.faltan > 0) {
-        const c = candidatosPara(cfg, staff, target, iso, t.id, Object.assign({ permitirPartido: !!o.permitirPartido }, ms))[0];
+        // (fase 6, S24; José, 17/09: el «nunca con» flexible «se respeta si hay gente suficiente; si no, se relaja
+        // y queda el aviso») primero sin relajar; si no hay nadie y el modo es el relajado, relajando solo las parejas
+        // flexibles (buscarRelajando: la misma escalera que la Cobertura; revisión de la fase 6)
+        const { r: cs, relajaPareja: relajar } = buscarRelajando(x => candidatosPara(cfg, staff, target, iso, t.id, Object.assign({ permitirPartido: !!o.permitirPartido }, ms, x)), !!o.permitirPartido);
+        const c = cs[0];
         if (!c) { r.huecos.push({ iso, turnoId: t.id, faltan: rev.faltan, minimo: rev.minimo, supuesto: rev.supuesto, porQueNadie: porQueNadie(cfg, staff, target, iso, t.id) }); break; }
-        const a = asignar(target, cfg, staff, iso, t.id, c.pid, { origen: 'generador', razon: c.razones.join(' · '), permitirPartido: !!o.permitirPartido, puesto: 'sala', por: c.cubre || undefined, porDesignacion: !!c.cubre, cubrePor: c.cubre || undefined });
+        const a = asignar(target, cfg, staff, iso, t.id, c.pid, { origen: 'generador', razon: c.razones.join(' · '), permitirPartido: !!o.permitirPartido, relajarNuncaCon: relajar, puesto: 'sala', por: c.cubre || undefined, porDesignacion: !!c.cubre, cubrePor: c.cubre || undefined });
         if (!a.ok) { r.huecos.push({ iso, turnoId: t.id, faltan: rev.faltan, minimo: rev.minimo, supuesto: rev.supuesto, porQueNadie: porQueNadie(cfg, staff, target, iso, t.id) }); break; }
         r.aplicados.push({ iso, turnoId: t.id, pid: c.pid, origen: 'generador', razon: a.entry.razon, avisos: a.avisos });
         rev = revisarTurno(cfg, staff, target, iso, t.id);
@@ -3023,9 +3256,10 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
 }
 // candidatos que solo romperían reglas blandas (partido no declarado) para un hueco
 // (y, desde la revisión F3, el apoyo que dejaría la casilla solo con apoyos: el encargado decide)
+// (fase 6, S24) y la pareja «nunca con» flexible
 function candidatosConAviso(cfg, staff, est, iso, tid) {
   const sin = new Set(candidatosPara(cfg, staff, est, iso, tid).map(c => c.pid));
-  return candidatosPara(cfg, staff, est, iso, tid, { permitirPartido: true, soloApoyos: true }).filter(c => !sin.has(c.pid));
+  return candidatosPara(cfg, staff, est, iso, tid, Object.assign({ soloApoyos: true }, RELAJABLE)).filter(c => !sin.has(c.pid));
 }
 
 
@@ -3100,7 +3334,10 @@ const VARIABLES = [
   { campo: 'partido.dias', clave: 'partido', trato: 'relajable', lbl: 'Días de partido',
     texto: (ctx, p) => {
       const pd = p.partido || {};
-      if (!pd.siempre && !(pd.dias || []).length) return [];
+      // (fase 6, S39) quien hace mañana y tarde y no declara ningún día: «no hace partido». Sin la condición, con
+      // «Permitir partidos no declarados» Yilian salía de partido el viernes y el Generador decía que todo se
+      // cumplía mientras la planilla avisaba «no hace partido los viernes»
+      if (!pd.siempre && !(pd.dias || []).length) return (p.franjas || []).length !== 1 && !p.standby ? [{ id: `p:${p.id}:partido`, texto: `${p.nombre} no hace partido`, k: 'partido' }] : [];
       const cl = ctx.lunes && !pd.siempre ? cambioDeLibre(ctx.cfg, p, ctx.lunes) : null;
       const mov = cl ? cl.pares.filter(x => (pd.dias || []).includes(x[0])) : [];
       return [{ id: `p:${p.id}:partido`, texto: `${p.nombre} hace partido ${pd.siempre ? 'siempre' : 'los ' + pd.dias.map(d => DOW_PL[d].replace('los ', '')).join(', ')}${mov.length ? ` (esta semana, ${mov.map(x => `el del ${DOW_LBL[x[0]]} pasa al ${DOW_LBL[x[1]]}`).join(' y ')})` : ''}`, k: 'partido' }];
@@ -3116,14 +3353,17 @@ const VARIABLES = [
   { campo: 'partido.siempre', clave: 'partido', trato: 'relajable', lbl: 'Partido cualquier día', condicion: 'partido.dias' },
   // una condición por veto, con su día (vetoDe)
   { campo: 'vetos', clave: 'vetos', trato: 'forzable', lbl: 'No hace (local y franja)',
-    texto: (ctx, p) => (p.vetos || []).map(v => ({ id: `p:${p.id}:veto:${v.localId}:${v.franja}`, texto: `${p.nombre} ${textoVeto(v, nombreLocalV(ctx.cfg, v.localId))}`, k: 'vetos' })),
+    // (fase 6, S30) con el día en el id: el de los lunes y el de los miércoles del mismo local y franja son dos
+    texto: (ctx, p) => (p.vetos || []).map(v => ({ id: `p:${p.id}:veto:${v.localId}:${v.franja}${dowsVeto(v) ? ':' + dowsVeto(v).join('-') : ''}`, texto: `${p.nombre} ${textoVeto(v, nombreLocalV(ctx.cfg, v.localId))}`, k: 'vetos' })),
     verificar: (ctx, p, iso, mis) => fallos(mis.filter(t => vetoDe(p, t.local.id, t.franja, isoDow(iso))).map(t => `${diaV(iso)}: ${t.local.nombre} ${FRANJA_LBL[t.franja].toLowerCase()}`)) },
-  // una condición por pareja (la tenga quien la tenga, una sola vez)
+  // una condición por pareja (la tenga quien la tenga, una sola vez), si se aplica (incompatibles: con el
+  // interruptor del grupo y el de la pareja, fase 6); la flexible dice que se relaja
   { campo: 'nuncaCon', clave: 'nuncaCon', trato: 'forzable', lbl: '«Nunca con»',
-    texto: (ctx, p) => (p.nuncaCon || []).filter(q => { const key = [p.id, q].sort().join('|'); if (ctx.parejas.has(key)) return false; ctx.parejas.add(key); return true; })
-      .map(q => ({ id: `p:${p.id}:nuncaCon:${q}`, texto: `${p.nombre} y ${nombreDe(ctx.staff, q)} no coinciden`, k: 'nuncaCon', otro: q })),
+    texto: (ctx, p) => (p.nuncaCon || []).filter(q => { const key = [p.id, q].sort().join('|'); if (ctx.parejas.has(key)) return false; const inc = incompatibles(ctx.cfg, p, personaDe(ctx.staff, q)); if (!inc) return false; ctx.parejas.add(key); return true; })
+      .map(q => ({ id: `p:${p.id}:nuncaCon:${q}`, texto: `${p.nombre} y ${nombreDe(ctx.staff, q)} no coinciden${incompatibles(ctx.cfg, p, personaDe(ctx.staff, q)).flexible ? ' (pareja flexible: si no hay nadie más, se puede juntar con aviso)' : ''}`, k: 'nuncaCon', otro: q })),
     verificar: (ctx, p, iso, mis, c) => fallos(mis.filter(t => pidsEn(ctx.est, iso, t.id).includes(c.otro)).map(t => `${diaV(iso)}: juntos en ${t.local.nombre}`)) },
-  { campo: 'nuncaConFlexible', clave: 'nuncaCon', trato: 'relajable', lbl: '«Nunca con» flexible', condicion: 'nuncaCon' },
+  // (fase 6, S21 y S24) «flexible» es de la pareja y está en las dos fichas
+  { campo: 'nuncaConFlex', clave: 'nuncaCon', trato: 'relajable', lbl: '«Nunca con» flexible (por pareja)', condicion: 'nuncaCon' },
   // «cubre a» (D13): informativa, prioridad en el sitio de quien falta
   { campo: 'cubreA', clave: 'cubreA', trato: 'punt', lbl: 'Cubre a',
     texto: (ctx, p) => (p.cubreA || []).map(c => ({ id: `p:${p.id}:cubre:${c.pid}:${c.dow || ''}`, texto: `${p.nombre} cubre a ${nombreDe(ctx.staff, c.pid)}${lugarCubre(ctx.cfg, c) ? ' ' + lugarCubre(ctx.cfg, c) : ''}`, k: 'cubreA', informativa: true })) },
@@ -3168,9 +3408,12 @@ const VARIABLES = [
     texto: (ctx, p) => p.standby ? [{ id: `p:${p.id}:standby`, texto: `${p.nombre} está en standby: aún no entra en la planilla`, k: 'standby' }] : [],
     verificar: (ctx, p, iso, mis) => fallos(mis.map(t => `${diaV(iso)}: en ${t.local.nombre} ${FRANJA_LBL[t.franja].toLowerCase()}`)) },
   { campo: 'puesto', clave: null, trato: 'relajable', lbl: 'Puesto (dos apoyos no se quedan solos; el apoyo suma)' },
-  { campo: 'comodin', clave: null, trato: 'punt', lbl: 'Sin local fijo (fase 6, D7: pasa a ser «sin locales»)' },
+  // (fase 6, S31) el local habitual (localHabitualDe): suma en la puntuación. «Sin local fijo» es no tener
+  // locales (D7): lo lee la variable «locales» (esComodin), sin marca aparte
+  { campo: 'localHabitual', clave: 'locales', trato: 'punt', lbl: 'Local habitual' },
   { campo: 'prefs.evitaDows', clave: 'prefs', trato: 'punt', lbl: 'Prefiere no trabajar' },
-  { campo: 'contrato.horasSemana', clave: 'contrato', trato: 'info', lbl: 'Contrato (lo compara Horas)' },
+  // (fase 6, S17 y D6) sin interruptor: lo compara Horas y no decide nada de la planilla
+  { campo: 'contrato.horasSemana', clave: null, trato: 'info', lbl: 'Contrato (lo compara Horas)' },
   // ----- el local (Ajustes de los locales) -----
   { campo: 'local.minimos', ambito: 'local', clave: 'minimos', trato: 'duro', lbl: 'Mínimos por local, franja y día',
     texto: (ctx, l) => FRANJAS.map(f => ({ f, r: resumenMinimos(l, f) })).filter(x => x.r).map(({ f, r }) => ({ id: `min:${l.id}:${f}`, texto: `${l.nombre} por la ${FRANJA_LBL[f].toLowerCase()}: ${r}`, tipo: 'minimos', localId: l.id, franja: f })),
@@ -3217,7 +3460,8 @@ const VARIABLES = [
       .map(({ f, p }) => ({ id: `loc:${l.id}:primero:${f}`, texto: `En ${l.nombre}, por la ${FRANJA_LBL[f].toLowerCase()}, abre ${p.nombre} («Quién abre» del local)`, tipo: 'primero', k: 'abre', pid: p.id, localId: l.id, franja: f })),
     verificar: (ctx, l, iso, mis, c) => { const tid = turnoId(c.localId, c.franja); if (!pidsEn(ctx.est, iso, tid).includes(c.pid)) return fallos([]); const s = ctx.slots(iso, tid).find(x => x.pid === c.pid); return fallos(s && s.pos !== 1 ? [`${diaV(iso)}: ${enPosicion(s.pos)}`] : []); } },
   { campo: 'local.partidoAbre', ambito: 'local', clave: null, trato: 'relajable', lbl: 'Quien hace partido puede abrir la tarde', alFinal: true,
-    texto: (ctx, l) => FRANJAS.filter(f => l.partidoAbre && l.partidoAbre[f]).map(f => ({ id: `loc:${l.id}:partidoAbre:${f}`, texto: `En ${l.nombre}, quien hace partido puede abrir la ${FRANJA_LBL[f].toLowerCase()}: no hace falta una cobertura entera (acordado con el grupo el 15/09)`, tipo: 'regla', k: 'partidoAbre', localId: l.id, franja: f, nueva: true })) },
+    // (fase 6, S22) es una casilla de Ajustes del local, no una regla del grupo: su botón lleva allí
+    texto: (ctx, l) => FRANJAS.filter(f => l.partidoAbre && l.partidoAbre[f]).map(f => ({ id: `loc:${l.id}:partidoAbre:${f}`, texto: `En ${l.nombre}, quien hace partido puede abrir la ${FRANJA_LBL[f].toLowerCase()}: no hace falta una cobertura entera (acordado con el grupo el 15/09)`, tipo: 'local', k: 'partidoAbre', localId: l.id, franja: f, nueva: true })) },
   // los horarios: no deciden quién va dónde; los lee Horas (y lo que se imprime)
   ...['horario', 'horarioSupuesto', 'cierreAprox', 'horarioPartido', 'horarioPartidoSupuesto', 'duracion', 'duracionSupuesta', 'descansoMin'].map(k => ({ campo: 'local.' + k, ambito: 'local', clave: null, trato: 'info', lbl: 'Horas: ' + k })),
 ];
@@ -3225,7 +3469,8 @@ for (const v of VARIABLES) v.ambito = v.ambito || 'persona';
 const VARIABLE_DE = {}; for (const v of VARIABLES) VARIABLE_DE[v.campo] = v;
 // Lo que es solo texto (o el propio interruptor): se enseña, no decide nada. La prueba de contrato lo
 // comprueba: con ellos puestos, ningún camino cambia su decisión.
-const SOLO_TEXTO = ['id', 'nombre', 'color', 'nota', 'supuestos', 'prefs.nota', 'libreVariable', 'inactivas', 'local.id', 'local.nombre', 'local.corto', 'local.color'];
+// (fase 6) nuncaConOff es el interruptor de cada pareja «nunca con», como inactivas el de cada característica
+const SOLO_TEXTO = ['id', 'nombre', 'color', 'nota', 'supuestos', 'prefs.nota', 'libreVariable', 'inactivas', 'nuncaConOff', 'local.id', 'local.nombre', 'local.corto', 'local.color'];
 
 // lunes: la semana que se genera o se mira (24/09). Con ella, quien está de baja TODA esa semana
 // no tiene condiciones, y el día libre sale como es esa semana («Mari Luz libra el martes esta
@@ -3576,7 +3821,7 @@ function candidatosCobertura(cfg, staff, est, iso, tid, faltaPid, opts) {
 function designadaPara(cfg, staff, est, iso, tid, xid, opts) {
   const o = opts || {};
   const cocina = !!o.faltaCocina && seBuscaCocina(cfg, staff, tid);   // (D5: con «Cocina» apagada, en su sitio de sala)
-  const base = { soloCubre: true, cocina, faltaCocina: cocina, permitirPartido: !!o.permitirPartido, evitar: o.evitar, excluir: o.excluir, meses: o.meses };
+  const base = { soloCubre: true, cocina, faltaCocina: cocina, permitirPartido: !!o.permitirPartido, relajarNuncaCon: !!o.relajarNuncaCon, evitar: o.evitar, excluir: o.excluir, meses: o.meses };
   let c = null;
   if (o.prefiereAbrir || o.soloSiAbre) c = candidatosCobertura(cfg, staff, est, iso, tid, xid, Object.assign({ primero: true }, base)).find(x => !x.evitado) || null;
   if (o.soloSiAbre) return c ? Object.assign({}, c, { cocina }) : null;
@@ -3597,10 +3842,15 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
   // al salir quien falta, sale con ella su marca de «abre» o de cocina fijada (retirarEntrada): si no,
   // la casilla seguía «fijada» sin nadie marcado y el relevo no abría (revisión F3)
   for (const a of afectados) retirarEntrada(e, cfg, staffSim, a.iso, a.tid, inc.pid);
-  const plan = { id: null, titulo: '', estrategia: estrategia.permitirPartido ? 'con avisos: partidos no declarados' : 'con las reglas del grupo', relajado: !!estrategia.permitirPartido, asignaciones: [], huecos: [], sinCubrir: [], estado: e };
+  // el plan relajado (decisiones.md, principio 6) relaja los partidos no declarados y, desde la fase 6 (S24), las
+  // parejas «nunca con» flexibles —estas solo si no hay nadie más, como en el relleno (José, 17/09: «se respeta si
+  // hay gente suficiente; si no, se relaja y queda el aviso»)—; nunca locales, franjas, días que libra, vetos ni un
+  // «nunca con» estricto
+  const relaja = !!estrategia.permitirPartido;
+  const plan = { id: null, titulo: '', estrategia: relaja ? 'con avisos: partidos no declarados y parejas «nunca con» flexibles' : 'con las reglas del grupo', relajado: relaja, asignaciones: [], huecos: [], sinCubrir: [], estado: e };
   const evitarEn = (iso, tid) => estrategia.evitarDe ? estrategia.evitarDe.asignaciones.filter(x => x.iso === iso && x.tid === tid && !x.yaEstaba).map(x => x.pid) : [];
   const sinLaPersona = pq => { const nombre = nombreDe(staff, inc.pid); for (const k of Object.keys(pq)) { pq[k] = pq[k].filter(n => n !== nombre); if (!pq[k].length) delete pq[k]; } return pq; };
-  const nCand = a => candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, { permitirPartido: !!estrategia.permitirPartido, faltaCocina: a.cocina, meses: o.meses }).length;
+  const nCand = a => candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, { permitirPartido: relaja, faltaCocina: a.cocina, meses: o.meses }).length;
   const orden = afectados.map(a => ({ a, n: nCand(a) })).sort((x, y) => x.n - y.n || (x.a.iso < y.a.iso ? -1 : x.a.iso > y.a.iso ? 1 : 0));
   const nombreX = nombreDe(staff, inc.pid);
   // D3: si la casilla ya tiene quien cubre a X (el relevo, o quien ya ha entrado «por X» en este plan),
@@ -3612,7 +3862,7 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
     const rev0 = revisarTurno(cfg, staffSim, e, a.iso, a.tid);
     const minimo = relevo ? `para llegar al mínimo (había ${rev0.n} de ${rev0.minimo})` : null;
     const cub = !relevo && c.cubre ? { cubrePor: inc.pid, cubreSuCasilla: true, cubreAusente: true } : {};
-    const r = asignar(e, cfg, staffSim, a.iso, a.tid, c.pid, Object.assign({ origen: 'cobertura', razon: minimo || `cubre a ${nombreX}`, por: minimo ? undefined : inc.pid, permitirPartido: !!estrategia.permitirPartido, puesto: extra && extra.cocina ? 'cocina' : 'sala' }, cub, extra || {}));
+    const r = asignar(e, cfg, staffSim, a.iso, a.tid, c.pid, Object.assign({ origen: 'cobertura', razon: minimo || `cubre a ${nombreX}`, por: minimo ? undefined : inc.pid, permitirPartido: relaja, relajarNuncaCon: relaja && !!c.relajaPareja, puesto: extra && extra.cocina ? 'cocina' : 'sala' }, cub, extra || {}));
     if (!r.ok) return false;
     const razones = minimo ? [minimo].concat(c.razones.filter(x => x !== `cubre a ${nombreX}`)) : c.razones;
     plan.asignaciones.push({ iso: a.iso, tid: a.tid, localId: a.localId, franja: a.franja, pid: c.pid, nombre: c.nombre, razones, avisos: c.avisos, autorizados: r.autorizados || [], cocina: !!(extra && extra.cocina), abre: primeroDe(cfg, staffSim, e, a.iso, a.tid) === c.pid, libre: c.libre, score: c.score, por: minimo ? null : inc.pid, razon: minimo || `cubre a ${nombreX}`, cubre: !minimo && !!c.cubre });
@@ -3622,9 +3872,12 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
   // vez de dejar el hueco (revisión F3)
   const ponPrimero = (a, opcs, extra) => {
     const excluir = [];
+    const busca = mas => { for (const op of opcs) { const c = candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, Object.assign({ excluir, sinCubre: yaCubierta(a), soloCubre: !!o.soloCubre, meses: o.meses }, op, mas))[0]; if (c) return c; } return null; };
     for (let k = 0; k < 8; k++) {
-      let c = null;
-      for (const op of opcs) { c = candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, Object.assign({ excluir, sinCubre: yaCubierta(a), soloCubre: !!o.soloCubre, meses: o.meses }, op))[0]; if (c) break; }
+      // (fase 6, S24) en el plan relajado, la pareja «nunca con» flexible, si no hay nadie más (buscarRelajando: la misma
+      // escalera que el relleno del Generador)
+      const br = buscarRelajando(busca, relaja);
+      const c = br.r && br.relajaPareja ? Object.assign({}, br.r, { relajaPareja: true }) : br.r;
       if (!c) return false;
       if (pon(a, c, extra)) return true;
       excluir.push(c.pid);
@@ -3653,8 +3906,9 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
     let rev = revisarTurno(cfg, staffSim, e, a.iso, a.tid);
     const necesitaCocina = rev.sinCocina && (rev.cocinaObligatoria || a.cocina || rev.faltan > 0) && l && cocinaExigida(cfg, staffSim, l, franja);
     const necesario = rev.faltan > 0 || necesitaCocina || rev.sinAbre;
-    if (!necesario && !o.siempre) { if (!rel) plan.sinCubrir.push({ iso: a.iso, tid: a.tid, localId, franja, n: rev.n, min: rev.minimo, motivo: `la casilla sigue completa (${rev.n} de ${rev.minimo})` }); continue; }
-    const base = { permitirPartido: !!estrategia.permitirPartido, evitar: evitarEn(a.iso, a.tid), faltaCocina: a.cocina };
+    // (revisión de la fase 6, D5) con «Mínimos» apagado la casilla no está «completa»: nadie pide el mínimo
+    if (!necesario && !o.siempre) { if (!rel) plan.sinCubrir.push({ iso: a.iso, tid: a.tid, localId, franja, n: rev.n, min: rev.minimo, motivo: rev.minimosApagados && rev.n < rev.minimo ? `la regla «Mínimos» está apagada: no hace falta nadie (${rev.n} de ${rev.minimo})` : `la casilla sigue completa (${rev.n} de ${rev.minimo})` }); continue; }
+    const base = { permitirPartido: relaja, evitar: evitarEn(a.iso, a.tid), faltaCocina: a.cocina };
     // D2/D13 (revisión F3b): sin relevo, la persona designada entra la primera y en el puesto de X, con la
     // misma evaluación que la semana tipo (designadaPara). Si X llevaba la cocina, entra con la cocina
     // aunque otra de la casilla la haya recogido (en «siempre» solo se buscaba sala y Hojan no entraba por
@@ -3663,7 +3917,8 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
       const sirve = !!o.siempre || rev.faltan > 0 || (necesitaCocina && !!a.cocina);
       const excluir = [];
       for (let k = 0; k < 8 && (sirve || rev.sinAbre); k++) {
-        const d = designadaPara(cfg, staffSim, e, a.iso, a.tid, inc.pid, { meses: o.meses, faltaCocina: a.cocina, prefiereAbrir: rev.sinAbre, soloSiAbre: !sirve, permitirPartido: !!estrategia.permitirPartido, evitar: base.evitar, excluir });
+        // (la pareja flexible no se relaja aquí: solo si nadie más puede, en la búsqueda general de abajo)
+        const d = designadaPara(cfg, staffSim, e, a.iso, a.tid, inc.pid, { meses: o.meses, faltaCocina: a.cocina, prefiereAbrir: rev.sinAbre, soloSiAbre: !sirve, permitirPartido: relaja, evitar: base.evitar, excluir });
         if (!d || pon(a, d, d.cocina ? { cocina: true } : null)) break;
         excluir.push(d.pid);
       }
@@ -3843,7 +4098,8 @@ function ponerPlanCobertura(cfg, staff, est, inc, plan, res0) {
     const cub = por ? { cubrePor: por, cubreSuCasilla: true, cubreAusente: true } : {};
     // la persona designada entra por la designación (D13: si se quita, al regenerar se retira); en un
     // cambio de turno no, que es un trato entre los dos
-    const r = asignar(est, cfg, staff, as.iso, as.tid, as.pid, Object.assign({ origen: 'cobertura', razon: as.razon || `cubre a ${p.nombre}`, por: por || undefined, porDesignacion: !!por && !!as.cubre && inc.tipo !== 'CAMBIO', cocina: as.cocina ? true : undefined, permitirPartido: true }, cub));
+    // (revisión de la fase 6) con lo que relajó el plan (RELAJABLE): la pareja flexible del plan relajado también
+    const r = asignar(est, cfg, staff, as.iso, as.tid, as.pid, Object.assign({ origen: 'cobertura', razon: as.razon || `cubre a ${p.nombre}`, por: por || undefined, porDesignacion: !!por && !!as.cubre && inc.tipo !== 'CAMBIO', cocina: as.cocina ? true : undefined }, RELAJABLE, cub));
     if (r.ok) res.asignados.push({ iso: as.iso, tid: as.tid, pid: as.pid, avisos: r.avisos }); else { res.rechazados.push({ iso: as.iso, tid: as.tid, pid: as.pid, motivo: r.motivo }); continue; }
     if (as.intercambio && inc.tipo === 'CAMBIO') {
       const x = as.intercambio;
@@ -4161,7 +4417,8 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
     }
     // 24/09 (D10): una ausencia de media jornada es media jornada (descuenta medio día del contrato)
     const ausM = p ? ausenciaEn(p, iso, 'M') : null, ausT = p ? ausenciaEn(p, iso, 'T') : null;
-    if (mias.length) { out.dias++; if (partido) out.partidos++; if (festivo) { out.festivas++; out.festivasMin += minDia; } if (dow === 7) { out.domingos++; out.domingosMin += minDia; } }
+    // (fase 6, S40 y D4) un turno continuo no es un partido: cuenta en «continuos», no en «Partidos» (antes, en los dos)
+    if (mias.length) { out.dias++; if (partido && !continuo) out.partidos++; if (festivo) { out.festivas++; out.festivasMin += minDia; } if (dow === 7) { out.domingos++; out.domingosMin += minDia; } }
     else if (ausM && ausT) out.ausencias++;
     if (!!ausM !== !!ausT) out.ausenciasMedias++;
   }
@@ -4239,7 +4496,8 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
       indices.forEach((x, i) => { if (apoyo.has(i) || w.unavailable[i] === '*') return; w.unavailable[i] = [...new Set([...(w.unavailable[i] || []), ...fuera])]; });
     }
     for (const l of cfg.locales) for (const dow of TODOS) if (puedeCocina(cfg, p, l.id, isoDe(2026, 10, 4 + dow))) { const s = skillDe(l.id, dow); if (!w.skills.includes(s)) w.skills.push(s); }
-    if (p.prefs && (p.prefs.evitaDows || []).length) indices.forEach((x, i) => { if (p.prefs.evitaDows.includes(x.dow)) w.preferences.push({ day: i, shift: 'OFF', weight: 3 }); });
+    // (fase 6, S14) con su interruptor «Preferencias» (evita), como la puntuación y la Cobertura
+    indices.forEach((x, i) => { if (evita(cfg, p, x.dow)) w.preferences.push({ day: i, shift: 'OFF', weight: 3 }); });
     return w;
   });
   // cobertura por medio día y local; cerrados a 0
@@ -4249,7 +4507,8 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
     for (const l of cfg.locales) {
       const tid = turnoId(l.id, x.franja);
       if (!turnoAbierto(cfg, est, x.iso, tid)) { by_day[i][l.id] = { min: 0, max: 0 }; continue; }
-      by_day[i][l.id] = { min: minimoDe(cfg, x.iso, tid, est).min };
+      // (fase 6, S16 y D5) con la regla del grupo «Mínimos» apagada, tampoco los pide el núcleo
+      by_day[i][l.id] = { min: regla(cfg, 'minimos') ? minimoDe(cfg, x.iso, tid, est).min : 0 };
     }
   });
   const rules = [{ type: 'coverage', mode: 'hard', tier: 3, id: 'mínimos por local, día y franja', params: { demand: {}, by_day } }];
@@ -4438,18 +4697,18 @@ function semillaPasarela() {
     P('jacquelin', 'Jacquelin', 'sala', ['ZAPA'], ['M'], [7]),
     P('cris', 'Cris Parreño', 'sala', ['MONACO'], ['M'], [7], { nota: 'Yilian le hace el día libre' }),
     P('esmeralda', 'Esmeralda', 'cocina', ['MONACO'], ['M'], [1], { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] }, nota: 'la sustituye Jenny los lunes' }),
-    P('mariluz', 'Mari Luz', 'sala', ['PASARELA'], ['M', 'T'], [3], { partido: { dias: [2, 4, 5, 6] }, vetos: [{ localId: 'PASARELA', franja: 'M', dow: 1 }], nuncaCon: ['lavinia'], nuncaConFlexible: true, nota: 'casi siempre partido; el lunes hace la tarde entera, de 16:00 a cierre, y por eso no puede la mañana (Aroa, 17/09); el domingo hace la mañana' }),
+    P('mariluz', 'Mari Luz', 'sala', ['PASARELA'], ['M', 'T'], [3], { partido: { dias: [2, 4, 5, 6] }, vetos: [{ localId: 'PASARELA', franja: 'M', dow: 1 }], nuncaCon: ['lavinia'], nuncaConFlex: ['lavinia'], nota: 'casi siempre partido; el lunes hace la tarde entera, de 16:00 a cierre, y por eso no puede la mañana (Aroa, 17/09); el domingo hace la mañana' }),
     P('noe', 'Noe', 'sala', ['EL33'], ['M', 'T'], [1], { partido: { dias: [2, 3] }, cocina: { titular: ['EL33'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'jenny', dow: 2 }, { pid: 'victoria', dow: 3 }], nota: 'siempre de tarde; cocina cuando cubre; el domingo estira el turno en El 33' }),
-    P('scapon', 'Susana Capón', 'sala', ['MONACO'], ['T'], [1], { nuncaConFlexible: true, cocina: { titular: ['MONACO'], reserva: [], soloDias: [2] }, abre: { MONACO: ['T'] }, nota: 'sale la primera; camarera, no cocinera salvo el martes (día flojo) para que libre Hojan' }),
+    P('scapon', 'Susana Capón', 'sala', ['MONACO'], ['T'], [1], { nuncaCon: ['leo'], nuncaConFlex: ['leo'], cocina: { titular: ['MONACO'], reserva: [], soloDias: [2] }, abre: { MONACO: ['T'] }, nota: 'sale la primera; camarera, no cocinera salvo el martes (día flojo) para que libre Hojan' }),
     P('ivan', 'Iván', 'sala', ['PASARELA'], ['T'], [1], { abre: { PASARELA: ['T'] }, nota: 'sale el primero' }),
     P('juani', 'Juani', 'sala', ['ZAPA'], ['M'], [6]),
     P('sluna', 'Susana Luna', 'sala', ['ZAPA'], ['T'], [4], { nota: 'la cubre Roberto los jueves' }),
     P('roberto', 'Roberto', 'sala', ['ZAPA', 'PASARELA'], ['M', 'T'], [1], { partido: { dias: [3, 5, 6] }, cocina: { titular: [], reserva: ['ZAPA'], soloDias: [] }, cubreA: [{ pid: 'sluna' }, { pid: 'adrian' }], nota: 'tercero de apoyo por las mañanas en Zapatillera; los jueves abre la tarde por Susana Luna; el domingo, Pasarela con Mari Luz' }),
-    P('lavinia', 'Lavinia', 'apoyo', ['PASARELA', 'ZAPA'], ['M', 'T'], [1, 2, 4], { partido: { dias: [3, 7] }, nuncaCon: ['mariluz'], nuncaConFlexible: true, cubreA: [{ pid: 'mariluz', dow: 3 }], comodin: true, nota: 'el miércoles (libre de Mari Luz) hace partido en Pasarela; viernes y sábado, tarde en Zapatillera; el domingo dobla' }),
-    P('tere', 'Tere', 'apoyo', ['PASARELA', 'MONACO'], ['M'], [6, 7], { comodin: true, nota: 'apoyo de mañanas; no trabaja fines de semana' }),
-    P('leo', 'Leo', 'apoyo', [], ['T'], [3, 4, 7], { nuncaCon: ['scapon'], nuncaConFlexible: true, noPrimero: ['M', 'T'], comodin: true, supuestos: ['en la semana tipo solo le salen dos días (viernes y sábado): falta saber dónde hace los demás'], nota: 'apoyo de tardes en cualquier local; entra siempre a partir del segundo puesto' }),
+    P('lavinia', 'Lavinia', 'apoyo', ['PASARELA', 'ZAPA'], ['M', 'T'], [1, 2, 4], { partido: { dias: [3, 7] }, nuncaCon: ['mariluz'], nuncaConFlex: ['mariluz'], cubreA: [{ pid: 'mariluz', dow: 3 }], nota: 'el miércoles (libre de Mari Luz) hace partido en Pasarela; viernes y sábado, tarde en Zapatillera; el domingo dobla' }),
+    P('tere', 'Tere', 'apoyo', ['PASARELA', 'MONACO'], ['M'], [6, 7], { nota: 'apoyo de mañanas; no trabaja fines de semana' }),
+    P('leo', 'Leo', 'apoyo', [], ['T'], [3, 4, 7], { nuncaCon: ['scapon'], nuncaConFlex: ['scapon'], noPrimero: ['M', 'T'], supuestos: ['en la semana tipo solo le salen dos días (viernes y sábado): falta saber dónde hace los demás'], nota: 'apoyo de tardes en cualquier local; entra siempre a partir del segundo puesto' }),
     P('jenny', 'Jenny', 'cocina', ['EL33', 'MONACO'], ['M', 'T'], [2], { partido: { dias: [3, 4, 5, 6, 7] }, cocina: { titular: ['EL33', 'MONACO'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'esmeralda', dow: 1 }], nota: 'cocina de El 33 en partido; los lunes cocina del Mónaco por Esmeralda; el domingo dobla (mañana El 33, tarde Mónaco)' }),
-    P('cristian', 'Cristian', 'apoyo', [], ['M', 'T'], [3], { partido: { dias: [6] }, cocina: { titular: [], reserva: [], soloDias: [], nunca: true }, vetos: [{ localId: 'PASARELA', franja: 'M' }], noAbre: ['EL33'], noPrimero: ['T'], comodin: true, supuestos: ['seis días (la plantilla dice cinco): pendiente del cliente'], nota: 'apoyo de sala; no hace la tarde completa (nunca el primero de la tarde); el martes tarde fijo en el Mónaco' }),
+    P('cristian', 'Cristian', 'apoyo', [], ['M', 'T'], [3], { partido: { dias: [6] }, cocina: { titular: [], reserva: [], soloDias: [], nunca: true }, vetos: [{ localId: 'PASARELA', franja: 'M' }], noAbre: ['EL33'], noPrimero: ['T'], supuestos: ['seis días (la plantilla dice cinco): pendiente del cliente'], nota: 'apoyo de sala; no hace la tarde completa (nunca el primero de la tarde); el martes tarde fijo en el Mónaco' }),
     P('yilian', 'Yilian', 'apoyo', ['MONACO'], ['M', 'T'], [4], { libreVariable: true, cubreA: [{ pid: 'cris', dow: 7 }, { pid: 'scapon', dow: 1, turnoId: 'MONACO_T' }], nota: 'apoyo de Cris Parreño de mañana; le hace el domingo; el lunes abre la tarde por Susana Capón' }),
     P('lola', 'Lola', 'sala', ['PASARELA'], ['M'], [7], { abre: { PASARELA: ['M'] }, cubreA: [{ pid: 'laura' }], nota: 'abre el local; cubre la baja de Laura' }),
     P('adrian', 'Adrián', 'cocina', ['ZAPA'], ['M', 'T'], [3], { partido: { siempre: true, dias: [1, 2, 4, 5, 6, 7] }, cocina: { titular: ['ZAPA'], reserva: [], soloDias: [] }, cubreA: [{ pid: 'susi' }], nota: 'cocina de Zapatillera, siempre partido; cubre la baja de Susi' }),
@@ -4548,7 +4807,8 @@ function migrarAltas(estado) {
 }
 function migrarPuestos(estado) {
   const r = { puestos: 0 };
-  for (const p of estado.staff || []) if (p.puesto === 'comodin') { p.puesto = 'apoyo'; p.comodin = p.comodin === undefined ? true : p.comodin; r.puestos++; }
+  // (fase 6, D7) sin la marca p.comodin: «sin local fijo» son sus locales
+  for (const p of estado.staff || []) if (p.puesto === 'comodin') { p.puesto = 'apoyo'; r.puestos++; }
   return r;
 }
 function migrarHorarios(estado) {
@@ -4638,5 +4898,8 @@ if (typeof module !== 'undefined') {
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,
     crearContexto, evaluarPlaza, primerBloqueo, incompatibles, evita, abreFijo, PESOS, puntuar, candidatos, VARIABLES, SOLO_TEXTO, gruposSelector, destrapa, fraseBloqueo,
     plazaOcupa, salaDelDia, siSeFuerza, cocinasTitular,
+    estadoInterruptor, parejasNuncaCon, ponerNuncaCon, quitarNuncaCon, migrarNuncaCon, migrarComodin, migrarInactivas,
+    localHabitualDe, alternarLocal, ponerLocalHabitual, vetoRepetido, seriaContinuo, textoVeto, dowsVeto,
+    RELAJABLE, buscarRelajando, TEXTO_PAREJA_FLEXIBLE,
   };
 }

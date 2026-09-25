@@ -263,6 +263,32 @@ test('roles: la auditoría es solo del programador; el encargado crea empleados 
   assert.equal((await prog('GET', '/api/copia')).status, 200);
 });
 
+// 24/09 (fase 6, S21 y S31): las parejas «nunca con» (con su «flexible» y su interruptor, en las dos fichas) y el
+// local habitual viajan en la ficha; el PUT comprueba su forma
+test('PUT /api/estado: las parejas «nunca con» y el local habitual de cada ficha tienen su forma', async () => {
+  const cur = await admin('GET', '/api/estado');
+  const base = cur.datos.estado, v = cur.datos.version;
+  const conFicha = extra => Object.assign({}, base, { staff: base.staff.map((p, i) => i ? p : Object.assign({}, p, extra)) });
+  const malo = async (extra, por) => assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: conFicha(extra) })).status, 400, por);
+  await malo({ nuncaCon: 'lavinia' }, 'nuncaCon es una lista');
+  await malo({ nuncaConFlex: [5] }, 'nuncaConFlex, de ids');
+  await malo({ nuncaConOff: { lavinia: true } }, 'nuncaConOff es una lista');
+  await malo({ localHabitual: 3 }, 'localHabitual es el id de un local');
+  assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: conFicha({ nuncaCon: ['x1'], nuncaConFlex: ['x1'], nuncaConOff: [], localHabitual: 'PASARELA' }) })).status, 200);
+});
+// (fase 6, S21) desde que la pareja está en las dos fichas, la ficha propia llevaría las parejas que declaró un
+// compañero («Leo, nunca con Susana Capón»): el empleado no las recibe (no le hacen falta para leer su planilla)
+test('el empleado no recibe las parejas «nunca con» de su ficha (son también de sus compañeros)', async () => {
+  const cur = await admin('GET', '/api/estado');
+  const estado = cur.datos.estado;
+  estado.staff = estado.staff.map(p => p.id === 'lola' ? Object.assign(p, { nuncaCon: ['cristian'], nuncaConFlex: ['cristian'], nuncaConOff: ['cristian'] }) : p);
+  assert.equal((await admin('PUT', '/api/estado', { baseVersion: cur.datos.version, estado })).status, 200);
+  const lola = (await emp('GET', '/api/estado')).datos.estado.staff.find(p => p.id === 'lola');
+  assert.ok(lola && lola.puesto, 'su ficha llega');
+  assert.equal(lola.nuncaCon, undefined); assert.equal(lola.nuncaConFlex, undefined); assert.equal(lola.nuncaConOff, undefined);
+  const guardada = (await admin('GET', '/api/estado')).datos.estado.staff.find(p => p.id === 'lola');
+  assert.deepEqual(guardada.nuncaCon, ['cristian'], 'lo guardado no se toca');
+});
 test('el empleado recibe SOLO lo suyo: locales sí; sin patrón, cierres, historial ni datos de terceros', async () => {
   const cur = await admin('GET', '/api/estado');
   const estado = cur.datos.estado;

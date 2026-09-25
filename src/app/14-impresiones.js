@@ -542,13 +542,13 @@ function abrirImpresionSemanaGenerada(res, opts) {
 }
 
 // ---------- tablón del mes: personas × días ----------
-// una píldora por día con el color del local: M mañana, T tarde, P partido; si dobla
+// una píldora por día con el color del local: M mañana, T tarde, P partido, C turno continuo (D4); si dobla
 // (partido en dos locales) la píldora lleva los dos colores. Ausencias con su tipo.
 function abrirImpresionMes() {
   const y = S.y, m = S.m, dias = est.days, n = dias.length;
   const fest = dias.filter(d => d.festivo).map(d => d.d).join(', ');
   const orden = ordenPersonasMes(dias[n - 1].iso);
-  let h = pxCabecera('Planilla mensual', 'Grupo Pasarela · tablón personas × días · M mañana · T tarde · P partido', `${MESES[m - 1]} ${y}`, `${n} días${fest ? ' · festivos: ' + fest : ''}`);
+  let h = pxCabecera('Planilla mensual', 'Grupo Pasarela · tablón personas × días · M mañana · T tarde · P partido · C turno continuo', `${MESES[m - 1]} ${y}`, `${n} días${fest ? ' · festivos: ' + fest : ''}`);
   h += `<table class="pxm"><thead><tr><th class="nomh">Persona</th>${dias.map(d => `<th class="${d.dow >= 6 || d.festivo ? 'wk2' : ''}${d.festivo ? ' fes' : ''}"><span>${DOW_C[d.dow]}</span><b>${d.d}</b></th>`).join('')}</tr></thead><tbody>`;
   for (const { p, baja } of orden) {
     h += `<tr${baja ? ' class="baja"' : ''}><td class="nom"><span class="nomw"><i style="background:${avColor(p.id)}"></i>${esc(p.nombre)}</span></td>`;
@@ -562,7 +562,8 @@ function abrirImpresionMes() {
       }
       const franjas = new Set(cas.map(c => partirTurno(c.tid).franja));
       const locs = [...new Set(cas.map(c => partirTurno(c.tid).localId))];
-      const cod = franjas.size === 2 ? 'P' : franjas.has('M') ? 'M' : 'T';
+      // D4 (24/09, revisión de la fase 6): de corrido en el mismo local es un turno continuo (turnoDelDia), no un partido
+      const cod = franjas.size === 2 ? (turnoDelDia(S, est, d.iso, p.id).continuo ? 'C' : 'P') : franjas.has('M') ? 'M' : 'T';
       const c1 = colorLocal(locs[0]), c2 = locs[1] ? colorLocal(locs[1]) : null;
       h += `<td class="${wk}"><span class="pm${c2 ? ' dobla' : ''}" style="--lc:${c1}${c2 ? ';--lc2:' + c2 : ''}">${cod}</span></td>`;
     }
@@ -577,7 +578,9 @@ function abrirImpresionMes() {
       for (const f of FRANJAS) {
         const tid = turnoId(l.id, f);
         if (!turnoAbierto(S, est, d.iso, tid)) continue;
-        const k = Math.max(0, minimoDe(S, d.iso, tid, est).min - asignados(est, d.iso, tid).length);
+        // lo que falta lo dice la Revisión (revisarTurno): con «Mínimos» apagado no falta nadie (D5; revisión de la
+        // fase 6: aquí se restaba el mínimo a pelo y la hoja seguía contando faltas)
+        const k = revisarTurno(S, S.staff, est, d.iso, tid).faltan;
         if (k) { faltan += k; fr.push(f); }
       }
       h += `<td class="${d.dow >= 6 || d.festivo ? 'wk2' : ''}">${faltan ? `<b class="falta">${faltan}<small>${fr.join('')}</small></b>` : ''}</td>`;
@@ -585,7 +588,7 @@ function abrirImpresionMes() {
     h += '</tr>';
   }
   h += '</tbody></table>';
-  h += `<div class="pxley">${S.locales.map(l => `<span class="pxchip"><span class="pm" style="--lc:${esc(l.color)}">M</span>${esc(l.nombre)}</span>`).join('')}<span class="pxchip"><b>M</b>mañana</span><span class="pxchip"><b>T</b>tarde</span><span class="pxchip"><b>P</b>partido (mañana y tarde)</span><span class="pxchip"><span class="pm dobla" style="--lc:#7a8a94;--lc2:#c3cbd1">P</span>dobla: dos locales el mismo día</span>${TIPOS_AUSENCIA.map(t => `<span class="pxchip a-${t.id}"><b>${t.id}</b>${esc(t.label)}</span>`).join('')}</div>`;
+  h += `<div class="pxley">${S.locales.map(l => `<span class="pxchip"><span class="pm" style="--lc:${esc(l.color)}">M</span>${esc(l.nombre)}</span>`).join('')}<span class="pxchip"><b>M</b>mañana</span><span class="pxchip"><b>T</b>tarde</span><span class="pxchip"><b>P</b>partido (mañana y tarde)</span><span class="pxchip"><b>C</b>turno continuo (mañana y tarde de corrido)</span><span class="pxchip"><span class="pm dobla" style="--lc:#7a8a94;--lc2:#c3cbd1">P</span>dobla: dos locales el mismo día</span>${TIPOS_AUSENCIA.map(t => `<span class="pxchip a-${t.id}"><b>${t.id}</b>${esc(t.label)}</span>`).join('')}</div>`;
   h += pxPie('Un número en la fila de un local = personas que faltan ese día para llegar al mínimo.');
   montarImpresion(h, true, `Planilla_mes_${claveMes(y, m)}`);
 }

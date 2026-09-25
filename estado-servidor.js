@@ -12,7 +12,11 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
   // 14/09 (Pasarela): de los compañeros solo identidad, color, puesto y locales
   // donde trabajan — lo justo para leer la casilla y proponer un cambio. Ni
   // ausencias, ni contrato, ni notas, ni preferencias, ni a quién cubren.
-  const staff = estado.staff.map(p => p.id === pid ? p : ({
+  // 24/09 (fase 6, S21): de su propia ficha, sin las parejas «nunca con»: desde que la pareja está en las dos fichas,
+  // la suya llevaría también las que declaró un compañero («Leo, nunca con Susana Capón»), y no le hacen falta
+  // para leer su planilla. Copia: el estado del servidor no se toca.
+  const propia = p => { const c = Object.assign({}, p); delete c.nuncaCon; delete c.nuncaConFlex; delete c.nuncaConOff; return c; };
+  const staff = estado.staff.map(p => p.id === pid ? propia(p) : ({
     id: p.id, nombre: p.nombre, color: p.color, puesto: p.puesto, locales: p.locales,
   }));
   const peticiones = (estado.peticiones || [])

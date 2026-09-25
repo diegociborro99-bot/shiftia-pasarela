@@ -1085,7 +1085,8 @@ ok('puestos: fuera «comodín», los puestos son sala, cocina y apoyo, y cada un
   assert.ok(M.puedeEstar(cfg, st, e, '2026-10-08', 'PASARELA_M', 'dulce', { forzar: true }).ok, 'a mano sí se la puede poner');
   assert.ok(M.personaDe(st, 'hojan').soloCocina, 'Johan siempre cocina');
 });
-ok('migrarPuestos: las fichas guardadas con puesto «comodín» pasan a «apoyo» sin perder el sin-local-fijo', () => {
+// (fase 6, D7) «sin local fijo» es no tener locales: migrarPuestos ya no pone la marca p.comodin (la borra migrarComodin)
+ok('migrarPuestos: las fichas guardadas con puesto «comodín» pasan a «apoyo»; «sin local fijo» son sus locales', () => {
   const estado = M.semillaPasarela();
   estado.staff[0].puesto = 'comodin';
   estado.staff[1].puesto = 'comodin'; estado.staff[1].comodin = true;
@@ -1093,7 +1094,7 @@ ok('migrarPuestos: las fichas guardadas con puesto «comodín» pasan a «apoyo�
   assert.equal(r.puestos, 2);
   assert.equal(estado.staff[0].puesto, 'apoyo');
   assert.equal(estado.staff[1].puesto, 'apoyo');
-  assert.equal(estado.staff[1].comodin, true, 'sigue sin local fijo');
+  assert.ok(!('comodin' in estado.staff[0]), 'no pone la marca');
   assert.equal(M.migrarPuestos(estado).puestos, 0, 'idempotente');
 });
 ok('dos apoyos no pueden quedarse solos: la casilla avisa y el generador prefiere a alguien de sala o cocina', () => {
@@ -1124,9 +1125,10 @@ ok('«nunca coincide» flexible: se respeta si hay gente, y si no se relaja con 
   const cfg = cfgBase(), st = staffDe(cfg);
   const e = M.nuevoEstado(2026, 10, { festivos: [] });
   const lav = M.personaDe(st, 'lavinia');
-  assert.equal(lav.nuncaConFlexible, true, 'Lavinia y Mari Luz pueden coincidir si hace falta');
+  // (fase 6, S21) «flexible» es de la pareja y está en las dos fichas (nuncaConFlex)
+  assert.deepEqual(lav.nuncaConFlex, ['mariluz'], 'Lavinia y Mari Luz pueden coincidir si hace falta');
   assert.deepEqual(M.personaDe(st, 'leo').nuncaCon, ['scapon']);
-  assert.equal(M.personaDe(st, 'leo').nuncaConFlexible, true, 'Leo y Susana Capón, lo mismo');
+  assert.deepEqual(M.personaDe(st, 'leo').nuncaConFlex, ['scapon'], 'Leo y Susana Capón, lo mismo');
   // viernes 2: Mari Luz en la tarde de Pasarela
   assert.ok(M.asignar(e, cfg, st, '2026-10-02', 'PASARELA_T', 'mariluz', { permitirPartido: true }).ok);
   const duro = M.puedeEstar(cfg, st, e, '2026-10-02', 'PASARELA_T', 'lavinia', {});
@@ -2745,7 +2747,13 @@ ok('F3 · R4 la semana tipo con la VAC de Iván en su ficha: Mari Luz, que ya es
     assert.strictEqual(ml[0].razon, 'cubre a Iván');
     assert.strictEqual(M.primeroDe(cfg, st, e, iso, 'PASARELA_T'), 'mariluz');
   }
-  assert.ok(!M.pidsEn(e, F3_DOM, 'PASARELA_T').includes('mariluz'), 'el domingo no');
+  // el domingo no (Aroa, 24/09: «el domingo haría mañana»): la pareja flexible con Lavinia solo se relaja en el plan
+  // relajado (decisiones.md, principio 6), y sin «Permitir partidos no declarados» el Generador no lo es (revisión
+  // de la fase 6: la fase 6 la relajaba siempre que no había nadie y el domingo ponía a Mari Luz con Lavinia)
+  assert.ok(!M.pidsEn(e, F3_DOM, 'PASARELA_T').includes('mariluz'), 'el domingo no: ' + JSON.stringify(M.asignados(e, F3_DOM, 'PASARELA_T')));
+  // con «Permitir partidos no declarados» hay alguien más (Roberto, con su aviso), como en la Cobertura: el domingo tampoco
+  const e2 = f3Semana(); M.generarSemana(cfg, st, e2, F3_LUN, { permitirPartido: true });
+  assert.ok(!M.pidsEn(e2, F3_DOM, 'PASARELA_T').includes('mariluz'), 'con partidos permitidos, el domingo no');
   M.generarSemana(cfg, st, e, F3_LUN, {});
   assert.strictEqual(M.asignados(e, F3_VIE, 'PASARELA_T').filter(x => x.pid === 'mariluz').length, 1, 'generar otra vez no la duplica');
   // Iván vuelve: Mari Luz no pierde su plaza (es la suya) y deja de ir «por Iván»
@@ -3319,6 +3327,8 @@ ok('F3 rev · C2 al quitar a quien tenía fijado «abre», la marca se va con é
 
 ok('F3 rev · C4 el Generador no deja una casilla solo con apoyos (como la Cobertura): la deja corta con el porqué, y la condición «dos apoyos no se quedan solos» se comprueba', () => {
   const cfg = f3Escenario(), st = cfg.staff;
+  // (revisión de la fase 6) con la pareja Mari Luz–Lavinia flexible, como en la semilla: sin «Permitir partidos no
+  // declarados» el Generador no la relaja (decisiones.md, principio 6: solo el plan relajado)
   M.anadirAusencia(M.personaDe(st, 'ivan'), { tipo: 'VAC', desde: F3_VIE, hasta: F3_DOM });
   const e = cieRango(cfg, F3_LUN, F3_DOM);
   for (const iso of [F3_VIE, F3_SAB, F3_DOM]) M.desasignar(e, iso, 'PASARELA_T', 'ivan');
@@ -3467,7 +3477,13 @@ ok('F3b · la Cobertura y el Generador dicen lo mismo que la ausencia apuntada e
   for (const iso of [F3_VIE, F3_SAB, F3_DOM]) assert.ok(!M.pidsEn(g.estado, iso, 'PASARELA_T').includes('ivan'), `${iso}: Iván, de vacaciones, sale de su tarde: ${M.pidsEn(g.estado, iso, 'PASARELA_T')}`);
   assert.ok(g.retirados.some(x => x.iso === F3_VIE && x.pid === 'ivan' && /vacaciones por la tarde/.test(x.motivo)), JSON.stringify(g.retirados));
   for (const iso of [F3_VIE, F3_SAB]) assert.deepStrictEqual(f3bPorIvan(g.estado, iso), ['mariluz'], iso);
-  assert.ok(!f3bPorIvan(g.estado, F3_DOM).includes('mariluz'));
+  // el domingo no, como dicen la confirmación de Equipo («nunca con Lavinia») y el plan B (revisión de la fase 6:
+  // sin «Permitir partidos no declarados» la pareja flexible no se relaja); con partidos permitidos, el Generador hace
+  // lo mismo que el plan A de la Cobertura (Roberto)
+  assert.ok(!f3bPorIvan(g.estado, F3_DOM).includes('mariluz') && !M.pidsEn(g.estado, F3_DOM, 'PASARELA_T').includes('mariluz'), JSON.stringify(M.asignados(g.estado, F3_DOM, 'PASARELA_T')));
+  const gPP = M.generarSemana(cfgG, cfgG.staff, cieRango(cfgG, F3_LUN, F3_DOM), F3_LUN, { simular: true, permitirPartido: true });
+  const domA = A.asignaciones.filter(a => a.iso === F3_DOM && a.tid === 'PASARELA_T' && !a.yaEstaba).map(a => a.pid);
+  assert.ok(!f3bPorIvan(gPP.estado, F3_DOM).includes('mariluz') && domA.every(pid => M.pidsEn(gPP.estado, F3_DOM, 'PASARELA_T').includes(pid)), JSON.stringify([domA, M.pidsEn(gPP.estado, F3_DOM, 'PASARELA_T')]));
   // el Generador de periodo (generarPlanilla) igual
   const cfgP = f3Escenario(); f3bVacIvan(cfgP);
   const gp = M.generarPlanilla(cfgP, cfgP.staff, cieRango(cfgP, F3_LUN, F3_DOM), F3_LUN, F3_DOM, { simular: true });
@@ -4497,7 +4513,11 @@ ok('F5 rev · S18 la «a» que decide se guarda en la semana tipo cada vez, y qu
     const e1 = f3Semana('2026-10-05'); M.generarSemana(c, s2, e1, '2026-10-05', {});
     c.patron = M.patronDesdeSemana(e1, '2026-10-05', c, s2);
     const e2 = f3Semana('2026-10-12'); M.generarSemana(c, s2, e2, '2026-10-12', {});
-    assert.deepStrictEqual(abre(e2, '2026-10-12'), antes, quien);
+    // sigue abriendo donde abría. (fase 6, D4) Puede abrir además alguna tarde de corrido: en la semana de sus
+    // vacaciones Noe hizo la mañana de El 33 de corrido con su tarde (antes quedaba el hueco), la semana tipo
+    // guardada la lleva, y a la vuelta la tarde la completa Victoria, que ya abre la mañana (turno continuo)
+    const despues = abre(e2, '2026-10-12');
+    assert.ok(antes.every(x => despues.includes(x)) && despues.filter(x => !antes.includes(x)).every(x => /:EL33_T$/.test(x) && despues.includes(x.replace('EL33_T', 'EL33_M'))), `${quien}: ${antes} → ${despues}`);
   }
 });
 
@@ -4553,6 +4573,378 @@ ok('F5 rev · textos: la condición de «sale el primero» no mezcla el género 
   const e = f3Semana(); M.asignar(e, cfg, st, F3_LUN, 'PASARELA_M', 'tere', {}); M.asignar(e, cfg, st, F3_LUN, 'PASARELA_M', 'lola', {}); M.marcarAbre(e, F3_LUN, 'PASARELA_M', 'tere', cfg);
   const v = M.verificarSemana(cfg, st, e, F3_LUN).find(c => c.id === 'p:lola:abre:PASARELA:M');
   assert.ok(v && !v.ok && /lunes 28: en la posición 2/.test(v.detalle) && !/2\.º/.test(v.detalle), JSON.stringify(v));
+});
+
+// ---------- fase 6 (24/09): lo que Equipo enseña y promete es lo que aplican el Generador y la Cobertura ----------
+// (decisiones.md D4-D7; huecos S13, S14, S16, S17, S20-S24, S29-S31, S39 y S40 de la auditoría del 24/09)
+const f6Sem = () => f3Semana('2026-09-28');
+ok('F6 · S13 con «Nunca con» apagado (el grupo o la pareja) la Revisión no marca «no pueden coincidir»; la pareja flexible no es de nivel alta', () => {
+  for (const prep of [cfg => { cfg.reglas = { nuncaCon: false }; }, (cfg, st) => { M.ponerNuncaCon(st, 'mariluz', 'lavinia', { activa: false }); }]) {
+    const cfg = cfgBase(), st = cfg.staff; prep(cfg, st); const e = estadoOct();
+    assert.ok(M.asignar(e, cfg, st, '2026-10-02', 'PASARELA_T', 'mariluz', {}).ok && M.asignar(e, cfg, st, '2026-10-02', 'PASARELA_T', 'lavinia', {}).ok);
+    assert.deepStrictEqual(M.revisarTurno(cfg, st, e, '2026-10-02', 'PASARELA_T').incompatibles, []);
+    assert.strictEqual(M.revisionMes(cfg, st, e, { desde: '2026-10-02', hasta: '2026-10-02' }).filter(x => /nunca con|no pueden coincidir/.test(x.msg)).length, 0);
+  }
+  // encendida: Mari Luz y Lavinia (flexible) puestas a mano juntas es un aviso (media), no «no pueden coincidir» (alta)
+  const cfg = cfgBase(), st = cfg.staff, e = estadoOct();
+  assert.ok(M.asignar(e, cfg, st, '2026-10-02', 'PASARELA_T', 'mariluz', {}).ok && M.asignar(e, cfg, st, '2026-10-02', 'PASARELA_T', 'lavinia', { forzar: true }).ok);
+  assert.deepStrictEqual(M.revisarTurno(cfg, st, e, '2026-10-02', 'PASARELA_T').incompatibles, []);
+  const rv = M.revisionMes(cfg, st, e, { desde: '2026-10-02', hasta: '2026-10-02' }).filter(x => x.turnoId === 'PASARELA_T');
+  assert.ok(rv.some(x => x.nivel === 'media' && /nunca con/.test(x.msg)) && !rv.some(x => x.tipo === 'incompatibles'), JSON.stringify(rv));
+  // una pareja estricta sí es de nivel alta
+  M.ponerNuncaCon(st, 'mariluz', 'lavinia', { flexible: false });
+  assert.deepStrictEqual(M.revisarTurno(cfg, st, e, '2026-10-02', 'PASARELA_T').incompatibles, [['Mari Luz', 'Lavinia']]);
+});
+ok('F6 · S21 «nunca con» es una pareja: se pone y se quita en las dos fichas, con su «flexible» y su interruptor', () => {
+  const cfg = cfgBase(), st = cfg.staff, P = id => M.personaDe(st, id);
+  // la semilla ya la tiene en las dos fichas (Leo y Susana Capón también), con «flexible» por pareja
+  assert.deepStrictEqual([P('mariluz').nuncaCon, P('lavinia').nuncaCon, P('leo').nuncaCon, P('scapon').nuncaCon], [['lavinia'], ['mariluz'], ['scapon'], ['leo']]);
+  assert.ok(st.every(p => p.nuncaConFlexible === undefined), 'sin el «flexible» de la persona');
+  assert.deepStrictEqual(M.parejasNuncaCon(cfg, st, P('scapon')).map(x => [x.pid, x.flexible, x.activa, x.estado]), [['leo', true, true, 'activa']]);
+  // quitarla en la ficha de Mari Luz la quita también de la de Lavinia (antes el selector seguía: «nunca con Lavinia»)
+  M.quitarNuncaCon(st, 'mariluz', 'lavinia');
+  assert.deepStrictEqual([P('mariluz').nuncaCon, P('lavinia').nuncaCon], [[], []]);
+  const e = estadoOct(); assert.ok(M.asignar(e, cfg, st, '2026-10-02', 'PASARELA_T', 'lavinia', {}).ok);
+  assert.ok(M.puedeEstar(cfg, st, e, '2026-10-02', 'PASARELA_T', 'mariluz', {}).ok);
+  // ponerla, estricta, en las dos
+  M.ponerNuncaCon(st, 'leo', 'lavinia', {});
+  assert.ok(P('leo').nuncaCon.includes('lavinia') && P('lavinia').nuncaCon.includes('leo'));
+  assert.deepStrictEqual(M.incompatibles(cfg, P('lavinia'), P('leo')), { flexible: false });
+  // apagar solo Leo–Susana Capón no apaga Leo–Lavinia (antes apagaba la característica entera, en cascada)
+  M.ponerNuncaCon(st, 'leo', 'scapon', { activa: false });
+  assert.strictEqual(M.incompatibles(cfg, P('leo'), P('scapon')), null);
+  assert.ok(M.incompatibles(cfg, P('leo'), P('lavinia')));
+  assert.ok(st.every(p => !(p.inactivas || []).includes('nuncaCon')));
+  assert.deepStrictEqual(M.parejasNuncaCon(cfg, st, P('leo')).map(x => [x.pid, x.activa]).sort(), [['lavinia', true], ['scapon', false]]);
+  // y volver a encenderla
+  M.ponerNuncaCon(st, 'leo', 'scapon', { activa: true });
+  assert.ok(M.incompatibles(cfg, P('leo'), P('scapon')));
+  // con la regla del grupo apagada, cada pareja lo dice
+  cfg.reglas = { nuncaCon: false };
+  assert.ok(M.parejasNuncaCon(cfg, st, P('leo')).every(x => x.estado === 'apagada-grupo'));
+});
+ok('F6 · S21 migración: la pareja pasa a las dos fichas, «flexible» y el interruptor pasan a ser de la pareja, y se aplica igual que antes', () => {
+  const estado = M.semillaPasarela(); const st = estado.staff, P = id => M.personaDe(st, id);
+  // la forma de antes del 24/09: la pareja en una ficha o en las dos, «flexible» de la persona y el interruptor de la ficha entera
+  for (const p of st) { delete p.nuncaConFlex; delete p.nuncaConOff; p.nuncaCon = []; }
+  P('mariluz').nuncaCon = ['lavinia']; P('lavinia').nuncaCon = ['mariluz']; P('mariluz').nuncaConFlexible = true; P('lavinia').nuncaConFlexible = true;
+  P('leo').nuncaCon = ['scapon']; P('leo').nuncaConFlexible = true; P('scapon').nuncaConFlexible = true;
+  P('cristian').nuncaCon = ['lola']; P('lola').nuncaCon = ['cristian']; P('cristian').inactivas = ['nuncaCon', 'vetos']; P('lola').inactivas = ['nuncaCon'];   // apagada en cascada
+  P('jenny').nuncaCon = ['juani']; P('jenny').inactivas = ['nuncaCon'];   // la tenía solo Jenny, apagada: no se aplicaba
+  P('noe').nuncaCon = ['tere']; P('tere').inactivas = ['nuncaCon'];        // la tenía Noe, encendida: se aplicaba
+  // lo que se aplicaba antes (la pareja flexible si lo era cualquiera de las dos personas; apagada si nadie que la
+  // tuviera la tenía encendida)
+  const antes = ['{"flexible":true}', '{"flexible":true}', 'null', 'null', '{"flexible":false}'];
+  const r = M.migrarNuncaCon(estado);
+  assert.ok(r.cambios > 0);
+  assert.deepStrictEqual([P('scapon').nuncaCon, P('juani').nuncaCon, P('tere').nuncaCon], [['leo'], ['jenny'], ['noe']], 'mutuas');
+  assert.deepStrictEqual([P('leo').nuncaConFlex, P('scapon').nuncaConFlex, P('mariluz').nuncaConFlex, P('lavinia').nuncaConFlex], [['scapon'], ['leo'], ['lavinia'], ['mariluz']]);
+  assert.deepStrictEqual([P('cristian').nuncaConOff, P('lola').nuncaConOff, P('jenny').nuncaConOff, P('juani').nuncaConOff], [['lola'], ['cristian'], ['juani'], ['jenny']]);
+  assert.ok(st.every(p => p.nuncaConFlexible === undefined && !(p.inactivas || []).includes('nuncaCon')), 'sin la forma de antes');
+  assert.deepStrictEqual(P('cristian').inactivas, ['vetos'], 'lo demás apagado se queda');
+  const despues = [['mariluz', 'lavinia'], ['leo', 'scapon'], ['cristian', 'lola'], ['jenny', 'juani'], ['noe', 'tere']].map(([a, b]) => JSON.stringify(M.incompatibles(estado, P(a), P(b))));
+  assert.deepStrictEqual(despues, antes, 'se aplica igual que antes');
+  const foto = JSON.stringify(st);
+  assert.strictEqual(M.migrarNuncaCon(estado).cambios, 0, 'idempotente'); assert.strictEqual(JSON.stringify(st), foto);
+  // la semilla ya viene así: la migración no la toca
+  const sem = M.semillaPasarela(); assert.strictEqual(M.migrarNuncaCon(sem).cambios, 0);
+});
+ok('F6 · S24 «nunca con» flexible (José, 17/09): si no hay nadie más, el relleno relajado la pone con aviso; si hay gente, se respeta; el selector y la Cobertura igual', () => {
+  const D = '2026-10-02';
+  const escenario = () => {
+    const cfg = cfgBase(), st = cfg.staff;
+    for (const p of st) if (!['ivan', 'mariluz', 'lavinia', 'leo'].includes(p.id)) M.anadirAusencia(p, { tipo: 'VAC', desde: D, hasta: D });
+    const e = estadoOct();
+    M.asignar(e, cfg, st, D, 'PASARELA_T', 'ivan', {}); M.asignar(e, cfg, st, D, 'PASARELA_T', 'mariluz', {}); M.asignar(e, cfg, st, D, 'ZAPA_T', 'leo', {});
+    return { cfg, st, e };
+  };
+  const { cfg, st, e } = escenario();
+  // (revisión de la fase 6; decisiones.md, principio 6) la pareja flexible se relaja en el plan relajado: el del
+  // Generador es «Permitir partidos no declarados». Sin él, el hueco queda y la propuesta «con aviso» la ofrece
+  const g0 = M.generarPlanilla(cfg, st, e, D, D, { simular: true, sinPatron: true });
+  assert.ok(!M.pidsEn(g0.estado, D, 'PASARELA_T').includes('lavinia') && g0.huecos.some(h => h.turnoId === 'PASARELA_T'), JSON.stringify(M.pidsEn(g0.estado, D, 'PASARELA_T')));
+  const g = M.generarPlanilla(cfg, st, e, D, D, { simular: true, sinPatron: true, permitirPartido: true });
+  const a = g.aplicados.find(x => x.turnoId === 'PASARELA_T' && x.pid === 'lavinia');
+  assert.ok(a && a.avisos.some(x => /nunca con Mari Luz/.test(x)), JSON.stringify(g.aplicados.filter(x => x.turnoId === 'PASARELA_T')));
+  // la Revisión: un aviso de nivel media, no «no pueden coincidir» (alta)
+  const rv = M.revisionMes(cfg, st, g.estado, { desde: D, hasta: D }).filter(x => x.turnoId === 'PASARELA_T');
+  assert.ok(!rv.some(x => x.tipo === 'incompatibles') && rv.some(x => x.nivel === 'media' && /nunca con/.test(x.msg)), JSON.stringify(rv));
+  // el selector la ofrece «con aviso», también candidatosConAviso
+  assert.ok(M.gruposSelector(cfg, st, e, D, 'PASARELA_T').conAviso.some(c => c.pid === 'lavinia'));
+  assert.ok(M.candidatosConAviso(cfg, st, e, D, 'PASARELA_T').some(c => c.pid === 'lavinia'));
+  // la Cobertura: si falta Iván, el plan relajado pone a Lavinia con aviso y va primero (con un mínimo de 2 esa
+  // tarde lo completa; el estricto deja el hueco)
+  const { cfg: c2, st: s2, e: e2 } = escenario(); M.localDe(c2, 'PASARELA').minimos.T[5] = 2;
+  const pc = M.planesCobertura(c2, s2, e2, { pid: 'ivan', tipo: 'LD', desde: D, hasta: D });
+  assert.ok(pc.planes[0].relajado && pc.planes[0].asignaciones.some(x => x.pid === 'lavinia' && x.avisos.some(y => /nunca con/.test(y))), JSON.stringify(pc.planes.map(p => [p.relajado, p.asignaciones.map(x => x.pid)])));
+  assert.ok(pc.planes.filter(p => !p.relajado).every(p => !p.asignaciones.some(x => x.pid === 'lavinia')), 'el plan estricto no la usa');
+  // con gente suficiente se respeta: sin las vacaciones hay otras personas para la tarde de Pasarela, y el
+  // relleno no pone a Lavinia con Mari Luz
+  const c3 = cfgBase(), s3 = c3.staff, e3 = estadoOct();
+  M.asignar(e3, c3, s3, D, 'PASARELA_T', 'ivan', {}); M.asignar(e3, c3, s3, D, 'PASARELA_T', 'mariluz', {});
+  const cs3 = M.candidatosPara(c3, s3, e3, D, 'PASARELA_T');
+  assert.ok(cs3.length && !cs3.some(c => c.pid === 'lavinia'), cs3.map(c => c.pid).join(','));
+  const g3 = M.generarPlanilla(c3, s3, e3, D, D, { simular: true, sinPatron: true, permitirPartido: true });
+  assert.ok(!g3.aplicados.some(x => x.pid === 'lavinia' && x.turnoId === 'PASARELA_T'), JSON.stringify(M.pidsEn(g3.estado, D, 'PASARELA_T')));
+  // una pareja estricta no se relaja nunca, ni en el relleno relajado: queda el hueco
+  const { cfg: c4, st: s4, e: e4 } = escenario(); M.ponerNuncaCon(s4, 'mariluz', 'lavinia', { flexible: false });
+  const g4 = M.generarPlanilla(c4, s4, e4, D, D, { simular: true, sinPatron: true, permitirPartido: true });
+  assert.ok(!M.pidsEn(g4.estado, D, 'PASARELA_T').includes('lavinia') && g4.huecos.some(h => h.turnoId === 'PASARELA_T'));
+});
+ok('F6 · S14 «Preferencias» apagada en la ficha no resta en el relleno, la Cobertura, el selector ni el núcleo', () => {
+  const cfg = cfgBase(), st = cfg.staff, p = M.personaDe(st, 'cristian'); p.prefs = { evitaDows: [1] };
+  const e = f6Sem(), L = '2026-09-28';
+  assert.ok(M.asignar(e, cfg, st, L, 'MONACO_M', 'jenny', { cocina: true, puesto: 'cocina' }).ok);   // un apoyo no entra solo (S33)
+  const razones = () => M.candidatosPara(cfg, st, e, L, 'MONACO_M').find(c => c.pid === 'cristian').razones;
+  assert.ok(razones().some(r => /prefiere no/.test(r)) && M.evita(cfg, p, 1));
+  p.inactivas = ['prefs'];
+  assert.strictEqual(M.evita(cfg, p, 1), false);
+  assert.ok(!razones().some(r => /prefiere no/.test(r)));
+  assert.strictEqual(M.candidatosPara(cfg, st, e, L, 'MONACO_M')[0].pid, 'cristian');
+  assert.strictEqual(M.candidatosCobertura(cfg, st, e, L, 'MONACO_M', 'cris')[0].pid, 'cristian');
+  assert.strictEqual(M.gruposSelector(cfg, st, e, L, 'MONACO_M').recomendado.pid, 'cristian');
+  assert.deepStrictEqual(M.toProblem(cfg, st, e, L, L, { conPatron: false }).workers.find(w => w.id === 'cristian').preferences, []);
+});
+ok('F6 · S16 (D5) con «Mínimos» apagado nadie los exige (Revisión, Generador, Cobertura y núcleo); el mínimo sigue en su sitio y la interfaz lo dice', () => {
+  const cfg = cfgBase(), st = cfg.staff; cfg.reglas = { minimos: false };
+  const e = f6Sem(), L = '2026-09-28';
+  const r = M.revisarTurno(cfg, st, e, L, 'PASARELA_M');
+  assert.strictEqual(r.faltan, 0); assert.strictEqual(r.minimo, 3, 'minimoDe no cambia: la cabecera n/mín lo sigue enseñando');
+  const g = M.generarSemana(cfg, st, f6Sem(), L, { sinPatron: true });
+  assert.strictEqual(g.huecos.filter(h => (h.tipo || 'faltan') === 'faltan').length, 0);
+  assert.ok(!g.condiciones.some(c => c.tipo === 'minimos'));
+  assert.strictEqual(M.revisionMes(cfg, st, g.estado, { desde: L, hasta: M.addDias(L, 6) }).filter(x => x.tipo === 'falta').length, 0);
+  // la Cobertura: con la semana tipo puesta, si falta Iván su casilla no pide a nadie por el mínimo
+  const c2 = cfgBase(), e2 = f6Sem(); M.generarSemana(c2, c2.staff, e2, L, {}); c2.reglas = { minimos: false };
+  const pc = M.planesCobertura(c2, c2.staff, e2, { pid: 'ivan', tipo: 'LD', desde: '2026-10-02', hasta: '2026-10-02' });
+  assert.ok(pc.afectados.every(a => !a.faltan) && pc.planes.every(p => !p.huecos.some(h => h.tipo === 'faltan')), JSON.stringify(pc.afectados));
+  // el núcleo
+  assert.strictEqual(M.toProblem(cfg, st, f6Sem(), L, L, { conPatron: false }).rules[0].params.by_day[0].MONACO.min, 0);
+  // la interfaz lo dice al apagarla (REGLAS, como «Cocina»)
+  assert.match(M.REGLAS.find(x => x.k === 'minimos').apagada, /nadie/);
+});
+ok('F6 · S17 (D6) «Contrato» deja de ser un interruptor: fuera de CARACTERISTICAS, Horas sigue comparando y el apagado de antes se limpia', () => {
+  assert.ok(!M.CARACTERISTICAS.some(c => c.k === 'contrato'));
+  assert.strictEqual(M.VARIABLES.find(v => v.campo === 'contrato.horasSemana').clave, null);
+  const cfg = cfgBase(), st = cfg.staff, y = M.personaDe(st, 'yilian'); y.contrato = { horasSemana: 40 }; y.inactivas = ['contrato', 'libra'];
+  const h = M.horasPersonaMes(cfg, st, {}, 'yilian', 2026, 10);
+  assert.ok(h.contratoHoras > 0 && h.saldo !== null, JSON.stringify([h.contratoHoras, h.saldo]));
+  const r = M.migrarInactivas({ staff: st });
+  assert.strictEqual(r.quitadas, 1); assert.deepStrictEqual(y.inactivas, ['libra']);
+  assert.strictEqual(M.migrarInactivas({ staff: st }).quitadas, 0, 'idempotente');
+});
+ok('F6 · S20 estadoInterruptor: activa, apagada en la ficha o apagada para todo el grupo (manda el grupo)', () => {
+  const cfg = cfgBase(), ml = M.personaDe(cfg.staff, 'mariluz');
+  assert.strictEqual(M.estadoInterruptor(cfg, ml, 'libra'), 'activa');
+  ml.inactivas = ['libra']; assert.strictEqual(M.estadoInterruptor(cfg, ml, 'libra'), 'apagada-ficha');
+  cfg.reglas = { libra: false }; assert.strictEqual(M.estadoInterruptor(cfg, ml, 'libra'), 'apagada-grupo');
+  delete ml.inactivas; assert.strictEqual(M.estadoInterruptor(cfg, ml, 'libra'), 'apagada-grupo');
+  assert.strictEqual(M.estadoInterruptor(cfg, ml, 'prefs'), 'activa', 'sin regla del grupo, solo la ficha');
+  // es lo mismo que aplica la puerta
+  assert.strictEqual(M.activa(cfg, ml, 'libra'), false);
+});
+ok('F6 · S22 la condición «quien hace partido puede abrir la tarde» es un ajuste del local, no una regla del grupo', () => {
+  const cfg = cfgBase();
+  const c = M.condicionesDe(cfg, cfg.staff).find(x => x.id === 'loc:PASARELA:partidoAbre:T');
+  assert.ok(c && c.tipo === 'local' && c.localId === 'PASARELA', JSON.stringify(c));
+});
+ok('F6 · S29 (D7) «sin local fijo» es no tener locales, igual en el generador, la planilla y Horas; la marca p.comodin se borra', () => {
+  const cfg = cfgBase(), st = cfg.staff, P = id => M.personaDe(st, id);
+  assert.ok(!st.some(p => 'comodin' in p), 'la semilla ya no la trae');
+  assert.deepStrictEqual(['tere', 'lavinia', 'leo', 'cristian'].map(id => M.esComodin(P(id))), [false, false, true, true]);
+  const e = f6Sem(); M.asignar(e, cfg, st, '2026-09-30', 'MONACO_M', 'cris', {});
+  const c = M.candidatosPara(cfg, st, e, '2026-09-30', 'MONACO_M').find(x => x.pid === 'tere');
+  assert.ok(c && !c.razones.includes('sin local fijo'), JSON.stringify(c && c.razones));
+  M.asignar(e, cfg, st, '2026-09-30', 'MONACO_M', 'tere', {});
+  assert.strictEqual(M.posicionesDe(cfg, st, e, '2026-09-30', 'MONACO_M').find(x => x.pid === 'tere').comodin, false);
+  // la marca de antes no cambia nada y la migración la borra (también la que ponía migrarPuestos)
+  P('tere').comodin = true;
+  assert.strictEqual(M.esComodin(P('tere')), false);
+  const estado = M.semillaPasarela(); M.personaDe(estado.staff, 'tere').comodin = true; M.personaDe(estado.staff, 'leo').comodin = true;
+  estado.staff[0].puesto = 'comodin'; M.migrarPuestos(estado);
+  assert.ok(!('comodin' in estado.staff[0]), 'migrarPuestos ya no la pone');
+  assert.strictEqual(M.migrarComodin(estado).quitadas, 2);
+  assert.ok(!estado.staff.some(p => 'comodin' in p));
+  assert.strictEqual(M.migrarComodin(estado).quitadas, 0, 'idempotente');
+});
+ok('F6 · S30 vetos con día: la condición lleva el día en su id y en su texto, y el alta no da por repetido un veto de otro día', () => {
+  const cfg = cfgBase(), st = cfg.staff, ml = M.personaDe(st, 'mariluz');
+  const cs = () => M.condicionesDe(cfg, st).filter(x => x.pid === 'mariluz' && x.k === 'vetos');
+  assert.deepStrictEqual(cs().map(x => x.id), ['p:mariluz:veto:PASARELA:M:1']);
+  assert.match(cs()[0].texto, /los lunes/);
+  assert.strictEqual(M.vetoRepetido(ml, { localId: 'PASARELA', franja: 'M' }), false);
+  assert.strictEqual(M.vetoRepetido(ml, { localId: 'PASARELA', franja: 'M', dow: 1 }), true);
+  assert.strictEqual(M.vetoRepetido(ml, { localId: 'PASARELA', franja: 'T', dow: 1 }), false);
+  ml.vetos.push({ localId: 'PASARELA', franja: 'M', dow: 3 });
+  assert.deepStrictEqual(cs().map(x => x.id), ['p:mariluz:veto:PASARELA:M:1', 'p:mariluz:veto:PASARELA:M:3']);
+  assert.strictEqual(M.vetoRepetido(M.personaDe(st, 'cristian'), { localId: 'PASARELA', franja: 'M', dow: 2 }), true, 'el de todos los días ya lo cubre');
+});
+ok('F6 · S31 el local habitual no cambia al quitar y volver a poner un local, y se puede elegir', () => {
+  const cfg = cfgBase(), st = cfg.staff, rob = M.personaDe(st, 'roberto'), J = '2026-10-01';
+  const razones = tid => (M.candidatosPara(cfg, st, f6Sem(), J, tid).find(c => c.pid === 'roberto') || { razones: [] }).razones;
+  assert.strictEqual(M.localHabitualDe(rob), 'ZAPA');
+  M.alternarLocal(rob, 'ZAPA');
+  assert.deepStrictEqual(rob.locales, ['PASARELA']); assert.strictEqual(M.localHabitualDe(rob), 'PASARELA', 'mientras no está, el que queda');
+  M.alternarLocal(rob, 'ZAPA');
+  assert.strictEqual(M.localHabitualDe(rob), 'ZAPA', 'al volver a ponerlo, vuelve a ser el habitual');
+  assert.ok(razones('ZAPA_T').includes('su local habitual es Zapatillera'), razones('ZAPA_T').join(' · '));
+  M.ponerLocalHabitual(rob, 'PASARELA');
+  assert.strictEqual(M.localHabitualDe(rob), 'PASARELA');
+  assert.ok(razones('PASARELA_T').includes('su local habitual es Pasarela') && !razones('ZAPA_T').some(r => /habitual/.test(r)));
+  // sin locales no tiene habitual
+  assert.strictEqual(M.localHabitualDe(M.personaDe(st, 'leo')), null);
+});
+ok('F6 · S39 quien hace mañana y tarde y no declara ningún día de partido tiene la condición «no hace partido», y el Generador la comprueba', () => {
+  const cfg = cfgBase(), st = cfg.staff, cs = M.condicionesDe(cfg, st);
+  const c = cs.find(x => x.id === 'p:yilian:partido');
+  assert.ok(c && /Yilian no hace partido/.test(c.texto) && c.k === 'partido', JSON.stringify(c));
+  assert.ok(!cs.some(x => x.id === 'p:dulce:partido'), 'en standby, no');
+  assert.ok(!cs.some(x => x.id === 'p:lola:partido'), 'solo mañanas, no');
+  const e = f6Sem();
+  M.asignar(e, cfg, st, '2026-10-02', 'MONACO_M', 'yilian', {}); M.asignar(e, cfg, st, '2026-10-02', 'MONACO_T', 'yilian', { permitirPartido: true });
+  const g = M.generarSemana(cfg, st, e, '2026-09-28', { permitirPartido: true });
+  assert.ok(g.condiciones.some(x => !x.ok && x.pid === 'yilian' && x.k === 'partido'), JSON.stringify(g.condiciones.filter(x => x.pid === 'yilian')));
+  // con «Días de partido» apagada (en su ficha), no se lista
+  M.personaDe(st, 'yilian').inactivas = ['partido'];
+  assert.ok(!M.condicionesDe(cfg, st).some(x => x.id === 'p:yilian:partido'));
+});
+ok('F6 · S40 (D4) un turno continuo no es un partido: la puerta lo deja con la nota «turno continuo», el Generador y la Revisión no lo marcan y Horas no lo cuenta', () => {
+  const cfg = cfgBase(), st = cfg.staff, d = '2026-10-08', e = estadoOct();
+  assert.ok(M.asignar(e, cfg, st, d, 'EL33_M', 'victoria', {}).ok && M.asignar(e, cfg, st, d, 'EL33_M', 'jenny', { cocina: true }).ok && M.asignar(e, cfg, st, d, 'EL33_T', 'hojan', { cocina: true }).ok);
+  const r = M.puedeEstar(cfg, st, e, d, 'EL33_T', 'victoria');
+  assert.ok(r.ok && !r.avisos.length && r.autorizados.some(a => a.texto === 'turno continuo'), JSON.stringify(r));
+  assert.ok(M.candidatosPara(cfg, st, e, d, 'EL33_T').some(c => c.pid === 'victoria'), 'en «pueden» del selector');
+  assert.ok(M.asignar(e, cfg, st, d, 'EL33_T', 'victoria', {}).ok);
+  for (const tid of ['EL33_M', 'EL33_T']) { const s = M.posicionesDe(cfg, st, e, d, tid).find(x => x.pid === 'victoria'); assert.ok(s.continuo && !s.partido && !s.avisos.length, JSON.stringify(s)); }
+  const v = M.verificarSemana(cfg, st, e, '2026-10-05').find(c => c.id === 'p:victoria:partido');
+  assert.ok(v.ok && /jueves 8: turno continuo/.test(v.nota || ''), JSON.stringify(v));
+  assert.deepStrictEqual(M.revisionMes(cfg, st, e, { desde: d, hasta: d }).filter(x => /Victoria/.test(x.msg)).map(x => x.msg), []);
+  const h = M.horasPersonaMes(cfg, st, { '2026-10': e }, 'victoria', 2026, 10);
+  assert.deepStrictEqual([h.continuos, h.partidos], [1, 0]);
+  // si otra persona abre la tarde (Noe, de sala; Hojan lleva la cocina), es un partido no declarado
+  const e2 = estadoOct();
+  M.asignar(e2, cfg, st, d, 'EL33_M', 'victoria', {}); M.asignar(e2, cfg, st, d, 'EL33_T', 'hojan', { cocina: true }); M.asignar(e2, cfg, st, d, 'EL33_T', 'noe', {});
+  assert.strictEqual(M.primeroDe(cfg, st, e2, d, 'EL33_T'), 'noe');
+  const r2 = M.puedeEstar(cfg, st, e2, d, 'EL33_T', 'victoria');
+  assert.ok(!r2.ok && r2.regla === 'partido', JSON.stringify(r2));
+});
+
+// ---------- revisión de la fase 6 (24/09): lo ya decidido con aviso llega a la planilla, y los textos dicen la verdad ----------
+// Una plaza que ya se decidió con aviso (el plan relajado de la Cobertura, la vista previa del Generador, la propuesta
+// «con aviso» de un hueco, lo puesto a mano desde el selector «con aviso») se pone con lo que se relajó al decidirla:
+// el partido no declarado y la pareja «nunca con» flexible (M.RELAJABLE, una sola lista). Antes la pareja flexible salía
+// en el plan y en la vista previa pero al aplicarla se rechazaba («nunca con Mari Luz»), y al quitar un cierre no volvía
+const fR = '2026-10-02';
+const fRescenario = soloEllos => {
+  const cfg = cfgBase(), st = cfg.staff;
+  for (const p of st) if (!soloEllos.includes(p.id)) M.anadirAusencia(p, { tipo: 'VAC', desde: fR, hasta: fR });
+  const e = estadoOct();
+  M.asignar(e, cfg, st, fR, 'PASARELA_T', 'ivan', {}); M.asignar(e, cfg, st, fR, 'PASARELA_T', 'mariluz', {});
+  return { cfg, st, e };
+};
+const flexDe = (e, tid) => M.asignados(e, fR, tid || 'PASARELA_T').find(x => x.pid === 'lavinia');
+const conAvisoFlex = x => !!x && (x.avisos || []).some(a => /nunca con Mari Luz \(pareja flexible/.test(a));
+ok('F6 rev · RELAJABLE: una sola lista de lo que se relaja al poner lo ya decidido con aviso (partido no declarado y pareja flexible)', () => {
+  assert.deepStrictEqual(Object.assign({}, M.RELAJABLE), { permitirPartido: true, relajarNuncaCon: true });
+  assert.ok(Object.isFrozen(M.RELAJABLE), 'nadie la cambia por el camino');
+});
+ok('F6 rev · el plan relajado de la Cobertura con la pareja flexible se aplica tal cual: Lavinia entra con su aviso, nada rechazado', () => {
+  const { cfg, st, e } = fRescenario(['ivan', 'mariluz', 'lavinia', 'leo']);
+  M.asignar(e, cfg, st, fR, 'ZAPA_T', 'leo', {});
+  M.localDe(cfg, 'PASARELA').minimos.T[5] = 2;
+  const inc = { pid: 'ivan', tipo: 'LD', desde: fR, hasta: fR };
+  const plan = M.planesCobertura(cfg, st, e, inc).planes[0];
+  assert.ok(plan.relajado && plan.asignaciones.some(x => x.pid === 'lavinia'), JSON.stringify(plan.asignaciones.map(x => x.pid)));
+  const r = M.aplicarCobertura(cfg, st, e, inc, plan);
+  assert.deepStrictEqual(r.rechazados, []);
+  assert.ok(conAvisoFlex(flexDe(e)), JSON.stringify(M.asignados(e, fR, 'PASARELA_T')));
+});
+ok('F6 rev · Generador → Periodo: lo que la vista previa pone con la pareja flexible se vuelca (0 fallos)', () => {
+  const { cfg, st, e: real } = fRescenario(['ivan', 'mariluz', 'lavinia', 'leo']);
+  M.asignar(real, cfg, st, fR, 'ZAPA_T', 'leo', {});
+  const pv = M.clonarEstado(real);
+  const previa = M.generarPlanilla(cfg, st, pv, fR, fR, { sinPatron: true, permitirPartido: true });
+  assert.ok(conAvisoFlex(flexDe(pv)), 'la vista previa la trae: ' + JSON.stringify(M.asignados(pv, fR, 'PASARELA_T')));
+  const r = M.volcarPrevia(cfg, st, () => real, previa, { desde: fR, hasta: fR, previaDe: () => pv });
+  assert.strictEqual(r.fallos, 0, JSON.stringify(r));
+  assert.ok(conAvisoFlex(flexDe(real)), JSON.stringify(M.asignados(real, fR, 'PASARELA_T')));
+});
+ok('F6 rev · la propuesta «con aviso» de un hueco se acepta con lo que ella misma relaja (RELAJABLE)', () => {
+  const { cfg, st, e } = fRescenario(['ivan', 'mariluz', 'lavinia']);
+  M.localDe(cfg, 'PASARELA').minimos.T[5] = 3;
+  M.asignar(e, cfg, st, fR, 'PASARELA_M', 'lavinia', {});
+  const alt = M.candidatosConAviso(cfg, st, e, fR, 'PASARELA_T').find(c => c.pid === 'lavinia');
+  assert.ok(alt && alt.avisos.some(a => /partido no declarado/.test(a)) && alt.avisos.some(a => /pareja flexible/.test(a)), JSON.stringify(alt));
+  const r = M.asignar(e, cfg, st, fR, 'PASARELA_T', 'lavinia', Object.assign({ origen: 'manual', razon: 'propuesta con aviso aceptada' }, M.RELAJABLE));
+  assert.ok(r.ok, r.motivo);
+  assert.ok(conAvisoFlex(flexDe(e)));
+});
+ok('F6 rev · principio 4: lo puesto a mano «con aviso» (pareja flexible) vuelve a su casilla al quitar un cierre', () => {
+  const { cfg, st, e } = fRescenario(M.semillaPasarela().staff.map(p => p.id));
+  cfg.cierresPuntuales = [];
+  assert.ok(M.asignar(e, cfg, st, fR, 'PASARELA_T', 'lavinia', Object.assign({ origen: 'manual' }, M.RELAJABLE)).ok);
+  assert.ok(M.aplicarCierre(cfg, st, e, { id: 'c1', localId: 'PASARELA', dias: { [fR]: ['T'] }, motivo: 'otro' }, {}).ok);
+  assert.deepStrictEqual(M.pidsEn(e, fR, 'PASARELA_T'), []);
+  const rq = M.quitarCierre(cfg, st, e, 'c1', { devolver: true, quitarVacaciones: true });
+  assert.deepStrictEqual(rq.noDevueltos.map(x => [x.pid, x.motivo]), []);
+  assert.ok(conAvisoFlex(flexDe(e)) && flexDe(e).origen === 'manual', JSON.stringify(M.asignados(e, fR, 'PASARELA_T')));
+});
+ok('F6 rev · el relleno y la Cobertura relajan igual (una sola escalera): la pareja flexible, solo en el modo relajado y si nadie más puede', () => {
+  // la misma casilla en los dos caminos: la tarde de Pasarela del viernes 2 con Mari Luz, un mínimo de 2 y solo Lavinia
+  // libre (Iván falta). El Generador sin «Permitir partidos no declarados» y el plan estricto de la Cobertura dejan el
+  // hueco; con él y en el plan relajado, entra Lavinia con su aviso
+  const prep = conIvan => {
+    const { cfg, st, e } = fRescenario(['ivan', 'mariluz', 'lavinia', 'leo']);
+    M.asignar(e, cfg, st, fR, 'ZAPA_T', 'leo', {});
+    M.localDe(cfg, 'PASARELA').minimos.T[5] = 2;
+    if (!conIvan) { M.desasignar(e, fR, 'PASARELA_T', 'ivan'); M.anadirAusencia(M.personaDe(st, 'ivan'), { tipo: 'LD', desde: fR, hasta: fR }); }
+    return { cfg, st, e };
+  };
+  const inc = { pid: 'ivan', tipo: 'LD', desde: fR, hasta: fR };
+  const c = prep(true), planes = M.planesCobertura(c.cfg, c.st, c.e, inc).planes;
+  for (const relaja of [false, true]) {
+    const { cfg, st, e } = prep(false);
+    const g = M.generarPlanilla(cfg, st, e, fR, fR, { simular: true, sinPatron: true, permitirPartido: relaja });
+    assert.strictEqual(conAvisoFlex(flexDe(g.estado)), relaja, `Generador (relajado: ${relaja}): ${JSON.stringify(M.asignados(g.estado, fR, 'PASARELA_T'))}`);
+    const plan = planes.find(p => p.relajado === relaja);
+    assert.ok(plan, `hay plan ${relaja ? 'relajado' : 'estricto'}: ${planes.map(p => p.relajado)}`);
+    assert.strictEqual(plan.asignaciones.some(x => x.pid === 'lavinia'), relaja, `Cobertura (relajado: ${relaja}): ${plan.asignaciones.map(x => x.pid)}`);
+  }
+});
+ok('F6 rev · D4 en la Cobertura: quien haría un turno continuo no lleva «ya trabaja ese día (partido)»', () => {
+  const cfg = cfgBase(), st = cfg.staff, d = '2026-10-08', e = estadoOct();
+  M.asignar(e, cfg, st, d, 'EL33_M', 'victoria', {}); M.asignar(e, cfg, st, d, 'EL33_M', 'jenny', { cocina: true });
+  M.asignar(e, cfg, st, d, 'EL33_T', 'hojan', { cocina: true });
+  const v = M.candidatosCobertura(cfg, st, e, d, 'EL33_T', 'noe').find(c => c.pid === 'victoria');
+  assert.ok(v && v.autorizados.some(a => a.continuo), JSON.stringify(v));
+  assert.ok(!v.razones.some(r => /\(partido\)/.test(r)) && v.razones.includes('ya trabaja ese día'), JSON.stringify(v.razones));
+  // quien haría un partido de verdad lo sigue diciendo
+  const e2 = estadoOct();
+  M.asignar(e2, cfg, st, d, 'PASARELA_M', 'roberto', {});
+  const r2 = M.candidatosCobertura(cfg, st, e2, d, 'EL33_T', 'noe', { permitirPartido: true }).find(c => c.pid === 'roberto');
+  assert.ok(!r2 || r2.razones.includes('ya trabaja ese día (partido)'), JSON.stringify(r2 && r2.razones));
+});
+ok('F6 rev · D5 con «Mínimos» apagado la Cobertura no dice «la casilla sigue completa» de una casilla corta, y revisarTurno lo dice (minimosApagados)', () => {
+  const cfg = cfgBase(), st = cfg.staff; cfg.reglas = { minimos: false };
+  const e = estadoOct();
+  M.asignar(e, cfg, st, fR, 'PASARELA_T', 'ivan', {}); M.asignar(e, cfg, st, fR, 'PASARELA_T', 'mariluz', {});
+  const pc = M.planesCobertura(cfg, st, e, { pid: 'ivan', tipo: 'LD', desde: fR, hasta: fR });
+  const sc = pc.planes[0].sinCubrir[0];
+  assert.ok(sc && !/sigue completa/.test(sc.motivo) && /«Mínimos» está apagada/.test(sc.motivo) && /1 de 3/.test(sc.motivo), JSON.stringify(sc));
+  const rv = M.revisarTurno(cfg, st, e, fR, 'PASARELA_T');
+  assert.ok(rv.minimosApagados === true && rv.faltan === 0 && rv.minimo === 3, JSON.stringify(rv));
+  // encendida, lo de siempre
+  const cfg2 = cfgBase(), e2 = estadoOct();
+  M.asignar(e2, cfg2, cfg2.staff, fR, 'PASARELA_T', 'ivan', {}); M.asignar(e2, cfg2, cfg2.staff, fR, 'PASARELA_T', 'mariluz', {}); M.asignar(e2, cfg2, cfg2.staff, fR, 'PASARELA_T', 'leo', {});
+  assert.strictEqual(M.revisarTurno(cfg2, cfg2.staff, e2, fR, 'PASARELA_T').minimosApagados, false);
+  const sc2 = M.planesCobertura(cfg2, cfg2.staff, e2, { pid: 'leo', tipo: 'LD', desde: fR, hasta: fR });
+  assert.ok(sc2.afectados.length === 1);
+});
+ok('F6 rev · los textos de la pareja flexible dicen cuándo se junta: con aviso, en el modo relajado (TEXTO_PAREJA_FLEXIBLE, uno solo)', () => {
+  assert.ok(/Permitir partidos no declarados/.test(M.TEXTO_PAREJA_FLEXIBLE) && /con aviso/.test(M.TEXTO_PAREJA_FLEXIBLE) && !/se relaja y queda el aviso/.test(M.TEXTO_PAREJA_FLEXIBLE), M.TEXTO_PAREJA_FLEXIBLE);
+  const cfg = cfgBase();
+  const c = M.condicionesDe(cfg, cfg.staff).find(x => x.k === 'nuncaCon' && [x.pid, x.otro].sort().join('+') === 'lavinia+mariluz');
+  assert.ok(c && /pareja flexible: si no hay nadie más, se puede juntar con aviso/.test(c.texto), JSON.stringify(c));
 });
 
 console.log(`\n${n} tests OK`);

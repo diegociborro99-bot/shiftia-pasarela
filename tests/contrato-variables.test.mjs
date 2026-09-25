@@ -14,8 +14,8 @@
 //      .cubreA, .partido.dias, .prefs, .cocina.*, .abre[ ni .vetos (lista blanca explícita);
 //  (d) reloj: el resultado no cambia con el reloj puesto en dos fechas distintas.
 // Y las pruebas en rojo de la auditoría que siguen pendientes, como casos (con la fase que las arregla).
-// Las celdas que arregla una fase posterior van con `todo` y el hueco (F6 interruptores y textos de
-// Equipo, F7 núcleo; las de la F5, cocina y quién abre, ya no tienen `todo`): salen en el informe de
+// Las celdas que arregla una fase posterior van con `todo` y el hueco (F7 núcleo; las de la F5, cocina y
+// quién abre, y las de la F6, interruptores y textos de Equipo, ya no tienen `todo`): salen en el informe de
 // node --test sin tumbar npm test, y la fase que las arregla les quita el `todo`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -68,7 +68,8 @@ function mundo(esc, variante) {
   const aplica = variante === 'sin' || variante === 'sinReglaOff' ? esc.sin : esc.con;
   if (aplica) aplica(x, st, cfg);
   if (variante === 'reglaOff' || variante === 'sinReglaOff') cfg.reglas[esc.clave] = false;
-  if (variante === 'fichaOff') M.personaDe(st, esc.quien || 'x').inactivas = [esc.clave];
+  // (fase 6, S21) «Nunca con» ya no se apaga en la ficha entera sino pareja a pareja: el escenario dice cómo
+  if (variante === 'fichaOff') { if (esc.apagarEnFicha) esc.apagarEnFicha(st, cfg); else M.personaDe(st, esc.quien || 'x').inactivas = [esc.clave]; }
   cfg.staff = st;
   return { cfg, st, x, esc, variante, tid, localId, franja };
 }
@@ -200,12 +201,6 @@ const COMPROBAR = {
     }
     return false;
   },
-  // se relaja sola cuando no hay nadie más (el «nunca con» flexible, José 17/09)
-  relajaSola(camino, c) {
-    if (camino === 'relleno' || camino === 'semana') return c.en.includes('x') && c.x && c.x.avisos;
-    if (camino === 'cobertura') return c.planes.length && c.planes[0].asig.some(a => a.includes('|x|aviso'));
-    return false;
-  },
   // ordena: no bloquea, pero cambia a quién se prefiere (Xavi frente a su rival idéntica)
   ordena(camino, c, s) {
     if (camino === 'relleno' || camino === 'semana') return JSON.stringify(c.en) !== JSON.stringify(s.en) && c.huecos.length === s.huecos.length;
@@ -268,20 +263,29 @@ const ESCENARIOS = [
   // S41 (L4): el veto de los lunes no frena un miércoles, tampoco en la hoja impresa
   { id: 'vetos de otro día', campo: 'vetos', clave: 'vetos', regla: 'vetos', trato: 'forzable', cond: 'p:x:veto:PASARELA:M', con: x => { x.vetos = [{ localId: 'PASARELA', franja: 'M', dow: 1 }]; },
     celdas: nada({ verificar: 'cumple', condiciones: 'lista' }) },
+  // (fase 6, D4) la tarde en Zapatillera: mañana y tarde en Pasarela saliendo la primera en las dos es un turno
+  // continuo, que no es un partido
   { id: 'partido', campo: 'partido.dias', clave: 'partido', regla: 'partido', trato: 'relajable', cond: 'p:x:partido', relaja: { permitirPartido: true },
-    planilla: (e, w) => assert.ok(M.asignar(e, w.cfg, w.st, ISO, 'PASARELA_T', 'x', {}).ok),
+    planilla: (e, w) => assert.ok(M.asignar(e, w.cfg, w.st, ISO, 'ZAPA_T', 'x', {}).ok),
     con: x => { x.partido = { dias: [5] }; }, sin: x => { x.partido = { siempre: true }; },
     celdas: duro({ puedeEstar: 'relaja', relleno: 'relaja', semana: 'relaja', cobertura: 'relaja', selector: 'relaja' }) },
+  // (fase 6) S13: la Revisión obedece el interruptor (incompatibles). S21: el de la ficha es el de la pareja
+  // (ponerNuncaCon con activa: false), no la característica entera en cascada; los datos de antes con la
+  // pareja en una sola ficha siguen valiendo (el segundo escenario)
   Object.assign({ id: 'nuncaCon', campo: 'nuncaCon', clave: 'nuncaCon', regla: 'nuncaCon', trato: 'forzable', cond: 'p:x:nuncaCon:a', con: x => { x.nuncaCon = ['a']; }, celdas: duro(),
-    apagada: { revision: 'F6 · S13: la Revisión marca «no pueden coincidir» con «Nunca con» apagado (revisarTurno)' } }, conA),
+    apagarEnFicha: st => M.ponerNuncaCon(st, 'x', 'a', { activa: false }) }, conA),
   Object.assign({ id: 'nuncaCon (en la ficha de la otra)', campo: 'nuncaCon', clave: 'nuncaCon', regla: 'nuncaCon', trato: 'forzable', quien: 'a', cond: 'p:a:nuncaCon:x', con: (x, st) => { M.personaDe(st, 'a').nuncaCon = ['x']; }, celdas: duro(),
-    apagada: { revision: 'F6 · S13: la Revisión marca «no pueden coincidir» con «Nunca con» apagado (revisarTurno)' } }, conA),
+    apagarEnFicha: st => M.ponerNuncaCon(st, 'a', 'x', { activa: false }) }, conA),
   // la pareja flexible (José, 17/09: «se respeta si hay gente suficiente; si no, se relaja y queda el
-  // aviso»); sin la variable no hay pareja, y con «Nunca con» apagado tampoco
-  Object.assign({ id: 'nuncaConFlexible', campo: 'nuncaConFlexible', clave: 'nuncaCon', regla: 'nuncaCon', trato: 'relajable', cond: 'p:x:nuncaCon:a', relaja: { relajarNuncaCon: true },
-    con: x => { x.nuncaCon = ['a']; x.nuncaConFlexible = true; },
-    celdas: duro({ puedeEstar: 'relaja', relleno: ['relajaSola', 'F6 · S24: el relleno no relaja el «nunca con» flexible cuando no hay nadie más'], semana: ['relajaSola', 'F6 · S24'], cobertura: ['relajaSola', 'F6 · S24: el plan relajado no relaja el «nunca con» flexible'], selector: ['relaja', 'F6 · S24: el selector no lo ofrece «con aviso»'], condiciones: 'lista', destrapa: 'pista', verificar: 'bloquea', revision: 'bloquea' }),
-    apagada: { revision: 'F6 · S13' } }, conA),
+  // aviso»); sin la variable no hay pareja, y con «Nunca con» apagado tampoco. (fase 6, S21) «flexible» es de
+  // la pareja (nuncaConFlex, en las dos fichas), no de la persona (el nuncaConFlexible de antes). (revisión de la
+  // fase 6; decisiones.md, principio 6) se relaja en el modo relajado de cada camino, como el partido no declarado:
+  // el Generador con «Permitir partidos no declarados» y el plan relajado de la Cobertura, solo si no hay nadie más;
+  // en el estricto queda el hueco (Aroa, 24/09: el domingo de Iván, Mari Luz no hace la tarde con Lavinia)
+  Object.assign({ id: 'nuncaConFlexible', campo: 'nuncaConFlex', clave: 'nuncaCon', regla: 'nuncaCon', trato: 'relajable', cond: 'p:x:nuncaCon:a', relaja: { relajarNuncaCon: true, permitirPartido: true },
+    con: (x, st) => { M.ponerNuncaCon(st, 'x', 'a', { flexible: true }); },
+    celdas: duro({ puedeEstar: 'relaja', relleno: 'relaja', semana: 'relaja', cobertura: 'relaja', selector: 'relaja', condiciones: 'lista', destrapa: 'pista', verificar: 'bloquea', revision: 'bloquea' }),
+    apagarEnFicha: st => M.ponerNuncaCon(st, 'x', 'a', { activa: false }) }, conA),
   // la designación «cubre a» (D1, D2, D13): prioridad en el sitio de quien falta
   { id: 'cubreA', campo: 'cubreA', clave: 'cubreA', trato: 'punt', cond: 'p:x:cubre:f:',
     otros: { b: {}, f: { locales: ['PASARELA'], franjas: ['M'], ausencias: [{ tipo: 'VAC', desde: ISO, hasta: ISO }] } },
@@ -324,8 +328,15 @@ const ESCENARIOS = [
   // S33 (José, 17/09): dos apoyos no se quedan solos
   { id: 'puesto apoyo', campo: 'puesto', clave: null, regla: 'soloApoyos', trato: 'relajable', con: x => { x.puesto = 'apoyo'; },
     celdas: duro({ puedeEstar: 'nada', patron: 'nada', selector: 'relaja', condiciones: 'nada' }) },
-  { id: 'comodin', campo: 'comodin', clave: null, trato: 'punt', base: { locales: ['PASARELA'] }, otros: { b: { locales: ['PASARELA'] }, f: { locales: ['PASARELA'], franjas: ['M'] } },
-    con: x => { x.comodin = true; }, celdas: nada({ relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena' }) },
+  // (fase 6, S29 y D7) «sin local fijo» es no tener locales (la marca p.comodin se borra): suma en el relleno, la
+  // Cobertura y el selector. El interruptor «Locales» de la ficha apaga el límite (no poder ir a otro local), no
+  // quién es de qué local: apagado, igual que encendido. Las condiciones y su verificación son las de «Locales»
+  { id: 'sin local fijo (D7: sin locales)', campo: 'locales', clave: 'locales', regla: 'locales', trato: 'forzable', base: { locales: ['PASARELA'] }, otros: { b: { locales: ['PASARELA'] }, f: { locales: ['PASARELA'], franjas: ['M'] } },
+    con: x => { x.locales = []; }, celdas: nada({ relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena', verificar: '–', condiciones: '–' }), apagadaRef: { fichaOff: 'con' } },
+  // (fase 6, S31) el local habitual: el elegido en la ficha (localHabitual) o el primero de sus locales; quitar
+  // y volver a poner un local no lo cambia. Suma en su local
+  { id: 'local habitual', campo: 'localHabitual', clave: 'locales', trato: 'punt', base: { locales: ['ZAPA', 'PASARELA'] }, otros: { b: { locales: ['ZAPA', 'PASARELA'] } },
+    con: x => { x.localHabitual = 'PASARELA'; }, celdas: nada({ relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena', verificar: '–', condiciones: '–' }), apagadaRef: { fichaOff: 'con' } },
   { id: 'abre', campo: 'abre', clave: 'abre', trato: 'punt', cond: 'p:x:abre:PASARELA:M', otros: { b: {} }, con: x => { x.abre = { PASARELA: ['M'] }; },
     celdas: { primero: 'ordena', condiciones: 'lista', verificar: 'cumple', puedeEstar: 'nada', destrapa: 'nada' } },
   // S18/S19 (fase 5): «Quién abre» del local es una condición del Generador y obedece los interruptores
@@ -338,13 +349,14 @@ const ESCENARIOS = [
   { id: 'noAbre', campo: 'noAbre', clave: 'noAbre', regla: 'noAbre', trato: 'forzable', cond: 'p:x:noAbre:PASARELA', huecoPrimero: true, con: x => { x.noAbre = ['PASARELA']; },
     celdas: { puedeEstar: 'nada', patron: 'primero', relleno: 'primero', semana: 'primero', cobertura: 'primero', verificar: 'cumple', revision: 'bloquea', condiciones: 'lista', selector: 'nada', destrapa: 'pista', primero: 'bloquea' } },
   { id: 'prefs', campo: 'prefs.evitaDows', clave: 'prefs', trato: 'punt', otros: { y: {} }, con: x => { x.prefs = { evitaDows: [DOW] }; },
-    celdas: nada({ relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena' }), apagada: Object.fromEntries(['relleno', 'semana', 'cobertura', 'selector'].map(k => [k, 'F6 · S14: «Preferencias» apagada sigue restando 40 puntos (evita)'])) },
-  { id: 'contrato', campo: 'contrato.horasSemana', clave: 'contrato', trato: 'info', con: x => { x.contrato = { horasSemana: 8 }; }, celdas: nada() },
+    celdas: nada({ relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena' }) },
+  // (fase 6, S17 y D6) el contrato no es un interruptor: lo compara Horas y no decide nada de la planilla
+  { id: 'contrato', campo: 'contrato.horasSemana', clave: null, trato: 'info', con: x => { x.contrato = { horasSemana: 8 }; }, celdas: nada() },
   // el local
   { id: 'Cuándo abre (local)', campo: 'local.abre', ambito: 'local', clave: null, regla: 'cerrado', trato: 'duro', con: (x, st, cfg) => { const l = M.localDe(cfg, 'PASARELA'); l.abre.M = l.abre.M.filter(d => d !== DOW); },
     celdas: { puedeEstar: 'bloquea', patron: 'bloquea', relleno: 'cerrado', semana: 'cerrado', selector: 'bloquea', destrapa: 'sinPista' } },
   { id: 'mínimos (local)', campo: 'local.minimos', ambito: 'local', clave: 'minimos', trato: 'duro', sin: (x, st, cfg) => { M.localDe(cfg, 'PASARELA').minimos.M[DOW] = 0; },
-    celdas: { relleno: 'cubre', semana: 'cubre', cobertura: 'llena' }, apagada: 'F6 · S16 (D5): con «Mínimos» apagado se siguen pidiendo' },
+    celdas: { relleno: 'cubre', semana: 'cubre', cobertura: 'llena' } },
 ];
 const REGLAS_GRUPO = new Set(M.REGLAS.map(r => r.k));
 const CARACT = new Set(M.CARACTERISTICAS.map(c => c.k));
@@ -388,9 +400,11 @@ for (const esc of ESCENARIOS) {
 // (revisión F4) «cubre a» × partido (D1): la designación autoriza el partido para cubrir a X SOLO en la
 // casilla de X; en otra casilla, o con un «por X» sin la designación, el partido sigue siendo un partido no
 // declarado. Sin esta fila, una puerta que autorizara el partido con cualquier «cubrePor» pasaba el contrato
+// (fase 6, D4) con la tarde en El 33: en la mañana y la tarde de Pasarela, o de Zapatillera, sola y saliendo la
+// primera en las dos, sería un turno continuo, que no es un partido
 test('matriz · cubreA × partido: autorizado en la casilla de quien falta; no en otra casilla ni sin la designación', () => {
   const esc = { tid: 'PASARELA_M', otros: { f: { locales: ['PASARELA'], franjas: ['M'], ausencias: [{ tipo: 'VAC', desde: ISO, hasta: ISO }] } },
-    con: x => { x.cubreA = [{ pid: 'f' }]; }, planilla: (e, w) => assert.ok(M.asignar(e, w.cfg, w.st, ISO, 'PASARELA_T', 'x', {}).ok) };
+    con: x => { x.cubreA = [{ pid: 'f' }]; }, planilla: (e, w) => assert.ok(M.asignar(e, w.cfg, w.st, ISO, 'EL33_T', 'x', {}).ok) };
   const w = mundo(esc, 'con'), e = planilla(w);
   // en la casilla de Fede (la mañana de Pasarela, su plaza de la semana tipo): entra, con el aviso autorizado
   w.cfg.patron = { [DOW]: [{ t: 'PASARELA_M', p: 'f' }] };
@@ -480,8 +494,10 @@ const PERMITIDOS = {
     cubreEnCasilla: 'capa', quienLeCubre: 'capa', porQueNoCubre: 'capa', puedeCocina: 'capa', cocinasTitular: 'capa', incompatibles: 'capa', evita: 'capa', abreFijo: 'capa', VARIABLES: 'el registro: texto y verificación de cada variable',
     // la cocina entre la ficha y Ajustes del local (fase 5, S36): una sola lectura (cocinaDe) y una sola escritura
     cocinaDe: 'capa', nuncaCocina: 'capa', ponerCocinaFicha: 'capa (escribe la ficha y la lista del local)', ponerCocinaLocal: 'capa (escribe la lista del local y la ficha)', migrarCocinaLocales: 'migración: la ficha y Ajustes del local, de acuerdo',
-    // la Revisión aún marca la pareja sin mirar el interruptor: fase 6 (S13)
-    revisarTurno: 'F6 · S13',
+    // (fase 6) las parejas «nunca con» (S21, S24), el local habitual (S31) y los vetos repetidos (S30): una sola
+    // lectura y una sola escritura de cada una
+    parejasNuncaCon: 'capa', ponerNuncaCon: 'capa (escribe las dos fichas)', quitarNuncaCon: 'capa (escribe las dos fichas)', migrarNuncaCon: 'migración: parejas mutuas, flexibles y apagadas por pareja',
+    localHabitualDe: 'capa', alternarLocal: 'capa (escribe la ficha sin cambiar el habitual)', ponerLocalHabitual: 'capa', vetoRepetido: 'capa',
     // el núcleo: fase 7 (S25)
     toProblem: 'F7 · S25',
     // los datos de partida
@@ -489,15 +505,17 @@ const PERMITIDOS = {
   },
   'src/app/02-estado-y-modelo-datos.js': { normalizarFicha: 'migración: los campos por defecto de la ficha' },
   'src/app/12-cierre-local.js': { marcaCierreDia: 'x es el resultado de estadoDia (la capa de lectura)' },
-  'src/app/19-vista-equipo.js': { setCaracteristica: 'editor (F6 · S21)', chipsCondiciones: 'tarjetas de Equipo (F6 · S20)', quitarPidDeTodo: 'editor: baja de una persona' },
+  // (fase 6, S20) las tarjetas de Equipo enseñan lo que dice la ficha, cada interruptor con estadoInterruptor
+  'src/app/19-vista-equipo.js': { chipsCondiciones: 'tarjetas de Equipo: lo que dice la ficha (con estadoInterruptor)', quitarPidDeTodo: 'editor: baja de una persona' },
   'src/app/20-ficha-persona.js': { openFicha: 'editor de la ficha', textoMoverDiaLibre: 'editor de la ficha', cambiarDiaLibreUI: 'editor de la ficha' },
   'src/app/22-generador.js': { openLibraSemana: 'editor del día libre de una semana (Generador)' },
-  'src/app/26-cobertura.js': { pintaCob: 'cabecera: los días libres de su ficha (F6 · S20)' },
-  'src/app/31-navegacion.js': { activarModoEmpleado: 'perfil: los días libres de su ficha (F6 · S20)' },
+  'src/app/26-cobertura.js': { pintaCob: 'cabecera: los días libres de su ficha (el dato, como en la ficha)' },
+  'src/app/31-navegacion.js': { activarModoEmpleado: 'perfil: los días libres de su ficha (el dato, como en la ficha)' },
 };
 // (revisión F4) también la lectura con un objeto vacío por defecto: ((p.partido || {}).dias || []) y
 // (p.cocina || {}).titular, que la comprobación no veía
-const RE_CAMPO = /([A-Za-z_$][\w$]*)\.(libra|nuncaCon|cubreA|prefs|vetos)\b(?!\s*=[^=])|([A-Za-z_$][\w$]*)\.partido\.dias\b|([A-Za-z_$][\w$]*)\.cocina\.(titular|reserva|soloDias|nunca)\b|([A-Za-z_$][\w$]*)\.abre\[|\(\s*([A-Za-z_$][\w$]*)\.(?:partido|cocina)\s*\|\|\s*\{\}\s*\)\s*\.\s*(?:dias|siempre|titular|reserva|soloDias|nunca)\b/g;
+// (fase 6) también las parejas «nunca con» (flexible y apagada, S21 y S24) y el local habitual (S31)
+const RE_CAMPO = /([A-Za-z_$][\w$]*)\.(libra|nuncaCon(?:Flex|Off)?|cubreA|prefs|vetos|localHabitual)\b(?!\s*=[^=])|([A-Za-z_$][\w$]*)\.partido\.dias\b|([A-Za-z_$][\w$]*)\.cocina\.(titular|reserva|soloDias|nunca)\b|([A-Za-z_$][\w$]*)\.abre\[|\(\s*([A-Za-z_$][\w$]*)\.(?:partido|cocina)\s*\|\|\s*\{\}\s*\)\s*\.\s*(?:dias|siempre|titular|reserva|soloDias|nunca)\b/g;
 const receptor = x => x[1] || x[3] || x[4] || x[6] || x[7];
 // receptores que no son una ficha: el local (l.abre[franja] es «Cuándo abre») y el resultado de estadoDia
 const NO_FICHA = new Set(['l', 'loc', 'local', 'lc', 'ed', 'edc', 'PESOS']);
@@ -541,6 +559,7 @@ test('lint: la comprobación ve una lectura a pelo y deja pasar el local y estad
   assert.deepEqual(vistas('if (p.libra.includes(3)) x = (q.cocina.soloDias || []); const a = p.abre[l.id];'), ['p', 'q', 'p']);
   assert.deepEqual(vistas('const d = ((p.partido || {}).dias || []); const t = (q.cocina || {}).titular; const u = ( r.cocina||{} ).nunca;'), ['p', 'q', 'r']);
   assert.deepEqual(vistas('const f = l.abre[franja]; if (ed.libra) {} // p.libra en un comentario'), []);
+  assert.deepEqual(vistas('const a = p.nuncaConFlex.includes(q); const b = (q.nuncaConOff || []); const c = r.localHabitual;'), ['p', 'q', 'r']);
 });
 
 // En el navegador el modelo y la interfaz comparten el ámbito global: una función de src/app con el mismo
@@ -712,20 +731,26 @@ test('auditoría S28 · una casilla abierta a mano con mínimo 0 y vacía la avi
   assert.ok(M.revisionMes(cfg, st, e, { desde: LUNES, hasta: LUNES }).some(x => x.turnoId === 'EL33_T' && x.tipo === 'abierta-vacia'));
 });
 
-// --- pendientes de otras fases (con su hueco) ---
-test('auditoría S13 (interruptores H1, relaciones-rol «H-nuncaCon-revision») · con «Nunca con» apagado la revisión no marca «no pueden coincidir»', { todo: 'F6 · S13' }, () => {
-  for (const prep of [cfg => { cfg.reglas = { nuncaCon: false }; }, (cfg, st) => { M.personaDe(st, 'mariluz').inactivas = ['nuncaCon']; M.personaDe(st, 'lavinia').inactivas = ['nuncaCon']; }]) {
+// --- fase 6 (24/09): interruptores y textos de Equipo que dicen la verdad ---
+// S13: con «Nunca con» apagado (la regla del grupo, las dos fichas como antes, o la pareja) la Revisión no la marca
+test('auditoría S13 (interruptores H1, relaciones-rol «H-nuncaCon-revision») · con «Nunca con» apagado la revisión no marca «no pueden coincidir»', () => {
+  for (const prep of [cfg => { cfg.reglas = { nuncaCon: false }; }, (cfg, st) => { M.personaDe(st, 'mariluz').inactivas = ['nuncaCon']; M.personaDe(st, 'lavinia').inactivas = ['nuncaCon']; }, (cfg, st) => { M.ponerNuncaCon(st, 'mariluz', 'lavinia', { activa: false }); }]) {
     const { cfg, st } = semilla(); prep(cfg, st); const e = semana(LUNES);
     assert.ok(M.asignar(e, cfg, st, '2026-10-02', 'PASARELA_T', 'mariluz', {}).ok && M.asignar(e, cfg, st, '2026-10-02', 'PASARELA_T', 'lavinia', {}).ok);
     assert.deepEqual(M.revisarTurno(cfg, st, e, '2026-10-02', 'PASARELA_T').incompatibles, []);
+    assert.equal(M.revisionMes(cfg, st, e, { desde: '2026-10-02', hasta: '2026-10-02' }).filter(x => x.tipo === 'incompatibles' || /nunca con/.test(x.msg)).length, 0);
   }
 });
-test('auditoría S14 (disponibilidad D7, interruptores H3) · «Preferencias» apagada no pesa en el generador ni en la cobertura', { todo: 'F6 · S14 (el núcleo, F7 · S25)' }, () => {
+// S14: el interruptor «Preferencias» de la ficha (evita) lo obedecen la puntuación, la Cobertura y el núcleo
+test('auditoría S14 (disponibilidad D7, interruptores H3) · «Preferencias» apagada no pesa en el generador, la cobertura ni el núcleo', () => {
   const { cfg, st } = semilla(); const p = M.personaDe(st, 'cristian'); p.prefs = { evitaDows: [1] }; p.inactivas = ['prefs']; const e = semana(LUNES);
+  // con Jenny en la cocina: desde la revisión F3 (S33) un apoyo no entra solo en una casilla vacía, y la auditoría es de antes
+  assert.ok(M.asignar(e, cfg, st, LUNES, 'MONACO_M', 'jenny', { cocina: true, puesto: 'cocina' }).ok);
   assert.equal(M.candidatosPara(cfg, st, e, LUNES, 'MONACO_M')[0].pid, 'cristian');
   assert.equal(M.candidatosCobertura(cfg, st, e, LUNES, 'MONACO_M', 'cris')[0].pid, 'cristian');
+  assert.deepEqual(M.toProblem(cfg, st, e, LUNES, LUNES, { conPatron: false }).workers.find(w => w.id === 'cristian').preferences, []);
 });
-test('auditoría S17 (interruptores H4, reescrita según D6) · «Contrato» deja de ser un interruptor y Horas sigue comparando', { todo: 'F6 · S17 (D6)' }, () => {
+test('auditoría S17 (interruptores H4, reescrita según D6) · «Contrato» deja de ser un interruptor y Horas sigue comparando', () => {
   assert.ok(!M.CARACTERISTICAS.some(c => c.k === 'contrato'));
   const { cfg, st } = semilla(); M.personaDe(st, 'yilian').contrato = { horasSemana: 40 };
   assert.notEqual(M.horasPersonaMes(cfg, st, {}, 'yilian', 2026, 10).contratoHoras, null);
@@ -778,10 +803,28 @@ test('auditoría S16 (relaciones-rol «H-cocina-regla», la parte de cocina de i
   // y la interfaz dice la consecuencia al apagarla (la lee de REGLAS)
   assert.ok(/nadie/.test((M.REGLAS.find(x => x.k === 'cocina') || {}).apagada || ''), 'REGLAS: el texto de lo que pasa con «Cocina» apagada');
 });
-test('auditoría S16 (interruptores H6, lugar L2) · con «Mínimos» apagados nadie los exige', { todo: 'F6 · S16 (mínimos), D5' }, () => {
+test('auditoría S16 (interruptores H6, lugar L2) · con «Mínimos» apagados nadie los exige', () => {
   const { cfg, st } = semilla(); cfg.reglas = { minimos: false };
   const rv = M.revisionMes(cfg, st, semana(LUNES), { desde: LUNES, hasta: M.addDias(LUNES, 6) });
   assert.equal(rv.filter(x => x.tipo === 'falta').length, 0);
+  // (lugar L2) ni el Generador rellena ni deja huecos «faltan»; el mínimo sigue ahí (la cabecera n/mín)
+  const e = semana(LUNES);
+  assert.equal(M.revisarTurno(cfg, st, e, LUNES, 'PASARELA_M').faltan, 0);
+  assert.equal(M.minimoDe(cfg, LUNES, 'PASARELA_M', e).min, 3, 'minimoDe no cambia');
+  const g = M.generarSemana(cfg, st, e, LUNES, { sinPatron: true });
+  assert.equal(g.huecos.filter(h => (h.tipo || 'faltan') === 'faltan').length, 0);
+  // apagada = como si todos los mínimos fueran 0 (la cocina sigue: su regla está encendida)
+  const c0 = semilla(); for (const l of c0.cfg.locales) for (const f of M.FRANJAS) for (const d of M.TODOS) l.minimos[f][d] = 0;
+  const g0 = M.generarSemana(c0.cfg, c0.st, semana(LUNES), LUNES, { sinPatron: true });
+  const foto = r => r.dias.flatMap(d => M.turnosDe(cfg).map(t => `${d}|${t.id}|${M.pidsEn(r.estado, d, t.id).join(',')}`));
+  assert.deepEqual(foto(g), foto(g0));
+  // (interruptores H6) con las dos apagadas, nada; y el núcleo tampoco los pide
+  const c2 = semilla(); c2.cfg.reglas = { minimos: false, cocina: false };
+  assert.equal(M.generarSemana(c2.cfg, c2.st, semana(LUNES), LUNES, { sinPatron: true }).aplicados, 0);
+  const pr = M.toProblem(c2.cfg, c2.st, semana(LUNES), LUNES, LUNES, { conPatron: false });
+  assert.equal(pr.rules[0].params.by_day[0].MONACO.min, 0);
+  // y la interfaz dice la consecuencia al apagarla (la lee de REGLAS, como la de «Cocina»)
+  assert.ok(/nadie/.test((M.REGLAS.find(x => x.k === 'minimos') || {}).apagada || ''), 'REGLAS: el texto de lo que pasa con «Mínimos» apagado');
 });
 test('auditoría S19 (interruptores H8/H9, lugar L9) · con «Sale el primero» apagado no suma ni manda', () => {
   // (fase 5) con Hojan en la cocina: desde la revisión F3 (S33) un apoyo no entra solo en una casilla vacía,
@@ -907,26 +950,49 @@ test('auditoría S19 · la hoja impresa: «¿Quién sale el primero…?» mira e
   assert.ok(/por la tarde en [^?]*Pasarela/.test(pregunta((cfg, st) => { M.personaDe(st, 'ivan').inactivas = ['abre']; })), 'con «Sale el primero» apagado en la ficha de Iván, se pregunta');
   assert.ok(/por la mañana en [^?]*Pasarela/.test(pregunta(cfg => { cfg.reglas = { abre: false }; })), 'con la regla del grupo apagada, se pregunta');
 });
-test('auditoría S24 (relaciones-rol «H-nuncaCon-flexible») · si solo queda Lavinia, entra con Mari Luz y con aviso', { todo: 'F6 · S24' }, () => {
+// (revisión de la fase 6; decisiones.md, principio 6: la pareja flexible se relaja en el plan relajado, que en el
+// Generador es «Permitir partidos no declarados»; sin él queda el hueco y la propuesta «con aviso» la ofrece. Es lo
+// que pidió Aroa el 24/09 para el domingo de Iván: Mari Luz no hace la tarde con Lavinia)
+test('auditoría S24 (relaciones-rol «H-nuncaCon-flexible») · si solo queda Lavinia, el relleno relajado la pone con Mari Luz y con aviso; el estricto no', () => {
   const { cfg, st } = semilla(); const D = '2026-10-02';
   for (const p of st) if (!['ivan', 'mariluz', 'lavinia', 'leo'].includes(p.id)) M.anadirAusencia(p, { tipo: 'VAC', desde: D, hasta: D });
   const e = M.nuevoEstado(2026, 10, { festivos: [] });
   M.asignar(e, cfg, st, D, 'PASARELA_T', 'ivan', {}); M.asignar(e, cfg, st, D, 'PASARELA_T', 'mariluz', {}); M.asignar(e, cfg, st, D, 'ZAPA_T', 'leo', {});
-  const a = M.generarPlanilla(cfg, st, e, D, D, { simular: true, sinPatron: true }).aplicados.find(x => x.turnoId === 'PASARELA_T' && x.pid === 'lavinia');
+  const a = M.generarPlanilla(cfg, st, e, D, D, { simular: true, sinPatron: true, permitirPartido: true }).aplicados.find(x => x.turnoId === 'PASARELA_T' && x.pid === 'lavinia');
   assert.ok(a && a.avisos.some(x => /nunca con/.test(x)));
+  const g0 = M.generarPlanilla(cfg, st, e, D, D, { simular: true, sinPatron: true });
+  assert.ok(!M.pidsEn(g0.estado, D, 'PASARELA_T').includes('lavinia') && M.candidatosConAviso(cfg, st, e, D, 'PASARELA_T').some(c => c.pid === 'lavinia'));
 });
-test('auditoría S21 (relaciones-rol «H-nuncaCon-asimetrico») · quitar la pareja la quita de las dos fichas', { todo: 'F6 · S21' }, () => {
+test('auditoría S21 (relaciones-rol «H-nuncaCon-asimetrico») · quitar la pareja la quita de las dos fichas', () => {
   const { cfg, st } = semilla();
   M.quitarNuncaCon(st, 'mariluz', 'lavinia');
   const e = semana(LUNES); M.asignar(e, cfg, st, '2026-10-02', 'PASARELA_T', 'lavinia', {});
   assert.ok(M.puedeEstar(cfg, st, e, '2026-10-02', 'PASARELA_T', 'mariluz', {}).ok);
+  assert.ok(!M.personaDe(st, 'lavinia').nuncaCon.includes('mariluz') && !M.personaDe(st, 'mariluz').nuncaCon.includes('lavinia'));
 });
-test('auditoría S39 (relaciones-rol «H-partido-verificar») · el Generador marca el partido de quien no declara ninguno', { todo: 'F6 · S39' }, () => {
+// S21 (revisor-interruptores n6): apagar la pareja Leo–Susana Capón no apaga Leo–Lavinia, y cada ficha la enseña
+test('auditoría S21 (revisor n6) · el interruptor de «nunca con» es de la pareja: apagar Leo–Susana Capón deja Leo–Lavinia', () => {
+  const { cfg, st } = semilla(); const P = id => M.personaDe(st, id);
+  M.ponerNuncaCon(st, 'leo', 'lavinia', {});
+  M.ponerNuncaCon(st, 'leo', 'scapon', { activa: false });
+  assert.equal(M.incompatibles(cfg, P('leo'), P('scapon')), null);
+  assert.ok(M.incompatibles(cfg, P('leo'), P('lavinia')) && M.incompatibles(cfg, P('lavinia'), P('mariluz')));
+  assert.ok(st.every(p => !(p.inactivas || []).includes('nuncaCon')), 'ninguna ficha entera apagada');
+  const ids = M.condicionesDe(cfg, st).filter(c => c.k === 'nuncaCon').map(c => [c.pid, c.otro].sort().join('+'));
+  assert.deepEqual(ids.sort(), ['lavinia+leo', 'lavinia+mariluz']);
+  // las dos fichas enseñan la pareja, una vez, con su estado
+  for (const [quien, otro] of [['leo', 'scapon'], ['scapon', 'leo']]) {
+    const x = M.parejasNuncaCon(cfg, st, P(quien)).find(y => y.pid === otro);
+    assert.ok(x && x.flexible && !x.activa && x.estado === 'apagada-pareja', JSON.stringify(x));
+  }
+  assert.equal(M.parejasNuncaCon(cfg, st, P('leo')).length, 2);
+});
+test('auditoría S39 (relaciones-rol «H-partido-verificar») · el Generador marca el partido de quien no declara ninguno', () => {
   const { cfg, st } = semilla(); const e = semana(LUNES);
   M.asignar(e, cfg, st, '2026-10-02', 'MONACO_M', 'yilian', {}); M.asignar(e, cfg, st, '2026-10-02', 'MONACO_T', 'yilian', { permitirPartido: true });
   assert.ok(M.generarSemana(cfg, st, e, LUNES, { permitirPartido: true }).condiciones.some(c => !c.ok && c.pid === 'yilian' && c.k === 'partido'));
 });
-test('auditoría S29 (lugar L3) · «sin local fijo» quiere decir lo mismo en el generador y en la planilla', { todo: 'F6 · S29 (D7)' }, () => {
+test('auditoría S29 (lugar L3) · «sin local fijo» quiere decir lo mismo en el generador y en la planilla', () => {
   const { cfg, st } = semilla(); const e = semana(LUNES);
   M.asignar(e, cfg, st, '2026-09-30', 'MONACO_M', 'cris', {});   // con alguien de sala, Tere (apoyo) es candidata
   const c = M.candidatosPara(cfg, st, e, '2026-09-30', 'MONACO_M').find(x => x.pid === 'tere');
@@ -934,10 +1000,66 @@ test('auditoría S29 (lugar L3) · «sin local fijo» quiere decir lo mismo en e
   M.asignar(e, cfg, st, '2026-09-30', 'MONACO_M', 'tere', {});
   assert.equal(!!(c && c.razones.includes('sin local fijo')), M.posicionesDe(cfg, st, e, '2026-09-30', 'MONACO_M').find(x => x.pid === 'tere').comodin);
 });
-test('auditoría S30 (lugar L4, la parte de Equipo) · el veto de los lunes se ve como de los lunes en la tarjeta', { todo: 'F6 · S30' }, () => {
+test('auditoría S30 (lugar L4, la parte de Equipo) · el veto de los lunes se ve como de los lunes en la tarjeta', () => {
   const { cfg, st } = semilla();
   const chips = funcionDeApp('19-vista-equipo.js', 'chipsCondiciones', { S: Object.assign({}, cfg, { staff: st }), isoHoy: () => '2026-09-24', esc: s => String(s), tchip: (lbl, txt) => `[${lbl}: ${txt}]`, lblCaracteristica: k => k, lblFranjas: () => '', lblDows: d => (d || []).join(','), lblDowPl: d => M.DOW_PL[d].replace('los ', ''), chipLocal: (id, x) => M.localDe(cfg, id).nombre + (x ? ' ' + x : ''), nombrePid: id => (M.personaDe(st, id) || {}).nombre, lblNoPrimero: f => f.join(','), lblTurno: x => x });
   assert.ok(/lunes/.test((chips(M.personaDe(st, 'mariluz')).match(/\[No hace:[^\]]*\]/) || [''])[0]));
+});
+// S30 (revisor-lugar r4): el veto con su día es una condición con el día en el id; dos del mismo local y franja
+// con días distintos son dos condiciones, y el alta no los da por repetidos
+test('auditoría S30 (revisor-lugar r4) · vetos con día: condición con el día, y repetidos por local, franja y día', () => {
+  const { cfg, st } = semilla(); const ml = M.personaDe(st, 'mariluz');
+  const ids = () => M.condicionesDe(cfg, st).filter(c => c.pid === 'mariluz' && c.k === 'vetos').map(c => c.id);
+  assert.deepEqual(ids(), ['p:mariluz:veto:PASARELA:M:1']);
+  assert.equal(M.vetoRepetido(ml, { localId: 'PASARELA', franja: 'M' }), false, 'el de todos los días no está');
+  assert.equal(M.vetoRepetido(ml, { localId: 'PASARELA', franja: 'M', dow: 1 }), true, 'el de los lunes, sí');
+  ml.vetos.push({ localId: 'PASARELA', franja: 'M', dow: 3 });
+  assert.deepEqual(ids(), ['p:mariluz:veto:PASARELA:M:1', 'p:mariluz:veto:PASARELA:M:3']);
+  // con el de todos los días puesto, uno de un día ya está (lo cubre)
+  assert.equal(M.vetoRepetido(M.personaDe(st, 'cristian'), { localId: 'PASARELA', franja: 'M', dow: 2 }), true);
+});
+// S20 (revisor-interruptores n2): con la regla del grupo apagada, la tarjeta de Equipo lo dice (tachada y por qué)
+test('auditoría S20 (revisor-interruptores n2) · con «Días que libra» apagada para el grupo, la tarjeta la tacha y dice que es del grupo', () => {
+  const { cfg, st } = semilla(); cfg.reglas = { libra: false };
+  const chips = funcionDeApp('19-vista-equipo.js', 'chipsCondiciones', { S: Object.assign({}, cfg, { staff: st }), isoHoy: () => '2026-09-24', esc: s => String(s), tchip: (lbl, txt, cls, title) => `[${lbl}: ${txt}${/\boff\b/.test(cls || '') ? ' (tachado)' : ''}${title ? ' {' + title + '}' : ''}]`, lblCaracteristica: k => (M.CARACTERISTICAS.find(c => c.k === k) || { lbl: k }).lbl, lblFranjas: () => '', lblDows: d => (d || []).join(','), lblDowPl: d => M.DOW_PL[d].replace('los ', ''), chipLocal: (id, x) => M.localDe(cfg, id).nombre + (x ? ' ' + x : ''), nombrePid: id => (M.personaDe(st, id) || {}).nombre, lblNoPrimero: f => f.join(','), lblTurno: x => x, fmtDDMM: x => x });
+  const h = chips(M.personaDe(st, 'mariluz'));
+  assert.ok(/\[Libra: 3 \(tachado\) \{[^}]*todo el grupo[^}]*\}\]/.test(h), h);
+  // y el estado de cada interruptor sale de un solo sitio
+  assert.equal(M.estadoInterruptor(cfg, M.personaDe(st, 'mariluz'), 'libra'), 'apagada-grupo');
+  M.personaDe(st, 'mariluz').inactivas = ['partido'];
+  assert.equal(M.estadoInterruptor({ reglas: {} }, M.personaDe(st, 'mariluz'), 'partido'), 'apagada-ficha');
+  assert.equal(M.estadoInterruptor({ reglas: {} }, M.personaDe(st, 'mariluz'), 'libra'), 'activa');
+});
+// S22 (revisor-interruptores n3): «quien hace partido puede abrir la tarde» es un ajuste del local, no una regla del grupo
+test('auditoría S22 · la condición «quien hace partido puede abrir la tarde» lleva a Ajustes del local', () => {
+  const { cfg, st } = semilla();
+  const c = M.condicionesDe(cfg, st).find(x => x.id === 'loc:PASARELA:partidoAbre:T');
+  assert.ok(c && c.tipo === 'local' && c.localId === 'PASARELA', JSON.stringify(c));
+  assert.ok(!M.condicionesDe(cfg, st).some(x => x.tipo === 'regla' && !M.REGLAS.some(r => r.k === x.k) && !['soloApoyos', 'cocinaSala'].includes(x.k)), 'ninguna condición de «regla» sin su regla');
+});
+// D4 (fase 6, S40; Aroa, 18/09: «de corrido» no es «turno partido»): un turno continuo —la misma persona sale la
+// primera por la mañana y por la tarde del mismo local— no es un partido en ningún camino: la puerta lo deja
+// pasar con la nota «turno continuo» (informativa), el Generador lo da por cumplido, la Revisión no avisa, la
+// planilla lo pinta C y Horas no lo cuenta en «Partidos». Si otra persona abre la tarde, es un partido.
+test('matriz · turno continuo (D4): no es un partido en la puerta, el selector, el Generador, la Revisión, la planilla ni Horas', () => {
+  const esc = { tid: 'PASARELA_T', con: x => { x.partido = { dias: [5] }; }, otros: { b: {} } };
+  const w = mundo(esc, 'con'); const e = semanaEst(w);
+  assert.ok(M.asignar(e, w.cfg, w.st, ISO, 'PASARELA_M', 'x', {}).ok);
+  const r = M.puedeEstar(w.cfg, w.st, e, ISO, 'PASARELA_T', 'x', { puesto: 'sala' });
+  assert.ok(r.ok && !r.avisos.length && r.autorizados.some(a => /turno continuo/.test(a.texto)), JSON.stringify(r));
+  assert.ok(M.gruposSelector(w.cfg, w.st, e, ISO, 'PASARELA_T').pueden.some(c => c.pid === 'x'), 'en «pueden» del selector');
+  assert.ok(M.asignar(e, w.cfg, w.st, ISO, 'PASARELA_T', 'x', {}).ok);
+  for (const tid of ['PASARELA_M', 'PASARELA_T']) { const s = M.posicionesDe(w.cfg, w.st, e, ISO, tid).find(y => y.pid === 'x'); assert.ok(s.continuo && !s.partido && !s.avisos.length, JSON.stringify(s)); }
+  const v = M.verificarSemana(w.cfg, w.st, e, LUNES).find(c => c.id === 'p:x:partido');
+  assert.ok(v && v.ok && /turno continuo/.test(v.nota || ''), JSON.stringify(v));
+  assert.deepEqual(M.revisionMes(w.cfg, w.st, e, { desde: ISO, hasta: ISO }).filter(l => /Xavi/.test(l.msg)).map(l => l.msg), []);
+  const h = M.horasPersonaMes(w.cfg, w.st, w.cfg.meses, 'x', 2026, 9);
+  assert.ok(h.continuos === 1 && h.partidos === 0, JSON.stringify({ continuos: h.continuos, partidos: h.partidos }));
+  // si otra persona abre la tarde ya no es un continuo: es un partido (no declarado ese día)
+  const w2 = mundo(esc, 'con'); const e2 = semanaEst(w2);
+  assert.ok(M.asignar(e2, w2.cfg, w2.st, ISO, 'PASARELA_M', 'x', {}).ok && M.asignar(e2, w2.cfg, w2.st, ISO, 'PASARELA_T', 'b', {}).ok);
+  const r2 = M.puedeEstar(w2.cfg, w2.st, e2, ISO, 'PASARELA_T', 'x', { puesto: 'sala' });
+  assert.ok(!r2.ok && r2.regla === 'partido', JSON.stringify(r2));
 });
 test('auditoría S25 (disponibilidad D6, interruptores H7, lugar L11, relaciones-rol «H-nucleo-nuncaCon») · el núcleo lee la ficha por la misma puerta', { todo: 'F7 · S25' }, () => {
   const { cfg, st } = semilla(); cfg.reglas = { nuncaCon: false };

@@ -108,12 +108,15 @@ function conSuRegla(avisos, inc) { return (avisos || []).map(t => { const x = (i
 // fallar el domingo 4; ahora el selector y la ★ llaman aquí. Si no se puede poner, el paso de Ctrl+Z se
 // retira (no queda un paso vacío) y se dice por qué. c: su fila de candidatosPara (o nada); conAviso: la
 // fila es de «con aviso» (un partido no declarado). Fase 4 (S35): la fila del grupo de cocina (c.cocina)
-// entra llevando la cocina, con el puesto de cocina.
+// entra llevando la cocina, con el puesto de cocina. 24/09 (fase 6, S24): «con aviso» es también la pareja «nunca
+// con» flexible (entra con su aviso); antes el selector no la ofrecía y, si se elegía, se rechazaba.
 function ponerRecomendadoUI(iso, tid, pid, c, conAviso) {
   pushUndo(`poner a ${nombrePid(pid)}`);
   const cub = c && c.cubre ? { por: c.cubre, cubrePor: c.cubre } : {};
   const puesto = c && c.cocina ? { puesto: 'cocina', cocina: true } : { puesto: 'sala' };
-  const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', permitirPartido: !!conAviso, razon: c ? c.razones.join(' · ') : 'recomendado' }, puesto, cub));
+  // (revisión de la fase 6) lo que relaja «con aviso» es la lista del modelo (RELAJABLE), la misma que al aplicar la
+  // Cobertura, volcar el Generador o aceptar su propuesta «con aviso»
+  const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', razon: c ? c.razones.join(' · ') : 'recomendado' }, conAviso ? RELAJABLE : {}, puesto, cub));
   if (!res.ok) { undoStack.pop(); actualizarUndoBtn(); toast(res.motivo, 'bad'); return res; }
   toast(res.avisos.length ? `${nombrePid(pid)} añadido con aviso: ${res.avisos.join(', ')}` : `${nombrePid(pid)} añadido`, res.avisos.length ? 'warn' : 'ok');
   return res;

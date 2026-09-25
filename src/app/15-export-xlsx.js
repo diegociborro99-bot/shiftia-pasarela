@@ -38,7 +38,8 @@ function xlsxFaltan(c, l) {
   for (const f of FRANJAS) {
     const tid = turnoId(l.id, f);
     if (!turnoAbierto(S, c.est, c.iso, tid)) continue;
-    const n = Math.max(0, minimoDe(S, c.iso, tid, c.est).min - asignados(c.est, c.iso, tid).length);
+    // lo que falta lo dice la Revisión (revisarTurno): con «Mínimos» apagado no falta nadie (D5; revisión de la fase 6)
+    const n = revisarTurno(S, S.staff, c.est, c.iso, tid).faltan;
     if (n) partes.push(`${FRANJA_LBL[f].toLowerCase()} ${n}`);
   }
   return partes.join(' · ');

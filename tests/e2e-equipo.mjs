@@ -3,7 +3,8 @@
 // En escritorio (1280×900): el botón «Condiciones» abre el catálogo que comprueba
 // el generador (≥ 30 condiciones, las tres NUEVA), los interruptores de las reglas
 // del grupo escriben S.reglas y el historial; en la ficha de Lavinia se apaga
-// «Nunca con» (p.inactivas, la condición sale del catálogo y vuelve al reactivarla
+// «Nunca con» con Mari Luz, la pareja (fase 6, S21: nuncaConOff en las dos fichas; la condición sale del
+// catálogo y vuelve al reactivarla
 // desde el panel); a Cristian se le pone «nunca el primero» de mañana desde la ficha
 // y se ve en su tarjeta; deshacer y persistencia. En el móvil (400×820): el panel y
 // la ficha sin desbordar y con filas tocables (≥ 44 px). Cuenta como fallo un
@@ -79,7 +80,8 @@ try {
   const nuevas = await pg.$$eval('#condOvl .condrow[data-cid]:not(.off) .condnew', x => x.length);
   ok(`las condiciones NUEVA llevan su etiqueta (Leo, Cristian, el primero completo, el partido que abre en Pasarela y El 33, desde la revisión F3 «dos apoyos no se quedan solos» y desde la revisión F4 «quien lleva la cocina no refuerza la sala»): ${nuevas}`, nuevas === 8, nuevas);
   ok('la lista está numerada como el modelo (1…N, sin saltos)', await pg.$$eval('#condOvl .condrow[data-cid]:not(.off) .condnum', xs => xs.every((x, i) => +x.textContent === i + 1)));
-  ok('las condiciones van agrupadas por tipo: mínimos, cocina, personas y reglas', await pg.$$eval('#condOvl .condgrp', xs => xs.map(x => x.dataset.grp).join(',')) === 'minimos,cocina,persona,regla', await pg.$$eval('#condOvl .condgrp', xs => xs.map(x => x.dataset.grp).join(',')));
+  // (fase 6, S22) «quien hace partido puede abrir la tarde» es de los locales, no una regla del grupo
+  ok('las condiciones van agrupadas por tipo: mínimos, cocina, personas, reglas y locales', await pg.$$eval('#condOvl .condgrp', xs => xs.map(x => x.dataset.grp).join(',')) === 'minimos,cocina,persona,regla,local', await pg.$$eval('#condOvl .condgrp', xs => xs.map(x => x.dataset.grp).join(',')));
   const nReglas = await pg.evaluate(() => REGLAS.length);
   ok(`arriba, una fila con interruptor por regla del grupo (${nReglas}), dos de ellas NUEVA`, await pg.$$eval('#condOvl [data-regla-row] input[role="switch"]', x => x.length) === nReglas && await pg.$$eval('#condOvl [data-regla-row] .condnew', x => x.length) === 2);
   ok('todas las reglas empiezan encendidas (aria-checked="true")', await pg.$$eval('#condOvl [data-regla-row] input[role="switch"]', xs => xs.every(x => x.checked && x.getAttribute('aria-checked') === 'true')));
@@ -88,7 +90,8 @@ try {
   ok('cada condición de una ficha lleva su interruptor; las de mínimos y cocina enlazan a «Ajustes del local»; la regla, a su interruptor', await pg.evaluate(() => {
     const filas = [...document.querySelectorAll('#condOvl .condrow[data-cid]:not(.off)')];
     const por = t => filas.filter(f => f.dataset.cid.startsWith(t));
-    return por('p:').every(f => f.querySelector('input[data-car][role="switch"]')) && por('min:').concat(por('coc:')).every(f => f.querySelector('[data-condlocal]')) && por('reg:').every(f => f.querySelector('[data-irregla]'));
+    // (fase 6, S21) las de «nunca con», el de su pareja (data-par)
+    return por('p:').every(f => f.querySelector('input[data-car][role="switch"], input[data-par][role="switch"]')) && por('min:').concat(por('coc:')).concat(por('loc:')).every(f => f.querySelector('[data-condlocal]')) && por('reg:').every(f => f.querySelector('[data-irregla]'));
   }));
   ok('las condiciones informativas («cubre a») van marcadas en gris', await pg.$$eval('#condOvl .condrow.info', xs => xs.length >= 1 && xs.every(x => /informativa/.test(x.textContent))));
 
@@ -127,16 +130,20 @@ try {
   ok('reactivarla desde la fila tachada la devuelve al catálogo y limpia p.inactivas', await llega(pg, () => !(S.staff.find(p => p.id === 'cristian').inactivas || []).includes('vetos') && !!document.querySelector('#condOvl .condrow[data-cid^="p:cristian:veto:"]:not(.off)'), null, 3000) >= 0);
   ok('el panel se cierra con «Listo»', await cerrarOvl(pg, 'condOvl') >= 0);
 
-  // 6) ficha de Lavinia: apagar «Nunca con»
+  // 6) ficha de Lavinia: apagar la pareja «Nunca con» Mari Luz
   await pg.click('#equipoRoot .pcfoot [data-ficha="lavinia"]');
   ok('la ficha de Lavinia se abre', await llega(pg, () => !!document.querySelector('#fichaOvl #fichBody .fcar'), null, 4000) >= 0);
-  const nCar = await pg.evaluate(() => CARACTERISTICAS.length);
+  // (fase 6) «Nunca con» lleva uno por pareja, no uno de la característica entera (S21)
+  const nCar = await pg.evaluate(() => CARACTERISTICAS.filter(c => !c.porPareja).length);
   ok(`cada característica de la ficha lleva su interruptor «activa» (${nCar})`, await pg.$$eval('#fichaOvl [data-car-tgl]', x => x.length) === nCar && await pg.$$eval('#fichaOvl .fcar', xs => xs.every(x => !x.classList.contains('off'))), await pg.$$eval('#fichaOvl [data-car-tgl]', x => x.length));
   ok('hay bloque «No sale nunca el primero» con las chips Mañana y Tarde y la marca NUEVA', await pg.evaluate(() => { const b = document.querySelector('#fichaOvl .fcar[data-car="noPrimero"]'); return !!b && b.querySelectorAll('[data-tnoprimero]').length === 2 && !!b.querySelector('.condnew'); }));
-  await pg.click('#fichaOvl .fcar[data-car="nuncaCon"] .tgl .tglk');
-  ok('apagar «Nunca con» en la ficha: p.inactivas de Lavinia incluye nuncaCon', await llega(pg, () => (S.staff.find(p => p.id === 'lavinia').inactivas || []).includes('nuncaCon'), null, 3000) >= 0, JSON.stringify(await persona(pg, 'lavinia')));
-  ok('la regla es mutua: también se apaga en la ficha de Mari Luz', ((await persona(pg, 'mariluz')) || {}).inactivas.includes('nuncaCon'));
-  ok('la sección se ve atenuada (.fcar.off) con el aviso «el generador no la tiene en cuenta», pero sigue editable', await pg.evaluate(() => { const b = document.querySelector('#fichaOvl .fcar[data-car="nuncaCon"]'); return b.classList.contains('off') && /no la tiene en cuenta/.test((b.querySelector('.fcaroff') || {}).textContent || '') && !!b.querySelector('[data-addnunca]') && !b.querySelector('[data-addnunca]').disabled; }));
+  // (fase 6, S21) el interruptor es el de la pareja Lavinia–Mari Luz: se apaga en las dos fichas, sin tocar
+  // la característica entera (antes, en cascada, apagaba también las demás parejas de las dos)
+  await pg.click('#fichaOvl [data-par="mariluz"] .tgl .tglk');
+  const off2 = () => pg.evaluate(() => ['lavinia', 'mariluz'].map(id => (S.staff.find(p => p.id === id).nuncaConOff || []).join(',')));
+  ok('apagar la pareja con Mari Luz en la ficha de Lavinia la apaga en las dos fichas (nuncaConOff)', await llega(pg, () => (S.staff.find(p => p.id === 'lavinia').nuncaConOff || []).includes('mariluz') && (S.staff.find(p => p.id === 'mariluz').nuncaConOff || []).includes('lavinia'), null, 3000) >= 0, JSON.stringify(await off2()));
+  ok('sin apagar la característica entera de nadie', await pg.evaluate(() => S.staff.every(p => !(p.inactivas || []).includes('nuncaCon'))));
+  ok('la fila de la pareja se ve apagada con el aviso «el generador no la tiene en cuenta», y se sigue editando', await pg.evaluate(() => { const r = document.querySelector('#fichaOvl [data-par="mariluz"]'); const b = document.querySelector('#fichaOvl .fcar[data-car="nuncaCon"]'); return r.classList.contains('off') && /no la tiene en cuenta/.test(r.textContent) && !!b.querySelector('[data-addnunca]') && !b.querySelector('[data-addnunca]').disabled; }));
   ok('el catálogo (condicionesDe) ya no lleva la condición «Lavinia y Mari Luz no coinciden»', await pg.evaluate(() => !condicionesDe(S, S.staff).some(c => c.k === 'nuncaCon' && (c.pid === 'lavinia' || c.otro === 'lavinia'))));
   ok('el modelo lo aplica: Lavinia y Mari Luz ya pueden coincidir (puedeEstar en una tarde de Pasarela)', await pg.evaluate(() => {
     // un día del mes en que Pasarela abre por la tarde y Lavinia no libra (libra L, M y J)
@@ -146,24 +153,24 @@ try {
     const r = puedeEstar(S, S.staff, e, d.iso, 'PASARELA_T', 'lavinia', {});
     return r.ok === true || r.motivo;
   }) === true, 'motivo devuelto (se esperaba ok)');
-  ok('el historial: «Ficha de Lavinia: «Nunca con» desactivada (también en Mari Luz)» (EQUIPO)', await pg.evaluate(() => (S.historial || []).some(h => h.tipo === 'equipo' && /^Ficha de Lavinia: «Nunca con» desactivada \(también en Mari Luz\)$/.test(h.txt))), (await textoHistorial(pg)).slice(0, 2).join(' | '));
-  ok('se guarda en localStorage (inactivas de la ficha)', await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('shiftia_pasarela_v01')).staff.find(p => p.id === 'lavinia').inactivas.includes('nuncaCon'); } catch (e) { return false; } }));
+  ok('el historial: «Ficha de Lavinia: «nunca con» Mari Luz apagada (la pareja, en las dos fichas)» (EQUIPO)', await pg.evaluate(() => (S.historial || []).some(h => h.tipo === 'equipo' && /^Ficha de Lavinia: «nunca con» Mari Luz apagada \(la pareja, en las dos fichas\)$/.test(h.txt))), (await textoHistorial(pg)).slice(0, 2).join(' | '));
+  ok('se guarda en localStorage (nuncaConOff de las dos fichas)', await pg.evaluate(() => { try { const st = JSON.parse(localStorage.getItem('shiftia_pasarela_v01')).staff; return st.find(p => p.id === 'lavinia').nuncaConOff.includes('mariluz') && st.find(p => p.id === 'mariluz').nuncaConOff.includes('lavinia'); } catch (e) { return false; } }));
   await pg.evaluate(() => document.querySelector('#fichaOvl .fcar[data-car="nuncaCon"]').scrollIntoView({ block: 'center' }));
   await captura(pg, 'ficha-escritorio');
   ok('la ficha se cierra con «Listo»', await cerrarOvl(pg, 'fichaOvl') >= 0);
-  ok('en las tarjetas, «Nunca con» sale tachada en Lavinia y en Mari Luz', await pg.evaluate(() => ['lavinia', 'mariluz'].every(id => [...document.querySelectorAll(`#equipoRoot [data-pcard="${id}"] .tchip.off`)].some(x => /Nunca con/.test(x.textContent)))));
+  ok('en las tarjetas, «Nunca con» de esa pareja sale tachada en Lavinia y en Mari Luz', await pg.evaluate(() => [['lavinia', 'Mari Luz'], ['mariluz', 'Lavinia']].every(([id, otro]) => [...document.querySelectorAll(`#equipoRoot [data-pcard="${id}"] .tchip.off`)].some(x => /Nunca con/.test(x.textContent) && x.textContent.includes(otro)))));
 
   // 7) desde el panel: la apagada se ve tachada y se reactiva
   ok('el panel vuelve a abrirse', await abrirPanel(pg) >= 0);
   const c3 = await contador2(pg);
-  ok(`el contador cuenta 2 apagadas (las dos fichas) y ${n1 - 1} activas`, !!c3 && c3.apagadas === 2 && c3.activas === n1 - 1, JSON.stringify(c3));
-  const filaOff = await pg.evaluate(() => { const r = [...document.querySelectorAll('#condOvl .condrow.off')].find(x => (x.querySelector('input[data-car]') || { dataset: {} }).dataset.car === 'lavinia|nuncaCon' || (x.querySelector('input[data-car]') || { dataset: {} }).dataset.car === 'mariluz|nuncaCon'); return r ? { cid: r.dataset.cid, txt: r.textContent.replace(/\s+/g, ' ').trim() } : null; });
-  ok('«apagadas» pinta la condición tachada, una sola vez, con las dos fichas en la nota', !!filaOff && /no coinciden/.test(filaOff.txt) && /fichas de (Mari Luz y Lavinia|Lavinia y Mari Luz)/.test(filaOff.txt) && await pg.$$eval('#condOvl .condrow.off', xs => xs.filter(x => /no coinciden/.test(x.textContent)).length) === 1, JSON.stringify(filaOff));
+  ok(`el contador cuenta 1 apagada (la pareja) y ${n1 - 1} activas`, !!c3 && c3.apagadas === 1 && c3.activas === n1 - 1, JSON.stringify(c3));
+  const filaOff = await pg.evaluate(() => { const r = [...document.querySelectorAll('#condOvl .condrow.off')].find(x => { const d = (x.querySelector('input[data-par]') || { dataset: {} }).dataset.par || ''; return d.split('|').sort().join('|') === 'lavinia|mariluz'; }); return r ? { cid: r.dataset.cid, txt: r.textContent.replace(/\s+/g, ' ').trim() } : null; });
+  ok('«apagadas» pinta la condición tachada, una sola vez, diciendo que está apagada esa pareja', !!filaOff && /no coinciden/.test(filaOff.txt) && /pareja/.test(filaOff.txt) && await pg.$$eval('#condOvl .condrow.off', xs => xs.filter(x => /no coinciden/.test(x.textContent)).length) === 1, JSON.stringify(filaOff));
   await captura(pg, 'panel-escritorio');
   await pg.evaluate(() => { const r = document.querySelector('#condOvl .condrow.off'); if (r) r.scrollIntoView({ block: 'center' }); });
   await captura(pg, 'panel-escritorio-apagadas');
   await pg.click(`#condOvl .condrow.off[data-cid="${filaOff ? filaOff.cid : 'x'}"] .tglk`);
-  ok('reactivarla desde el panel devuelve la condición al catálogo y limpia las dos fichas', await llega(pg, () => condicionesDe(S, S.staff).some(c => c.k === 'nuncaCon' && (c.pid === 'lavinia' || c.otro === 'lavinia')) && ['lavinia', 'mariluz'].every(id => !(S.staff.find(p => p.id === id).inactivas || []).includes('nuncaCon')), null, 3000) >= 0, JSON.stringify(await persona(pg, 'lavinia')));
+  ok('reactivarla desde el panel devuelve la condición al catálogo y limpia las dos fichas', await llega(pg, () => condicionesDe(S, S.staff).some(c => c.k === 'nuncaCon' && (c.pid === 'lavinia' || c.otro === 'lavinia')) && ['lavinia', 'mariluz'].every(id => !(S.staff.find(p => p.id === id).nuncaConOff || []).length), null, 3000) >= 0, JSON.stringify(await persona(pg, 'lavinia')));
   const c4 = await contador2(pg);
   ok(`el contador vuelve a ${n1} activas · 0 apagadas`, !!c4 && c4.activas === n1 && c4.apagadas === 0, JSON.stringify(c4));
   ok('«Ajustes del local» desde una condición de mínimos abre los ajustes de ese local', (await pg.click('#condOvl .condrow[data-cid^="min:EL33:"] [data-condlocal]'), await llega(pg, () => !!document.querySelector('#localesOvl [data-loctab="EL33"].on'), null, 3000) >= 0));

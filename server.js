@@ -676,8 +676,12 @@ const server = http.createServer(async (req, res) => {
         const lista = k => estado[k] === undefined || estado[k] === null || Array.isArray(estado[k]);
         // 24/09 (D11): los cierres de un local por fechas, con su local y sus días { iso: [franjas] }
         const esCierre = c => !!c && typeof c === 'object' && typeof c.localId === 'string' && !!c.dias && typeof c.dias === 'object' && !Array.isArray(c.dias) && Object.values(c.dias).every(Array.isArray);
+        // 24/09 (fase 6, S21 y S31): en cada ficha, las parejas «nunca con» (con su «flexible» y su interruptor) son
+        // listas de ids, y el local habitual, el id de un local
+        const ids = v => v === undefined || v === null || (Array.isArray(v) && v.every(x => typeof x === 'string'));
+        const fichaBien = p => ['nuncaCon', 'nuncaConFlex', 'nuncaConOff'].every(k => ids(p[k])) && (p.localHabitual === undefined || p.localHabitual === null || typeof p.localHabitual === 'string');
         const bien = ['locales', 'peticiones', 'avisos', 'historial', 'festivos', 'eventos', 'extras', 'mesesPublicados', 'cierresPuntuales'].every(lista)
-          && estado.staff.every(p => p && typeof p === 'object' && typeof p.id === 'string')
+          && estado.staff.every(p => p && typeof p === 'object' && typeof p.id === 'string' && fichaBien(p))
           && (!Array.isArray(estado.cierresPuntuales) || estado.cierresPuntuales.every(esCierre))
           && (estado.meses === undefined || (estado.meses && typeof estado.meses === 'object' && !Array.isArray(estado.meses)));
         if (!bien) { json(res, 400, { error: 'estado inválido: alguna lista no tiene la forma esperada' }); return; }

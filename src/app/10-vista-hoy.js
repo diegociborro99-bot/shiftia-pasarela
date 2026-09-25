@@ -28,6 +28,13 @@ function chipHueco(iso, tid, s, opts) {
     <span class="pos">${s.pos}</span><span class="pnom"><b>Hueco disponible</b><small class="por">abre la ${FRANJA_LBL[franja].toLowerCase()} · turno completo${s.motivo ? ' — ' + esc(s.motivo.replace(/^nadie de la casilla puede abrir:?\s*/i, '')) : ''}</small></span>
   </span>`;
 }
+// La cabecera n/mín de una casilla. 24/09 (revisión de la fase 6, D5): con la regla del grupo «Mínimos» apagada
+// nadie pide el mínimo (revisarTurno no da «faltan»), pero una casilla por debajo no está «cubierta»: sale sin
+// color y lo dice, en vez de en verde con «Mínimo cubierto»
+function htmlCuentaCasilla(r, n) {
+  if (r.minimosApagados && n < r.minimo) return `<span class="cnt" data-tipstr="Mínimos apagados para todo el grupo (Equipo → Condiciones): nadie pide el mínimo">${n}/${r.minimo}</span>`;
+  return `<span class="cnt ${r.faltan ? 'falta' : 'ok'}" data-tipstr="${r.faltan ? esc('Faltan ' + r.faltan) : 'Mínimo cubierto'}">${n}/${r.minimo}</span>`;
+}
 function htmlCasilla(iso, tid, opts) {
   const e = estadoDeIso(iso);
   const { localId, franja } = partirTurno(tid);
@@ -37,7 +44,7 @@ function htmlCasilla(iso, tid, opts) {
   const r = revisarTurno(S, S.staff, e, iso, tid);
   const h = horarioDe(l, isoDow(iso), franja);
   const cab = `<div class="cashd"><span class="fr">${FRANJA_LBL[franja]}</span>
-    ${abierto ? `<span class="cnt ${r.faltan ? 'falta' : 'ok'}" data-tipstr="${r.faltan ? esc('Faltan ' + r.faltan) : 'Mínimo cubierto'}">${lista.length}/${r.minimo}</span>` : ''}
+    ${abierto ? htmlCuentaCasilla(r, lista.length) : ''}
     ${abierto && r.supuesto ? '<span class="sup" data-tipstr="Mínimo supuesto por Highkey Labs: pendiente de confirmar con el grupo">supuesto</span>' : ''}
     ${abierto && r.refuerzo ? `<span class="ref" data-tipstr="${esc('Refuerzo: +' + r.refuerzo + ' por ' + minimoDe(S, iso, tid).eventos.map(x => x.nombre).join(', '))}">+${r.refuerzo}</span>` : ''}
     ${abierto && r.sinCocina ? `<span class="bdg ${r.cocinaObligatoria ? 'forz' : 'sup'}" data-tipstr="${r.cocinaObligatoria ? 'La cocina es obligatoria en este local' : 'Este local suele llevar cocina'}">sin cocina</span>` : ''}

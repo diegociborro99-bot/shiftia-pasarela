@@ -114,6 +114,9 @@ tr.piedesc .dn em{font-style:normal;font-family:var(--mono);font-size:9px;color:
 .pill.pT{background:color-mix(in srgb, var(--lc,var(--accent)) 78%, #000)}
 .pill.pP{background:linear-gradient(135deg,var(--lc,var(--accent)) 50%,color-mix(in srgb, var(--lc2,var(--lc,var(--accent))) 78%, #000) 50%)}
 .pill.pP.dobla{background:linear-gradient(135deg,var(--lc) 50%,var(--lc2) 50%)}
+/* 24/09 (revisión de la fase 6, D4): el turno continuo (mañana y tarde de corrido en el mismo local) no es un partido:
+   un solo color, con un borde más oscuro que lo distingue de la mañana */
+.pill.pC{color:#fff;background:var(--lc,var(--accent));font-size:11px;box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--lc,var(--accent)) 60%, #000)}
 .pill .fz{position:absolute;top:-4px;left:-4px;width:11px;height:11px;border-radius:50%;background:var(--bad);border:1.5px solid var(--surface)}
 .pill .fz.aw{background:var(--warn)}
 .pill.ev{box-shadow:inset 0 0 0 1.5px var(--accent)}

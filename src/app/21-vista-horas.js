@@ -12,9 +12,11 @@
 const HORAS_ABIERTAS = new Set();   // filas desplegadas; sobreviven al repintado
 
 function numHoras(h) { return (Math.round((+h || 0) * 10) / 10).toLocaleString('es-ES', { maximumFractionDigits: 1 }); }
+// 24/09 (fase 6, S29 y D7): «sin local fijo» es no tener locales (esComodin), como en el Generador y en Equipo; con
+// la marca p.comodin, Horas decía «Apoyo · sin local fijo» de Tere, que tiene dos locales
 function puestoLbl(p) {
   const base = (PUESTOS.find(x => x.id === p.puesto) || {}).label || '';
-  return p.comodin ? `${base} · sin local fijo`.replace(/^ · /, '') : base;
+  return esComodin(p) ? `${base} · sin local fijo`.replace(/^ · /, '') : base;
 }
 // el mes de la vista; si aún no se ha elegido, el de la planilla en pantalla (y se recuerda)
 function mesHoras() {
