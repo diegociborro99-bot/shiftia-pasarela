@@ -15,6 +15,7 @@ if (window.visualViewport) {
   try { esPrimeraVez = !localStorage.getItem(LS_KEY); } catch (e) {}
   S = loadState() || freshState();
   migrarEstado(S);
+  marcarHuellaConfig();   // (revisión F5) desde aquí, un cambio de configuración recalcula quién abre y la cocina
   restaurarNav();
   cargarMes();
   // ?demo=1 → el mes en curso y el siguiente se generan con la semana tipo (solo lo

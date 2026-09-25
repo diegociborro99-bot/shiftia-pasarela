@@ -300,7 +300,7 @@ function ofrecerMigracion() {
   const empezar = async () => {
     // «Empezar de cero»: el servidor arranca con el equipo de fábrica y nada de
     // lo que hubiera en este navegador (demo, pruebas) — y se guarda ya
-    S = freshState(); migrarEstado(S);
+    S = freshState(); migrarEstado(S); marcarHuellaConfig();
     const d = sembrarDemo(S, isoHoy());   // el mes en curso y el siguiente, generados con la semana tipo: la app enseña algo desde el primer minuto
     cargarMes();
     if (d.meses.length) registrarCambio(`Primer arranque: ${d.meses.join(' y ')} generados con la semana tipo (${d.aplicados} plazas)${d.evento ? ' y partido de muestra el ' + fmtDM(d.evento) : ''}`, 'ia');

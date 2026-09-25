@@ -76,14 +76,15 @@ function chipsCondiciones(p) {
   // su semana, para que se vea a qué semana se refiere
   const lunesHoy = lunesDe(isoHoy());
   for (const x of librasPuntuales(p).filter(x => x.dias.length && x.semana >= lunesHoy)) h.push(tc('libra', 'Libra', esc(`Semana del ${fmtDDMM(x.semana)}: ${textoCambioLibre(p, x)}`), 'warn'));
+  // 24/09 (fase 5, S15): el interruptor «Cocina» de la ficha apaga sus límites (nunca, solo unos días, solo
+  // hace cocina), no que sea titular o reserva de un local: eso no se tacha, como no lo quita la puerta
   const c = p.cocina || {};
   if (c.nunca) h.push(tc('cocina', 'Cocina', 'nunca', 'warn'));
-  else {
-    for (const id of c.titular || []) h.push(tc('cocina', 'Cocina', chipLocal(id, '· titular'), 'loc'));
-    for (const id of c.reserva || []) h.push(tc('cocina', 'Cocina', chipLocal(id, '· reserva'), 'loc'));
-    if (p.puesto === 'cocina' && !(c.titular || []).length && !(c.reserva || []).length) h.push(tc('cocina', 'Cocina', 'por su puesto'));
-    if ((c.soloDias || []).length) h.push(tc('cocina', 'Cocina', 'solo ' + esc(c.soloDias.map(lblDowPl).join(' y ')), 'warn'));
-  }
+  for (const id of c.titular || []) h.push(tchip('Cocina', chipLocal(id, '· titular'), 'loc'));
+  for (const id of c.reserva || []) h.push(tchip('Cocina', chipLocal(id, '· reserva'), 'loc'));
+  if (p.puesto === 'cocina' && !(c.titular || []).length && !(c.reserva || []).length) h.push(tchip('Cocina', 'por su puesto'));
+  if ((c.soloDias || []).length) h.push(tc('cocina', 'Cocina', 'solo ' + esc(c.soloDias.map(lblDowPl).join(' y ')), 'warn'));
+  if (p.soloCocina) h.push(tc('cocina', 'Cocina', 'solo hace cocina', 'warn', 'no refuerza la sala'));
   for (const [lid, fr] of Object.entries(p.abre || {})) if ((fr || []).length) h.push(tc('abre', 'Abre', chipLocal(lid, fr.map(f => FRANJA_LBL[f].toLowerCase()).join(' y ')), 'loc'));
   for (const lid of p.noAbre || []) h.push(tc('noAbre', 'No abre', chipLocal(lid), 'loc warn'));
   if ((p.noPrimero || []).length) h.push(tc('noPrimero', 'Nunca 1.º', esc(lblNoPrimero(p.noPrimero)), 'warn', 'no sale nunca el primero en esa franja: entra a partir del segundo puesto'));
@@ -241,11 +242,12 @@ function altaAusenciaUI(pid, aus, hecho) {
   const hoy = isoHoy();
   const prueba = JSON.parse(JSON.stringify(S.staff));
   anadirAusencia(personaDe(prueba, pid), a);
-  const sim = cubrirAusencia(S, prueba, clonarEstado(estadoRango(rg.desde, rg.hasta, false)), pid, a.desde, hasta, a.franjas, { desdeIso: hoy });
+  // (revisión F5) con S.meses, la carga «M este mes» de quien cubre cuenta el mes entero, como en la Cobertura
+  const sim = cubrirAusencia(S, prueba, clonarEstado(estadoRango(rg.desde, rg.hasta, false)), pid, a.desde, hasta, a.franjas, { desdeIso: hoy, meses: S.meses });
   const guardar = conCobertura => {
     pushUndo(`ausencia de ${p.nombre}`, { staff: true, otrosMeses: true });
     const r0 = anadirAusencia(p, a);
-    const r = cubrirAusencia(S, S.staff, estadoRango(rg.desde, rg.hasta, true), pid, a.desde, hasta, a.franjas, { desdeIso: hoy });
+    const r = cubrirAusencia(S, S.staff, estadoRango(rg.desde, rg.hasta, true), pid, a.desde, hasta, a.franjas, { desdeIso: hoy, meses: S.meses });
     const quien = r.puestos.concat(r.relevos);
     // las fechas en orden (revisión F3b: salían en el orden en que se cubrían: «20/9, 15/9, 22/9…»)
     const cubren = [...new Set(quien.map(x => x.pid))].map(q => `${nombrePid(q)} le cubre ${listaY([...new Set(quien.filter(x => x.pid === q).map(x => x.iso))].sort().map(fmtDM))}`);
@@ -442,14 +444,38 @@ function openAjustesLocales(localId, cambiosPrevios) {
     ov.querySelector('#locTabs').innerHTML = S.locales.map(l => `<button type="button" class="segk${l.id === actual ? ' on' : ''}" data-loctab="${esc(l.id)}" style="--lc:${esc(l.color)}"><i class="ldot"></i>${esc(l.nombre)}</button>`).join('');
   };
   const personasSel = (sel, vacio) => `<option value="">${esc(vacio)}</option>` + activos(isoHoy()).map(p => `<option value="${esc(p.id)}"${sel === p.id ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('');
-  // candidatos a cocina: primero quien ya cocina en ese local (o es de cocina), luego el resto por si acaso
+  // candidatos a cocina: primero quien ya puede llevar la de ese local (puedeCocina: su ficha, esta lista o
+  // ser de cocina); luego el resto, avisando de que al añadirlas pasan a serlo en su ficha (24/09, fase 5, S36:
+  // la lista de Ajustes y la ficha son una sola cosa; antes se añadía a Victoria aquí y nadie le daba la cocina)
   const selCocina = (l, excluidos) => {
     const libres = activos(isoHoy()).filter(p => !excluidos.includes(p.id));
-    const aptos = libres.filter(p => puedeCocina(S, p, l.id, null) || p.puesto === 'cocina');
+    const aptos = libres.filter(p => puedeCocina(S, p, l.id, null));
     const otros = libres.filter(p => !aptos.includes(p));
     return `<option value="">— elegir persona —</option>` +
-      (aptos.length ? `<optgroup label="Cocina de este local">${aptos.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}</optgroup>` : '') +
-      (otros.length ? `<optgroup label="Otras personas">${otros.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}</optgroup>` : '');
+      // (revisión F5: «Cocina de este local» ofrecía a Esmeralda y a Adrián, del Mónaco y de Zapatillera, que pueden
+      // llevarla por ser de cocina pero no son de este local)
+      (aptos.length ? `<optgroup label="Ya pueden llevarla (su ficha, esta lista o ser de cocina)">${aptos.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}</optgroup>` : '') +
+      (otros.length ? `<optgroup label="Otras personas · al añadirlas pasan a ser de cocina de ${esc(l.nombre)} en su ficha">${otros.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}</optgroup>` : '');
+  };
+  // poner o quitar a alguien de la cocina del local: la lista y su ficha a la vez (ponerCocinaLocal), con su
+  // paso de Ctrl+Z. A quien aún no puede llevarla se le pregunta antes, diciendo lo que cambia en su ficha
+  const cambiaCocina = (l, o) => {
+    const p = personaDeId(o.pid);
+    // (revisión F5) si con ella el local pasa a tener cocina en esa franja (Tere, titular de la mañana de
+    // Pasarela), se dice: desde entonces la Revisión avisará los días que falte
+    const nueva = !o.quitar && o.lista !== 'reservas' ? cocinaQueCrea(S, S.staff, l.id, [o.franja]) : [];
+    const avisoNueva = nueva.length ? `\n\n${l.nombre} no tiene cocina por la ${nueva.map(f => FRANJA_LBL[f].toLowerCase()).join(' ni por la ')}: con ${p ? p.nombre : 'ella'} de titular pasa a tener cocina ${nueva.length > 1 ? 'mañana y tarde' : 'por la ' + FRANJA_LBL[nueva[0]].toLowerCase()} todos los días que abre, y la Revisión avisará los días que no esté.` : '';
+    if (!o.quitar && p && !puedeCocina(S, p, l.id, null)) {
+      const papel = o.lista === 'reservas' ? 'reserva' : 'titular';
+      const nunca = nuncaCocina(S, p);
+      if (!confirm(`${p.nombre} no es de cocina de ${l.nombre}. Al añadirla pasa a ser ${papel} de la cocina de ${l.nombre} también en su ficha, y el Generador podrá darle la cocina.${nunca ? `\n\nOjo: su ficha dice «Nunca cocina»; mientras lo diga, no la llevará.` : ''}${avisoNueva}\n\n¿Seguir?`)) return false;
+    } else if (avisoNueva && !confirm(avisoNueva.trim() + '\n\n¿Seguir?')) return false;
+    pushUndo(`cocina de ${l.nombre}`, { staff: true, cocinaLocales: true });
+    const antes = p ? cocinaDe(S, p, l.id) : null;
+    ponerCocinaLocal(S, S.staff, l.id, o);
+    const ahora = p ? cocinaDe(S, p, l.id) : null;
+    anota(l, `${o.lista === 'reservas' ? 'reservas de cocina' : `cocina de ${FRANJA_LBL[o.franja].toLowerCase()}`}${p && antes !== ahora ? ` (${p.nombre}: en su ficha, ${ahora || 'ya no es de cocina de este local'})` : ''}`);
+    return true;
   };
   const listaOrdenada = (ids, attr, pref) => ids.length ? ids.map((pid, i) => `<div class="festrow coc"><span class="av" style="background:${avColor(pid)}">${esc(initials(nombrePid(pid)))}</span>
       <span class="festinfo"><b>${i + 1}. ${esc(nombrePid(pid))}</b><small>${i === 0 ? 'primera opción' : 'si falta quien va antes'}</small></span>
@@ -581,23 +607,34 @@ function openAjustesLocales(localId, cambiosPrevios) {
       anota(l, 'mínimos supuestos'); pintaLocal(); return;
     }
     const tk = t.closest('[data-tit]');
-    if (tk) { const [f, op, i] = tk.dataset.tit.split('|'); mueve(l.cocina.titulares[f], op, +i); anota(l, `cocina de ${FRANJA_LBL[f].toLowerCase()}`); pintaLocal(); return; }
+    if (tk) {
+      const [f, op, i] = tk.dataset.tit.split('|');
+      // quitar, también de su ficha (fase 5, S36); subir y bajar solo cambian el orden
+      if (op === 'rm') { const pid = l.cocina.titulares[f][+i]; if (pid) cambiaCocina(l, { lista: 'titulares', franja: f, pid, quitar: true }); }
+      else { mueve(l.cocina.titulares[f], op, +i); anota(l, `cocina de ${FRANJA_LBL[f].toLowerCase()}`); }
+      pintaLocal(); return;
+    }
     for (const f of FRANJAS) {
       const ta = t.closest(`[data-titadd="${f}"]`);
       if (ta) {
         const pid = ov.querySelector(`[data-titsel="${f}"]`).value;
         if (!pid) { toast('Elige a alguien', 'warn'); return; }
-        if (!l.cocina.titulares[f].includes(pid)) l.cocina.titulares[f].push(pid);
-        anota(l, `cocina de ${FRANJA_LBL[f].toLowerCase()}`); pintaLocal(); return;
+        if (!l.cocina.titulares[f].includes(pid)) cambiaCocina(l, { lista: 'titulares', franja: f, pid });
+        pintaLocal(); return;
       }
     }
     const rk = t.closest('[data-res]');
-    if (rk) { const [op, i] = rk.dataset.res.split('|'); mueve(l.cocina.reservas, op, +i); anota(l, 'reservas de cocina'); pintaLocal(); return; }
+    if (rk) {
+      const [op, i] = rk.dataset.res.split('|');
+      if (op === 'rm') { const pid = l.cocina.reservas[+i]; if (pid) cambiaCocina(l, { lista: 'reservas', pid, quitar: true }); }
+      else { mueve(l.cocina.reservas, op, +i); anota(l, 'reservas de cocina'); }
+      pintaLocal(); return;
+    }
     if (t.closest('[data-resadd]')) {
       const pid = ov.querySelector('[data-ressel]').value;
       if (!pid) { toast('Elige a alguien', 'warn'); return; }
-      if (!l.cocina.reservas.includes(pid)) l.cocina.reservas.push(pid);
-      anota(l, 'reservas de cocina'); pintaLocal();
+      if (!l.cocina.reservas.includes(pid)) cambiaCocina(l, { lista: 'reservas', pid });
+      pintaLocal();
     }
   });
   ov.addEventListener('change', e => {
@@ -660,7 +697,15 @@ function openAjustesLocales(localId, cambiosPrevios) {
     if (t.dataset.cocobl) { l.cocina.obligatoria[t.dataset.cocobl] = t.checked; anota(l, `cocina obligatoria de ${FRANJA_LBL[t.dataset.cocobl].toLowerCase()}`); return; }
     if (t.dataset.cocpos) { l.cocina.posicion[t.dataset.cocpos] = +t.value === 3 ? 3 : 2; anota(l, 'posición de la cocina'); return; }
     if (t.dataset.cocdesde) { const v = +t.value; if (v >= 2) l.cocina.posicionSiDesde[t.dataset.cocdesde] = v; else { delete l.cocina.posicionSiDesde[t.dataset.cocdesde]; t.value = ''; } anota(l, 'posición de la cocina'); return; }
-    if (t.dataset.primero) { l.primero[t.dataset.primero] = t.value || null; anota(l, `quién abre de ${FRANJA_LBL[t.dataset.primero].toLowerCase()}`); }
+    if (t.dataset.primero) {
+      // (revisión F5) si su ficha no le deja abrir (Leo, «nunca de primero»; quien «no abre» este local) o está en
+      // standby, se dice antes: su ficha manda y no abrirá mientras lo diga
+      const f = t.dataset.primero, q = t.value ? personaDeId(t.value) : null;
+      const imp = q ? fichaImpideAbrir(S, q, l.id, f) : null;
+      const pega = imp ? `${imp.motivo} («${nombreRegla(imp.regla)}» en su ficha)` : q && q.standby ? `${q.nombre} está en standby: aún no entra en la planilla` : '';
+      if (pega && !confirm(`${pega}. Si la pones en «Quién abre» de ${l.nombre} por la ${FRANJA_LBL[f].toLowerCase()}, no abrirá mientras su ficha lo diga.\n\n¿Ponerla igualmente?`)) { t.value = l.primero[f] || ''; return; }
+      l.primero[f] = t.value || null; anota(l, `quién abre de ${FRANJA_LBL[f].toLowerCase()}`);
+    }
   });
   let cerrado = false;
   // el listener de abrirOverlay (✕ y fondo) ya ha quitado el overlay cuando llega este: solo se anota una vez
@@ -681,11 +726,13 @@ function openAjustesLocales(localId, cambiosPrevios) {
 // reglas), con un interruptor por regla del grupo (S.reglas[k]) y otro por
 // característica de cada ficha (p.inactivas). Lo apagado se ve tachado y se
 // puede volver a encender desde aquí. Cada toque guarda y deja huella en el historial.
-const TIPO_COND = { minimos: 'Mínimos por local', cocina: 'Cocina de los locales', persona: 'Personas (sus fichas)', regla: 'Reglas del grupo' };
+// (fase 5: «Quién abre» de cada local es una condición, S18)
+const TIPO_COND = { minimos: 'Mínimos por local', cocina: 'Cocina de los locales', primero: 'Quién abre cada local', persona: 'Personas (sus fichas)', regla: 'Reglas del grupo' };
 // a qué regla del grupo obedece cada condición (null: no depende de ninguna)
 function reglaDeCondicion(c) {
   if (c.tipo === 'minimos') return 'minimos';
   if (c.tipo === 'cocina') return 'cocina';
+  if (c.tipo === 'primero') return 'abre';
   if (c.tipo === 'regla') return c.k;
   return ['libra', 'partido', 'vetos', 'nuncaCon', 'cubreA', 'cocina', 'abre', 'noPrimero'].includes(c.k) ? c.k : null;
 }
@@ -723,7 +770,8 @@ function openCondiciones() {
     let reglasOff = 0;
     for (const r of REGLAS) {
       const on = regla(S, r.k); if (!on) reglasOff++;
-      h += `<div class="condrow regla${on ? '' : ' off'}" data-regla-row="${r.k}" data-q="${esc(norm(r.lbl))}"><span class="condnum">${on ? '●' : '○'}</span><span class="condtx">${esc(r.lbl)}${r.nueva ? ' <span class="condnew">NUEVA</span>' : ''}</span>${htmlToggle(on, `data-regla="${r.k}"`, `Regla: ${r.lbl}`)}</div>`;
+      // 24/09 (fase 5, D5): apagada, dice lo que pasa (el texto sale del modelo, REGLAS)
+      h += `<div class="condrow regla${on ? '' : ' off'}" data-regla-row="${r.k}" data-q="${esc(norm(r.lbl))}"><span class="condnum">${on ? '●' : '○'}</span><span class="condtx">${esc(r.lbl)}${r.nueva ? ' <span class="condnew">NUEVA</span>' : ''}${!on && r.apagada ? ` <small class="condinfo">${esc(r.apagada)}</small>` : ''}</span>${htmlToggle(on, `data-regla="${r.k}"`, `Regla: ${r.lbl}`)}</div>`;
     }
     // ---- condiciones activas, por tipo ----
     h += `<div class="revgrp" style="margin-top:18px"><span class="dot" style="background:var(--teal)"></span>CONDICIONES ACTIVAS · ${activas.length}</div>
@@ -738,7 +786,7 @@ function openCondiciones() {
           const p = personaDeId(c.pid);
           const q = c.k === 'nuncaCon' && c.otro ? ` y ${nombrePid(c.otro)}` : '';
           ctrl = htmlToggle(true, `data-car="${esc(c.pid)}|${esc(c.k)}"`, `«${lblCaracteristica(c.k)}» en la ficha de ${p ? p.nombre : c.pid}${q}`);
-        } else if (c.tipo === 'minimos' || c.tipo === 'cocina') ctrl = `<button type="button" class="condlnk" data-condlocal="${esc(c.localId)}">Ajustes del local</button>`;
+        } else if (c.tipo === 'minimos' || c.tipo === 'cocina' || c.tipo === 'primero') ctrl = `<button type="button" class="condlnk" data-condlocal="${esc(c.localId)}">Ajustes del local</button>`;
         else if (c.tipo === 'regla') ctrl = `<button type="button" class="condlnk" data-irregla="${esc(c.k)}">Regla del grupo ↑</button>`;
         h += fila(c, ctrl, { q: c.tipo === 'persona' ? nombrePid(c.pid) + ' ' + lblCaracteristica(c.k) : c.localId ? nombreLocal(c.localId) : '' });
       }
@@ -798,7 +846,7 @@ function openCondiciones() {
       S.reglas[r.k] = on;
       registrarCambio(`Regla «${r.lbl}» ${on ? 'activada' : 'desactivada'}`, 'equipo');
       saveState(); renderVistaActiva(); pinta();
-      toast(`Regla ${on ? 'activada' : 'desactivada'} para todo el grupo`, on ? 'ok' : 'warn');
+      toast(`Regla ${on ? 'activada' : 'desactivada'} para todo el grupo${!on && r.apagada ? '. ' + r.apagada : ''}`, on ? 'ok' : 'warn');
       return;
     }
     if (ds.car) {

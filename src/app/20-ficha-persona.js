@@ -26,9 +26,11 @@ function openFicha(pid, opts) {
   normalizarFicha(p);
 
   let tocada = false, undoHecho = false;
-  // un registro por cambio; deshacer con una sola instantánea por ficha abierta
+  // un registro por cambio; deshacer con una sola instantánea por ficha abierta (con la cocina de los locales:
+  // la cocina de la ficha escribe también la lista del local, fase 5; solo la cocina, revisión F5: con los
+  // locales enteros, Ctrl+Z devolvía también el mínimo o «Quién abre» cambiados después en Ajustes)
   const guarda = (campo, mut, tipo) => {
-    if (!undoHecho) { pushUndo(`ficha de ${p.nombre}`, { staff: true }); undoHecho = true; }
+    if (!undoHecho) { pushUndo(`ficha de ${p.nombre}`, { staff: true, cocinaLocales: true }); undoHecho = true; }
     mut(p);
     tocada = true;
     registrarCambio(`Ficha de ${p.nombre}: ${campo}`, tipo || 'cambio');
@@ -66,9 +68,9 @@ function openFicha(pid, opts) {
     const on = act(k), o = opts || {};
     return `<div class="fcar${on ? '' : ' off'}" data-car="${k}">
       <div class="fcarh"><span class="fcart">${titulo ? esc(titulo) : ''}${o.nueva ? ' <span class="condnew">NUEVA</span>' : ''}${sub ? ` <small>${sub}</small>` : ''}</span>
-        <label class="tgl" title="${on ? 'Activa: el generador la tiene en cuenta' : 'Desactivada: el generador no la tiene en cuenta'}"><input type="checkbox" role="switch" aria-checked="${on ? 'true' : 'false'}" aria-label="«${esc(lblCaracteristica(k))}» activa" data-car-tgl="${k}" data-libre${on ? ' checked' : ''}><span class="tglk"></span><span class="tgll">${on ? 'Activa' : 'Apagada'}</span></label></div>
+        <label class="tgl" title="${on ? 'Activa: el generador la tiene en cuenta' : esc(o.apagada || 'Desactivada: el generador no la tiene en cuenta')}"><input type="checkbox" role="switch" aria-checked="${on ? 'true' : 'false'}" aria-label="«${esc(lblCaracteristica(k))}» activa" data-car-tgl="${k}" data-libre${on ? ' checked' : ''}><span class="tglk"></span><span class="tgll">${on ? 'Activa' : 'Apagada'}</span></label></div>
       <div class="fcarb">${html}</div>
-      ${on ? '' : '<p class="fcaroff">Desactivada: el generador no la tiene en cuenta. Se puede seguir editando y volver a activar cuando haga falta.</p>'}</div>`;
+      ${on ? '' : `<p class="fcaroff">${o.apagada ? esc(o.apagada) : 'Desactivada: el generador no la tiene en cuenta.'} Se puede seguir editando y volver a activar cuando haga falta.</p>`}</div>`;
   };
   const subOff = (k, sub) => (act(k) ? '' : 'desactivada · ') + sub;
 
@@ -96,7 +98,9 @@ function openFicha(pid, opts) {
        <div class="pinlbl">Reserva de cocina en</div><div class="locset">${locChips(c.reserva, 'tcocr')}</div>
        <div class="pinlbl">Solo cocina estos días <small>(ninguno = cualquiera)</small></div><div class="dowset">${dowSet(c.soloDias, 'tcocd')}</div>
        ${chk('cocinaNunca', !!c.nunca, 'Nunca cocina')}
-       ${chk('soloCocina', !!p.soloCocina, 'Solo hace cocina: no refuerza la sala (el generador, la cobertura y el selector no la ponen de sala)')}`));
+       ${chk('soloCocina', !!p.soloCocina, 'Solo hace cocina: no refuerza la sala (el generador, la cobertura y el selector no la ponen de sala)')}`,
+       // 24/09 (fase 5, S15): qué apaga el interruptor de la cocina de la ficha (lo mismo que la puerta y los chips)
+       { apagada: 'Apagada: no se miran «solo estos días», «nunca cocina» ni «solo hace cocina». Sigue siendo titular o reserva donde lo diga (eso se cambia arriba o en Ajustes del local).' }));
     h += sec('abre', 'Abre el local', 'quién sale primero, quién no',
       car('abre', 'Sale el primero en', '', S.locales.map(l => `<div class="abrerow" style="--lc:${esc(l.color)}"><span class="abrenm"><i class="ldot"></i>${esc(l.nombre)}</span><span class="segrow" style="margin:0">${FRANJAS.map(f => `<button type="button" class="segk${((p.abre[l.id] || []).includes(f)) ? ' on' : ''}" data-tabre="${esc(l.id)}|${f}" data-libre>${FRANJA_LBL[f]}</button>`).join('')}</span></div>`).join('')) +
       car('noAbre', 'No abre nunca en', '', `<div class="locset">${locChips(p.noAbre, 'tnoabre')}</div>`) +
@@ -180,7 +184,18 @@ function openFicha(pid, opts) {
     const ds = el.dataset;
     if (ds.tnoprimero !== undefined) {
       const f = ds.tnoprimero, quita = p.noPrimero.includes(f);
-      guarda(`nunca el primero de ${FRANJA_LBL[f].toLowerCase()} ${quita ? 'quitado' : 'añadido'}`, x => { alterna(x.noPrimero, f); x.noPrimero.sort(); }, 'equipo'); pinta(); return;
+      // (revisión F5) si es «Quién abre» de algún local en esa franja o tiene «Sale el primero» ahí, se dice y se
+      // ofrece quitarlo: si no, el Generador marcaba cada semana «✗ Lola sale la primera en Pasarela…»
+      const fr = FRANJA_LBL[f].toLowerCase();
+      const delLocal = quita ? [] : S.locales.filter(l => l.primero && l.primero[f] === p.id);
+      const deFicha = quita ? [] : S.locales.filter(l => (p.abre[l.id] || []).includes(f));
+      const otras = !!(delLocal.length || deFicha.length) && confirm(`${p.nombre} ${[delLocal.length ? `es «Quién abre» de ${delLocal.map(l => l.nombre).join(' y ')} por la ${fr}` : '', deFicha.length ? `tiene «Sale el primero» en ${deFicha.map(l => l.nombre).join(' y ')} por la ${fr} en su ficha` : ''].filter(Boolean).join(' y ')}. Con «Nunca de primero» no abrirá.\n\nAceptar: quitarlo también de ahí. Cancelar: dejarlo como está.`);
+      guarda(`nunca el primero de ${fr} ${quita ? 'quitado' : 'añadido'}${otras ? ` (y deja de ser quien abre ${[...new Set(delLocal.concat(deFicha).map(l => l.nombre))].join(' y ')} por la ${fr})` : ''}`, x => {
+        alterna(x.noPrimero, f); x.noPrimero.sort();
+        if (!otras) return;
+        for (const l of delLocal) l.primero[f] = null;
+        for (const l of deFicha) { x.abre[l.id] = (x.abre[l.id] || []).filter(y => y !== f); if (!x.abre[l.id].length) delete x.abre[l.id]; }
+      }, 'equipo'); pinta(); return;
     }
     if (ds.tloc !== undefined) { guarda(`local ${nombreLocal(ds.tloc)} ${p.locales.includes(ds.tloc) ? 'quitado' : 'añadido'}`, x => alterna(x.locales, ds.tloc)); pinta(); return; }
     if (ds.tfranja !== undefined) {
@@ -201,11 +216,21 @@ function openFicha(pid, opts) {
     if (ds.lpquita !== undefined) { if (cambiarDiaLibreUI(p.id, ds.lpquita, [])) tocada = true; pinta(); return; }
     if (ds.tlibra !== undefined) { guarda(`libra ${lblDowPl(+ds.tlibra)} ${p.libra.includes(+ds.tlibra) ? 'quitado' : 'añadido'}`, x => alterna(x.libra, +ds.tlibra)); pinta(); return; }
     if (ds.tpartido !== undefined) { guarda(`partido ${lblDowPl(+ds.tpartido)} ${p.partido.dias.includes(+ds.tpartido) ? 'quitado' : 'añadido'}`, x => alterna(x.partido.dias, +ds.tpartido)); pinta(); return; }
-    if (ds.tcoct !== undefined) { guarda(`cocina titular en ${nombreLocal(ds.tcoct)} ${p.cocina.titular.includes(ds.tcoct) ? 'quitada' : 'añadida'}`, x => { alterna(x.cocina.titular, ds.tcoct); if (x.cocina.titular.includes(ds.tcoct)) { const i = x.cocina.reserva.indexOf(ds.tcoct); if (i >= 0) x.cocina.reserva.splice(i, 1); } }); pinta(); return; }
-    if (ds.tcocr !== undefined) { guarda(`cocina reserva en ${nombreLocal(ds.tcocr)} ${p.cocina.reserva.includes(ds.tcocr) ? 'quitada' : 'añadida'}`, x => { alterna(x.cocina.reserva, ds.tcocr); if (x.cocina.reserva.includes(ds.tcocr)) { const i = x.cocina.titular.indexOf(ds.tcocr); if (i >= 0) x.cocina.titular.splice(i, 1); } }); pinta(); return; }
+    // 24/09 (fase 5, S36): titular o reserva de la cocina de un local, en la ficha y en Ajustes del local a la vez
+    if (ds.tcoct !== undefined && cocinaDe(S, p, ds.tcoct) !== 'titular') {
+      // (revisión F5) un local sin cocina (Pasarela) pasa a tenerla con una titular: se pregunta antes, como en
+      // Ajustes del local. Antes se creaba sin avisar y la Revisión daba «sin cocina» los días que ella no está
+      const nueva = cocinaQueCrea(S, S.staff, ds.tcoct, (p.franjas || []).length ? p.franjas : FRANJAS);
+      if (nueva.length && !confirm(`${nombreLocal(ds.tcoct)} no tiene cocina por la ${nueva.map(f => FRANJA_LBL[f].toLowerCase()).join(' ni por la ')}. Con ${p.nombre} de titular pasa a tener cocina ${nueva.length > 1 ? 'mañana y tarde' : 'por la ' + FRANJA_LBL[nueva[0]].toLowerCase()} todos los días que abre, y la Revisión avisará los días que no esté.\n\n¿Seguir?`)) return;
+    }
+    if (ds.tcoct !== undefined) { const ya = cocinaDe(S, p, ds.tcoct) === 'titular'; guarda(`cocina titular en ${nombreLocal(ds.tcoct)} ${ya ? 'quitada' : 'añadida'} (también en Ajustes del local)`, x => ponerCocinaFicha(S, x, ds.tcoct, ya ? null : 'titular')); pinta(); return; }
+    if (ds.tcocr !== undefined) { const ya = cocinaDe(S, p, ds.tcocr) === 'reserva'; guarda(`cocina reserva en ${nombreLocal(ds.tcocr)} ${ya ? 'quitada' : 'añadida'} (también en Ajustes del local)`, x => ponerCocinaFicha(S, x, ds.tcocr, ya ? null : 'reserva')); pinta(); return; }
     if (ds.tcocd !== undefined) { guarda(`cocina solo ${lblDowPl(+ds.tcocd)} ${p.cocina.soloDias.includes(+ds.tcocd) ? 'quitado' : 'añadido'}`, x => alterna(x.cocina.soloDias, +ds.tcocd)); pinta(); return; }
     if (ds.tabre !== undefined) {
       const [lid, f] = ds.tabre.split('|');
+      // (revisión F5) «Sale el primero» donde su propia ficha no le deja abrir: se dice antes
+      const imp = (p.abre[lid] || []).includes(f) ? null : fichaImpideAbrir(S, p, lid, f);
+      if (imp && !confirm(`${imp.motivo} («${nombreRegla(imp.regla)}» en su ficha): con las dos marcas no abrirá.\n\n¿Marcar «Sale el primero» igualmente?`)) return;
       guarda(`abre ${nombreLocal(lid)} ${FRANJA_LBL[f].toLowerCase()} ${(p.abre[lid] || []).includes(f) ? 'quitado' : 'añadido'}`, x => { x.abre[lid] = x.abre[lid] || []; alterna(x.abre[lid], f); x.abre[lid].sort(); if (!x.abre[lid].length) delete x.abre[lid]; });
       pinta(); return;
     }
@@ -347,7 +372,7 @@ function cambiarDiaLibreUI(pid, lunes, dias) {
   if (semanaVolcada(l0)) {
     // se ensaya sobre copias para contar lo que va a pasar antes de tocar nada
     const copia = clonarEstado(estadoSemana(l0, false));
-    const sim = moverDiaLibre(S, JSON.parse(JSON.stringify(S.staff)), copia, pid, l0, dias, { desdeIso });
+    const sim = moverDiaLibre(S, JSON.parse(JSON.stringify(S.staff)), copia, pid, l0, dias, { desdeIso, meses: S.meses });
     if (sim.quitados.length || sim.puestos.length || sim.quedan.length || sim.rechazados.length || sim.avisos.length) {
       if (!confirmarSiCerrado(l0)) return false;
       if (!confirm(textoMoverDiaLibre(p, l0, dias, sim, copia))) return false;
@@ -356,7 +381,7 @@ function cambiarDiaLibreUI(pid, lunes, dias) {
   }
   pushUndo(`día libre de ${p.nombre} (semana del ${fmtDDMM(l0)})`, { staff: true, otrosMeses: volcar });
   const real = volcar ? estadoSemana(l0, true) : null;
-  const r = volcar ? moverDiaLibre(S, S.staff, real, pid, l0, dias, { desdeIso }) : null;
+  const r = volcar ? moverDiaLibre(S, S.staff, real, pid, l0, dias, { desdeIso, meses: S.meses }) : null;
   if (!volcar) ponerLibraPuntual(p, l0, dias);
   const txtD = ds => ds.map(d => DIAS_L[d].toLowerCase()).join(' y ');
   const nRech = r ? r.rechazados.length : 0;

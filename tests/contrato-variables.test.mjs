@@ -14,9 +14,9 @@
 //      .cubreA, .partido.dias, .prefs, .cocina.*, .abre[ ni .vetos (lista blanca explícita);
 //  (d) reloj: el resultado no cambia con el reloj puesto en dos fechas distintas.
 // Y las pruebas en rojo de la auditoría que siguen pendientes, como casos (con la fase que las arregla).
-// Las celdas que arregla una fase posterior van con `todo` y el hueco (F5 cocina y quién abre, F6
-// interruptores y textos de Equipo, F7 núcleo): salen en el informe de node --test sin tumbar npm test,
-// y la fase que las arregla les quita el `todo`.
+// Las celdas que arregla una fase posterior van con `todo` y el hueco (F6 interruptores y textos de
+// Equipo, F7 núcleo; las de la F5, cocina y quién abre, ya no tienen `todo`): salen en el informe de
+// node --test sin tumbar npm test, y la fase que las arregla les quita el `todo`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -65,9 +65,9 @@ function mundo(esc, variante) {
   for (const [id, extra] of Object.entries(esc.otros || {})) st.push(persona(id, clon(extra)));
   if (esc.cfg) esc.cfg(cfg, st);
   const x = st[0];
-  const aplica = variante === 'sin' ? esc.sin : esc.con;
+  const aplica = variante === 'sin' || variante === 'sinReglaOff' ? esc.sin : esc.con;
   if (aplica) aplica(x, st, cfg);
-  if (variante === 'reglaOff') cfg.reglas[esc.clave] = false;
+  if (variante === 'reglaOff' || variante === 'sinReglaOff') cfg.reglas[esc.clave] = false;
   if (variante === 'fichaOff') M.personaDe(st, esc.quien || 'x').inactivas = [esc.clave];
   cfg.staff = st;
   return { cfg, st, x, esc, variante, tid, localId, franja };
@@ -104,7 +104,8 @@ const CAMINOS = {
     w.cfg.patron = { [DOW]: clon(w.esc.patron || [{ t: w.tid, p: 'x' }]) };
     const r = M.instanciarPatron(w.cfg, w.st, e, ISO, ISO);
     const x = M.asignados(e, ISO, w.tid).find(y => y.pid === 'x');
-    return { en: M.pidsEn(e, ISO, w.tid).slice().sort(), xCocina: x ? !!x.cocina : null, rechazado: r.rechazados.some(y => y.pid === 'x') };
+    // (fase 5, S18) y quién abre, y si la marca «a» quedó como puesta a mano
+    return { en: M.pidsEn(e, ISO, w.tid).slice().sort(), xCocina: x ? !!x.cocina : null, rechazado: r.rechazados.some(y => y.pid === 'x'), abre: M.primeroDe(w.cfg, w.st, e, ISO, w.tid), abreManual: !!M.manualDe(e, ISO, w.tid).abre };
   },
   relleno(w) {
     const e = planilla(w);
@@ -219,6 +220,8 @@ const COMPROBAR = {
   primero(camino, c, s) {
     if (camino === 'relleno' || camino === 'semana') return c.en.includes('x') && c.huecos.includes('primero') && !s.huecos.includes('primero');
     if (camino === 'cobertura') return c.planes[0].asig.some(a => a.includes('|x')) && c.planes[0].huecos.includes('primero') && !s.planes[0].huecos.includes('primero');
+    // (fase 5, S18) la semana tipo la pone, pero no la deja abrir
+    if (camino === 'patron') return c.en.includes('x') && c.abre !== 'x' && s.abre === 'x';
     return false;
   },
   // la cocina: con la variable la lleva; sin ella, no
@@ -289,28 +292,51 @@ const ESCENARIOS = [
   // (revisión F4) y el Generador la enseña y la comprueba («Hojan solo hace cocina»)
   { id: 'soloCocina', campo: 'soloCocina', clave: 'cocina', regla: 'cocina', trato: 'forzable', cond: 'p:x:soloCocina', opts: { puesto: 'sala' }, con: x => { x.soloCocina = true; },
     celdas: duro({ patron: 'nada' }) },
+  // Fase 5 (24/09), qué apaga cada interruptor de la cocina:
+  //  · «Cocina» en la FICHA (S15) apaga sus límites —«solo unos días», «nunca», «solo hace cocina»—, no que
+  //    sea titular o reserva de un local: eso es un dato de la plaza (como el «por», D12), y se cambia en la
+  //    ficha o en Ajustes del local. Apagada en la ficha, titular = igual que encendida (apagadaRef 'con');
+  //  · «Cocina» del GRUPO (S16, D5) apaga la cocina entera: nadie la busca, la exige ni la marca sola, ni
+  //    se miran los límites. Apagada, ser titular no cambia nada: igual que la misma persona sin serlo y con
+  //    la regla también apagada (apagadaRef 'sinReglaOff'), y los límites, igual que sin ellos.
   Object.assign({ id: 'cocina (titular)', campo: 'cocina.titular', clave: 'cocina', regla: 'cocina', trato: 'forzable', con: x => { x.cocina.titular = ['MONACO']; },
     celdas: { puedeEstar: 'habilita', relleno: 'cocina', semana: 'cocina', cobertura: 'cocina', selector: 'cocina', condiciones: 'nada' },
-    apagada: Object.fromEntries(['puedeEstar', 'relleno', 'semana', 'cobertura', 'selector'].map(k => [k, 'F5 · S15/S36: qué apaga «Cocina» en la ficha y en el grupo'])) }, mCocina),
+    apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
   Object.assign({ id: 'cocina (reserva)', campo: 'cocina.reserva', clave: 'cocina', regla: 'cocina', trato: 'forzable', con: x => { x.cocina.reserva = ['MONACO']; },
-    celdas: { puedeEstar: 'habilita', relleno: 'cocina', selector: 'cocina' }, apagada: Object.fromEntries(['puedeEstar', 'relleno', 'selector'].map(k => [k, 'F5 · S15/S36'])) }, mCocina),
+    celdas: { puedeEstar: 'habilita', relleno: 'cocina', selector: 'cocina' }, apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
   Object.assign({ id: 'cocina (solo unos días)', campo: 'cocina.soloDias', clave: 'cocina', regla: 'cocina', trato: 'forzable', cond: 'p:x:cocina', base: { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] } },
     con: x => { x.cocina.soloDias = [2]; }, forzarOpts: { puesto: 'cocina', cocina: true }, patron: [{ t: 'MONACO_M', p: 'x', c: 1 }],
-    celdas: { puedeEstar: 'bloquea', relleno: 'noCocina', semana: 'noCocina', cobertura: 'noCocina', selector: 'noCocina', condiciones: 'lista', verificar: 'bloquea', patron: ['noCocina', 'F5 · S38: la plaza «c» de la semana tipo le da la cocina sin mirar la ficha'] },
-    apagada: Object.fromEntries(['puedeEstar', 'relleno', 'semana', 'cobertura', 'selector'].map(k => [k, 'F5 · S15: el interruptor «Cocina» no quita «solo unos días» (puedeCocina)'])) }, mCocina),
+    celdas: { puedeEstar: 'bloquea', relleno: 'noCocina', semana: 'noCocina', cobertura: 'noCocina', selector: 'noCocina', condiciones: 'lista', verificar: 'bloquea', patron: 'noCocina' },
+    apagadaRef: { reglaOff: 'sinReglaOff' } }, mCocina),
   Object.assign({ id: 'cocina (nunca)', campo: 'cocina.nunca', clave: 'cocina', regla: 'cocina', trato: 'forzable', cond: 'p:x:cocina', base: { cocina: { titular: ['MONACO'], reserva: [], soloDias: [] } },
-    con: x => { x.cocina.nunca = true; }, celdas: { puedeEstar: 'bloquea', relleno: 'noCocina', selector: 'noCocina', condiciones: 'lista' }, apagada: Object.fromEntries(['puedeEstar', 'relleno', 'selector'].map(k => [k, 'F5 · S15'])) }, mCocina),
+    con: x => { x.cocina.nunca = true; }, celdas: { puedeEstar: 'bloquea', relleno: 'noCocina', selector: 'noCocina', condiciones: 'lista' }, apagadaRef: { reglaOff: 'sinReglaOff' } }, mCocina),
+  // S36 (fase 5): quien figura en la cocina de un local en Ajustes puede llevarla, en todos los caminos. Por
+  // Ajustes (ponerCocinaLocal, que escribe también la ficha) y en datos de antes que solo la tenían en la
+  // lista del local (el Generador ya la anunciaba y nadie le daba la cocina)
+  Object.assign({ id: 'cocina titular en Ajustes del local', campo: 'local.cocina.titulares', ambito: 'local', clave: 'cocina', regla: 'cocina', trato: 'forzable',
+    con: (x, st, cfg) => { M.ponerCocinaLocal(cfg, st, 'MONACO', { lista: 'titulares', franja: 'M', pid: 'x', pos: 0 }); },
+    celdas: { puedeEstar: 'habilita', relleno: 'cocina', semana: 'cocina', cobertura: 'cocina', selector: 'cocina', patron: 'cocina' }, patron: [{ t: 'MONACO_M', p: 'x', c: 1 }],
+    apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
+  Object.assign({ id: 'cocina titular solo en la lista del local (datos de antes)', campo: 'local.cocina.titulares', ambito: 'local', clave: 'cocina', regla: 'cocina', trato: 'forzable',
+    con: (x, st, cfg) => { M.localDe(cfg, 'MONACO').cocina.titulares.M.unshift('x'); },
+    celdas: { puedeEstar: 'habilita', relleno: 'cocina', semana: 'cocina', cobertura: 'cocina', selector: 'cocina' },
+    apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
   // S33 (José, 17/09): dos apoyos no se quedan solos
   { id: 'puesto apoyo', campo: 'puesto', clave: null, regla: 'soloApoyos', trato: 'relajable', con: x => { x.puesto = 'apoyo'; },
     celdas: duro({ puedeEstar: 'nada', patron: 'nada', selector: 'relaja', condiciones: 'nada' }) },
   { id: 'comodin', campo: 'comodin', clave: null, trato: 'punt', base: { locales: ['PASARELA'] }, otros: { b: { locales: ['PASARELA'] }, f: { locales: ['PASARELA'], franjas: ['M'] } },
     con: x => { x.comodin = true; }, celdas: nada({ relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena' }) },
   { id: 'abre', campo: 'abre', clave: 'abre', trato: 'punt', cond: 'p:x:abre:PASARELA:M', otros: { b: {} }, con: x => { x.abre = { PASARELA: ['M'] }; },
-    celdas: { primero: 'ordena', condiciones: 'lista', verificar: 'cumple', puedeEstar: 'nada', destrapa: 'nada' }, apagada: { primero: 'F5 · S19: con «Sale el primero» apagado sigue sumando «sale el primero»' } },
+    celdas: { primero: 'ordena', condiciones: 'lista', verificar: 'cumple', puedeEstar: 'nada', destrapa: 'nada' } },
+  // S18/S19 (fase 5): «Quién abre» del local es una condición del Generador y obedece los interruptores
+  // (la regla del grupo «Sale el primero» y la característica de la ficha de quien abre)
+  { id: 'Quién abre (local)', campo: 'local.primero', ambito: 'local', clave: 'abre', trato: 'punt', cond: 'loc:PASARELA:primero:M', otros: { b: {} },
+    con: (x, st, cfg) => { M.localDe(cfg, 'PASARELA').primero.M = 'x'; },
+    celdas: { primero: 'ordena', condiciones: 'lista', verificar: 'cumple', puedeEstar: 'nada', destrapa: 'nada' } },
   { id: 'noPrimero', campo: 'noPrimero', clave: 'noPrimero', regla: 'noPrimero', trato: 'forzable', cond: 'p:x:noPrimero', huecoPrimero: true, con: x => { x.noPrimero = ['M']; },
-    celdas: { puedeEstar: 'nada', patron: 'nada', relleno: 'primero', semana: 'primero', cobertura: 'primero', verificar: 'cumple', revision: 'bloquea', condiciones: 'lista', selector: 'nada', destrapa: 'pista', primero: 'bloquea' } },
+    celdas: { puedeEstar: 'nada', patron: 'primero', relleno: 'primero', semana: 'primero', cobertura: 'primero', verificar: 'cumple', revision: 'bloquea', condiciones: 'lista', selector: 'nada', destrapa: 'pista', primero: 'bloquea' } },
   { id: 'noAbre', campo: 'noAbre', clave: 'noAbre', regla: 'noAbre', trato: 'forzable', cond: 'p:x:noAbre:PASARELA', huecoPrimero: true, con: x => { x.noAbre = ['PASARELA']; },
-    celdas: { puedeEstar: 'nada', patron: 'nada', relleno: 'primero', semana: 'primero', cobertura: 'primero', verificar: 'cumple', revision: 'bloquea', condiciones: 'lista', selector: 'nada', destrapa: 'pista', primero: 'bloquea' } },
+    celdas: { puedeEstar: 'nada', patron: 'primero', relleno: 'primero', semana: 'primero', cobertura: 'primero', verificar: 'cumple', revision: 'bloquea', condiciones: 'lista', selector: 'nada', destrapa: 'pista', primero: 'bloquea' } },
   { id: 'prefs', campo: 'prefs.evitaDows', clave: 'prefs', trato: 'punt', otros: { y: {} }, con: x => { x.prefs = { evitaDows: [DOW] }; },
     celdas: nada({ relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena' }), apagada: Object.fromEntries(['relleno', 'semana', 'cobertura', 'selector'].map(k => [k, 'F6 · S14: «Preferencias» apagada sigue restando 40 puntos (evita)'])) },
   { id: 'contrato', campo: 'contrato.horasSemana', clave: 'contrato', trato: 'info', con: x => { x.contrato = { horasSemana: 8 }; }, celdas: nada() },
@@ -346,11 +372,15 @@ for (const esc of ESCENARIOS) {
       if (variante === 'reglaOff' && !REGLAS_GRUPO.has(esc.clave)) continue;   // sin interruptor de grupo en Equipo
       if (variante === 'fichaOff' && !CARACT.has(esc.clave)) continue;
       const pa = typeof esc.apagada === 'string' ? esc.apagada : (esc.apagada || {})[camino];
-      test(`matriz · ${esc.id} · ${camino}: apagada (${variante === 'reglaOff' ? 'regla del grupo' : 'en la ficha'}) = sin la variable`, pa ? { todo: pa } : {}, () => {
+      // (fase 5) con qué se compara: por defecto, la misma persona sin la variable; la cocina declara la suya
+      // (apagadaRef: 'con' = el interruptor no la quita; 'sinReglaOff' = sin la variable y con la regla apagada)
+      const ref = (esc.apagadaRef || {})[variante] || 'sin';
+      const dice = { sin: 'sin la variable', con: 'igual que encendida (no la quita)', sinReglaOff: 'sin la variable, con la regla también apagada' }[ref];
+      test(`matriz · ${esc.id} · ${camino}: apagada (${variante === 'reglaOff' ? 'regla del grupo' : 'en la ficha'}) = ${dice}`, pa ? { todo: pa } : {}, () => {
         const o = obs(esc, camino, variante);
-        if (camino === 'condiciones') assert.ok(!o.some(id => id.startsWith(esc.cond || '·')), `se lista apagada: ${o}`);
-        else if (camino === 'verificar') assert.ok(!o.conds.some(k => k.startsWith(esc.cond || '·')), `se verifica apagada: ${o.conds}`);
-        else assert.deepEqual(o, obs(esc, camino, 'sin'));
+        if (ref === 'sin' && camino === 'condiciones') assert.ok(!o.some(id => id.startsWith(esc.cond || '·')), `se lista apagada: ${o}`);
+        else if (ref === 'sin' && camino === 'verificar') assert.ok(!o.conds.some(k => k.startsWith(esc.cond || '·')), `se verifica apagada: ${o.conds}`);
+        else assert.deepEqual(o, obs(esc, camino, ref));
       });
     }
   }
@@ -447,9 +477,9 @@ const PERMITIDOS = {
   'modelo.js': {
     // la capa de lectura de la ficha (una sola lectura de cada campo)
     vetoDe: 'capa', libraEn: 'capa', librasPuntuales: 'capa', ponerLibraPuntual: 'capa', textoCambioLibre: 'capa', cambioDeLibre: 'capa', partidoEn: 'capa', estadoDia: 'capa',
-    cubreEnCasilla: 'capa', quienLeCubre: 'capa', porQueNoCubre: 'capa', puedeCocina: 'capa', cocinasTitular: 'capa', incompatibles: 'capa', evita: 'capa', abreFijo: 'capa (F5 · S19: su interruptor)', VARIABLES: 'el registro: texto y verificación de cada variable',
-    // quién abre y la cocina: fase 5 (S18, S19)
-    abrePorDefecto: 'F5 · S19', primeroDe: 'F5 · S19',
+    cubreEnCasilla: 'capa', quienLeCubre: 'capa', porQueNoCubre: 'capa', puedeCocina: 'capa', cocinasTitular: 'capa', incompatibles: 'capa', evita: 'capa', abreFijo: 'capa', VARIABLES: 'el registro: texto y verificación de cada variable',
+    // la cocina entre la ficha y Ajustes del local (fase 5, S36): una sola lectura (cocinaDe) y una sola escritura
+    cocinaDe: 'capa', nuncaCocina: 'capa', ponerCocinaFicha: 'capa (escribe la ficha y la lista del local)', ponerCocinaLocal: 'capa (escribe la lista del local y la ficha)', migrarCocinaLocales: 'migración: la ficha y Ajustes del local, de acuerdo',
     // la Revisión aún marca la pareja sin mirar el interruptor: fase 6 (S13)
     revisarTurno: 'F6 · S13',
     // el núcleo: fase 7 (S25)
@@ -464,7 +494,6 @@ const PERMITIDOS = {
   'src/app/22-generador.js': { openLibraSemana: 'editor del día libre de una semana (Generador)' },
   'src/app/26-cobertura.js': { pintaCob: 'cabecera: los días libres de su ficha (F6 · S20)' },
   'src/app/31-navegacion.js': { activarModoEmpleado: 'perfil: los días libres de su ficha (F6 · S20)' },
-  'src/app/14-impresiones.js': { pxgPreguntas: 'preguntas para el cliente: quién abre (F5 · S19)' },
 };
 // (revisión F4) también la lectura con un objeto vacío por defecto: ((p.partido || {}).dias || []) y
 // (p.cocina || {}).titular, que la comprobación no veía
@@ -701,23 +730,70 @@ test('auditoría S17 (interruptores H4, reescrita según D6) · «Contrato» dej
   const { cfg, st } = semilla(); M.personaDe(st, 'yilian').contrato = { horasSemana: 40 };
   assert.notEqual(M.horasPersonaMes(cfg, st, {}, 'yilian', 2026, 10).contratoHoras, null);
 });
-test('auditoría S15 (interruptores H5, relaciones-rol «H-cocina-caracteristica») · «Cocina» apagada en la ficha quita «solo unos días» y «nunca»', { todo: 'F5 · S15' }, () => {
+// --- fase 5 (24/09): cocina y quién abre ---
+test('auditoría S15 (interruptores H5, relaciones-rol «H-cocina-caracteristica») · «Cocina» apagada en la ficha quita «solo unos días» y «nunca»', () => {
   const { cfg, st } = semilla(); M.personaDe(st, 'scapon').inactivas = ['cocina'];
   assert.ok(M.puedeCocina(cfg, M.personaDe(st, 'scapon'), 'MONACO', '2026-09-30'));
+  // (interruptores H5) y con la cocina marcada, la Revisión no dice que no es cocina de ese local
+  const e = semana(LUNES); M.asignar(e, cfg, st, '2026-09-30', 'MONACO_T', 'scapon', { cocina: true });
+  assert.equal(M.revisarTurno(cfg, st, e, '2026-09-30', 'MONACO_T').cocinaNoApta, false);
+  // «nunca» también, pero no hace cocinera a quien no lo es (Cristian no es titular ni reserva de ningún local)
+  M.personaDe(st, 'cristian').inactivas = ['cocina'];
+  assert.ok(!M.puedeCocina(cfg, M.personaDe(st, 'cristian'), 'MONACO', '2026-09-30'));
 });
-test('auditoría S16 (interruptores H6, lugar L2, relaciones-rol «H-cocina-regla») · con «Mínimos» y «Cocina» apagados nadie los exige', { todo: 'F5 · S16 (cocina) y F6 · S16 (mínimos), D5' }, () => {
-  const { cfg, st } = semilla(); cfg.reglas = { minimos: false, cocina: false };
+// S15: los chips de Equipo dicen lo mismo que la puerta: apagada «Cocina», se tachan sus límites y no su titularidad
+test('auditoría S15 · los chips de Equipo: con «Cocina» apagada se tachan «solo unos días» y «nunca», no la titular', () => {
+  const { cfg, st } = semilla();
+  const sc = M.personaDe(st, 'scapon'); sc.inactivas = ['cocina'];
+  const cr = M.personaDe(st, 'cristian'); cr.inactivas = ['cocina'];
+  const chips = funcionDeApp('19-vista-equipo.js', 'chipsCondiciones', { S: Object.assign({}, cfg, { staff: st }), isoHoy: () => '2026-09-24', esc: s => String(s), tchip: (lbl, txt, cls) => `[${lbl}: ${txt}${/\boff\b/.test(cls || '') ? ' (tachado)' : ''}]`, lblCaracteristica: k => k, lblFranjas: () => '', lblDows: d => (d || []).join(','), lblDowPl: d => M.DOW_PL[d].replace('los ', ''), chipLocal: (id, x) => M.localDe(cfg, id).nombre + (x ? ' ' + x : ''), nombrePid: id => (M.personaDe(st, id) || {}).nombre, lblNoPrimero: f => f.join(','), lblTurno: x => x, fmtDDMM: x => x, cuandoCubre: () => '', quienLeCubre: () => [] });
+  const h = chips(sc);
+  assert.ok(/\[Cocina: Bar Mónaco · titular\]/.test(h), h);
+  assert.ok(/\[Cocina: solo martes \(tachado\)\]/.test(h), h);
+  assert.ok(/\[Cocina: nunca \(tachado\)\]/.test(chips(cr)), chips(cr));
+});
+test('auditoría S16 (relaciones-rol «H-cocina-regla», la parte de cocina de interruptores H6) · con «Cocina» del grupo apagada nadie la exige ni la marca (D5)', () => {
+  const { cfg, st } = semilla(); cfg.reglas = { cocina: false };
   const rv = M.revisionMes(cfg, st, semana(LUNES), { desde: LUNES, hasta: M.addDias(LUNES, 6) });
-  assert.equal(rv.filter(x => x.tipo === 'falta' || x.tipo === 'sin-cocina').length, 0);
+  assert.equal(rv.filter(x => x.tipo === 'sin-cocina' || x.tipo === 'cocina-no-apta').length, 0);
+  const e = M.nuevoEstado(2026, 10, { festivos: [] });
+  M.asignar(e, cfg, st, '2026-10-07', 'MONACO_T', 'scapon', {});
+  const r = M.revisarTurno(cfg, st, e, '2026-10-07', 'MONACO_T');
+  assert.ok(!r.sinCocina && !r.cocinaObligatoria && !r.cocinaNoApta, JSON.stringify(r));
+  // ni el Generador semanal (con y sin semana tipo) ni la Cobertura la buscan, ni el selector la ofrece, ni el núcleo la pide
+  for (const sinPatron of [true, false]) {
+    const g = M.generarSemana(cfg, st, semana(LUNES), LUNES, { sinPatron });
+    assert.ok(!g.huecos.some(h => h.tipo === 'cocina'), 'huecos de cocina');
+    for (const d of g.dias) for (const t of M.turnosDe(cfg)) assert.ok(!M.asignados(g.estado, d, t.id).some(x => x.cocina), `${d} ${t.id}: marcada de cocina`);
+  }
+  const eC = semana(LUNES); M.generarSemana(cfg, st, eC, LUNES, {});
+  const pc = M.planesCobertura(cfg, st, eC, { pid: 'hojan', tipo: 'LD', desde: '2026-09-30', hasta: '2026-09-30' });
+  assert.ok(pc.afectados.every(a => !a.sinCocina) && pc.planes.every(p => !p.huecos.some(h => h.tipo === 'cocina')), JSON.stringify(pc.afectados));
+  assert.deepEqual(M.gruposSelector(cfg, st, e, '2026-10-07', 'MONACO_T').cocina, []);
+  assert.ok(!M.toProblem(cfg, st, M.nuevoEstado(2026, 10, { festivos: [] }), '2026-10-05', '2026-10-11', {}).rules.some(x => x.type === 'skill_coverage'));
+  // lo marcado a mano se queda (principio 4)
+  const e2 = semana(LUNES); M.asignar(e2, cfg, st, '2026-09-30', 'MONACO_T', 'hojan', {}); M.asignar(e2, cfg, st, '2026-09-30', 'MONACO_T', 'yilian', {});
+  M.marcarCocina(e2, '2026-09-30', 'MONACO_T', 'hojan'); M.normalizarCasilla(e2, cfg, st, '2026-09-30', 'MONACO_T');
+  assert.ok(M.asignados(e2, '2026-09-30', 'MONACO_T').find(x => x.pid === 'hojan').cocina);
+  // y la interfaz dice la consecuencia al apagarla (la lee de REGLAS)
+  assert.ok(/nadie/.test((M.REGLAS.find(x => x.k === 'cocina') || {}).apagada || ''), 'REGLAS: el texto de lo que pasa con «Cocina» apagada');
 });
-test('auditoría S19 (interruptores H8/H9, lugar L9) · con «Sale el primero» apagado no suma ni manda', { todo: 'F5 · S19' }, () => {
+test('auditoría S16 (interruptores H6, lugar L2) · con «Mínimos» apagados nadie los exige', { todo: 'F6 · S16 (mínimos), D5' }, () => {
+  const { cfg, st } = semilla(); cfg.reglas = { minimos: false };
+  const rv = M.revisionMes(cfg, st, semana(LUNES), { desde: LUNES, hasta: M.addDias(LUNES, 6) });
+  assert.equal(rv.filter(x => x.tipo === 'falta').length, 0);
+});
+test('auditoría S19 (interruptores H8/H9, lugar L9) · con «Sale el primero» apagado no suma ni manda', () => {
+  // (fase 5) con Hojan en la cocina: desde la revisión F3 (S33) un apoyo no entra solo en una casilla vacía,
+  // y la auditoría es de antes (Yilian, apoyo, salía la primera en la tarde vacía del Mónaco)
   const { cfg, st } = semilla(); cfg.reglas = { abre: false }; const e = semana(LUNES);
+  assert.ok(M.asignar(e, cfg, st, '2026-09-30', 'MONACO_T', 'hojan', { cocina: true, puesto: 'cocina' }).ok);
   assert.equal(M.candidatosPara(cfg, st, e, '2026-09-30', 'MONACO_T', { primero: true })[0].pid, 'yilian');
   const c2 = semilla(); M.personaDe(c2.st, 'lola').inactivas = ['abre']; const e2 = semana(LUNES);
   M.asignar(e2, c2.cfg, c2.st, LUNES, 'PASARELA_M', 'tere', {}); M.asignar(e2, c2.cfg, c2.st, LUNES, 'PASARELA_M', 'lola', {});
   assert.equal(M.primeroDe(c2.cfg, c2.st, e2, LUNES, 'PASARELA_M'), 'tere');
 });
-test('auditoría S18 (lugar L5) · «Sale primero» a mano sobre quien no puede abrir deja aviso', { todo: 'F5 · S18' }, () => {
+test('auditoría S18 (lugar L5) · «Sale primero» a mano sobre quien no puede abrir deja aviso', () => {
   const { cfg, st } = semilla(); const e = semana(LUNES); M.generarSemana(cfg, st, e, LUNES, {});
   M.marcarAbre(e, LUNES, 'PASARELA_T', 'leo', cfg);
   assert.ok(M.posicionesDe(cfg, st, e, LUNES, 'PASARELA_T').find(x => x.pid === 'leo').avisos.length > 0);
@@ -725,20 +801,111 @@ test('auditoría S18 (lugar L5) · «Sale primero» a mano sobre quien no puede 
   const c2 = semilla(); c2.cfg.reglas = { abre: false }; const e2 = semana(LUNES); M.generarSemana(c2.cfg, c2.st, e2, LUNES, {});
   assert.notEqual(M.manualDe(e2, '2026-09-29', 'PASARELA_M').abre, true);
 });
-test('auditoría S36 (interruptores H10, relaciones-rol «H-cocina-local-vs-ficha») · titular del local = puede llevar esa cocina', { todo: 'F5 · S36' }, () => {
+test('auditoría S36 (interruptores H10, relaciones-rol «H-cocina-local-vs-ficha») · titular del local = puede llevar esa cocina', () => {
   const { cfg, st } = semilla(); M.localDe(cfg, 'EL33').cocina.titulares.M.unshift('victoria');
   assert.ok(M.rangoCocina(cfg, M.localDe(cfg, 'EL33'), M.personaDe(st, 'victoria'), 'M', '2026-10-05') >= 0);
+  // (interruptores H10) el Generador nombra a quien puede llevarla, y solo a quien puede
+  for (const [lid, pid] of [['MONACO', 'tere'], ['PASARELA', 'cristian']]) {
+    const c2 = semilla(); M.localDe(c2.cfg, lid).cocina.titulares.M.push(pid);
+    const cond = M.condicionesDe(c2.cfg, c2.st).find(c => c.id === 'coc:' + lid);
+    const lista = !!cond && new RegExp(M.personaDe(c2.st, pid).nombre).test(cond.texto);
+    assert.equal(lista, M.puedeCocina(c2.cfg, M.personaDe(c2.st, pid), lid, '2026-09-29'), `${pid} en ${lid}: «${cond && cond.texto}»`);
+  }
+  // Cristian («nunca cocina») puesto de titular en Pasarela no le crea una cocina que nadie puede llevar
+  const c3 = semilla(); M.localDe(c3.cfg, 'PASARELA').cocina.titulares.M.push('cristian');
+  const g = M.generarSemana(c3.cfg, c3.st, semana(LUNES), LUNES, {});
+  assert.equal(M.revisionMes(c3.cfg, c3.st, g.estado, { desde: LUNES, hasta: M.addDias(LUNES, 6) }).filter(x => x.tipo === 'sin-cocina' && x.turnoId === 'PASARELA_M').length, 0);
 });
-test('auditoría S37 (relaciones-rol «H-cocina-hueco») · una cocina obligatoria que nadie puede llevar es un hueco', { todo: 'F5 · S37' }, () => {
+// S36: Ajustes del local y la ficha, una sola fuente de verdad en los dos sentidos (revisor-interruptores r10 y r10b)
+test('auditoría S36 · Ajustes del local escribe la ficha, y quitar en Ajustes quita en la ficha (y al revés)', () => {
+  const { cfg, st } = semilla(); const iso = '2026-09-29';
+  // (r10) Cris de reserva de la cocina del Mónaco: su ficha lo dice y la lleva si faltan las demás
+  M.ponerCocinaLocal(cfg, st, 'MONACO', { lista: 'reservas', pid: 'cris' });
+  assert.equal(M.cocinaDe(cfg, M.personaDe(st, 'cris'), 'MONACO'), 'reserva');
+  for (const id of ['esmeralda', 'jenny']) M.anadirAusencia(M.personaDe(st, id), { tipo: 'VAC', desde: iso, hasta: iso });
+  const e = semana(LUNES); M.asignar(e, cfg, st, iso, 'MONACO_M', 'cris', {});
+  assert.equal(M.revisarTurno(cfg, st, e, iso, 'MONACO_M').sinCocina, false);
+  // (r10b) quitar a Noe de los titulares de El 33 (las dos franjas) la quita de la ficha: ya no lleva esa cocina
+  const c2 = semilla();
+  for (const f of ['M', 'T']) M.ponerCocinaLocal(c2.cfg, c2.st, 'EL33', { lista: 'titulares', franja: f, pid: 'noe', quitar: true });
+  const noe = M.personaDe(c2.st, 'noe');
+  assert.equal(M.cocinaDe(c2.cfg, noe, 'EL33'), null);
+  assert.ok(!M.puedeCocina(c2.cfg, noe, 'EL33', iso));
+  assert.ok(!/Noe/.test(M.condicionesDe(c2.cfg, c2.st).find(c => c.id === 'coc:EL33').texto));
+  const g = M.generarSemana(c2.cfg, c2.st, semana(LUNES), LUNES, {});
+  for (const d of g.dias) for (const f of ['M', 'T']) assert.ok(!M.asignados(g.estado, d, 'EL33_' + f).some(x => x.pid === 'noe' && x.cocina), `${d} ${f}: Noe lleva la cocina`);
+  // la ficha escribe la lista del local: Juani titular de El 33 (solo hace mañanas) y quitarla la quita
+  const c3 = semilla(); const juani = M.personaDe(c3.st, 'juani'); const l = M.localDe(c3.cfg, 'EL33');
+  M.ponerCocinaFicha(c3.cfg, juani, 'EL33', 'titular');
+  assert.ok(l.cocina.titulares.M.includes('juani') && !l.cocina.titulares.T.includes('juani'), JSON.stringify(l.cocina.titulares));
+  assert.ok(/Juani/.test(M.condicionesDe(c3.cfg, c3.st).find(c => c.id === 'coc:EL33').texto));
+  M.ponerCocinaFicha(c3.cfg, juani, 'EL33', 'reserva');
+  assert.ok(!l.cocina.titulares.M.includes('juani') && l.cocina.reservas.includes('juani'));
+  M.ponerCocinaFicha(c3.cfg, juani, 'EL33', null);
+  assert.ok(!l.cocina.reservas.includes('juani') && !M.puedeCocina(c3.cfg, juani, 'EL33', iso));
+});
+test('auditoría S37 (relaciones-rol «H-cocina-hueco») · una cocina obligatoria que nadie puede llevar es un hueco', () => {
   const { cfg, st } = semilla(); const MIE = '2026-10-07';
   for (const id of ['hojan', 'jenny', 'maydeth', 'esmeralda']) M.anadirAusencia(M.personaDe(st, id), { tipo: 'VAC', desde: MIE, hasta: MIE });
   const e = semana('2026-10-05'); for (const p of ['cris', 'yilian', 'tere']) M.asignar(e, cfg, st, MIE, 'MONACO_M', p, {});
   assert.ok(M.generarPlanilla(cfg, st, e, MIE, MIE, { simular: true }).huecos.some(h => h.turnoId === 'MONACO_M'));
 });
-test('auditoría S38 (relaciones-rol «H-cocina-patron») · la semana tipo no da la cocina un día que la ficha no deja', { todo: 'F5 · S38' }, () => {
+test('auditoría S38 (relaciones-rol «H-cocina-patron») · la semana tipo no da la cocina un día que la ficha no deja', () => {
   const { cfg, st } = semilla(); M.personaDe(st, 'scapon').cocina.soloDias = [3];
   const g = M.generarSemana(cfg, st, semana(LUNES), LUNES, {});
   assert.ok(g.condiciones.find(x => x.pid === 'scapon' && x.k === 'cocina').ok);
+  // (revisor r14b, con S37) la tarde del martes 29 del Mónaco tiene cocina o sale como hueco de cocina
+  const r = M.revisarTurno(cfg, st, g.estado, '2026-09-29', 'MONACO_T');
+  assert.ok(!r.sinCocina || g.huecos.some(h => h.iso === '2026-09-29' && h.turnoId === 'MONACO_T' && h.tipo === 'cocina'), JSON.stringify(g.huecos));
+  assert.ok(!M.manualDe(g.estado, '2026-09-29', 'MONACO_T').cocina || M.asignados(g.estado, '2026-09-29', 'MONACO_T').find(x => x.cocina).pid !== 'scapon');
+});
+// S18: la marca «a» de la semana tipo es una preferencia (origen 'patron'), no algo puesto a mano; la usa
+// quien sale el primero tras «Quién abre» del local y «Sale el primero» de la ficha, si puede abrir y con el
+// interruptor encendido (revisor-interruptores n4, revisor-lugar r5b y n2)
+test('matriz · la marca «a» de la semana tipo: preferencia, con puedePrimero y su interruptor; nunca «a mano»', () => {
+  const esc = { tid: 'PASARELA_M', min: 2, otros: { b: {} }, patron: [{ t: 'PASARELA_M', p: 'b' }, { t: 'PASARELA_M', p: 'x', a: 1 }] };
+  const o = (variante, prep) => { const w = mundo(esc, variante); if (prep) prep(w); return CAMINOS.patron(w); };
+  const con = o('con');
+  assert.equal(con.abre, 'x', 'con la marca, abre Xavi'); assert.equal(con.abreManual, false, 'y no queda como puesta a mano');
+  assert.equal(o('con', w => { w.x.noPrimero = ['M']; }).abre, 'b', 'si no puede salir el primero, abre otra');
+  assert.equal(o('con', w => { w.cfg.reglas.abre = false; }).abre, 'b', 'con «Sale el primero» del grupo apagado, la marca no manda');
+  assert.equal(o('con', w => { w.x.inactivas = ['abre']; }).abre, 'b', 'ni apagada en su ficha');
+  assert.equal(o('con', w => { M.localDe(w.cfg, 'PASARELA').primero.M = 'b'; }).abre, 'b', '«Quién abre» del local va antes');
+  // guardar la semana como semana tipo: la «a» calculada no se guarda; la puesta a mano, sí
+  const w = mundo(esc, 'con'); const e = planilla(w); w.cfg.patron = { [DOW]: clon(esc.patron) };
+  M.instanciarPatron(w.cfg, w.st, e, ISO, ISO);
+  const semanaDe = est => M.patronDesdeSemana(est, LUNES, w.cfg, w.st)[DOW].filter(pl => pl.t === 'PASARELA_M');
+  assert.deepEqual(semanaDe(e).filter(pl => pl.a).map(pl => pl.p), [], 'la calculada no se guarda como «a»');
+  assert.equal(semanaDe(e)[0].p, 'x', 'pero la plaza de quien abría va la primera: vuelve a abrir');
+  M.marcarAbre(e, ISO, 'PASARELA_M', 'b', w.cfg);
+  assert.deepEqual(semanaDe(e).filter(pl => pl.a).map(pl => pl.p), ['b'], 'la puesta a mano se guarda');
+});
+test('matriz · «Sale primero» a mano sobre quien no puede abrir: queda, con el aviso en la casilla y en la Revisión (abre-no-apto)', () => {
+  const esc = { tid: 'PASARELA_M', min: 2, otros: { b: {} }, con: x => { x.noPrimero = ['M']; } };
+  const w = mundo(esc, 'con'); const e = planilla(w);
+  assert.ok(M.asignar(e, w.cfg, w.st, ISO, 'PASARELA_M', 'b', {}).ok && M.asignar(e, w.cfg, w.st, ISO, 'PASARELA_M', 'x', {}).ok);
+  M.marcarAbre(e, ISO, 'PASARELA_M', 'x', w.cfg);
+  assert.equal(M.primeroDe(w.cfg, w.st, e, ISO, 'PASARELA_M'), 'x', 'lo puesto a mano manda');
+  const s = M.posicionesDe(w.cfg, w.st, e, ISO, 'PASARELA_M').find(y => y.pid === 'x');
+  assert.ok(s.abre && s.avisos.some(a => /no sale el primero/.test(a)), JSON.stringify(s));
+  assert.ok(M.avisosVigentes(w.cfg, w.st, e, ISO, 'PASARELA_M', 'x').some(a => /no sale el primero/.test(a)));
+  const rv = M.revisionMes(w.cfg, w.st, e, { desde: ISO, hasta: ISO }).filter(l => l.turnoId === 'PASARELA_M');
+  assert.ok(rv.some(l => l.tipo === 'abre-no-apto' && /Xavi/.test(l.msg)), JSON.stringify(rv));
+  // con «Nunca de primero» apagada, ya no hay aviso
+  const w2 = mundo(esc, 'con'); w2.x.inactivas = ['noPrimero']; const e2 = planilla(w2);
+  M.asignar(e2, w2.cfg, w2.st, ISO, 'PASARELA_M', 'b', {}); M.asignar(e2, w2.cfg, w2.st, ISO, 'PASARELA_M', 'x', {}); M.marcarAbre(e2, ISO, 'PASARELA_M', 'x', w2.cfg);
+  assert.ok(!M.revisionMes(w2.cfg, w2.st, e2, { desde: ISO, hasta: ISO }).some(l => l.tipo === 'abre-no-apto'));
+});
+// S19: la hoja impresa pregunta quién abre donde nadie lo tiene fijo, con los mismos interruptores
+test('auditoría S19 · la hoja impresa: «¿Quién sale el primero…?» mira el fijo con sus interruptores (abreFijo)', () => {
+  const pregunta = (prep) => {
+    const { cfg, st } = semilla(); if (prep) prep(cfg, st);
+    const f = funcionDeApp('14-impresiones.js', 'pxgPreguntas', { S: Object.assign({}, cfg, { staff: st }), esc: s => String(s), pxgLista: xs => xs.join(', ') });
+    return f({ condiciones: [] });
+  };
+  assert.ok(!/por la tarde en [^?]*Pasarela/.test(pregunta()), 'Pasarela tarde tiene fijo (Iván)');
+  assert.ok(/por la tarde en [^?]*Pasarela/.test(pregunta((cfg, st) => { M.personaDe(st, 'ivan').inactivas = ['abre']; })), 'con «Sale el primero» apagado en la ficha de Iván, se pregunta');
+  assert.ok(/por la mañana en [^?]*Pasarela/.test(pregunta(cfg => { cfg.reglas = { abre: false }; })), 'con la regla del grupo apagada, se pregunta');
 });
 test('auditoría S24 (relaciones-rol «H-nuncaCon-flexible») · si solo queda Lavinia, entra con Mari Luz y con aviso', { todo: 'F6 · S24' }, () => {
   const { cfg, st } = semilla(); const D = '2026-10-02';

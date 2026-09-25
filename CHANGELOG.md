@@ -2,6 +2,90 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Lo de la cocina y quién abre llega también a las semanas que ya estaban en la planilla (24/09).** Hasta
+  ahora solo cambiaban las semanas que se generasen de nuevo. Lo que se nota:
+  - **Al abrir la app con esta versión**, quién abre y quién lleva la cocina de la planilla que ya estaba dejan
+    de estar «puestos a mano»: la versión de antes los fijaba así sin que nadie los tocara. Lo que pusiste tú
+    («Sale primero», «Lleva la cocina», «Quitar la marca de cocina») se queda. La Revisión ya no dice «sale
+    primero Lola, marcado a mano» cuando nadie la marcó.
+  - **Cambiar «Quién abre» o la cocina de un local, una ficha o un interruptor se nota al momento de hoy en
+    adelante**, sin vaciar ni volver a generar. Si pones a Mari Luz en «Quién abre» de la tarde de Pasarela, abre
+    ella también en las semanas ya volcadas, y el Mes, el perfil de cada empleado, el Excel y las horas dicen lo
+    mismo que Hoy (antes seguían con Iván y el tramo de Mari Luz empezaba a las 21:00). Lola con «nunca de
+    primero» deja de abrir; Susana Capón con «cocina solo los miércoles» deja la cocina del martes; con la regla
+    «Cocina» apagada desaparecen las «COCINA». Lo de días pasados no cambia: es lo que se trabajó.
+  - **Nuevo en el menú de la casilla: «Quitar «sale primero» a mano».** La casilla vuelve a decidir quién abre.
+  - **La Semana y el Mes también avisan** (en ámbar) de un «Sale primero» a mano sobre quien no puede abrir, como
+    Hoy. El aviso dice «“Sale primero” marcado a mano, pero no puede abrir: Leo no sale el primero de la tarde».
+  - **Avisos antes de meter una contradicción:** poner en «Quién abre» a alguien cuya ficha no le deja abrir
+    (Leo) o que está en standby; «Nunca de primero» a quien es «Quién abre» de un local o tiene «Sale el primero»
+    (ofrece quitarlo de ahí); «Sale el primero» a quien tiene «nunca de primero».
+  - **Hacer a alguien titular de la cocina de un local que no la tiene** (Tere en la mañana de Pasarela desde
+    Ajustes, o Mari Luz desde su ficha) pregunta antes, porque el local pasa a tener cocina todos los días que
+    abre y la Revisión avisará los días que falte. Antes se creaba sin avisar.
+  - **Ctrl+Z de una ficha o de la cocina de Ajustes ya no deshace lo que cambiaste después en Ajustes del
+    local** (el mínimo, «Quién abre»). Antes lo devolvía sin decirlo.
+  - **«Guardar como semana tipo» ya no pierde quién abre:** la marca que decide se guarda cada vez (antes se
+    perdía la segunda vez), y quien abría y estaba de vacaciones la semana que guardas sigue abriendo.
+  - **Con «Cocina» apagada**, «cubre a» y la Cobertura no le dan la cocina a quien no es de cocina (Yilian por
+    Hojan), ni le suman puntos de «cocina titular».
+  - **Generando un mes sin semana tipo, la cocina obligatoria del Mónaco ya no se queda sin nadie** (el 21 y el 28
+    de octubre se perdía por el reparto del mes): el Generador guarda para ella a quien hace falta. Octubre sale
+    con 559 plazas y 40 huecos (antes 556 y 45). El reparto del mes queda un poco menos igualado que en la primera
+    versión (desviación 9,55 en vez de 9,45; antes de contar «M este mes», 10,87) porque Noe y Jenny llevan tres
+    cocinas más.
+  - **La cocina que se marca sola no se la lleva quien ese día ya está de sala en otro sitio** (Jenny, de sala en
+    la mañana de El 33, ya no se lleva por su orden la cocina de la tarde).
+  - **Textos:** el desplegable de la cocina dice «Ya pueden llevarla» (decía «Cocina de este local» y ofrecía a
+    cocineros de otros locales); el interruptor «Cocina» apagado de la ficha dice lo mismo al pasar por encima que
+    debajo; el Generador dice «lunes 28: en la posición 2» (decía «Lola … sale 2.º»); y «Quién abre» del local
+    no sale en las condiciones de una semana en que esa persona está de baja entera.
+  - Apuntar una ausencia en Equipo o cambiar el día libre de una semana en la ficha cuentan «M este mes» con el
+    mes entero, como la Cobertura.
+
+- **La cocina y quién sale el primero se leen igual en todas partes (24/09).** Lo que cambia:
+  - **Ajustes del local → Cocina y la ficha de cada persona son lo mismo.** Añadir a alguien a los
+    titulares o a las reservas de la cocina de un local lo pone también en su ficha, y quitarlo lo quita.
+    Al revés, marcar en una ficha «Titular de cocina en El 33» la pone en Ajustes de El 33 (en las
+    franjas que trabaja). Antes se podía añadir a Victoria en Ajustes: el Generador la anunciaba y
+    nunca le daba la cocina. Y quitar a Noe no se la quitaba de la ficha.
+  - **El desplegable de la cocina ofrece primero a quien ya puede llevarla.** Si eliges a otra
+    persona, te avisa de que pasa a ser de cocina de ese local en su ficha, y pregunta antes de hacerlo.
+    Se deshace con Ctrl+Z.
+  - **Quien tiene «Nunca cocina» no le crea una cocina a un local** por estar en su lista. Antes, poner a
+    alguien así de titular de Pasarela hacía salir siete «sin cocina» a la semana.
+  - **La semana tipo no le da la cocina a quien su ficha no deja ese día.** Por ejemplo, a Susana Capón
+    si su ficha dice «cocina solo los miércoles». La cocina la lleva otra persona y, si no hay nadie, sale
+    como hueco.
+  - **Una cocina obligatoria que nadie puede llevar es un hueco:** sale en «Huecos» del Generador
+    (Semana y Periodo) y en la hoja impresa, con el porqué. Antes solo lo decía la Revisión.
+  - **Apagar «Cocina» en la ficha de una persona** deja de mirar sus límites: «solo estos días», «nunca
+    cocina» y «solo hace cocina». No le quita ser titular o reserva de un local. Las tarjetas de Equipo lo
+    enseñan igual: tachan los límites y no el «titular».
+  - **Apagar la regla «Cocina» del grupo apaga la cocina entera.** Nadie la busca, la exige ni la marca:
+    ni el Generador, ni la semana tipo, ni la Cobertura, ni el selector, ni la Revisión. Equipo →
+    Condiciones lo dice al apagarla. La cocina marcada a mano se queda.
+  - **Quién sale el primero:** primero va el que tenga el local en «Quién abre» (si puede abrir ese día),
+    luego quien tenga «Sale el primero» en su ficha y después la marca de la semana tipo. Si pones a Mari
+    Luz en «Quién abre» de la tarde de Pasarela, abre ella los días que puede, y el Generador lo comprueba
+    como una condición más. Lola con «nunca de primero» ya no sale la primera.
+  - **La semana tipo ya no fija quién abre como si lo hubieras puesto a mano.** «Guardar como semana tipo»
+    solo guarda el «sale primero» que pusiste tú. Quien abría sigue abriendo, porque su plaza se guarda la
+    primera. Al abrir la app, de la semana tipo guardada se quitan una sola vez las marcas que solo
+    repetían quién abría. Volcar el Generador → Periodo tampoco fija quién abre.
+  - **«Sale primero» a mano sobre quien no puede abrir te pregunta, como «forzar», con la regla y el
+    motivo.** Pasa, por ejemplo, con Leo («nunca de primero») o con Cristian en El 33. Si sigues, la
+    casilla lo marca (ABRE ⚠) y Revisar lo avisa: «sale primero Leo, marcado a mano, y no puede abrir».
+  - **Apagar «Sale el primero»** (la regla del grupo o la ficha de una persona) quita también el ▸ y los
+    puntos de «sale el primero». La hoja impresa vuelve a preguntar quién abre ese local.
+  - **La razón de quien abre dice cómo abre:** «abre la tarde en partido (el local lo permite)», «turno
+    continuo» o «puede abrir (turno completo)». Antes decía siempre lo último.
+- **El reparto del mes, igualado otra vez (24/09).** Al elegir entre varias personas, además de «N turnos
+  esa semana» cuenta ahora «M este mes», en el Generador y en la Cobertura. Generando octubre sin semana tipo,
+  Victoria pasa de 36 turnos a 25 y Juani de 9 a 13; ninguna semana sale menos igualada. Con la semana tipo no
+  cambia nada, y el plan A de la Cobertura de Iván tampoco. La razón dice, por ejemplo, «3 turnos esa semana
+  · 12 este mes».
+
 - **La puerta única de reglas, repasada antes de subirla (24/09).** Lo que cambia para quien la usa:
   - **Si a la casilla le falta la cocina y quien la lleva solo rompe algo que se puede relajar** (Jenny,
     que el lunes lleva la cocina del Mónaco por la mañana y por la tarde haría un partido que no tiene
@@ -26,9 +110,9 @@
     vez y contada dos veces en Horas.
   - La hoja impresa dice «Dulce, que está en standby» y, con un hueco de uno, «Falta uno para el mínimo de
     3» (decía «Faltan un»).
-  - **Pendiente de decidir con Diego:** generando un mes entero sin semana tipo (la casilla «Partir de la
-    semana tipo» desmarcada), el reparto del mes sale menos igualado que antes (en octubre, Victoria 36
-    turnos y Juani 9, frente a 25 y 13). Con la semana tipo no cambia nada.
+  - Generando un mes entero sin semana tipo (la casilla «Partir de la semana tipo» desmarcada), el reparto
+    del mes salía menos igualado que antes (en octubre, Victoria 36 turnos y Juani 9, frente a 25 y 13).
+    Resuelto el mismo 24/09: ver «El reparto del mes, igualado otra vez».
 - **Todo lo que se pone en Equipo se lee igual en todas partes (24/09).** Diego: «que lea todas
   las variables». Las reglas de la ficha estaban copiadas en el selector, el Generador, la Cobertura,
   la Revisión y la hoja impresa, y cada copia decía una cosa. Ahora hay una sola puerta de reglas y

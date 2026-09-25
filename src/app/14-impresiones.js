@@ -438,7 +438,7 @@ function pxgDestrapa(res, hu) {
   const est = res.estado || estadoDeIso(hu.iso);
   const out = [];
   for (const p of S.staff) {
-    const d = destrapa(S, S.staff, est, hu.iso, hu.turnoId, p.id, { primero: hu.tipo === 'primero' });
+    const d = destrapa(S, S.staff, est, hu.iso, hu.turnoId, p.id, { primero: hu.tipo === 'primero', cocina: hu.tipo === 'cocina' });
     if (d) out.push({ nombre: d.nombre, motivo: d.frase, regla: d.regla });
   }
   return out;
@@ -453,6 +453,8 @@ function pxgHuecos(res) {
     const fr = FRANJA_LBL[franja].toLowerCase();
     let h = `<div class="pxg-hueco"><h4>${esc(l.nombre)} · ${pxgDia(hu.iso)} por la ${fr}</h4>`;
     if (hu.tipo === 'primero') h += `<p class="pxg-p">Ninguna de las ${pxgNum(nPlantilla)} personas puede abrir esa ${fr}. ${esc(pxgCap(String(hu.motivo || '').replace(/^nadie de la casilla puede abrir:?\s*/i, 'En la casilla, ')))}${/[.!?]$/.test(hu.motivo || '') ? '' : '.'}</p>`;
+    // (fase 5, S37) la cocina obligatoria que nadie de la plantilla puede llevar
+    else if (hu.tipo === 'cocina') h += `<p class="pxg-p">Esa ${fr} la cocina es obligatoria y ninguna de las ${pxgNum(nPlantilla)} personas puede llevarla.</p>`;
     // (revisión F4, cliente) «Faltan un para el mínimo de 3» → «Falta uno para el mínimo de 3»
     else h += `<p class="pxg-p">${hu.faltan === 1 ? 'Falta uno' : `Faltan ${pxgNum(hu.faltan)}`} para el mínimo de ${hu.minimo}${hu.supuesto ? ' (mínimo supuesto)' : ''}${d && d.refuerzo ? ', que ese día lleva refuerzo por el evento' : ''}: ninguna de las ${pxgNum(nPlantilla)} personas puede entrar.</p>`;
     // el resto de la plantilla, por motivo (solo los que son condiciones; los ya colocados y los de baja, en una frase)
@@ -475,7 +477,8 @@ function pxgPreguntas(res) {
   const sin = { M: [], T: [] }, con = [];
   for (const l of S.locales) for (const f of FRANJAS) {
     if (!(l.abre && l.abre[f] && l.abre[f].length)) continue;
-    const fijo = (l.primero && l.primero[f]) || S.staff.some(p => caracteristicaActiva(p, 'abre') && p.abre && p.abre[l.id] && p.abre[l.id].includes(f));
+    // 24/09 (fase 5, S19): el fijo con sus interruptores, la misma lectura que la planilla (abreFijo)
+    const fijo = quienAbreFijo(S, S.staff, l, f);
     if (fijo) con.push(`${l.nombre} (${FRANJA_LBL[f].toLowerCase()})`); else sin[f].push(l.nombre);
   }
   if (sin.M.length || sin.T.length) out.push(`<b>¿Quién sale el primero ${[sin.M.length ? `por la mañana en ${esc(pxgLista(sin.M))}` : '', sin.T.length ? `por la tarde en ${esc(pxgLista(sin.T))}` : ''].filter(Boolean).join(', y ')}?</b> ${con.length ? `Ya consta en ${esc(pxgLista(con))}. ` : ''}Ahora pesa más, porque el primero de la casilla define quién hace turno completo.`);

@@ -4,6 +4,9 @@
 // posición. Es la pantalla que el encargado abre cada mañana.
 const ORIGEN_LBL = { patron: 'semana tipo', generador: 'generador', manual: 'a mano', nucleo: 'núcleo', refuerzo: 'refuerzo', cubre: 'cobertura', cobertura: 'gestor de cobertura', cierre: 'apoyo por un cierre' };
 
+// 24/09 (revisión de la fase 5): el aviso de «Sale primero» a mano sobre quien no puede abrir, igual en Hoy, la
+// Semana y el Mes, y sin género (antes: «sale primero puesta a mano…», también para Leo)
+const textoAbreNoApto = motivo => `«Sale primero» marcado a mano, pero no puede abrir: ${motivo}`;
 function chipPersona(iso, tid, s, opts) {
   const p = personaDeId(s.pid); if (!p) return '';
   const est = estadoDeIso(iso);
@@ -11,10 +14,10 @@ function chipPersona(iso, tid, s, opts) {
   const { localId: lid, franja: fr } = partirTurno(tid);
   // el tramo del partido de esa persona ese día: quien abre una franja entra a abrir
   const hTramo = s.partido && !s.continuo ? horarioDe(localDe(S, lid), isoDow(iso), fr, true, turnoDelDia(S, est, iso, s.pid).abre) : null;
-  const razon = [e.razon, e.avisos && e.avisos.length ? 'aviso: ' + e.avisos.join(', ') : '', s.supuesto ? 'plaza supuesta (pendiente de confirmar con el grupo)' : '', s.continuo ? 'turno continuo: abre la mañana y la tarde del mismo local' : s.partido ? `partido: mañana y tarde${hTramo ? ` · este tramo, ${hTramo.ini}–${hTramo.fin}` : ''}` : '', s.comodin ? 'sin local fijo: puede ir a cualquier bar' : '', `origen: ${ORIGEN_LBL[s.origen] || s.origen || 'a mano'}`].filter(Boolean).join('\n');
+  const razon = [e.razon, e.avisos && e.avisos.length ? 'aviso: ' + e.avisos.join(', ') : '', s.abreNoApto ? textoAbreNoApto(s.abreNoApto) : '', s.supuesto ? 'plaza supuesta (pendiente de confirmar con el grupo)' : '', s.continuo ? 'turno continuo: abre la mañana y la tarde del mismo local' : s.partido ? `partido: mañana y tarde${hTramo ? ` · este tramo, ${hTramo.ini}–${hTramo.fin}` : ''}` : '', s.comodin ? 'sin local fijo: puede ir a cualquier bar' : '', `origen: ${ORIGEN_LBL[s.origen] || s.origen || 'a mano'}`].filter(Boolean).join('\n');
   return `<span class="pchip${s.forzado ? ' forzado' : ''}${s.abre ? ' primero' : ''}" data-pid="${s.pid}" data-turno="${iso}|${tid}" style="--pc:${avColor(s.pid)}" data-tipstr="${esc(razon)}" role="button" tabindex="0">
     <span class="pos">${s.pos}</span><span class="avq">${esc(initials(p.nombre))}</span><span class="pnom">${s.abreFijo ? '<i class="mk fijo" title="sale el primero (fijo)">▸</i>' : ''}${esc(p.nombre)}${s.tramo ? `<small class="por tramo">${esc(s.tramo.ini)}–${esc(s.tramo.fin)}</small>` : ''}${s.por ? `<small class="por">por ${esc(nombreCorto(nombrePid(s.por)))}</small>` : s.nota ? `<small class="por">${esc(s.nota)}</small>` : ''}</span>
-    ${s.abre ? '<span class="bdg abre">ABRE</span>' : ''}${s.cocina ? `<span class="bdg cocina">${SVG_COCINA} COCINA</span>` : ''}${s.continuo ? '<span class="bdg cont" title="turno continuo: abre mañana y tarde">C</span>' : s.partido ? '<span class="bdg part" title="partido: mañana y tarde">P</span>' : ''}${s.comodin ? '<span class="bdg com" title="sin local fijo: puede ir a cualquier bar">□</span>' : ''}${s.forzado ? '<span class="bdg forz" title="Asignación forzada: rompe una regla">!</span>' : ''}${s.supuesto ? '<span class="bdg sup" title="Supuesto: pendiente de confirmar">?</span>' : ''}${s.origen === 'refuerzo' ? '<span class="bdg ref">REFUERZO</span>' : ''}
+    ${s.abre ? (s.abreNoApto ? `<span class="bdg abre warn" title="${esc(textoAbreNoApto(s.abreNoApto))}">ABRE ⚠</span>` : '<span class="bdg abre">ABRE</span>') : ''}${s.cocina ? `<span class="bdg cocina">${SVG_COCINA} COCINA</span>` : ''}${s.continuo ? '<span class="bdg cont" title="turno continuo: abre mañana y tarde">C</span>' : s.partido ? '<span class="bdg part" title="partido: mañana y tarde">P</span>' : ''}${s.comodin ? '<span class="bdg com" title="sin local fijo: puede ir a cualquier bar">□</span>' : ''}${s.forzado ? '<span class="bdg forz" title="Asignación forzada: rompe una regla">!</span>' : ''}${s.supuesto ? '<span class="bdg sup" title="Supuesto: pendiente de confirmar">?</span>' : ''}${s.origen === 'refuerzo' ? '<span class="bdg ref">REFUERZO</span>' : ''}
     ${opts && opts.soloLectura ? '' : `<button class="rmx" data-un="${iso}|${tid}|${s.pid}" aria-label="Quitar a ${esc(p.nombre)}">×</button>`}
   </span>`;
 }

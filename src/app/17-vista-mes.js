@@ -69,12 +69,15 @@ function renderMes() {
         const cls = m && t ? 'pP' + (lm.id !== lt.id ? ' dobla' : '') : m ? 'pM' : 'pT';
         const txt = m && t ? (lm.id !== lt.id ? `${lm.corto}+${lt.corto}` : `P·${lm.corto}`) : m ? `M·${lm.corto}` : `T·${lt.corto}`;
         const forz = cas.some(c => c.entry.forzado);
+        // (revisión de la fase 5) «Sale primero» a mano sobre quien no puede abrir: el aviso, como en Hoy y la Semana
+        const noApto = c => c.entry.abre && manualDe(est, d.iso, c.tid).abre ? revisarEntrada(S, S.staff, est, d.iso, c.tid, p.id).abreNoApto : null;
+        const abreNo = cas.map(c => ({ c, na: noApto(c) })).filter(x => x.na);
         // la otra mitad del día sin trabajo por un cierre (Hojan: El 33 por la mañana, la tarde del Mónaco
         // cerrada): un punto en la pastilla y la franja en el aviso (24/09, revisión F2)
         const edc = cierresDe(S).length ? estadoDia(S, p, d.iso) : null;
         const cieF = edc && edc.cierre && edc.cierre.tipo !== 'REFUERZA' && !edc.libra ? edc : null;
-        const tip = cas.map(c => `${FRANJA_LBL[partirTurno(c.tid).franja]}: ${nombreLocal(partirTurno(c.tid).localId)}${c.entry.abre ? ' (abre)' : ''}${c.entry.cocina ? ' (cocina)' : ''}${c.entry.avisos && c.entry.avisos.length ? ' · ' + c.entry.avisos.join(', ') : ''}`).concat(cieF ? [`${cieF.cierre.franjas.map(f => FRANJA_LBL[f]).join(' y ')}: ${cieF.texto}`] : []).join('\n');
-        h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill ${cls}${evPor[d.iso] ? ' ev' : ''}" style="--lc:${esc((lm || lt).color)};--lc2:${esc((lt || lm).color)}" data-tipstr="${esc(tip)}">${forz ? '<i class="fz"></i>' : ''}${cieF ? '<i class="cief"></i>' : ''}${esc(txt)}</span></td>`;
+        const tip = cas.map(c => `${FRANJA_LBL[partirTurno(c.tid).franja]}: ${nombreLocal(partirTurno(c.tid).localId)}${c.entry.abre ? ' (abre)' : ''}${c.entry.cocina ? ' (cocina)' : ''}${c.entry.avisos && c.entry.avisos.length ? ' · ' + c.entry.avisos.join(', ') : ''}`).concat(abreNo.map(x => `⚠ ${textoAbreNoApto(x.na.motivo)}`)).concat(cieF ? [`${cieF.cierre.franjas.map(f => FRANJA_LBL[f]).join(' y ')}: ${cieF.texto}`] : []).join('\n');
+        h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill ${cls}${evPor[d.iso] ? ' ev' : ''}" style="--lc:${esc((lm || lt).color)};--lc2:${esc((lt || lm).color)}" data-tipstr="${esc(tip)}">${forz ? '<i class="fz"></i>' : abreNo.length ? '<i class="fz aw"></i>' : ''}${cieF ? '<i class="cief"></i>' : ''}${esc(txt)}</span></td>`;
       }
       h += '</tr>';
     }

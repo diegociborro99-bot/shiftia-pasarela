@@ -187,9 +187,11 @@ function htmlPrevia(p) {
   const fila = a => `<div class="genrow"><span class="av" style="background:${avColor(a.pid)}">${esc(initials(nombrePid(a.pid)))}</span><span class="gtxt"><b>${esc(nombrePid(a.pid))}</b><small>${esc(a.razon || '')}${a.avisos && a.avisos.length ? ' · <span style="color:var(--warn)">' + esc(a.avisos.join(', ')) + '</span>' : ''}${a.supuesto ? ' · <span style="color:var(--warn)">supuesto</span>' : ''}</small></span>${lp(a.turnoId)}</div>`;
   const hueco = h => {
     const e = p.meses[h.iso.slice(0, 7)];
-    const alt = candidatosConAviso(S, S.staff, e, h.iso, h.turnoId).slice(0, 3);
+    const alt = h.tipo === 'cocina' ? [] : candidatosConAviso(S, S.staff, e, h.iso, h.turnoId).slice(0, 3);
     const pq = Object.entries(h.porQueNadie || {}).slice(0, 5).map(([m, quienes]) => `<b>${esc(m)}</b>: ${esc(quienes.slice(0, 4).join(', '))}${quienes.length > 4 ? ` +${quienes.length - 4}` : ''}`).join(' · ');
-    return `<div class="genrow hueco"><span class="av" style="background:var(--bad)">!</span><span class="gtxt"><b>Faltan ${h.faltan} de ${h.minimo}${h.supuesto ? ' (mínimo supuesto)' : ''}</b><small class="pqn">${pq || 'nadie disponible'}</small>${alt.length ? `<small>Con aviso: ${alt.map(c => `<button class="btn-mini ghost" data-aplicaruno="${h.iso}|${h.turnoId}|${c.pid}" title="${esc(c.razones.join(' · '))}">${esc(nombreCorto(c.nombre))}</button>`).join(' ')}</small>` : ''}</span>${lp(h.turnoId)}</div>`;
+    // (fase 5, S37) qué le falta a la casilla: gente, quien abra o la cocina obligatoria
+    const titulo = h.tipo === 'cocina' ? 'Sin cocina (obligatoria)' : h.tipo === 'primero' ? 'Nadie puede abrir (1.ª posición)' : `Faltan ${h.faltan} de ${h.minimo}${h.supuesto ? ' (mínimo supuesto)' : ''}`;
+    return `<div class="genrow hueco"><span class="av" style="background:var(--bad)">!</span><span class="gtxt"><b>${titulo}</b><small class="pqn">${pq || 'nadie disponible'}</small>${alt.length ? `<small>Con aviso: ${alt.map(c => `<button class="btn-mini ghost" data-aplicaruno="${h.iso}|${h.turnoId}|${c.pid}" title="${esc(c.razones.join(' · '))}">${esc(nombreCorto(c.nombre))}</button>`).join(' ')}</small>` : ''}</span>${lp(h.turnoId)}</div>`;
   };
   return `<div class="genkpis">
       <div class="genk ok"><b>${p.aplicados.length}</b><span>plazas propuestas</span></div>
@@ -266,7 +268,8 @@ function estadoSemana(lunes, escribible) {
   }
   return e;
 }
-function opcionesSemana() { return { simular: false, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron }; }
+// 24/09 (fase 5): con S.meses, «M este mes» de la carga cuenta el mes entero y no solo los días de la semana
+function opcionesSemana() { return { simular: false, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron, meses: S.meses }; }
 function tituloSemana(lunes) { const fin = addDias(lunes, 6); const m1 = +lunes.slice(5, 7), m2 = +fin.slice(5, 7); return `${+lunes.slice(8, 10)}${m1 !== m2 ? ' ' + MES3[m1 - 1] : ''} – ${+fin.slice(8, 10)} de ${MESES[m2 - 1].toLowerCase()} ${fin.slice(0, 4)}`; }
 function renderGeneradorSemana() {
   if (!GEN.lunes) GEN.lunes = mondayOf(isoDia());
@@ -365,8 +368,9 @@ function htmlSemanaGenerada(res) {
   // con su «por» (revisión F3): «Mari L. → Mari L. por Iván» es un cambio aunque la casilla tenga la misma gente
   const ncPor = (pid, por) => nc(pid) + (por ? ` <small>por ${nc(por)}</small>` : '');
   const cambios = res.cambios.map(c => `<li>${lp(c.turnoId)} <b>${dl(c.iso)}</b>: ${c.antes.length ? '<s>' + c.antes.map(pid => ncPor(pid, (c.porAntes || {})[pid])).join(', ') + '</s> → ' : '<em>nueva:</em> '}${c.despues.map(pid => ncPor(pid, (c.porDespues || {})[pid])).join(', ') || 'vacía'}</li>`).join('');
-  const huecos = res.huecos.map(h => { const pq = Object.entries(h.porQueNadie || {}).slice(0, 6).map(([m, q]) => `<b>${esc(m)}</b>: ${esc(q.slice(0, 5).join(', '))}${q.length > 5 ? ' +' + (q.length - 5) : ''}`).join(' · '); return `<div class="ghitem">${lp(h.turnoId)} <b>${dl(h.iso)}</b> · ${h.tipo === 'primero' ? '1.ª posición vacante' : `faltan ${h.faltan} de ${h.minimo}`}<p>${esc(h.motivo || '')}</p><small>${pq || 'nadie de la plantilla puede'}</small></div>`; }).join('');
-  const grupos = [['minimos', 'Mínimos'], ['cocina', 'Cocina'], ['persona', 'Fichas'], ['regla', 'Reglas del grupo']];
+  // (fase 5, S37) la cocina obligatoria que nadie puede llevar también es un hueco
+  const huecos = res.huecos.map(h => { const pq = Object.entries(h.porQueNadie || {}).slice(0, 6).map(([m, q]) => `<b>${esc(m)}</b>: ${esc(q.slice(0, 5).join(', '))}${q.length > 5 ? ' +' + (q.length - 5) : ''}`).join(' · '); return `<div class="ghitem">${lp(h.turnoId)} <b>${dl(h.iso)}</b> · ${h.tipo === 'primero' ? '1.ª posición vacante' : h.tipo === 'cocina' ? 'cocina' : `faltan ${h.faltan} de ${h.minimo}`}<p>${esc(h.motivo || '')}</p><small>${pq || 'nadie de la plantilla puede'}</small></div>`; }).join('');
+  const grupos = [['minimos', 'Mínimos'], ['cocina', 'Cocina'], ['primero', 'Quién abre'], ['persona', 'Fichas'], ['regla', 'Reglas del grupo']];
   const conds = grupos.map(([t, lbl]) => { const xs = res.condiciones.filter(c => c.tipo === t); return xs.length ? `<div class="gcgrp">${lbl} · ${xs.length}</div>` + xs.map(c => `<div class="gcond${c.ok ? '' : ' rota'}"><i>${c.ok ? '✓' : '✗'}</i><span><b>${c.num}</b> ${esc(c.texto)}${c.nueva ? ' <em class="gnueva">NUEVA</em>' : ''}${c.ok ? (c.nota ? `<small class="gnota">✓ ${esc(c.nota)}</small>` : '') : `<small>${esc(c.detalle)}</small>`}</span></div>`).join('') : ''; }).join('');
   return `<div class="genkpis">
       <div class="genk ok"><b>${r.turnos}</b><span>turnos abiertos</span></div>
@@ -389,7 +393,7 @@ function htmlSemanaGenerada(res) {
 }
 function openCondicionesGen() {
   const cs = condicionesDe(S, S.staff, GEN.lunes || mondayOf(isoDia()));   // las de la semana del Generador (24/09)
-  const grupos = [['minimos', 'Mínimos por local, franja y día'], ['cocina', 'Cocina'], ['persona', 'Condiciones de las fichas'], ['regla', 'Reglas del grupo']];
+  const grupos = [['minimos', 'Mínimos por local, franja y día'], ['cocina', 'Cocina'], ['primero', 'Quién abre cada local'], ['persona', 'Condiciones de las fichas'], ['regla', 'Reglas del grupo']];
   const html = `<span class="micro">LO QUE COMPRUEBA EL GENERADOR</span><h2 class="revh2" style="margin-top:8px">${cs.length} condiciones activas</h2>
     <p class="revsub">Salen de los ajustes de cada local y de las fichas de Equipo. Cada una se puede apagar desde allí (o desde Equipo → Condiciones) y el generador deja de comprobarla.</p>
     ${grupos.map(([t, lbl]) => { const xs = cs.filter(c => c.tipo === t); return xs.length ? `<div class="revgrp"><span class="dot" style="background:var(--accent)"></span>${lbl.toUpperCase()} · ${xs.length}</div>${xs.map(c => `<div class="gcond"><i>·</i><span><b>${c.num}</b> ${esc(c.texto)}${c.nueva ? ' <em class="gnueva">NUEVA</em>' : ''}</span></div>`).join('')}` : ''; }).join('')}`;

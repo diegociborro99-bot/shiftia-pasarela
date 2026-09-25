@@ -66,7 +66,27 @@ function restaurarNav() {
   return false;
 }
 let ultimoAvisoCuota = 0;
+// 24/09 (revisión de la fase 5; Diego: «que lea todas las variables»). Quién abre y quién lleva la cocina se
+// guardan en cada casilla (los leen el Mes, el perfil del empleado, el Excel y las horas) y no se enteraban de
+// los cambios de configuración: «Quién abre» de Pasarela tarde a Mari Luz cambiaba Hoy, pero el Mes, el perfil y
+// el Excel seguían diciendo Iván, y Susana Capón con «cocina solo los miércoles» seguía con la del martes. Al
+// guardar, si ha cambiado lo que los decide (los locales, las fichas o las reglas del grupo), venga el cambio de
+// donde venga (Ajustes, la ficha, los interruptores, Ctrl+Z), se recalculan de hoy en adelante (refrescarMarcas:
+// lo puesto a mano no se toca; lo pasado es lo que se trabajó y no cambia).
+let huellaMarcas = null;
+const huellaConfigMarcas = e => JSON.stringify([e.locales || [], e.staff || [], e.reglas || {}]);
+function marcarHuellaConfig() { try { huellaMarcas = S ? huellaConfigMarcas(S) : null; } catch (e) { huellaMarcas = null; } }
+function refrescarMarcasSiCambia() {
+  if (!S || (typeof SRV !== 'undefined' && SRV.on && !SRV.esAdmin)) return;   // quien no escribe la planilla, no
+  const h = huellaConfigMarcas(S);
+  if (huellaMarcas === null || h === huellaMarcas) { huellaMarcas = h; return; }
+  huellaMarcas = h;
+  // (como al poner a alguien en una casilla: es lo que se deduce de la configuración, no un cambio aparte que
+  // haya que apuntar en el historial; el cambio de Ajustes o de la ficha ya tiene su línea)
+  refrescarMarcas(S, S.staff, S.meses, isoHoy());
+}
 function saveState() {
+  refrescarMarcasSiCambia();
   guardarNav();
   if (typeof SRV !== 'undefined' && SRV.on) { if (SRV.esAdmin) empujarEstadoDebounced(); return; }
   try { localStorage.setItem(LS_KEY, JSON.stringify(S)); }
@@ -120,6 +140,15 @@ function migrarEstado(estado) {
   migrarPuestos(estado);    // 17/09: el puesto «comodín» pasa a ser «apoyo»
   migrarAltas(estado);      // 17/09: Dulce y Susi, que entraron después del primer arranque
   for (const p of estado.staff) normalizarFicha(p);   // también las altas de arriba (revisión F3)
+  // 24/09 (fase 5): la cocina de Ajustes del local y la de la ficha, de acuerdo (S36); y de las «a» de la
+  // semana tipo guardada, fuera las que solo repetían quién abría (S18). Una vez cada una (estado.migraciones)
+  migrarCocinaLocales(estado);
+  // 24/09 (revisión de la fase 5): en la planilla ya volcada, quién abre y la cocina que dejó «a mano» la
+  // versión de antes pasan a ser de lo automático (lo que puso el encargado se queda); antes que las «a» de la
+  // semana tipo, que las mira. Y de hoy en adelante se recalculan con la configuración de ahora
+  const mm = migrarMarcasAutomaticas(estado, isoHoy());
+  migrarAbrePatron(estado, isoHoy());
+  if (mm.abre || mm.cocina) refrescarMarcas(estado, estado.staff, estado.meses, isoHoy());
   // 17/09: la base de entrevistas de Notion (entrevistas + alerta interna)
   if (!Array.isArray(estado.entrevistas) || !estado.entrevistas.length) estado.entrevistas = JSON.parse(JSON.stringify(ENTREVISTAS_SEMILLA));
   // 17/09: las 150 entrevistas que estaban en papel. A quien ya tenía la app en marcha no
@@ -190,6 +219,7 @@ function aplicarEstadoExterno(nuevo) {
   S = Object.assign(freshState(), nuevo);
   for (const k of Object.keys(nav)) if (nav[k] !== undefined) S[k] = nav[k];
   migrarEstado(S);
+  marcarHuellaConfig();   // lo que llega de otro dispositivo ya viene recalculado
   if (S.day > diasDelMes(S.y, S.m)) S.day = 1;
   cargarMes();
   if (document.body.classList.contains('modo-empleado')) { if (typeof activarModoEmpleado === 'function') activarModoEmpleado(); }
@@ -230,6 +260,10 @@ function pushUndo(label, extra) {
     // 24/09 (D11): cerrar un local por fechas toca los cierres, las fichas (vacaciones) y varios meses
     if (extra && extra.cierres) u.cierresPuntuales = JSON.parse(JSON.stringify(S.cierresPuntuales || []));
     if (extra && extra.locales) u.locales = JSON.parse(JSON.stringify(S.locales));
+    // 24/09 (revisión de la fase 5): la ficha y la cocina de Ajustes solo guardan la cocina de cada local. Con los
+    // locales enteros, Ctrl+Z de la ficha de Juani devolvía también el mínimo y «Quién abre» que se habían
+    // cambiado después en Ajustes (que no apilan su propio paso), sin decirlo
+    if (extra && extra.cocinaLocales) u.cocinaLocales = Object.fromEntries(S.locales.map(l => [l.id, JSON.parse(JSON.stringify(l.cocina || null))]));
     undoStack.push(u);
     if (undoStack.length > 20) undoStack.shift();
     actualizarUndoBtn();
@@ -261,6 +295,7 @@ function deshacer() {
   if (u.patron) S.patron = u.patron;
   if (u.cierresPuntuales) S.cierresPuntuales = u.cierresPuntuales;
   if (u.locales) S.locales = u.locales;
+  if (u.cocinaLocales) for (const l of S.locales) if (u.cocinaLocales[l.id] !== undefined) { if (u.cocinaLocales[l.id]) l.cocina = u.cocinaLocales[l.id]; else delete l.cocina; }
   registrarCambio('Deshecho: ' + u.label, 'undo');
   saveState(); renderVistaActiva();
   repintarPaneles();

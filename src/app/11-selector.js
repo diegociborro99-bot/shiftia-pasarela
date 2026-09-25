@@ -146,8 +146,8 @@ function openMenuTurno(iso, tid, pid, anchor) {
     <button class="popb full rec" data-mt="cobertura">Falta estos días… buscar quién cubre</button>
     ${i > 0 ? '<button class="popb full" data-mt="subir">▲ Subir en la casilla</button>' : ''}
     ${i < lista.length - 1 ? '<button class="popb full" data-mt="bajar">▼ Bajar en la casilla</button>' : ''}
-    ${entry.abre ? '' : '<button class="popb full" data-mt="abre">Sale primero (abre el local)</button>'}
-    ${localTieneCocina(l, franja) || entry.cocina ? (entry.cocina ? '<button class="popb full" data-mt="nococina">Quitar la marca de cocina</button>' : `<button class="popb full" data-mt="cocina">Lleva la cocina${puedeCocina(S, p, localId, iso) ? '' : ' (no es cocina de este local)'}</button>`) : ''}
+    ${entry.abre ? (manualDe(e, iso, tid).abre ? '<button class="popb full" data-mt="noabre">Quitar «sale primero» a mano<small>que la casilla decida quién abre</small></button>' : '') : '<button class="popb full" data-mt="abre">Sale primero (abre el local)</button>'}
+    ${localTieneCocina(l, franja, S, S.staff) || entry.cocina ? (entry.cocina ? '<button class="popb full" data-mt="nococina">Quitar la marca de cocina</button>' : `<button class="popb full" data-mt="cocina">Lleva la cocina${puedeCocina(S, p, localId, iso) ? '' : ' (no es cocina de este local)'}</button>`) : ''}
     ${esApoyo(p) ? '' : btnTramo}
     <button class="popb full" data-mt="cerrar">Cerrar esta franja…</button>
     <button class="popb full peligro" data-mt="quitar">Quitar de la casilla</button>`;
@@ -199,7 +199,22 @@ function openMenuTurno(iso, tid, pid, anchor) {
     if (!confirmarSiCerrado(iso)) return;
     const ew = estadoDeIso(iso, true);
     if (a === 'subir' || a === 'bajar') { pushUndo('reordenar casilla'); moverEnCasilla(ew, iso, tid, pid, i + (a === 'subir' ? -1 : 1)); registrarCambio(`${p.nombre} ${a === 'subir' ? 'sube' : 'baja'} en la casilla de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); }
-    else if (a === 'abre') { pushUndo('quién abre'); marcarAbre(ew, iso, tid, pid, S); registrarCambio(`${p.nombre} abre ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); }
+    else if (a === 'abre') {
+      // 24/09 (fase 5, S18): sobre quien no puede abrir (Leo, «nunca de primero»; Cristian, que no abre El 33;
+      // quien viene de hacer la mañana) avisa igual que «forzar», con la regla y el motivo (puedePrimero, la
+      // misma lectura que el generador); si sigue, queda puesto a mano y la casilla y Revisar lo avisan
+      const pr = puedePrimero(S, S.staff, ew, iso, tid, pid);
+      let motivo = '';
+      if (!pr.ok) {
+        motivo = prompt(`Vas a poner a ${p.nombre} de primero (abre ${l.nombre} por la ${FRANJA_LBL[franja].toLowerCase()}) incumpliendo esta regla:\n\n${pr.regla ? nombreRegla(pr.regla) + ' — ' : ''}${pr.motivo}\n\nSi la equivocada es la ficha, se corrige en Equipo. Escribe por qué lo haces (quedará en el historial):`);
+        if (motivo === null) return;
+      }
+      pushUndo('quién abre'); marcarAbre(ew, iso, tid, pid, S);
+      registrarCambio(`${p.nombre} abre ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}${pr.ok ? '' : ` · puesto a la fuerza (incumple ${pr.regla ? nombreRegla(pr.regla) + ': ' : ''}${pr.motivo})${motivo.trim() ? ' · ' + motivo.trim() : ''}`}`, 'asig');
+      if (!pr.ok) toast(`${p.nombre} sale primero a la fuerza · incumple ${pr.regla ? nombreRegla(pr.regla) + ': ' : ''}${pr.motivo}`, 'warn');
+    }
+    // (revisión de la fase 5) quitar el «sale primero» puesto a mano: la casilla vuelve a decidir quién abre
+    else if (a === 'noabre') { pushUndo('quién abre'); quitarAbreAMano(ew, S, S.staff, iso, tid); registrarCambio(`${p.nombre} ya no sale primero a mano en ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}: abre ${nombrePid(primeroDe(S, S.staff, ew, iso, tid) || '') || 'nadie'}`, 'asig'); }
     else if (a === 'cocina') { pushUndo('cocina'); marcarCocina(ew, iso, tid, pid); if (!manualDe(ew, iso, tid).orden) ew.asig[iso][tid] = ordenarCasilla(S, iso, tid, ew.asig[iso][tid]); registrarCambio(`${p.nombre} lleva la cocina de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); }
     else if (a === 'nococina') { pushUndo('cocina'); entry.cocina = false; marcarManual(ew, iso, tid, 'cocina'); registrarCambio(`${p.nombre} deja la cocina de ${l.nombre} del ${fmtDM(iso)}`, 'asig'); }
     else if (a === 'quitar') { pushUndo(`quitar a ${p.nombre}`); desasignarUI(iso, tid, pid); }

@@ -192,7 +192,8 @@ function proponerCobertura(root, modo) {
     // «N turnos esa semana» (Mari Luz, 3 en vez de 8) y el cambio de turno no encontraba nada
     const rango = rangoNecesario(inc);
     const base = clonarEstado(estadoRango(rango.desde, rango.hasta, false));
-    const res = planesCobertura(S, S.staff, base, inc, { siempre: COB.siempre, intercambio: COB.tipo === 'CAMBIO' && COB.intercambio });
+    // (fase 5) y con S.meses, «M este mes» cuenta el mes entero, no solo las semanas que se traen
+    const res = planesCobertura(S, S.staff, base, inc, { siempre: COB.siempre, intercambio: COB.tipo === 'CAMBIO' && COB.intercambio, meses: S.meses });
     res.inc = inc; res.ts = Date.now(); res.rango = rango; res.huella = huellaPlanilla(S);
     COB.res = res; COB.aplicado = null; COB.caducado = null;
   } catch (e) { toast('No se pudo proponer: ' + (e && e.message ? e.message : e), 'bad'); }

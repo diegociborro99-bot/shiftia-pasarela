@@ -37,6 +37,8 @@
 .pchip .pnom{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pchip .bdg{flex:none;font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.08em;border-radius:5px;padding:2px 5px}
 .bdg.abre{background:var(--grad);color:#fff}
+/* 24/09 (fase 5, S18): sale primero marcado a mano y no puede abrir (Leo, «nunca de primero») */
+.bdg.abre.warn{background:var(--warn);color:#fff}
 .bdg.cocina{background:var(--ink);color:var(--bg)}
 .bdg.forz{background:var(--bad-bg);color:var(--bad)}
 .bdg.sup{background:var(--warn-bg);color:var(--warn)}
@@ -97,6 +99,7 @@ tr.locsec .secl i{width:10px;height:10px;border-radius:3px;background:var(--lc)}
 .wav.abre{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--accent)}
 .wav.cocina::after{content:"";position:absolute;right:-4px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--ink);border:2px solid var(--surface)}
 .wav.forzado{outline:2px solid var(--bad);outline-offset:1px}
+.wav.abrewarn{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--warn)}
 .wfalta{font-family:var(--mono);font-size:9.5px;font-weight:800;color:var(--warn);background:var(--warn-bg);border-radius:5px;padding:1px 6px}
 .wcerr{color:var(--ink3);opacity:.5;font-size:12px}
 td.wcorta{background:color-mix(in srgb, var(--warn-bg) 80%, transparent) !important}
@@ -112,6 +115,7 @@ tr.piedesc .dn em{font-style:normal;font-family:var(--mono);font-size:9px;color:
 .pill.pP{background:linear-gradient(135deg,var(--lc,var(--accent)) 50%,color-mix(in srgb, var(--lc2,var(--lc,var(--accent))) 78%, #000) 50%)}
 .pill.pP.dobla{background:linear-gradient(135deg,var(--lc) 50%,var(--lc2) 50%)}
 .pill .fz{position:absolute;top:-4px;left:-4px;width:11px;height:11px;border-radius:50%;background:var(--bad);border:1.5px solid var(--surface)}
+.pill .fz.aw{background:var(--warn)}
 .pill.ev{box-shadow:inset 0 0 0 1.5px var(--accent)}
 .plan th.day .evd{display:block;font-size:7px;color:var(--accent);font-weight:800;line-height:1}
 .plan th.day.evday{background:var(--accent-l)}
