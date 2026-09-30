@@ -145,7 +145,8 @@ try {
   console.log('── 3) Ficha de Iván → vacaciones del 2 al 4/10 solo por la tarde → la confirmación lo explica → Guardar');
   ok('la semana del 28/09 ya está en la planilla, con Iván en sus tardes', (await casilla(pg, VIE)).some(x => x.pid === 'ivan'));
   const hayFranja = await vacacionesIvan(pg, 'T');
-  ok('el alta de ausencias de la ficha deja elegir la franja (día entero / solo mañana / solo tarde)', hayFranja && await pg.evaluate(() => [...document.querySelectorAll('#fichaOvl #fAusFr option')].map(o => o.textContent.trim()).join('|') === 'Día entero|Solo mañana|Solo tarde'), await pg.evaluate(() => [...document.querySelectorAll('#fichaOvl #fAusFr option')].map(o => o.textContent).join('|')));
+  // (30/09, auditoría G7) solo las franjas que trabaja: Iván solo hace tardes, así que «Día entero / Solo tarde»
+  ok('el alta de ausencias de la ficha deja elegir la franja (día entero / solo tarde: Iván solo hace tardes, sin «Solo mañana»)', hayFranja && await pg.evaluate(() => [...document.querySelectorAll('#fichaOvl #fAusFr option')].map(o => o.textContent.trim()).join('|') === 'Día entero|Solo tarde'), await pg.evaluate(() => [...document.querySelectorAll('#fichaOvl #fAusFr option')].map(o => o.textContent).join('|')));
   ok('sale la confirmación', await llega(pg, () => !!document.getElementById('ausOvl'), null, 4000) >= 0);
   const conf = await texto(pg, '#ausOvl');
   ok('dice «Iván no está del viernes 2 al domingo 4 por la tarde»', /Iván no está del viernes 2 al domingo 4 por la tarde/.test(conf), conf);

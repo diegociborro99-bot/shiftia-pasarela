@@ -1413,8 +1413,8 @@ ok('la fecha de la entrevista se entiende tal y como está escrita en la ficha',
   assert.strictEqual(f(''), null);
   assert.strictEqual(f('cuando pueda'), null);
   assert.strictEqual(f('45/13/2026'), null);
-  assert.strictEqual(M.fechaCandidato({}), null);
-  assert.strictEqual(M.fechaCandidato(null), null);
+  assert.strictEqual(M.fechaCandidato({}, '2026-09-21'), null);   // (30/09, A5: siempre con la fecha de hoy)
+  assert.strictEqual(M.fechaCandidato(null, '2026-09-21'), null);
 });
 
 ok('las entrevistas salen las últimas primero, nunca en orden alfabético (José, 21/09)', () => {
@@ -1434,15 +1434,16 @@ ok('las entrevistas salen las últimas primero, nunca en orden alfabético (Jos�
   ];
   const orden = M.ordenarCandidatos(base, '2026-09-21').map(c => c.id);
   assert.deepStrictEqual(orden, ['fran', 'dani', 'gala', 'carla', 'bea', 'ana', 'eva']);
-  assert.notStrictEqual(M.ordenarCandidatos(base), base, 'devuelve una copia: la base no se toca');
+  // (30/09, A5: siempre con la fecha de hoy; el modelo no mira el reloj)
+  assert.notStrictEqual(M.ordenarCandidatos(base, '2026-09-21'), base, 'devuelve una copia: la base no se toca');
   assert.deepStrictEqual(base.map(c => c.id), ['ana', 'bea', 'carla', 'dani', 'eva', 'fran', 'gala']);
   // el filtro respeta ese orden
-  const bien = M.filtrarCandidatos(M.ordenarCandidatos(base.map(c => Object.assign({}, c, { val: c.id === 'ana' || c.id === 'fran' || c.id === 'bea' ? 'bien' : null }))), { val: 'bien' }).map(c => c.id);
+  const bien = M.filtrarCandidatos(M.ordenarCandidatos(base.map(c => Object.assign({}, c, { val: c.id === 'ana' || c.id === 'fran' || c.id === 'bea' ? 'bien' : null })), '2026-09-21'), { val: 'bien' }).map(c => c.id);
   assert.deepStrictEqual(bien, ['fran', 'bea', 'ana']);
   // y un ts sin fecha gana a cualquier fecha: acabar de valorar a alguien lo sube arriba
-  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'x', fecha: '20/9/2026' }, { id: 'y', ts: 1 }]).map(c => c.id), ['y', 'x']);
+  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'x', fecha: '20/9/2026' }, { id: 'y', ts: 1 }], '2026-09-21').map(c => c.id), ['y', 'x']);
   // una fecha que no se entiende no manda a nadie al fondo por delante de quien no tiene ninguna
-  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'p' }, { id: 'q', fecha: 'cuando pueda' }, { id: 'r', fecha: '1/1/2024' }]).map(c => c.id), ['r', 'p', 'q']);
+  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'p' }, { id: 'q', fecha: 'cuando pueda' }, { id: 'r', fecha: '1/1/2024' }], '2026-09-21').map(c => c.id), ['r', 'p', 'q']);
 });
 
 ok('la lista se ordena de cuatro maneras: alfabético, por valoración, por fecha y las últimas primero', () => {
@@ -1901,7 +1902,8 @@ ok('revisión F1 · el aviso de días sin emparejar solo sale si hay días de si
   M.ponerLibraPuntual(M.personaDe(st, 'lavinia'), LP_LUN, [5]);   // libra lunes, martes y jueves; esta semana, el viernes
   const r = M.generarSemana(cfg, st, estadoOct(), LP_LUN, {});
   const a = r.avisos.find(x => x.pid === 'lavinia');
-  assert.ok(a && /no se sabe qué día trabaja a cambio/.test(a.texto) && !/emparejar/.test(a.texto), JSON.stringify(r.avisos));
+  // (30/09, revisión de A2) el aviso dice lo que pasa: «trabaja el lunes, el martes y el jueves (libra el viernes): no se sabe qué turno hace a cambio»
+  assert.ok(a && /no se sabe qué turno hace a cambio/.test(a.texto) && !/emparejar/.test(a.texto), JSON.stringify(r.avisos));
 });
 
 ok('revisión F1 · un día del cambio que ya ha pasado no se toca: lo demás se aplica igual que en el generador y se avisa de cuántos días trabaja', () => {
@@ -6552,6 +6554,359 @@ ok('A1 rev · 7 (modelo 4; R/05): la línea «deja la cocina» del historial sol
   assert.deepStrictEqual(M.migrarSinCocina(S, '2026-10-06'), { sinCocina: 0, cocina: 0 }, 'con la migración hecha no vuelve a mirar el historial');
   M.refrescarCasillas(S, st, e, '2026-10-10', '2026-10-10');
   assert.ok(M.asignados(e, '2026-10-10', 'ZAPA_T').some(x => x.cocina) && !M.manualDe(e, '2026-10-10', 'ZAPA_T').cocina, 'la casilla la trata como huérfana: ya no lee el historial');
+});
+
+// ---------- A2 (30/09): auditoría del modelo · ausencias (A1/H8, A2/H9, A8, G7, A3/A11, A5/G15, A10, A7, A12) ----------
+// Los scripts de los revisores (scratchpad/auditoria-modelo/A-fechas-lectura/02-ausencias.js, 02b-mes-quitar-baja.js y
+// 04-libre-puntual.js; G-horas-nucleo-estado/03-media-jornada.js; H-invariantes/caso-07-directo.mjs) como pruebas del repo.
+
+ok('A2 · A1/H8 (02b, caso 07a): quitar un día de una baja SIN fecha de fin la parte y la cola sigue abierta; quitar el primer día la deja abierta desde el siguiente', () => {
+  for (const pid of ['laura', 'maydeth', 'susi']) {
+    const cfg = cfgBase(), p = M.personaDe(cfg.staff, pid);
+    assert.deepStrictEqual(p.ausencias.map(a => [a.tipo, a.desde, a.hasta]), [['BAJ', '2026-09-01', undefined]], pid + ': en la semilla, baja abierta desde el 1/9');
+    const det = p.ausencias[0].detalle;
+    p.ausencias = M.quitarDiaDeAusencia(p.ausencias, '2026-10-15');
+    assert.deepStrictEqual(p.ausencias, [{ tipo: 'BAJ', desde: '2026-09-01', hasta: '2026-10-14', detalle: det }, { tipo: 'BAJ', desde: '2026-10-16', detalle: det }], pid);
+    assert.ok(!M.deBaja(p, '2026-10-15') && M.deBaja(p, '2026-10-14') && M.deBaja(p, '2026-10-16') && M.deBaja(p, '2027-03-01'), pid + ': solo el 15/10 deja de estar de baja');
+    p.ausencias = M.quitarDiaDeAusencia(p.ausencias, '2026-09-01');
+    assert.deepStrictEqual(p.ausencias, [{ tipo: 'BAJ', desde: '2026-09-02', hasta: '2026-10-14', detalle: det }, { tipo: 'BAJ', desde: '2026-10-16', detalle: det }], pid + ': quitar el primer día no borra la baja');
+    assert.ok(!M.deBaja(p, '2026-09-01') && M.deBaja(p, '2026-09-02'));
+  }
+  // caso 07 (a), tal cual
+  const p = { id: 'x', nombre: 'X', ausencias: [] };
+  M.anadirAusencia(p, { tipo: 'BAJ', desde: '2026-09-01' });
+  p.ausencias = M.quitarDiaDeAusencia(p.ausencias, '2026-10-05');
+  assert.deepStrictEqual(p.ausencias, [{ tipo: 'BAJ', desde: '2026-09-01', hasta: '2026-10-04' }, { tipo: 'BAJ', desde: '2026-10-06' }]);
+  assert.strictEqual(M.ausenciaEn(p, '2026-10-05'), null);
+  p.ausencias = M.quitarDiaDeAusencia(p.ausencias, '2026-09-01');
+  assert.deepStrictEqual(p.ausencias, [{ tipo: 'BAJ', desde: '2026-09-02', hasta: '2026-10-04' }, { tipo: 'BAJ', desde: '2026-10-06' }]);
+  assert.ok(M.ausenciaEn(p, '2026-09-02') && !M.ausenciaEn(p, '2026-09-01'));
+  // un día fuera de la baja no la toca; y las cerradas se parten como siempre (02 §2)
+  assert.deepStrictEqual(M.quitarDiaDeAusencia([{ tipo: 'BAJ', desde: '2026-09-01' }], '2026-08-31'), [{ tipo: 'BAJ', desde: '2026-09-01' }]);
+  const v = [{ tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-08', detalle: 'x' }];
+  assert.deepStrictEqual(M.quitarDiaDeAusencia(v, '2026-10-07'), [{ tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-06', detalle: 'x' }, { tipo: 'VAC', desde: '2026-10-08', hasta: '2026-10-08', detalle: 'x' }]);
+  assert.deepStrictEqual(M.quitarDiaDeAusencia(v, '2026-10-06'), [{ tipo: 'VAC', desde: '2026-10-07', hasta: '2026-10-08', detalle: 'x' }]);
+  assert.deepStrictEqual(M.quitarDiaDeAusencia(v, '2026-10-08'), [{ tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-07', detalle: 'x' }]);
+  assert.deepStrictEqual(v, [{ tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-08', detalle: 'x' }], 'la entrada no se muta');
+  // una VAC sin fin (dato de antes) se lee como abierta (ausenciaEn) y se parte igual (02 §10)
+  const vv = [{ tipo: 'VAC', desde: '2026-10-01' }];
+  assert.deepStrictEqual(M.quitarDiaDeAusencia(vv, '2026-10-20'), [{ tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-19' }, { tipo: 'VAC', desde: '2026-10-21' }]);
+  assert.deepStrictEqual(M.quitarDiaDeAusencia(vv, '2026-10-01'), [{ tipo: 'VAC', desde: '2026-10-02' }]);
+});
+
+ok('A2 · A2/H9 (02 §3-4, caso 07b): anadirAusencia funde las bajas abiertas (queda una, desde el menor desde) y una que engloba absorbe a las de dentro', () => {
+  // caso 07 (b): tres altas de baja que se solapan → una sola, abierta desde el 1/9
+  const q = { id: 'y', nombre: 'Y', ausencias: [] };
+  M.anadirAusencia(q, { tipo: 'BAJ', desde: '2026-09-01' });
+  assert.deepStrictEqual(M.anadirAusencia(q, { tipo: 'BAJ', desde: '2026-10-01' }), { fusionada: true, ausencia: { tipo: 'BAJ', desde: '2026-09-01' } });
+  assert.deepStrictEqual(M.anadirAusencia(q, { tipo: 'BAJ', desde: '2026-09-20', hasta: '2026-09-25' }), { fusionada: true, ausencia: { tipo: 'BAJ', desde: '2026-09-01' } });
+  assert.deepStrictEqual(q.ausencias, [{ tipo: 'BAJ', desde: '2026-09-01' }]);
+  assert.strictEqual(M.diasAusenciaMes(q, 2026, 10, 'BAJ').length, 31);
+  // 02 §4: abierta + cerrada que pisa → abierta desde el menor desde; + abierta posterior → sigue una; una cerrada anterior sin tocar, aparte
+  const p4 = { ausencias: [] };
+  M.anadirAusencia(p4, { tipo: 'BAJ', desde: '2026-09-01' });
+  assert.strictEqual(M.anadirAusencia(p4, { tipo: 'BAJ', desde: '2026-10-01', hasta: '2026-10-05' }).fusionada, true);
+  assert.strictEqual(M.anadirAusencia(p4, { tipo: 'BAJ', desde: '2026-09-15' }).fusionada, true);
+  assert.deepStrictEqual(p4.ausencias, [{ tipo: 'BAJ', desde: '2026-09-01' }]);
+  assert.strictEqual(M.anadirAusencia(p4, { tipo: 'BAJ', desde: '2026-08-20' }).fusionada, true, 'una abierta anterior: la fundida empieza antes');
+  assert.deepStrictEqual(p4.ausencias, [{ tipo: 'BAJ', desde: '2026-08-20' }]);
+  assert.strictEqual(M.anadirAusencia(p4, { tipo: 'BAJ', desde: '2026-08-01', hasta: '2026-08-10' }).fusionada, false, 'con hueco en medio, aparte');
+  assert.deepStrictEqual(p4.ausencias.map(a => a.desde), ['2026-08-01', '2026-08-20']);
+  assert.deepStrictEqual(M.anadirAusencia(p4, { tipo: 'VAC', desde: '2026-11-01' }).ausencia, { tipo: 'VAC', desde: '2026-11-01', hasta: '2026-11-01' }, 'sin hasta y no es baja: de un día');
+  // 02 §3: solapes, contigüidad, hueco de un día y la que engloba
+  const p3 = { ausencias: [] };
+  M.anadirAusencia(p3, { tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-08' });
+  assert.deepStrictEqual(M.anadirAusencia(p3, { tipo: 'VAC', desde: '2026-10-08', hasta: '2026-10-10' }), { fusionada: true, ausencia: { tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-10' } });
+  assert.strictEqual(M.anadirAusencia(p3, { tipo: 'VAC', desde: '2026-10-11' }).fusionada, true, 'contigua');
+  assert.strictEqual(M.anadirAusencia(p3, { tipo: 'VAC', desde: '2026-10-13' }).fusionada, false, 'con un día de hueco, aparte');
+  assert.deepStrictEqual(p3.ausencias.map(a => [a.desde, a.hasta]), [['2026-10-06', '2026-10-11'], ['2026-10-13', '2026-10-13']]);
+  assert.strictEqual(M.anadirAusencia(p3, { tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-20' }).fusionada, true);
+  assert.deepStrictEqual(p3.ausencias, [{ tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-20' }], 'la del 13 no queda dentro de la grande');
+  assert.strictEqual(M.anadirAusencia(p3, { tipo: 'PERM', desde: '2026-10-07' }).fusionada, false, 'otro tipo, aparte');
+  assert.strictEqual(M.ausenciaEn(p3, '2026-10-07').tipo, 'VAC'); assert.strictEqual(M.ausenciaEn(p3, '2026-10-07', null, 'PERM').tipo, 'PERM');
+  // el puente: una en medio funde a las dos de los lados (y los detalles se juntan sin repetir)
+  const p5 = { ausencias: [{ tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-05', detalle: 'boda' }, { tipo: 'VAC', desde: '2026-10-07', hasta: '2026-10-10', detalle: 'viaje' }] };
+  const r5 = M.anadirAusencia(p5, { tipo: 'VAC', desde: '2026-10-06', detalle: 'boda' });
+  assert.deepStrictEqual(p5.ausencias, [{ tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-10', detalle: 'boda · viaje' }]);
+  assert.strictEqual(r5.ausencia, p5.ausencias[0]);
+  // una media jornada no se funde con un día entero del mismo tipo (D10), ni con la otra franja
+  const p6 = { ausencias: [] };
+  M.anadirAusencia(p6, { tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-06', franjas: ['M'] });
+  assert.strictEqual(M.anadirAusencia(p6, { tipo: 'VAC', desde: '2026-10-07', hasta: '2026-10-07' }).fusionada, false);
+  assert.strictEqual(M.anadirAusencia(p6, { tipo: 'VAC', desde: '2026-10-07', hasta: '2026-10-07', franjas: ['T'] }).fusionada, false);
+  assert.strictEqual(p6.ausencias.length, 3);
+});
+
+ok('A2 · A8 (02 §5): el orden de p.ausencias es total (desde, franja mañana < tarde < día entero, tipo) y ausenciaEn sin franja prefiere la de día entero', () => {
+  const A = { tipo: 'PERM', desde: '2026-10-07', hasta: '2026-10-07', franjas: ['M'] }, B = { tipo: 'VAC', desde: '2026-10-07', hasta: '2026-10-07', franjas: ['T'] };
+  const p5a = { ausencias: [] }; M.anadirAusencia(p5a, A); M.anadirAusencia(p5a, B);
+  const p5b = { ausencias: [] }; M.anadirAusencia(p5b, B); M.anadirAusencia(p5b, A);
+  assert.deepStrictEqual(p5a.ausencias.map(a => a.tipo), ['PERM', 'VAC']);
+  assert.deepStrictEqual(p5b.ausencias.map(a => a.tipo), ['PERM', 'VAC'], 'el mismo orden se dé de alta como se dé');
+  assert.strictEqual(M.ausenciaEn(p5a, '2026-10-07').tipo, 'PERM'); assert.strictEqual(M.ausenciaEn(p5b, '2026-10-07').tipo, 'PERM');
+  assert.strictEqual(M.etiquetaAusencia(M.ausenciaEn(p5b, '2026-10-07')), 'Permiso por la mañana');
+  // mismo día y franja, distinto tipo: por el catálogo (BAJ, VAC, LD, PERM, OTRO); día entero detrás de las medias
+  const p = { ausencias: [] };
+  for (const a of [{ tipo: 'OTRO', desde: '2026-10-07', hasta: '2026-10-07' }, { tipo: 'PERM', desde: '2026-10-07', hasta: '2026-10-07', franjas: ['T'] }, { tipo: 'LD', desde: '2026-10-07', hasta: '2026-10-07', franjas: ['T'] }, { tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-09', franjas: ['M'] }]) M.anadirAusencia(p, a);
+  assert.deepStrictEqual(p.ausencias.map(a => a.tipo + ':' + a.desde + ':' + (a.franjas || 'dia')), ['VAC:2026-10-06:M', 'LD:2026-10-07:T', 'PERM:2026-10-07:T', 'OTRO:2026-10-07:dia']);
+  // sin franja, la de día entero aunque otra empiece antes; con franja o tipo, la que toca
+  assert.strictEqual(M.ausenciaEn(p, '2026-10-07').tipo, 'OTRO', 'el día entero manda para las vistas del día');
+  assert.strictEqual(M.ausenciaEn(p, '2026-10-07', 'M').tipo, 'VAC');
+  assert.strictEqual(M.ausenciaEn(p, '2026-10-07', 'T').tipo, 'LD');
+  assert.strictEqual(M.ausenciaEn(p, '2026-10-07', null, 'PERM').tipo, 'PERM');
+  assert.strictEqual(M.ausenciaEn(p, '2026-10-08').tipo, 'VAC', 'sin día entero, la primera');
+});
+
+ok('A2 · G7 (G-03): una ausencia en una franja en la que la persona no trabaja no cuenta: ni medio día de vacaciones ni descuento del contrato; en las suyas, como hasta ahora', () => {
+  const cfg = cfgBase(), st = cfg.staff, clon = x => JSON.parse(JSON.stringify(x));
+  const iv = clon(M.personaDe(st, 'ivan'));   // solo tardes
+  assert.deepStrictEqual(iv.franjas, ['T']);
+  iv.ausencias = [{ tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-06', franjas: ['M'] }]; iv.contrato = { horasSemana: 35 };
+  const st2 = st.map(p => p.id === 'ivan' ? iv : p);
+  assert.strictEqual(M.esMediaJornada(iv, ['M']), false);
+  assert.deepStrictEqual(M.diasAusenciaMes(iv, 2026, 10, 'VAC'), []);
+  assert.deepStrictEqual(M.mediasAusenciaMes(iv, 2026, 10, 'VAC'), {});
+  const h = M.horasPersonaMes(cfg, st2, {}, 'ivan', 2026, 10);
+  assert.deepStrictEqual([h.vacaciones, h.vacacionesMedias, h.ausenciasMedias, h.ausencias, h.contratoHoras], [0, {}, 0, 0, 155], JSON.stringify([h.vacaciones, h.vacacionesMedias, h.ausenciasMedias, h.ausencias, h.contratoHoras]));
+  assert.strictEqual(M.vacacionesAno(st2, 2026).find(x => x.pid === 'ivan'), undefined);
+  // (la vista del día sigue diciendo que está de vacaciones por la mañana: es lo apuntado)
+  assert.ok(M.ausenciaEn(iv, '2026-10-06', 'M') && !M.ausenciaEn(iv, '2026-10-06', 'T'));
+  // sus tardes: día entero (revisión final 25/09); M+T: día entero; Mari Luz (M y T) solo mañana: media
+  iv.ausencias = [{ tipo: 'VAC', desde: '2026-10-02', hasta: '2026-10-04', franjas: ['T'] }];
+  assert.strictEqual(M.esMediaJornada(iv, ['T']), false);
+  assert.strictEqual(M.jornadasAusencia(M.diasAusenciaMes(iv, 2026, 10, 'VAC'), M.mediasAusenciaMes(iv, 2026, 10, 'VAC')), 3);
+  assert.strictEqual(M.horasPersonaMes(cfg, st2, {}, 'ivan', 2026, 10).contratoHoras, 140);
+  iv.ausencias = [{ tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-06', franjas: ['M', 'T'] }];
+  assert.strictEqual(M.esMediaJornada(iv, ['M', 'T']), false);
+  assert.strictEqual(M.horasPersonaMes(cfg, st2, {}, 'ivan', 2026, 10).vacaciones, 1);
+  const ml = clon(M.personaDe(st, 'mariluz')); ml.ausencias = [{ tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-06', franjas: ['M'] }];
+  assert.strictEqual(M.esMediaJornada(ml, ['M']), true);
+  assert.deepStrictEqual(M.mediasAusenciaMes(ml, 2026, 10, 'VAC'), { '2026-10-06': ['M'] });
+  assert.strictEqual(M.horasPersonaMes(cfg, st.map(p => p.id === 'mariluz' ? ml : p), {}, 'mariluz', 2026, 10).vacaciones, 0.5);
+});
+
+ok('A2 · A3/A11 (04): los textos del cambio de día libre cuando incluye el de siempre («esta semana libra además el viernes», «libra los miércoles»), y tres días «lunes, martes y jueves»', () => {
+  const cfg = cfgBase(), st = cfg.staff, ml = M.personaDe(st, 'mariluz');   // libra [3]
+  const LUN = '2026-09-28', MAR = '2026-09-29', MIE = '2026-09-30', VIE = '2026-10-02';
+  const vLibra = M.VARIABLES.find(v => v.campo === 'libra');
+  ml.libraPuntual = [{ semana: LUN, dias: [3, 5] }];
+  assert.strictEqual(M.estadoDia(cfg, ml, MIE).texto, 'libra los miércoles');
+  assert.strictEqual(M.estadoDia(cfg, ml, VIE).texto, 'esta semana libra además el viernes');
+  assert.strictEqual(M.motivoLibra(ml, MIE), 'libra los miércoles');
+  assert.strictEqual(M.motivoLibra(ml, VIE), 'esta semana libra además el viernes');
+  assert.strictEqual(M.textoCambioLibre(ml, M.libraPuntualDe(ml, MIE)), 'libra además el viernes');
+  assert.strictEqual(M.textoCambioLibre(ml, M.libraPuntualDe(ml, MIE), true), 'libra además el viernes');
+  assert.deepStrictEqual(vLibra.texto({ cfg, lunes: LUN }, ml).map(x => x.texto), ['Mari Luz libra los miércoles y esta semana además el viernes']);
+  assert.ok(M.libraEn(ml, MIE) && M.libraEn(ml, VIE) && !M.libraEn(ml, MAR));
+  // el cambio normal sigue igual
+  ml.libraPuntual = [{ semana: LUN, dias: [2] }];
+  assert.strictEqual(M.estadoDia(cfg, ml, MAR).texto, 'libra el martes esta semana (en vez de los miércoles)');
+  assert.strictEqual(M.estadoDia(cfg, ml, MIE).texto, 'esta semana trabaja (libra el martes)');
+  assert.strictEqual(M.motivoLibra(ml, MAR), 'libra el martes esta semana');
+  assert.strictEqual(M.textoCambioLibre(ml, M.libraPuntualDe(ml, MAR)), 'libra martes (en vez de miércoles)');
+  assert.deepStrictEqual(vLibra.texto({ cfg, lunes: LUN }, ml).map(x => x.texto), ['Mari Luz libra el martes esta semana (en vez de los miércoles)']);
+  // tres días (A11): con comas y la «y» al final
+  ml.libraPuntual = [{ semana: LUN, dias: [1, 2, 4] }];
+  assert.strictEqual(M.textoCambioLibre(ml, M.libraPuntualDe(ml, MAR)), 'libra lunes, martes y jueves (en vez de miércoles)');
+  assert.strictEqual(M.estadoDia(cfg, ml, MAR).texto, 'libra el martes esta semana (en vez de los miércoles)');
+  assert.deepStrictEqual(vLibra.texto({ cfg, lunes: LUN }, ml).map(x => x.texto), ['Mari Luz libra el lunes, el martes y el jueves esta semana (en vez de los miércoles)']);
+  assert.strictEqual(M.estadoDia(cfg, ml, MIE).texto, 'esta semana trabaja (libra el lunes, el martes y el jueves)');
+  // quien no tiene día fijo (Susi): sin «en vez de» ni «además»
+  const su = M.personaDe(st, 'susi'); su.ausencias = []; su.libraPuntual = [{ semana: LUN, dias: [2] }];
+  assert.deepStrictEqual(su.libra, []);
+  assert.strictEqual(M.estadoDia(cfg, su, MAR).texto, 'libra el martes esta semana');
+  assert.strictEqual(M.textoCambioLibre(su, M.libraPuntualDe(su, MAR)), 'libra martes');
+  assert.deepStrictEqual(vLibra.texto({ cfg, lunes: LUN }, su).map(x => x.texto), ['Susi libra el martes esta semana']);
+  // solo parte de sus días de siempre (Lavinia libra lunes, martes y jueves; esa semana solo lunes y martes): trabaja el jueves
+  const la = M.personaDe(st, 'lavinia');
+  assert.deepStrictEqual(la.libra, [1, 2, 4]);
+  la.libraPuntual = [{ semana: LUN, dias: [1, 2] }];
+  assert.strictEqual(M.textoCambioLibre(la, M.libraPuntualDe(la, LUN)), 'trabaja el jueves (libra solo lunes y martes)');
+  assert.strictEqual(M.textoCambioLibre(la, M.libraPuntualDe(la, LUN), true), 'trabaja el jueves');
+  assert.strictEqual(M.estadoDia(cfg, la, LUN).texto, 'libra los lunes');
+  assert.strictEqual(M.estadoDia(cfg, la, '2026-10-01').texto, 'esta semana trabaja (libra el lunes y el martes)');
+  assert.deepStrictEqual(vLibra.texto({ cfg, lunes: LUN }, la).map(x => x.texto), ['Lavinia esta semana trabaja el jueves (libra el lunes y el martes)']);
+});
+
+ok('A2 · A5/G15: fechaCandidato, ordenarCandidatos, primerDiaPlanificable, mesVisibleParaPersonal y sembrarDemo piden la fecha (el modelo no mira el reloj, como deBaja)', () => {
+  const sinFecha = /falta la fecha/;
+  assert.throws(() => M.fechaCandidato({ fecha: '14 de septiembre' }), { name: 'TypeError', message: sinFecha });
+  assert.throws(() => M.fechaCandidato({}), TypeError, 'también sin nada que leer: la firma es la misma');
+  assert.strictEqual(M.fechaCandidato({ fecha: '14 de septiembre' }, '2026-09-21'), '2026-09-14');
+  assert.throws(() => M.ordenarCandidatos([{ id: 'x' }]), { name: 'TypeError', message: sinFecha });
+  assert.throws(() => M.ordenarCandidatos([{ id: 'x' }], null, 'fecha'), TypeError);
+  assert.deepStrictEqual(M.ordenarCandidatos([{ id: 'x' }], '2026-09-21').map(c => c.id), ['x']);
+  const e = estadoOct();
+  assert.throws(() => M.primerDiaPlanificable(e), { name: 'TypeError', message: sinFecha });
+  assert.strictEqual(M.primerDiaPlanificable(e, '2026-10-10'), '2026-10-10');
+  assert.strictEqual(M.primerDiaPlanificable(e, '2026-09-10'), '2026-10-01');
+  assert.strictEqual(M.primerDiaPlanificable(e, '2026-11-10'), null);
+  assert.throws(() => M.mesVisibleParaPersonal(['2026-11'], '2026-10'), { name: 'TypeError', message: sinFecha });
+  assert.strictEqual(M.mesVisibleParaPersonal(['2026-11'], '2026-10', '2026-10'), true);
+  assert.strictEqual(M.mesVisibleParaPersonal(['2026-11'], '2026-12', '2026-10'), false);
+  assert.throws(() => M.mesesVisibles({ meses: { '2026-10': {} } }), TypeError);
+  assert.throws(() => M.sembrarDemo(Object.assign(cfgBase(), { meses: {} })), { name: 'TypeError', message: sinFecha });
+});
+
+ok('A2 · A10: rangoIso con una fecha que no es AAAA-MM-DD corta con un error claro en vez de dar vueltas sin parar', () => {
+  assert.deepStrictEqual([...M.rangoIso('2026-10-30', '2026-11-01')], ['2026-10-30', '2026-10-31', '2026-11-01']);
+  assert.deepStrictEqual([...M.rangoIso('2026-10-30', '2026-10-29')], []);
+  for (const [d, h] of [['2026-10-1', '2026-10-03'], ['2026-10-01', '2026-10-3'], ['', '2026-10-03'], [undefined, '2026-10-03'], ['2026-10-01', undefined], ['30/10/2026', '2026-11-01'], ['2026-10-01', 'null']]) assert.throws(() => [...M.rangoIso(d, h)], { name: 'TypeError', message: /rangoIso/ }, JSON.stringify([d, h]));
+  // con la forma bien pero un día que no existe: acaba (nunca da vueltas) y no suelta «NaN-NaN-NaN» (el 30/02 el navegador
+  // lo desborda a marzo; un mes 13 no es fecha y se corta tras el primero)
+  const r = [...M.rangoIso('2026-02-30', '2026-03-05')];
+  assert.ok(r.length <= 5 && r.every(x => /^\d{4}-\d{2}-\d{2}$/.test(x)), JSON.stringify(r));
+  assert.deepStrictEqual([...M.rangoIso('2026-13-01', '2026-13-05')], ['2026-13-01']);
+});
+
+ok('A2 · A7 (04): limpiarLibrePuntual normaliza lo que venga de fuera: la semana a su lunes (también «2026-9-28»), los días a números 1..7 sin repetir, y funde dos entradas de la misma semana', () => {
+  const LUN = '2026-09-28';
+  const p = { id: 'x', libra: [3], libraPuntual: [{ semana: '2026-09-30', dias: ['2'] }, { semana: '2026-9-28', dias: [5, 5, '9', 0, 4.5] }, { semana: '2026-10-04', dias: [1] }, { semana: '2026-10-12', dias: [] }, { semana: 'x', dias: [1] }, { semana: '2026-09-21', dias: [4] }] };
+  assert.strictEqual(M.limpiarLibrePuntual([p], LUN), 2, 'la semana pasada del 21/09 y la que no es una fecha');
+  assert.deepStrictEqual(p.libraPuntual, [{ semana: LUN, dias: [1, 2, 5] }]);
+  assert.ok(M.libraEn(p, '2026-09-28') && M.libraEn(p, '2026-09-29') && !M.libraEn(p, '2026-09-30') && M.libraEn(p, '2026-10-02'));
+  // la forma de antes (objeto) con la semana en domingo
+  const q = { libraPuntual: { semana: '2026-10-04', dias: [2] } };
+  assert.strictEqual(M.limpiarLibrePuntual([q], LUN), 0);
+  assert.deepStrictEqual(q.libraPuntual, [{ semana: LUN, dias: [2] }]);
+  assert.strictEqual(M.limpiarLibrePuntual([{ id: 'z' }], LUN), 0);
+});
+
+ok('A2 · A12: vetoDe compara el día como número (un veto guardado con dow "1" o pedido con "1" vale igual, como vetoRepetido)', () => {
+  const p = { vetos: [{ localId: 'PASARELA', franja: 'M', dow: '1' }, { localId: 'EL33', franja: 'T', dow: ['2', 3] }] };
+  assert.ok(M.vetoDe(p, 'PASARELA', 'M', 1) && M.vetoDe(p, 'PASARELA', 'M', '1') && !M.vetoDe(p, 'PASARELA', 'M', 2));
+  assert.ok(M.vetoDe(p, 'EL33', 'T', 2) && M.vetoDe(p, 'EL33', 'T', 3) && M.vetoDe(p, 'EL33', 'T', '3') && !M.vetoDe(p, 'EL33', 'T', 4));
+  assert.ok(M.vetoDe({ vetos: [{ localId: 'EL33', franja: 'T' }] }, 'EL33', 'T', 5), 'sin dow, todos los días');
+});
+
+// ---------- A2, corrección tras las dos revisiones (30/09): el detalle al fundir, el orden tras quitar un día, las vistas de un día
+// con dos ausencias, el aviso del Generador, «sin plaza», y lo que llega de fuera (hasta "", dow «x», sin fecha) ----------
+
+ok('A2 fix · modelo 1: el detalle se junta por trozos (« · ») sin repetir ninguno: boda + viaje + boda → «boda · viaje», y editar un cierre dos veces deja el mismo detalle', () => {
+  const p = { ausencias: [] };
+  M.anadirAusencia(p, { tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-03', detalle: 'boda' });
+  M.anadirAusencia(p, { tipo: 'VAC', desde: '2026-10-04', hasta: '2026-10-05', detalle: 'viaje' });
+  M.anadirAusencia(p, { tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-06', detalle: 'boda' });
+  M.anadirAusencia(p, { tipo: 'VAC', desde: '2026-10-07', hasta: '2026-10-07', detalle: 'viaje' });
+  assert.deepStrictEqual(p.ausencias.map(a => a.detalle), ['boda · viaje']);
+  // el puente con el detalle de un lado repetido
+  const q = { ausencias: [{ tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-05', detalle: 'boda' }, { tipo: 'VAC', desde: '2026-10-07', hasta: '2026-10-10', detalle: 'viaje' }] };
+  const r = M.anadirAusencia(q, { tipo: 'VAC', desde: '2026-10-06', detalle: 'boda' });
+  assert.deepStrictEqual(q.ausencias, [{ tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-10', detalle: 'boda · viaje' }]);
+  assert.strictEqual(r.ausencia, q.ausencias[0]);
+  // editar un cierre (aplicarCierre sobre el mismo id lo deshace y lo vuelve a aplicar): el detalle no crece
+  const cfg = cfgBase(); cfg.meses = {}; const e = M.nuevoEstado(2026, 9); M.generarPlanilla(cfg, cfg.staff, e, '2026-09-28', '2026-09-30', {});
+  const su = M.personaDe(cfg.staff, 'scapon'); su.ausencias = [];
+  M.anadirAusencia(su, { tipo: 'VAC', desde: '2026-09-30', hasta: '2026-10-02', detalle: 'las suyas' });
+  const cierre = () => ({ id: 'cie_t', localId: 'MONACO', motivo: 'reforma', dias: { '2026-09-28': ['T'], '2026-09-29': ['T'] } });
+  M.aplicarCierre(cfg, cfg.staff, e, cierre(), { scapon: { tipo: 'VAC' } });
+  const d1 = su.ausencias.map(a => a.detalle);
+  M.aplicarCierre(cfg, cfg.staff, e, cierre(), { scapon: { tipo: 'VAC' } });
+  M.aplicarCierre(cfg, cfg.staff, e, cierre(), { scapon: { tipo: 'VAC' } });
+  assert.deepStrictEqual(su.ausencias.map(a => a.detalle), d1);
+  assert.ok(d1.length === 1 && (d1[0].match(/reforma/g) || []).length === 1, JSON.stringify(d1));
+});
+
+ok('A2 fix · modelo 2 (A8): quitar un día deja la lista en el orden total y ausenciaEn sin franja da lo mismo antes y después', () => {
+  const p = { ausencias: [] };
+  M.anadirAusencia(p, { tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-20', franjas: ['T'] });
+  M.anadirAusencia(p, { tipo: 'PERM', desde: '2026-10-08', hasta: '2026-10-16', franjas: ['M'] });
+  p.ausencias = M.quitarDiaDeAusencia(p.ausencias, '2026-10-10');
+  assert.deepStrictEqual(p.ausencias.map(a => `${a.tipo} ${a.desde}..${a.hasta}`), ['VAC 2026-10-01..2026-10-09', 'PERM 2026-10-08..2026-10-09', 'PERM 2026-10-11..2026-10-16', 'VAC 2026-10-11..2026-10-20']);
+  assert.deepStrictEqual(p.ausencias.slice().sort(M.compararAusencias), p.ausencias);
+  assert.strictEqual(M.etiquetaAusencia(M.ausenciaEn(p, '2026-10-12')), 'Permiso por la mañana', 'la primera del orden (mañana antes que tarde), como tras cualquier alta');
+  M.anadirAusencia(p, { tipo: 'LD', desde: '2026-12-01' });
+  assert.strictEqual(M.etiquetaAusencia(M.ausenciaEn(p, '2026-10-12')), 'Permiso por la mañana');
+  // con filtro (el Mes quita solo una de las dos del día), igual
+  const q = { ausencias: [] };
+  M.anadirAusencia(q, { tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-10', franjas: ['T'] });
+  M.anadirAusencia(q, { tipo: 'PERM', desde: '2026-10-05', hasta: '2026-10-05', franjas: ['M'] });
+  const esa = q.ausencias[0];
+  q.ausencias = M.quitarDiaDeAusencia(q.ausencias, '2026-10-05', a => a === esa);
+  assert.deepStrictEqual(q.ausencias.map(a => `${a.tipo} ${a.desde}..${a.hasta}`), ['VAC 2026-10-01..2026-10-04', 'PERM 2026-10-05..2026-10-05', 'VAC 2026-10-06..2026-10-10']);
+});
+
+ok('A2 fix · cliente 2: ausenciasDia y etiquetaAusenciasDia enseñan TODAS las del día («Permiso por la mañana · Vacaciones por la tarde (día entero)»)', () => {
+  const p = { franjas: ['M', 'T'], ausencias: [] };
+  M.anadirAusencia(p, { tipo: 'VAC', desde: '2026-10-08', franjas: ['T'] });
+  M.anadirAusencia(p, { tipo: 'PERM', desde: '2026-10-08', franjas: ['M'], detalle: 'médico' });
+  assert.deepStrictEqual(M.ausenciasDia(p, '2026-10-08').map(a => a.tipo), ['PERM', 'VAC']);
+  assert.strictEqual(M.etiquetaAusenciasDia(p, '2026-10-08'), 'Permiso por la mañana · Vacaciones por la tarde (día entero)');
+  assert.strictEqual(M.etiquetaAusenciasDia(p, '2026-10-09'), '');
+  const q = { franjas: ['M', 'T'], ausencias: [] };
+  M.anadirAusencia(q, { tipo: 'PERM', desde: '2026-10-08', franjas: ['M'] });
+  assert.strictEqual(M.etiquetaAusenciasDia(q, '2026-10-08'), 'Permiso por la mañana', 'una sola media jornada: como etiquetaAusencia');
+  M.anadirAusencia(q, { tipo: 'OTRO', desde: '2026-10-08' });
+  assert.strictEqual(M.etiquetaAusenciasDia(q, '2026-10-08'), 'Otro motivo', 'con una de día entero, esa (la de ausenciaEn)');
+  const iv = { franjas: ['T'], ausencias: [] };
+  M.anadirAusencia(iv, { tipo: 'VAC', desde: '2026-10-08', franjas: ['T'] });
+  assert.strictEqual(M.etiquetaAusenciasDia(iv, '2026-10-08'), 'Vacaciones por la tarde', 'Iván: lo apuntado, sin «(día entero)» (es el dato)');
+  const s = { franjas: ['M', 'T'], salida: { desde: '2026-10-01' }, ausencias: [{ tipo: 'BAJ', desde: '2026-09-01' }] };
+  assert.deepStrictEqual(M.ausenciasDia(s, '2026-10-08'), [], 'desde su salida, ninguna (como ausenciaEn)');
+  assert.strictEqual(M.etiquetaAusenciasDia(s, '2026-09-15'), 'Baja');
+});
+
+ok('A2 fix · cliente 4: el aviso del Generador dice «esta semana trabaja el jueves» (lo que pasa) sin «en vez de» ni «y … y»; y quien trabaja un día liberado sin turno va en sinPlaza, no en libran', () => {
+  const yy = s => /\by\b[^.();:]*\by\b/.test(s || '');
+  const avisos = (pid, dias) => { const cfg = cfgBase(); cfg.meses = {}; M.personaDe(cfg.staff, pid).libraPuntual = [{ semana: LP_LUN, dias }]; return M.instanciarPatron(cfg, cfg.staff, estadoOct(), LP_LUN, '2026-10-11', {}).avisos.filter(a => a.tipo === 'emparejar' && a.pid === pid).map(a => a.texto); };
+  const lav = avisos('lavinia', [1, 2]);
+  assert.strictEqual(lav.length, 1);
+  assert.match(lav[0], /^Lavinia esta semana trabaja el jueves: no se sabe qué turno hace a cambio, así que no se le pone nada más; el resto de su semana tipo no se mueve$/);
+  assert.ok(!yy(lav[0]) && !/en vez de/.test(lav[0]));
+  const ml = avisos('mariluz', [1, 2, 4]);
+  assert.match(ml[0], /^Mari Luz esta semana trabaja el miércoles \(libra el lunes, el martes y el jueves\): no se sabe qué turno hace a cambio, así que solo se le quita el lunes, el martes y el jueves; el resto/);
+  assert.ok(!yy(ml[0]));
+  assert.deepStrictEqual(avisos('mariluz', [3, 5]), [], 'añadir un día sin liberar ninguno: sin aviso');
+  // «Quién libra cada día»: Lavinia el jueves (día liberado) sin turno es «sin plaza», no «libra»
+  const cfg = cfgBase(); cfg.meses = {}; const e = estadoOct();
+  M.personaDe(cfg.staff, 'lavinia').libraPuntual = [{ semana: LP_LUN, dias: [1, 2] }];
+  const res = M.generarSemana(cfg, cfg.staff, e, LP_LUN, { meses: cfg.meses });
+  const jue = '2026-10-08', trabaja = M.turnosDe(cfg).some(t => M.pidsEn(e, jue, t.id).includes('lavinia'));
+  assert.ok(res.sinPlaza && res.dias.every(iso => Array.isArray(res.sinPlaza[iso])));
+  if (!trabaja) { assert.ok(!res.libran[jue].includes('lavinia') && res.sinPlaza[jue].includes('lavinia'), JSON.stringify([res.libran[jue], res.sinPlaza[jue]])); }
+  assert.ok(res.libran[LP_LUN].includes('lavinia') && !res.sinPlaza[LP_LUN].includes('lavinia'), 'el lunes libra de verdad');
+  assert.strictEqual(res.resumen.descansos, Object.values(res.libran).reduce((a, x) => a + x.length, 0), 'los descansos son los que libran');
+});
+
+ok('A2 fix · modelo 3, 5, 8 y 9: la variable «Días que libra» con un cambio igual a lo habitual, vetoDe con un día que no es un número, limpiarLibrePuntual sin fecha y hasta ""', () => {
+  const cfg = cfgBase(), ml = M.personaDe(cfg.staff, 'mariluz'), v = M.VARIABLES.find(x => x.campo === 'libra');
+  const sin = v.texto({ cfg, lunes: LP_LUN }, ml).map(x => x.texto);
+  ml.libraPuntual = [{ semana: LP_LUN, dias: [3] }];
+  const con = v.texto({ cfg, lunes: LP_LUN }, ml);
+  assert.deepStrictEqual(con.map(x => x.texto), sin, 'el texto de siempre, no «trabaja  (libra el miércoles)»');
+  assert.ok(!con.some(x => x.puntual));
+  const p = { vetos: [{ localId: 'MONACO', franja: 'T', dow: 'x' }] };
+  assert.strictEqual(M.vetoDe(p, 'MONACO', 'T'), null, 'dow «x» y llamada sin dow: no casa (NaN)');
+  assert.strictEqual(M.vetoDe(p, 'MONACO', 'T', 3), null);
+  assert.ok(M.vetoDe({ vetos: [{ localId: 'MONACO', franja: 'T' }] }, 'MONACO', 'T'), 'sin dow guardado: todos los días');
+  const staff = [{ id: 'a', libraPuntual: [{ semana: LP_LUN, dias: [2] }] }];
+  assert.throws(() => M.limpiarLibrePuntual(staff), { name: 'TypeError', message: /limpiarLibrePuntual.*fecha/ });
+  assert.deepStrictEqual(staff[0].libraPuntual, [{ semana: LP_LUN, dias: [2] }], 'y no borra nada');
+  const b = { ausencias: [] };
+  assert.deepStrictEqual(M.anadirAusencia(b, { tipo: 'BAJ', desde: '2026-10-01', hasta: '' }).ausencia, { tipo: 'BAJ', desde: '2026-10-01' }, 'hasta "" → sin la clave');
+  assert.deepStrictEqual(M.anadirAusencia({ ausencias: [] }, { tipo: 'VAC', desde: '2026-10-01', hasta: null }).ausencia, { tipo: 'VAC', desde: '2026-10-01', hasta: '2026-10-01' });
+});
+
+ok('A2 fix · cliente 7 (decisión): normalizarAusencias quita al cargar una ausencia en una franja que la persona no trabaja (y lo devuelve para el historial) y deja la lista en el orden total', () => {
+  const staff = [
+    { id: 'ivan', nombre: 'Iván', franjas: ['T'], ausencias: [{ tipo: 'VAC', desde: '2026-10-20', hasta: '2026-10-20', franjas: ['M'] }, { tipo: 'VAC', desde: '2026-10-02', hasta: '2026-10-04', franjas: ['T'] }, { tipo: 'PERM', desde: '2026-10-06', hasta: '2026-10-06' }] },
+    { id: 'tere', nombre: 'Tere', franjas: ['M'], ausencias: [{ tipo: 'PERM', desde: '2026-10-08', hasta: '2026-10-09', franjas: ['T'], detalle: 'médico' }] },
+    { id: 'mariluz', nombre: 'Mari Luz', franjas: ['M', 'T'], ausencias: [{ tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-06', franjas: ['M'] }] },
+    { id: 'leo', nombre: 'Leo', franjas: ['T'] },
+  ];
+  const arr = staff[0].ausencias;
+  const r = M.normalizarAusencias(staff);
+  assert.deepStrictEqual(r.map(x => [x.pid, x.nombre, x.ausencia.tipo, x.ausencia.desde, x.ausencia.franjas]), [['ivan', 'Iván', 'VAC', '2026-10-20', ['M']], ['tere', 'Tere', 'PERM', '2026-10-08', ['T']]]);
+  assert.deepStrictEqual(staff[0].ausencias.map(a => a.tipo + ':' + a.desde), ['VAC:2026-10-02', 'PERM:2026-10-06'], 'lo suyo se queda, en orden');
+  assert.strictEqual(staff[0].ausencias, arr, 'el mismo array (la ficha lo guarda por referencia)');
+  assert.deepStrictEqual(staff[1].ausencias, []);
+  assert.deepStrictEqual(staff[2].ausencias, [{ tipo: 'VAC', desde: '2026-10-06', hasta: '2026-10-06', franjas: ['M'] }]);
+  assert.deepStrictEqual(M.normalizarAusencias(staff), [], 'idempotente');
+  assert.deepStrictEqual(M.normalizarAusencias(undefined), []);
+  // y con la semilla no toca nada (nadie tiene ausencias en franjas que no hace)
+  const cfg = cfgBase(), antes = JSON.stringify(cfg.staff.map(p => p.ausencias));
+  assert.deepStrictEqual(M.normalizarAusencias(cfg.staff), []);
+  assert.strictEqual(JSON.stringify(cfg.staff.map(p => p.ausencias)), antes);
 });
 
 console.log(`\n${n} tests OK`);

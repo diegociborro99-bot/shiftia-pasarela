@@ -177,6 +177,9 @@ function migrarEstado(estado) {
   }
   migrarCandidatos(estado);   // 17/09: el puesto del candidato pasa de uno suelto a una lista
   limpiarLibrePuntual(estado.staff, isoHoy());   // los días libres puntuales caducan solos
+  // 30/09 (revisión de A2, cliente 7; decisión del coordinador): una ausencia en una franja que la persona no trabaja (la VAC
+  // «solo mañana» de Iván, de antes de G7) se quita y se apunta en el historial (el empleado recibe la planilla sin historial)
+  for (const x of normalizarAusencias(estado.staff)) if (!empleado) apuntarEn(estado, `Ausencia quitada al cargar: ${x.nombre}, ${etiquetaAusencia(x.ausencia)} ${rangoAusencia(x.ausencia)}: no hace ${FRANJA_LBL[x.ausencia.franjas[0]].toLowerCase()}s, así que no contaba para nada`, 'aus');
   asignarColores(estado.staff);
   // 25/09 (revisión final): el esquema de esta versión (ESQUEMA_PLANILLA, 2). Con él el servidor sabe que la planilla
   // ya la guardó la app de ahora y deja de aceptar lo que mande una pestaña abierta con la de antes (que lo ponía a 1)
@@ -259,12 +262,16 @@ if (bcSync) bcSync.addEventListener('message', sincronizarDesdeFuera);
 window.addEventListener('storage', e => { if (e.key === LS_KEY && e.newValue) sincronizarDesdeFuera(); });
 
 // ---------- historial de cambios ----------
-function registrarCambio(txt, tipo) {
+// (revisión de A2) sobre un estado dado: al cargar, migrarEstado apunta lo que corrige antes de que ese estado sea S
+function apuntarEn(estado, txt, tipo) {
   const entrada = { ts: Date.now(), tipo: tipo || 'cambio', txt };
   if (typeof SRV !== 'undefined' && SRV.on && SRV.usuario) entrada.usuario = SRV.usuario;
-  (S.historial = S.historial || []).unshift(entrada);
-  if (S.historial.length > 400) S.historial.length = 400;
+  (estado.historial = estado.historial || []).unshift(entrada);
+  if (estado.historial.length > 400) estado.historial.length = 400;
 }
+function registrarCambio(txt, tipo) { apuntarEn(S, txt, tipo); }
+// «el 8/10», «del 1/10 al 20/10», «desde el 28/9 (sin fecha de fin)»: el tramo de una ausencia en el historial
+function rangoAusencia(a) { return a.hasta ? (a.hasta !== a.desde ? `del ${fmtDM(a.desde)} al ${fmtDM(a.hasta)}` : `el ${fmtDM(a.desde)}`) : `desde el ${fmtDM(a.desde)} (sin fecha de fin)`; }
 
 // ---------- deshacer (pila de instantáneas) ----------
 const undoStack = [];

@@ -2,6 +2,42 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Las ausencias: un día suelto de una baja sin fecha de fin, las bajas que se pisan y las medias jornadas
+  (30/09; auditoría del modelo del 25/09, fase A2).** Lo que se nota:
+  - **«Quitar la ausencia de este día»** en el Mes sobre una baja sin fecha de fin (Laura, Maydeth, Susi) quita solo ese
+    día y la baja sigue antes y después; la app lo dice antes («Laura está de baja desde el 1/9 sin fecha de fin: se quita
+    solo el 15/10…») y así queda en el historial. Antes, en un día posterior no cambiaba nada (y el historial decía que sí)
+    y en el primer día borraba la baja entera.
+  - **Apuntar una baja que pisa otra** (una baja abierta y luego otra desde octubre, o una de unos días por dentro) deja
+    una sola baja, abierta desde la primera fecha; y una ausencia que abarca a otra del mismo tipo la absorbe (la del 13
+    ya no queda dentro de la del 1 al 20). Con dos ausencias de media jornada el mismo día (permiso por la mañana y
+    vacaciones por la tarde), Hoy, el Mes (la pastilla «PERM+VAC» y la hoja del día), la Cobertura (sin «½»: entre las
+    dos no queda turno) y el perfil del empleado enseñan las dos: «Permiso por la mañana · Vacaciones por la tarde (día
+    entero)»; y en la hoja del día del Mes hay un botón por ausencia («Quitar el permiso de la mañana», «Quitar las
+    vacaciones de la tarde»), que quita solo esa y así queda en el historial (antes se quitaban las dos sin decirlo). Al
+    quitar el primer día de una baja sin fin, «sigue de baja desde el día siguiente». Un alta idéntica a lo que ya está
+    apuntado no deja línea en el historial («ya tenía apuntada esa ausencia»). El detalle de una ausencia fundida no se
+    repite al editar un cierre.
+  - **Una ausencia en una franja que la persona no trabaja no cuenta**: unas vacaciones «solo de mañana» de Iván, que
+    solo hace tardes, ya no le restan medio día de vacaciones ni medio día de contrato en Horas. Y al apuntar una
+    ausencia (tarjeta de Equipo, ficha y Mes), «Cuándo» solo ofrece las franjas que esa persona trabaja (a Iván, «Día
+    entero» y «Solo tarde»); la Cobertura, igual («Turnos afectados»: a Iván, «Todos» y «Tarde»). Una ausencia así
+    guardada antes de este cambio se quita al cargar y queda en el historial («Ausencia quitada al cargar: Iván,
+    Vacaciones por la mañana el 20/10: no hace mañanas, así que no contaba para nada»). En la ficha, una ausencia de un
+    día se lee «Permiso el 8/10 por la mañana».
+  - **Los textos del cambio de día libre cuando incluye el día de siempre**: Mari Luz libra los miércoles y esa semana
+    también el viernes → «libra los miércoles» el miércoles y «esta semana libra además el viernes» el viernes (antes,
+    «libra el viernes esta semana (en vez de los miércoles)» aunque el miércoles también libraba), en Hoy, el Mes, la
+    ficha, la tarjeta de Equipo, el Generador, el selector y la Revisión. Si solo quita días libres: «trabaja el jueves
+    (libra solo lunes y martes)». Y con tres días, «lunes, martes y jueves» (antes «lunes y martes y jueves»), también
+    en la ficha, la Cobertura, el perfil y el Generador. El aviso del Generador cuando no se sabe qué turno hace a
+    cambio dice lo que pasa («Lavinia esta semana trabaja el jueves: no se sabe qué turno hace a cambio…»), y en «Quién
+    libra cada día» (Generador y hoja impresa) ese jueves Lavinia sale como «sin plaza», no como si librara.
+  - En Equipo, la tarjeta de quien tiene fecha de salida futura dice «se va el 5/10».
+  - Por dentro: las Entrevistas (la fecha de la entrevista y el orden), el mes visible para el equipo y el mes de
+    demostración reciben la fecha del día en vez de mirar el reloj por su cuenta; un rango de fechas mal formado avisa
+    en vez de colgar la pestaña; un cambio de día libre que llega con la semana en un día que no es lunes, con los días
+    como texto o repetidos se arregla al cargar; y un veto guardado con el día como texto se reconoce igual.
 - **La casilla decide sola quién abre y quién lleva la cocina, y lo vuelve a decidir cuando cambia algo del día
   (30/09; auditoría del modelo del 25/09, fase A1).** Lo que se nota:
   - Lo que dice Hoy de quién abre es lo mismo que dicen el Mes, el Excel, Horas y la app del empleado, también

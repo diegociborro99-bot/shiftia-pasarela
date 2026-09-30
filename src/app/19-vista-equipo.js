@@ -135,7 +135,7 @@ function htmlAbsForm(p) {
     <span><label>Detalle</label><input type="text" data-f="detalle" placeholder="opcional"></span></div>
     <div class="row2"><span><label>Desde</label><input type="date" data-f="desde" value="${hoy}" required></span>
     <span><label>Hasta</label><input type="date" data-f="hasta" value="${hoy}"></span></div>
-    <label>Cuándo</label>${selFranjaAusencia('data-f="franja"')}
+    <label>Cuándo</label>${selFranjaAusencia('data-f="franja"', p)}
     <p class="filltxt" style="margin:0">Una baja puede ir sin fecha de fin: deja «Hasta» vacío.</p>
     <div class="bar"><button type="button" class="btn-mini ghost" data-cancelabs="${esc(p.id)}">Cancelar</button><button type="submit" class="btn-mini">Guardar</button></div>
   </form>`;
@@ -144,7 +144,7 @@ function htmlTarjetaPersona(p, baja) {
   const locs = (p.locales || []).map(id => (localDe(S, id) || { corto: id }).corto).join(' · ');
   return `<div class="pcard${baja ? ' baja' : ''}" data-pcard="${esc(p.id)}">
     <div class="pchead"><span class="av" data-ficha="${esc(p.id)}" style="cursor:pointer;background:${avColor(p.id)}">${esc(initials(p.nombre))}</span>
-      <span data-ficha="${esc(p.id)}" style="min-width:0;cursor:pointer"><b>${esc(p.nombre)}</b><small>${esc(lblPuesto(p.puesto))}${locs ? ' · ' + esc(locs) : ' · sin local fijo'}${baja ? ' · de baja' : p.standby ? ' · en standby' : ''}</small></span>
+      <span data-ficha="${esc(p.id)}" style="min-width:0;cursor:pointer"><b>${esc(p.nombre)}</b><small>${esc(lblPuesto(p.puesto))}${locs ? ' · ' + esc(locs) : ' · sin local fijo'}${baja ? ' · de baja' : p.standby ? ' · en standby' : ''}${salidaDe(p) && !haSalido(p, isoHoy()) ? ` · se va el ${fmtDM(salidaDe(p).desde)}` : ''}</small></span>
       <button type="button" class="pmini" data-ficha="${esc(p.id)}" title="Editar ficha" aria-label="Editar ficha de ${esc(p.nombre)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m13.5 6.5 3 3"/></svg></button></div>
     <div class="traits">${chipsCondiciones(p)}</div>
     <div class="abschips">${chipsAusencias(p)}</div>
@@ -211,7 +211,12 @@ function repintarTrasEquipo() { renderEquipo(); if (vistaActivaId() !== 'equipo'
 
 // ---------- ausencias (la tarjeta, la ficha y el Mes comparten esto) ----------
 // 24/09 (D10): la ausencia puede ser del día entero o de una franja; «solo mañana» no le quita la tarde.
-function selFranjaAusencia(attr) { return `<select ${attr} data-libre><option value="">Día entero</option><option value="M">Solo mañana</option><option value="T">Solo tarde</option></select>`; }
+// 30/09 (auditoría G7): solo las franjas que la persona trabaja (una ausencia en una franja que no es suya no cuenta para
+// nada: ni medio día de vacaciones ni contrato). A Iván, que solo hace tardes, se le ofrece «Día entero» y «Solo tarde»
+// (es como el grupo apunta sus vacaciones desde la fase 3b), nunca «Solo mañana»
+function selFranjaAusencia(attr, p) {
+  return `<select ${attr} data-libre><option value="">Día entero</option>${franjasDeTrabajo(p).map(f => `<option value="${f}">Solo ${FRANJA_LBL[f].toLowerCase()}</option>`).join('')}</select>`;
+}
 // «el viernes 2», «del viernes 2 al domingo 4», «desde el viernes 2 (sin fecha de fin)»
 const diaLargoAus = iso => `${DIAS_L[isoDow(iso)].toLowerCase()} ${+iso.slice(8, 10)}`;
 const listaY = xs => xs.length > 1 ? xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1] : (xs[0] || '');
@@ -278,8 +283,12 @@ function altaAusenciaUI(pid, aus, hecho) {
   const hoy = isoHoy();
   const prueba = JSON.parse(JSON.stringify(S.staff));
   anadirAusencia(personaDe(prueba, pid), a);
+  // 30/09 (revisión de A2, cliente 5): un alta idéntica a lo que ya está apuntado (o dentro de ello) no cambia nada: ni línea
+  // del historial ni Ctrl+Z (antes, dos altas iguales dejaban dos líneas)
+  const yaEstaba = JSON.stringify(personaDe(prueba, pid).ausencias) === JSON.stringify(p.ausencias);
   // (revisión F5) con S.meses, la carga «M este mes» de quien cubre cuenta el mes entero, como en la Cobertura
   const sim = cubrirAusencia(S, prueba, clonarEstado(estadoRango(rg.desde, rg.hasta, false)), pid, a.desde, hasta, a.franjas, { desdeIso: hoy, meses: S.meses });
+  if (yaEstaba && !sim.quitados.length && !sim.puestos.length && !sim.relevos.length) { toast(`${p.nombre} ya tenía apuntada esa ausencia: no hay nada que cambiar`, 'ok'); return null; }
   const guardar = conCobertura => {
     pushUndo(`ausencia de ${p.nombre}`, { staff: true, otrosMeses: true });
     const r0 = anadirAusencia(p, a);

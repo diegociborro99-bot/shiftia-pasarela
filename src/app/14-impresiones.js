@@ -389,8 +389,8 @@ function pxgLibran(res) {
   const bajas = lblBajasSemana(res);   // de baja toda la semana, y «Tere de baja el lunes» (24/09)
   let h = `<div class="pxg-loc gris"><i></i><b>Quién libra cada día</b></div><table class="pxg-tab pxg-lib">${pxgCabeceraTabla(res)}<tbody><tr><td class="pxg-lbl"><b>Libran</b><small>${bajas.length ? 'De baja: ' + esc(pxgLista(bajas)) : 'sin turno ese día'}</small></td>`;
   for (const iso of res.dias) {
-    const pids = res.libran[iso] || [];
-    h += `<td class="pxg-c" data-libran="${iso}"><div class="pxg-cnt">${pids.length} libra${pids.length === 1 ? '' : 'n'}</div>${pids.length ? `<div class="pxg-chips">${pids.map(pid => `<span>${esc(nombrePid(pid))}</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`;
+    const pids = res.libran[iso] || [], sinPl = (res.sinPlaza || {})[iso] || [];   // (revisión de A2) «sin plaza» aparte de «libra»
+    h += `<td class="pxg-c" data-libran="${iso}"><div class="pxg-cnt">${pids.length} libra${pids.length === 1 ? '' : 'n'}</div>${pids.length || sinPl.length ? `<div class="pxg-chips">${pids.map(pid => `<span>${esc(nombrePid(pid))}</span>`).join('')}${sinPl.map(pid => `<span class="sinplaza">${esc(nombrePid(pid))} · sin plaza</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`;
   }
   return h + '</tr></tbody></table>';
 }

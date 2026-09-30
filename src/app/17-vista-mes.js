@@ -63,7 +63,9 @@ function renderMes() {
         const aus = ausenciaEn(p, d.iso);
         const wk = d.dow >= 6 ? ' wk' : '';
         if (!cas.length) {
-          if (aus) { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-${esc(aus.tipo)}" data-tipstr="${esc(etiquetaAusencia(aus) + (aus.detalle ? ' · ' + aus.detalle : ''))}">${esc(aus.tipo)}</span></td>`; continue; }
+          // 30/09 (revisión de A2, cliente 2): con dos ausencias ese día (permiso por la mañana y vacaciones por la tarde) la
+          // pastilla dice «PERM+VAC» y el tooltip las dos con sus detalles (antes solo la primera)
+          if (aus) { const as = ausenciasDia(p, d.iso); h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-${esc(aus.tipo)}" data-tipstr="${esc(etiquetaAusenciasDia(p, d.iso) + as.filter(a => a.detalle).map(a => ' · ' + a.detalle).join(''))}">${esc(franjasAusencia(aus) ? as.map(a => a.tipo).join('+') : aus.tipo)}</span></td>`; continue; }
           const ed = estadoDia(S, p, d.iso);
           // sin trabajo por el cierre de su local: pastilla «CIE» (24/09, D11)
           if (!ed.libra && ed.cierre && ed.cierre.tipo !== 'REFUERZA') { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-CIE" data-tipstr="${esc(ed.texto)}">CIE</span></td>`; continue; }
@@ -131,22 +133,30 @@ $('#mesRoot').addEventListener('click', e => {
   const c = e.target.closest('[data-asig]');
   if (c) { const [pid, iso] = c.dataset.asig.split('|'); openDiaPersona(pid, iso, c); }
 });
+// «Quitar la ausencia de este día» o, con varias ese día, «Quitar el permiso de la mañana» / «Quitar las vacaciones de la
+// tarde» (30/09, revisión de A2, cliente 1: con dos ausencias el mismo día se quitaban las dos sin decirlo)
+const QUITAR_AUS = { BAJ: 'la baja', VAC: 'las vacaciones', LD: 'el día libre', PERM: 'el permiso', OTRO: 'la ausencia' };
+function textoQuitarAusencia(a, varias) {
+  if (!varias) return 'Quitar la ausencia de este día';
+  const fs = franjasAusencia(a);
+  return `Quitar ${QUITAR_AUS[a.tipo] || 'la ausencia'}${fs ? ` de la ${FRANJA_LBL[fs[0]].toLowerCase()}` : ' de este día'}`;
+}
 // hoja de una persona en un día: sus casillas, ir al día, ausencia
 function openDiaPersona(pid, iso, anchor) {
   cerrarPops();
   const p = personaDeId(pid); if (!p) return;
   const e = estadoDeIso(iso);
   const cas = casillasDe(e, iso, pid);
-  const aus = ausenciaEn(p, iso);
+  const ausDia = ausenciasDia(p, iso);   // todas las del día, en su orden (revisión de A2, cliente 1 y 2)
   // 30/09 (revisión S0): desde su salida no se le puede poner en ningún sitio (la puerta lo bloquea sin forzar): se dice y
   // no se ofrece «Poner en…»
   const fuera = haSalido(p, iso);
   const pop = document.createElement('div');
   pop.className = 'pop'; pop.id = 'diaPersPop'; pop.setAttribute('role', 'dialog');
-  pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div><div class="pd">${fmtLargo(iso)}${aus ? ` · <b>${esc(etiquetaAusencia(aus))}</b>` : ''}${fuera ? `<br><small style="color:var(--bad)">${esc(textoSalida(p))}</small>` : ''}</div>
+  pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div><div class="pd">${fmtLargo(iso)}${ausDia.length ? ` · <b>${esc(etiquetaAusenciasDia(p, iso))}</b>` : ''}${fuera ? `<br><small style="color:var(--bad)">${esc(textoSalida(p))}</small>` : ''}</div>
     ${cas.map(c => { const { localId, franja } = partirTurno(c.tid); return `<div class="festrow" style="border-left-color:${colorLocal(localId)}"><span class="festinfo"><b>${esc(nombreLocal(localId))} · ${FRANJA_LBL[franja].toLowerCase()}</b><small>${c.entry.abre ? 'abre · ' : ''}${c.entry.cocina ? 'cocina · ' : ''}${esc(c.entry.razon || ORIGEN_LBL[c.entry.origen] || '')}</small></span><button class="festrm" data-quita="${c.tid}" aria-label="Quitar">✕</button></div>`; }).join('') || '<div class="festvacio">Sin turno este día.</div>'}
     <button class="popb full" data-dp="dia">Ir al día</button>
-    ${aus ? `<button class="popb full" data-dp="quitaraus">Quitar la ausencia de este día</button>` : `<button class="popb full" data-dp="aus">Marcar ausencia</button>`}
+    ${ausDia.length ? ausDia.map(a => `<button class="popb full" data-dp="quitaraus" data-aus="${p.ausencias.indexOf(a)}">${esc(textoQuitarAusencia(a, ausDia.length > 1))}</button>`).join('') : `<button class="popb full" data-dp="aus">Marcar ausencia</button>`}
     ${cas.length ? `<button class="popb full rec" data-dp="cobertura">Buscar quién cubre este día…</button>` : ''}
     ${fuera ? '' : S.locales.map(l => FRANJAS.filter(f => turnoAbierto(S, e, iso, turnoId(l.id, f)) && !cas.some(c => c.tid === turnoId(l.id, f))).map(f => `<button class="popb full" data-pon="${turnoId(l.id, f)}" style="border-left:4px solid ${esc(l.color)}">Poner en ${esc(l.nombre)} · ${FRANJA_LBL[f].toLowerCase()}</button>`).join('')).join('')}`;
   document.body.appendChild(pop);
@@ -181,7 +191,18 @@ function openDiaPersona(pid, iso, anchor) {
     if (b.dataset.dp === 'dia') irAIso(iso);
     else if (b.dataset.dp === 'aus') openAusenciaMes(pid, anchor, iso);
     else if (b.dataset.dp === 'cobertura') openCobertura({ pid, tipo: 'LD', dias: [iso] });
-    else if (b.dataset.dp === 'quitaraus') { pushUndo('quitar ausencia', { staff: true }); p.ausencias = quitarDiaDeAusencia(p.ausencias, iso); registrarCambio(`Ausencia retirada: ${p.nombre} el ${fmtDM(iso)}`, 'aus'); saveState(); renderVistaActiva(); }
+    else if (b.dataset.dp === 'quitaraus') {
+      // 30/09 (revisión de A2, cliente 1): se quita solo la ausencia del botón (con permiso por la mañana y vacaciones por la
+      // tarde el mismo día se quitaban las dos sin decirlo) y el historial la nombra
+      const esa = p.ausencias[+b.dataset.aus]; if (!esa) return;
+      // 30/09 (auditoría A1): si es un día de una ausencia SIN fecha de fin (la baja de Laura), se dice que se quita solo ese
+      // día y que la baja sigue (antes no cambiaba nada, o quitando el primer día borraba la baja entera). En el primer día
+      // no hay «antes»: sigue desde el día siguiente (revisión de A2, modelo 4)
+      const abierta = !esa.hasta;
+      if (abierta && !confirm(`${p.nombre} está ${motivoAusencia(esa)} desde el ${fmtDM(esa.desde)} sin fecha de fin: se quita solo el ${fmtDM(iso)} y sigue ${motivoAusencia(esa)} ${esa.desde === iso ? 'desde el día siguiente' : 'antes y después'}. Para cerrarla, ponle fecha de fin en Equipo.\n\n¿Quitar solo ese día?`)) return;
+      pushUndo('quitar ausencia', { staff: true }); p.ausencias = quitarDiaDeAusencia(p.ausencias, iso, a => a === esa);
+      registrarCambio(`Ausencia retirada: ${p.nombre} el ${fmtDM(iso)}${ausDia.length > 1 ? ` · ${etiquetaAusencia(esa)}` : ''}${abierta ? ` (solo ese día: sigue ${motivoAusencia(esa)} desde el ${fmtDM(esa.desde)} sin fecha de fin)` : ''}`, 'aus'); saveState(); renderVistaActiva();
+    }
   });
 }
 function openAusenciaMes(pid, anchor, iso0) {
@@ -193,7 +214,7 @@ function openAusenciaMes(pid, anchor, iso0) {
   pop.innerHTML = `<div class="ph">Ausencia de ${esc(p.nombre)}</div>
     <div class="austipos" style="display:flex;flex-wrap:wrap;gap:5px;margin:8px 0">${TIPOS_AUSENCIA.map((t, i) => `<button type="button" class="austipo abschip a-${t.id}${i === 1 ? ' on' : ''}" data-tipo="${t.id}" style="${i === 1 ? 'outline:2px solid var(--ink)' : ''}">${esc(t.label)}</button>`).join('')}</div>
     <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><label class="pinlbl">Desde<input type="date" id="ausD1" class="logininp" value="${d1}"></label><label class="pinlbl">Hasta<input type="date" id="ausD2" class="logininp" value="${d1}"></label></div>
-    <label class="pinlbl">Cuándo${selFranjaAusencia('id="ausFr" class="logininp"')}</label>
+    <label class="pinlbl">Cuándo${selFranjaAusencia('id="ausFr" class="logininp"', p)}</label>
     <label class="pinlbl">Detalle (opcional)<input type="text" id="ausDet" class="logininp" placeholder="p. ej. boda, médico"></label>
     <button class="popb full rec" id="ausOk">Guardar ausencia</button>`;
   document.body.appendChild(pop);

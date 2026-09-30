@@ -41,7 +41,7 @@ function irAEntrevistas(lista) { ENT.lista = lista || 'ent'; switchTab('entrevis
 // la fecha de la entrevista, corta («14 sep 2026»), delante de cada fila: es la llave por la que
 // va ordenada la lista cuando nadie ha tocado la ficha. Si no se entiende, no se enseña nada.
 function fechaCortaCand(c) {
-  const iso = fechaCandidato(c);
+  const iso = fechaCandidato(c, isoHoy());   // (30/09, A5) el modelo no mira el reloj: la fecha de hoy va desde aquí
   return iso ? `<span class="entfecha">${+iso.slice(8, 10)} ${MESES[+iso.slice(5, 7) - 1].slice(0, 3).toLowerCase()} ${iso.slice(0, 4)}</span> · ` : '';
 }
 
@@ -49,7 +49,7 @@ function renderEntrevistas() {
   const todos = listaCandidatos();
   const res = LISTAS_CAND.map(l => ({ l, r: resumenCandidatos(todos, l.id) }));
   // el orden lo elige quien mira (de partida, el que pidió José: las últimas primero)
-  const vistos = filtrarCandidatos(ordenarCandidatos(todos, null, ENT.orden), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
+  const vistos = filtrarCandidatos(ordenarCandidatos(todos, isoHoy(), ENT.orden), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
   const r = res.find(x => x.l.id === ENT.lista).r;
   const alerta = ENT.lista === 'alerta';
 
@@ -110,7 +110,7 @@ function altaAlertaRapida() {
 }
 // repinta solo la lista al teclear, para no perder el foco del buscador
 function pintaListaEnt() {
-  const vistos = filtrarCandidatos(ordenarCandidatos(listaCandidatos(), null, ENT.orden), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
+  const vistos = filtrarCandidatos(ordenarCandidatos(listaCandidatos(), isoHoy(), ENT.orden), { lista: ENT.lista, q: ENT.q, puesto: ENT.puesto, val: ENT.val, motivo: ENT.motivo, hab: ENT.hab });
   const tot = resumenCandidatos(listaCandidatos(), ENT.lista).total;
   $('#entrevistasRoot .entlist').innerHTML = vistos.length ? vistos.map(filaCand).join('') : `<div class="entzero"><b>No hay nadie con esos filtros.</b><span>Prueba a quitarlos o registra a alguien nuevo.</span></div>`;
   $('#entrevistasRoot .entcount').firstChild.textContent = vistos.length === tot ? `${tot} ${tot === 1 ? 'persona' : 'personas'}` : `${vistos.length} de ${tot}`;

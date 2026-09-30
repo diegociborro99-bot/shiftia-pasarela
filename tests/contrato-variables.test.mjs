@@ -572,6 +572,8 @@ const PERMITIDOS = {
   'modelo.js': {
     // la capa de lectura de la ficha (una sola lectura de cada campo)
     vetoDe: 'capa', libraEn: 'capa', librasPuntuales: 'capa', ponerLibraPuntual: 'capa', textoCambioLibre: 'capa', cambioDeLibre: 'capa', partidoEn: 'capa', estadoDia: 'capa',
+    // (30/09, A2/A3) qué cambia esa semana respecto a sus días de siempre, sin interruptores: lo leen los textos y cambioDeLibre
+    cambioLibreCrudo: 'capa',
     cubreEnCasilla: 'capa', quienLeCubre: 'capa', porQueNoCubre: 'capa', puedeCocina: 'capa', cocinasTitular: 'capa', incompatibles: 'capa', evita: 'capa', abreFijo: 'capa', VARIABLES: 'el registro: texto y verificación de cada variable',
     // la cocina entre la ficha y Ajustes del local (fase 5, S36): una sola lectura (cocinaDe) y una sola escritura
     cocinaDe: 'capa', nuncaCocina: 'capa', ponerCocinaFicha: 'capa (escribe la ficha y la lista del local)', ponerCocinaLocal: 'capa (escribe la lista del local y la ficha)', migrarCocinaLocales: 'migración: la ficha y Ajustes del local, de acuerdo',

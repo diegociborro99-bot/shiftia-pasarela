@@ -34,7 +34,15 @@ function fechaMadrid(fecha) {
   const g = t => p.find(x => x.type === t).value;
   return `${g('year')}-${g('month')}-${g('day')}`;
 }
-function* rangoIso(desde, hasta) { for (let iso = desde; iso <= hasta; iso = addDias(iso, 1)) yield iso; }
+// 30/09 (auditoría A10): con una fecha que no es AAAA-MM-DD, addDias daba «NaN-NaN-NaN» y, si «hasta» ordenaba por detrás
+// de esa cadena, el bucle no acababa nunca (la pestaña se colgaba). Las dos fechas se exigen con la forma. Un día que no
+// existe pero tiene la forma (30/02, 31/04) el navegador lo lee como el siguiente (02/03, 01/05) y se sigue desde ahí; un
+// mes que no existe (13, 00) no da fecha (addDias devuelve «NaN-NaN-NaN»): se da ese primero y se corta (revisión de A2).
+const ES_ISO = /^\d{4}-\d{2}-\d{2}$/;
+function* rangoIso(desde, hasta) {
+  if (!ES_ISO.test(desde) || !ES_ISO.test(hasta)) throw new TypeError(`rangoIso(desde, hasta): fechas AAAA-MM-DD (${desde}, ${hasta})`);
+  for (let iso = desde; iso <= hasta; iso = addDias(iso, 1)) { yield iso; if (!ES_ISO.test(addDias(iso, 1))) return; }
+}
 
 // ---------- catálogo ----------
 const FRANJAS = ['M', 'T'];
@@ -60,8 +68,11 @@ function esApoyo(p) { return !!p && p.puesto === 'apoyo'; }
 // varios) para los casos como Mari Luz: la mañana de Pasarela solo se le veta los lunes,
 // porque esa tarde la hace entera. Sin `dow`, el veto es de todos los días, como el de Cristian.
 function dowsVeto(v) { return v.dow === undefined || v.dow === null ? null : (Array.isArray(v.dow) ? v.dow : [v.dow]); }
+// (30/09, auditoría A12) el día se compara como número, como hace vetoRepetido: un veto guardado con dow "1" (datos de
+// fuera) o pedido con "1" vale igual. (revisión de A2, modelo 5) Un día que no es un número (un dow «x» guardado, o la
+// llamada sin dow) no casa con nada: [NaN].includes(NaN) es true y un veto roto valía para todos los días
 function vetoDe(p, localId, franja, dow) {
-  return (p.vetos || []).find(v => v.localId === localId && v.franja === franja && (dowsVeto(v) === null || dowsVeto(v).includes(dow))) || null;
+  return (p.vetos || []).find(v => v.localId === localId && v.franja === franja && (dowsVeto(v) === null || (Number.isFinite(+dow) && dowsVeto(v).map(Number).includes(+dow)))) || null;
 }
 // (fase 6, S30: sin local, «no hace mañanas los lunes», para la fila de la ficha, que ya dice el local)
 function textoVeto(v, nombreLocal) {
@@ -239,7 +250,10 @@ function filtrarCandidatos(cands, f) {
 // la última vez que cayó esa fecha: este año si ya ha pasado, si no el anterior. Lo que no se
 // entiende devuelve null y no manda a nadie a ningún sitio.
 const MES_PREF = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+// 30/09 (auditoría A5/G15, principio 3): la fecha de hoy es OBLIGATORIA (sin año, decide qué año es); sin ella se miraba el
+// reloj, y la app la llamaba sin fecha. tests/debaja-fecha.test.mjs vigila las llamadas.
 function fechaCandidato(c, hoy) {
+  if (!hoy) throw new TypeError('fechaCandidato(c, hoy): falta la fecha (el modelo no mira el reloj)');
   const s = String((c && c.fecha) || '').split('\n')[0].trim().toLowerCase();
   if (!s) return null;
   let y = 0, m = 0, d = 0, r;
@@ -251,9 +265,8 @@ function fechaCandidato(c, hoy) {
   } else return null;
   if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
   if (!y) {
-    const h = hoy || fechaMadrid();
-    y = +h.slice(0, 4);
-    if (isoDe(y, m, d) > h) y--;
+    y = +hoy.slice(0, 4);
+    if (isoDe(y, m, d) > hoy) y--;
   }
   return isoDe(y, m, d);
 }
@@ -275,9 +288,10 @@ function claveAlfabetica(c) {
   return String((c && c.nombre) || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 }
 function ordenarCandidatos(cands, hoy, modo) {
-  const h = hoy || fechaMadrid();
+  // (30/09, auditoría A5/G15) la fecha es obligatoria: sin ella se miraba el reloj
+  if (!hoy) throw new TypeError('ordenarCandidatos(cands, hoy, modo): falta la fecha (el modelo no mira el reloj)');
   const vals = VALORACIONES.map(v => v.id);
-  const lista = (cands || []).map((c, i) => ({ c, i, f: fechaCandidato(c, h) || '', n: claveAlfabetica(c) }));
+  const lista = (cands || []).map((c, i) => ({ c, i, f: fechaCandidato(c, hoy) || '', n: claveAlfabetica(c) }));
   // sin fecha va al final, no al principio: '' es menor que cualquier fecha, así que se mira aparte
   const porFecha = (a, b) => (a.f === b.f ? a.i - b.i : !a.f || !b.f ? (a.f ? -1 : 1) : a.f < b.f ? 1 : -1);
   const reciente = (a, b) => {
@@ -972,8 +986,9 @@ function casillasDe(est, iso, pid) {
 function manualDe(est, iso, tid) { return (est.manual && est.manual[iso] && est.manual[iso][tid]) || {}; }
 function marcarManual(est, iso, tid, k) { est.manual = est.manual || {}; ((est.manual[iso] = est.manual[iso] || {})[tid] = est.manual[iso][tid] || {})[k] = true; }
 function primerDiaPlanificable(est, hoy) {
-  const h = hoy || fechaMadrid();
-  const d = est.days.find(x => x.iso >= h);
+  // (30/09, auditoría A5/G15) la fecha es obligatoria: sin ella se miraba el reloj
+  if (!hoy) throw new TypeError('primerDiaPlanificable(est, hoy): falta la fecha (el modelo no mira el reloj)');
+  const d = est.days.find(x => x.iso >= hoy);
   return d ? d.iso : null;
 }
 
@@ -991,19 +1006,33 @@ function franjasAusencia(a) {
 // también la de media jornada (quien pregunta por el día entero —vistas, nómina— la ve).
 // Con tipo, solo las de ese tipo (la nómina: un permiso por la mañana y vacaciones por la tarde el
 // mismo día son dos cosas; revisión F3).
+// ¿la ausencia cubre ese día (y, con tipo, es de ese tipo)? Una sin `hasta` llega hasta siempre. La única lectura de las
+// fechas de una ausencia: ausenciaEn, ausenciasDia y franjasAusenteDia (revisión de A2)
+const ausenciaCubre = (a, iso, tipo) => !(iso < a.desde || (a.hasta && iso > a.hasta)) && (!tipo || a.tipo === tipo);
 function ausenciaEn(persona, iso, franja, tipo) {
   // 30/09 (revisión S0): desde su salida, quien ya no está con nosotros no está «ausente»: se fue. Una sola lectura
   // para todo lo que cuenta ausencias (deBaja, Horas, las vacaciones del año, Cobertura): la baja abierta de Susi
   // seguía contando 31 días en Horas de diciembre y el Generador la decía «de baja» tras irse
   if (haSalido(persona, iso)) return null;
+  // 30/09 (auditoría A8): sin franja, la de día entero si la hay; si solo hay medias jornadas, la primera del orden
+  // (compararAusencias, siempre el mismo). Antes salía la primera por orden de alta: Hoy y el Mes decían «Permiso por la
+  // mañana» o «Vacaciones por la tarde» según cuál se apuntó antes
+  let primera = null;
   for (const a of persona.ausencias || []) {
-    if (iso < a.desde || (a.hasta && iso > a.hasta)) continue;
-    if (tipo && a.tipo !== tipo) continue;
-    const fs = franja ? franjasAusencia(a) : null;
-    if (fs && !fs.includes(franja)) continue;
-    return a;
+    if (!ausenciaCubre(a, iso, tipo)) continue;
+    const fs = franjasAusencia(a);
+    if (franja) { if (fs && !fs.includes(franja)) continue; return a; }
+    if (!fs) return a;
+    primera = primera || a;
   }
-  return null;
+  return primera;
+}
+// 30/09 (revisión de A2, cliente 2): TODAS las ausencias de un día, en el orden total (para las vistas del día: con un
+// permiso por la mañana y vacaciones por la tarde, ausenciaEn solo da una y Hoy, el Mes, la Cobertura y el perfil callaban la
+// otra). Desde su salida, ninguna (como ausenciaEn).
+function ausenciasDia(persona, iso) {
+  if (!persona || haSalido(persona, iso)) return [];
+  return (persona.ausencias || []).filter(a => ausenciaCubre(a, iso)).sort(compararAusencias);
 }
 // «de permiso» o, si es de media jornada, «de permiso por la mañana»
 function textoFranjasAusencia(a) { const fs = franjasAusencia(a); return fs ? ` por la ${FRANJA_LBL[fs[0]].toLowerCase()}` : ''; }
@@ -1016,40 +1045,127 @@ function etiquetaAusencia(a, corta) {
   if (corta) return a.tipo + (fs ? ' · ' + FRANJA_LBL[fs[0]].toLowerCase() : '');
   return ((AUS_LBL[a.tipo] || {}).label || a.tipo) + textoFranjasAusencia(a);
 }
+// 30/09 (revisión de A2, cliente 2): lo que se enseña de un día con varias ausencias: «Permiso por la mañana · Vacaciones por
+// la tarde» y, si entre las medias jornadas cubren todas las franjas que trabaja, «… (día entero)». Con una de día entero,
+// esa (la misma que da ausenciaEn). Una sola media jornada se enseña tal como se apuntó (es el dato: «Vacaciones por la
+// tarde» de Iván, que solo hace tardes, sin «día entero»). La usan Hoy, el Mes, la Cobertura y el perfil del empleado.
+function etiquetaAusenciasDia(persona, iso) {
+  const as = ausenciasDia(persona, iso);
+  if (!as.length) return '';
+  const entera = as.find(a => !franjasAusencia(a));
+  if (entera) return etiquetaAusencia(entera);
+  const txt = as.map(a => etiquetaAusencia(a)).join(' · ');
+  const todas = as.length > 1 && franjasDeTrabajo(persona).every(f => as.some(a => franjasAusencia(a).includes(f)));
+  return todas ? `${txt} (día entero)` : txt;
+}
 // quita un día de las ausencias; con filtro, solo de las que lo cumplen (el cierre quita SU
 // media jornada de vacaciones, no las demás ausencias de ese día)
+// 30/09 (auditoría A1/H8, ALTA): una ausencia SIN fecha de fin (la baja de Laura, Maydeth y Susi) llega hasta siempre:
+// quitar un día la parte y la cola sigue ABIERTA. Antes se tomaba como de un solo día (`a.hasta || a.desde`): desde el Mes,
+// «Quitar la ausencia de este día» en un día posterior no cambiaba nada (y se apuntaba en el historial) y en el primer día
+// borraba la baja entera.
+// (revisión de A2, modelo 2) la lista sale en el orden total (compararAusencias): partir una la cambiaba de sitio y ausenciaEn sin
+// franja (Hoy, el Mes) daba otra ausencia que antes de quitar el día y que tras el siguiente alta
 function quitarDiaDeAusencia(ausencias, iso, filtro) {
   const out = [];
   for (const a of ausencias || []) {
-    const h = a.hasta || a.desde;
-    if (iso < a.desde || iso > h || (filtro && !filtro(a))) { out.push(a); continue; }
+    const abierta = !a.hasta;
+    if (iso < a.desde || (!abierta && iso > a.hasta) || (filtro && !filtro(a))) { out.push(a); continue; }
     if (a.desde < iso) out.push(Object.assign({}, a, { hasta: addDias(iso, -1) }));
-    if (h > iso) out.push(Object.assign({}, a, { desde: addDias(iso, 1), hasta: a.hasta }));
+    if (abierta) { const cola = Object.assign({}, a, { desde: addDias(iso, 1) }); delete cola.hasta; out.push(cola); }
+    else if (a.hasta > iso) out.push(Object.assign({}, a, { desde: addDias(iso, 1) }));
   }
-  return out;
+  return out.sort(compararAusencias);
 }
-// alta sin duplicados: si solapa o toca otra del mismo tipo (y de las mismas franjas), se alarga
-// esa. Mañana y tarde a la vez es el día entero: se guarda sin franjas.
+// 30/09 (auditoría A8): el orden de las ausencias de una ficha es TOTAL: por fecha de inicio, luego la franja (mañana, tarde,
+// día entero) y luego el tipo (el orden del catálogo). El comparador de antes nunca devolvía 0 y dos ausencias del mismo
+// día quedaban según el orden de alta.
+const ordenFranjaAusencia = a => { const fs = franjasAusencia(a); return fs ? (fs[0] === 'M' ? 0 : 1) : 2; };
+const ordenTipoAusencia = t => { const i = TIPOS_AUSENCIA.findIndex(x => x.id === t); return i < 0 ? TIPOS_AUSENCIA.length : i; };
+function compararAusencias(x, y) {
+  const dx = x.desde || '', dy = y.desde || '';
+  if (dx !== dy) return dx < dy ? -1 : 1;
+  const fx = ordenFranjaAusencia(x), fy = ordenFranjaAusencia(y);
+  if (fx !== fy) return fx - fy;
+  const tx = ordenTipoAusencia(x.tipo), ty = ordenTipoAusencia(y.tipo);
+  return tx !== ty ? tx - ty : String(x.tipo).localeCompare(String(y.tipo));
+}
+// alta sin duplicados: si solapa o toca otra del mismo tipo (y de las mismas franjas), se funden en una. Mañana y tarde a
+// la vez es el día entero: se guarda sin franjas.
+// 30/09 (auditoría A2/H9): se funde con TODAS las que toca (una que engloba absorbe a las de dentro; una que hace de puente
+// junta a las de los dos lados), y una sin fecha de fin (la baja abierta) también: queda una abierta desde el menor
+// «desde». Antes solo se alargaba la primera que tocaba y solo si las dos tenían fin: la del 13 quedaba dentro de la del
+// 1 al 20, y las bajas abiertas se apilaban.
+// (revisión de A2, modelo 9) `hasta: ''` o null (dato de fuera) es «sin fecha de fin»: la clave no se guarda (una baja con hasta ""
+// se leía como abierta pero se guardaba con la cadena vacía). Cambio de contrato de rangoIso (A10): con `desde` que no es una
+// fecha, lo que la lee (turnosAfectados, cubrirAusencia, vaciarPlanilla…) lanza en vez de no hacer nada.
+// (modelo 1) los detalles se juntan por trozos (« · ») sin repetir ninguno: al editar un cierre, «las suyas · cierre de Bar
+// Mónaco · reforma» se fundía otra vez consigo mismo y el detalle crecía cada vez.
+// (modelo 6) la lista se mantiene ordenada insertando en su sitio (no se ordena entera en cada alta) y las que se funden salen
+// en una pasada (sin splice una a una); el array de la ficha sigue siendo el mismo (la app lo guarda por referencia).
+const insertarAusencia = (lista, a) => { let lo = 0, hi = lista.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (compararAusencias(lista[mid], a) <= 0) lo = mid + 1; else hi = mid; } lista.splice(lo, 0, a); };
 function anadirAusencia(persona, aus) {
   const a = Object.assign({}, aus);
-  if (!a.hasta && a.tipo !== 'BAJ') a.hasta = a.desde;
+  if (!a.hasta) { delete a.hasta; if (a.tipo !== 'BAJ') a.hasta = a.desde; }
   if (a.hasta && a.hasta < a.desde) a.hasta = a.desde;
   const fa = franjasAusencia(a);
   if (fa) a.franjas = fa; else delete a.franjas;
   persona.ausencias = persona.ausencias || [];
-  const mismas = (x, y) => String(franjasAusencia(x) || '') === String(franjasAusencia(y) || '');
-  const toca = (x, y) => !mismas(x, y) ? false : (!x.hasta || !y.hasta) ? (x.tipo === y.tipo && x.tipo === 'BAJ') : !(addDias(x.hasta, 1) < y.desde || addDias(y.hasta, 1) < x.desde);
-  const ex = persona.ausencias.find(x => x.tipo === a.tipo && toca(x, a));
-  if (ex && ex.hasta && a.hasta) {
-    ex.desde = ex.desde < a.desde ? ex.desde : a.desde;
-    ex.hasta = ex.hasta > a.hasta ? ex.hasta : a.hasta;
-    if (a.detalle && !(ex.detalle || '').includes(a.detalle)) ex.detalle = [ex.detalle, a.detalle].filter(Boolean).join(' · ');
-    persona.ausencias.sort((x, y) => x.desde < y.desde ? -1 : 1);
+  const fra = String(fa || ''), mismas = x => String(franjasAusencia(x) || '') === fra;
+  // se tocan: se solapan o son contiguas; una sin fin llega hasta siempre. Las fechas de al lado de la nueva (el día antes de
+  // «desde», el día después de «hasta») se calculan una vez, no por cada ausencia de la lista (modelo 6)
+  let antes = addDias(a.desde, -1), despues = a.hasta ? addDias(a.hasta, 1) : null;
+  const toca = x => x.tipo === a.tipo && mismas(x) && !(x.hasta && x.hasta < antes) && !(despues && despues < x.desde);
+  const detalles = [];
+  const suma = x => { for (const d of String(x.detalle || '').split(' · ')) if (d && !detalles.includes(d)) detalles.push(d); };
+  let ex = null, hubo = true;
+  while (hubo) {   // hasta que ninguna toque el tramo fundido (que crece con cada una)
+    hubo = false;
+    const quedan = [];
+    for (const x of persona.ausencias) {
+      if (x === ex || !toca(x)) { quedan.push(x); continue; }
+      hubo = true;
+      if (!ex) { ex = x; quedan.push(x); }   // se conserva la primera que toca (la app guarda esa referencia); las demás se van
+      suma(x);
+      if (x.desde < a.desde) { a.desde = x.desde; antes = addDias(a.desde, -1); }
+      if (!x.hasta || !a.hasta) { delete a.hasta; despues = null; } else if (x.hasta > a.hasta) { a.hasta = x.hasta; despues = addDias(a.hasta, 1); }
+    }
+    if (quedan.length !== persona.ausencias.length) persona.ausencias.splice(0, persona.ausencias.length, ...quedan);
+  }
+  if (ex) {
+    suma(a);
+    ex.desde = a.desde;
+    if (a.hasta) ex.hasta = a.hasta; else delete ex.hasta;
+    if (detalles.length) ex.detalle = detalles.join(' · ');
+    persona.ausencias.splice(persona.ausencias.indexOf(ex), 1);   // su sitio puede haber cambiado (empieza antes)
+    insertarAusencia(persona.ausencias, ex);
     return { fusionada: true, ausencia: ex };
   }
-  persona.ausencias.push(a);
-  persona.ausencias.sort((x, y) => x.desde < y.desde ? -1 : 1);
+  insertarAusencia(persona.ausencias, a);
   return { fusionada: false, ausencia: a };
+}
+// 30/09 (revisión de A2, cliente 7; decisión del coordinador): al cargar, una ausencia apuntada solo en una franja que la persona
+// NO trabaja (la VAC «solo mañana» de Iván, que solo hace tardes, guardada antes de G7) se quita: no contaba para nada (ni
+// vacaciones ni contrato) y se enseñaba como una ausencia normal. Se quitan las franjas que no son suyas y, si no queda
+// ninguna, la ausencia entera. Devuelve lo borrado [{ pid, nombre, ausencia }] para que la app lo apunte en el historial.
+// Y deja p.ausencias en el orden total (un dato de fuera puede venir desordenado; la app lo mantiene al añadir y al quitar),
+// sin cambiar el array (la ficha lo guarda por referencia). Idempotente: la segunda vez no cambia nada.
+function normalizarAusencias(staff) {
+  const out = [];
+  for (const p of staff || []) {
+    if (!Array.isArray(p.ausencias) || !p.ausencias.length) continue;
+    const mias = franjasDeTrabajo(p), quedan = [];
+    for (const a of p.ausencias) {
+      const fs = franjasAusencia(a);
+      const suyas = fs ? fs.filter(f => mias.includes(f)) : null;
+      if (fs && !suyas.length) { out.push({ pid: p.id, nombre: p.nombre, ausencia: a }); continue; }
+      if (fs && suyas.length < fs.length) a.franjas = suyas;
+      quedan.push(a);
+    }
+    quedan.sort(compararAusencias);
+    if (quedan.length !== p.ausencias.length || quedan.some((a, i) => a !== p.ausencias[i])) p.ausencias.splice(0, p.ausencias.length, ...quedan);
+  }
+  return out;
 }
 // 24/09 (reunión, decisiones.md principio 3): la fecha es OBLIGATORIA. Sin ella se miraba el
 // reloj (fechaMadrid()) y el Generador dejaba sin comprobar las condiciones de quien estaba de
@@ -1355,8 +1471,8 @@ function libraEn(p, iso) {
 // «libra los miércoles» o, con un cambio esa semana, «libra el martes esta semana» (24/09,
 // revisión: «libra los martes esta semana» sonaba a todos los martes)
 function motivoLibra(p, iso) {
-  const dow = isoDow(iso);
-  return libraPuntualVigente(p, iso) ? `libra ${textoDiasEl([dow])} esta semana` : `libra ${DOW_PL[dow]}`;
+  const dow = isoDow(iso), lp = libraPuntualDe(p, iso);
+  return lp ? textoLibraDia(p, lp, dow, false) : `libra ${DOW_PL[dow]}`;
 }
 // guarda el cambio de una semana (o lo quita, con dias = []) sin tocar las demás semanas.
 // Marcar justo sus días de siempre no es un cambio (24/09, revisión: se guardaba «libra miércoles
@@ -1374,25 +1490,66 @@ function ponerLibraPuntual(p, lunes, dias) {
 }
 // al cargar la planilla: la forma de antes del 24/09 pasa a lista y las semanas ya pasadas
 // se borran solas (caducan). Devuelve cuántas semanas pasadas se han borrado.
+// 30/09 (auditoría A7): se normaliza lo que venga de fuera antes de mirar qué ha caducado: la semana a su lunes (un
+// miércoles o un domingo, o «2026-9-28», no se aplicaban nunca y no caducaban), los días a números 1..7 sin repetir
+// (["2"] no se aplicaba) y dos entradas de la misma semana se funden. Lo que no es una fecha se borra (cuenta en n).
+function semanaDeFuera(s) {
+  const r = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(s || '').trim());
+  if (!r) return null;
+  const iso = `${r[1]}-${r[2].padStart(2, '0')}-${r[3].padStart(2, '0')}`;
+  return fechaIsoValida(iso) ? lunesDe(iso) : null;
+}
 function limpiarLibrePuntual(staff, hoyIso) {
+  // (revisión de A2, modelo 8) sin la fecha, lunesDe daba «NaN-NaN-NaN» y se borraban TODOS los cambios en silencio
+  if (!hoyIso) throw new TypeError('limpiarLibrePuntual(staff, hoyIso): falta la fecha (el modelo no mira el reloj)');
   const lunes = lunesDe(hoyIso); let n = 0;
   for (const p of staff || []) {
     if (p.libraPuntual === undefined) continue;
-    const todas = librasPuntuales(p);
-    n += todas.filter(x => x.semana < lunes).length;
-    const vivas = todas.filter(x => x.semana >= lunes && x.dias.length).map(x => ({ semana: x.semana, dias: x.dias.slice() }));
+    const porSemana = new Map();
+    for (const x of librasPuntuales(p)) {
+      const sem = semanaDeFuera(x.semana);
+      if (!sem) { n++; continue; }
+      const dias = x.dias.map(Number).filter(d => Number.isInteger(d) && d >= 1 && d <= 7);
+      porSemana.set(sem, [...new Set((porSemana.get(sem) || []).concat(dias))].sort((a, b) => a - b));
+    }
+    const vivas = [];
+    for (const [sem, dias] of [...porSemana].sort((a, b) => (a[0] < b[0] ? -1 : 1))) { if (sem < lunes) n++; else if (dias.length) vivas.push({ semana: sem, dias }); }
     p.libraPuntual = vivas.length ? vivas : null;
   }
   return n;
 }
-const textoDiasEl = ds => ds.map(d => 'el ' + DOW_LBL[d]).join(' y ');   // «el martes y el jueves»
-const textoDiasPl = ds => ds.map(d => DOW_PL[d]).join(' y ');             // «los miércoles»
+// «lunes, martes y jueves» (30/09, auditoría A11: antes «lunes y martes y jueves»)
+const enumerar = xs => xs.length > 1 ? xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1] : (xs[0] || '');
+const textoDiasEl = ds => enumerar(ds.map(d => 'el ' + DOW_LBL[d]));   // «el martes y el jueves»
+const textoDiasPl = ds => enumerar(ds.map(d => DOW_PL[d]));             // «los miércoles»
+const textoDias = ds => enumerar(ds.map(d => DOW_LBL[d]));              // «martes y jueves»
+// Qué cambia esa semana respecto a sus días de siempre: los días que ahora libra y trabajaba (nuevos) y los que libraba
+// y ahora trabaja (liberados). Sin mirar los interruptores: lo usan los textos (motivoLibra no tiene cfg; quien la llama
+// ya comprobó que «Días que libra» está activa) y cambioDeLibre, que añade los interruptores y los pares (30/09, A3).
+function cambioLibreCrudo(p, lp) {
+  const hab = [...new Set((p && p.libra) || [])].sort((a, b) => a - b), dias = [...new Set((lp && lp.dias) || [])].sort((a, b) => a - b);
+  return { semana: lp && lp.semana, dias, habituales: hab, nuevos: dias.filter(d => !hab.includes(d)), liberados: hab.filter(d => !dias.includes(d)) };
+}
 // «libra martes (en vez de miércoles)»: el cambio de una semana tal como lo enseñan la tarjeta
-// de Equipo, la ficha y la Cobertura (corto: sin el «en vez de»)
+// de Equipo, la ficha y la Cobertura (corto: sin el paréntesis).
+// 30/09 (auditoría A3): el «en vez de» solo nombra los días de siempre que esa semana trabaja (liberados). Si el cambio
+// incluye el de siempre y añade otro, «libra además el viernes» (antes: «libra miércoles y viernes (en vez de
+// miércoles)»); si solo quita días libres, «trabaja el jueves (libra solo lunes y martes)».
 function textoCambioLibre(p, lp, corto) {
-  const hab = (p && p.libra) || [];
-  const dias = ((lp && lp.dias) || []).map(d => DOW_LBL[d]).join(' y ');
-  return `libra ${dias}${!corto && hab.length ? ` (en vez de ${hab.map(d => DOW_LBL[d]).join(' y ')})` : ''}`;
+  const c = cambioLibreCrudo(p, lp);
+  if (!c.nuevos.length && c.liberados.length) return `trabaja ${textoDiasEl(c.liberados)}${corto ? '' : ` (libra solo ${textoDias(c.dias)})`}`;
+  if (c.nuevos.length && !c.liberados.length && c.habituales.length) return `libra además ${textoDiasEl(c.nuevos)}`;
+  return `libra ${textoDias(c.nuevos.length ? c.nuevos : c.dias)}${!corto && c.liberados.length ? ` (en vez de ${textoDias(c.liberados)})` : ''}`;
+}
+// Cómo está un día concreto del cambio (estadoDia, motivoLibra): «libra el martes esta semana (en vez de los miércoles)»;
+// si ese día es uno de siempre que sigue en el cambio, «libra los miércoles»; si el cambio no libera ningún día de
+// siempre, «esta semana libra además el viernes» (30/09, A3: con [3,5] sobre [3] decía «libra el viernes esta semana
+// (en vez de los miércoles)» aunque el miércoles también libraba). Sin días de siempre, «libra el martes esta semana».
+function textoLibraDia(p, lp, dow, conEnVezDe) {
+  const c = cambioLibreCrudo(p, lp);
+  if (c.habituales.includes(dow)) return `libra ${DOW_PL[dow]}`;
+  if (!c.liberados.length && c.habituales.length) return `esta semana libra además ${textoDiasEl([dow])}`;
+  return `libra ${textoDiasEl([dow])} esta semana${conEnVezDe && c.liberados.length ? ` (en vez de ${textoDiasPl(c.liberados)})` : ''}`;
 }
 // Qué cambia esa semana: los días que ahora libra y trabajaba (nuevos) y los que libraba y
 // ahora trabaja (liberados), emparejados en orden —«libra martes en vez de miércoles» = el
@@ -1403,10 +1560,9 @@ function cambioDeLibre(cfg, p, iso) {
   if (!p || !activa(cfg, p, 'libra')) return null;
   const lp = libraPuntualDe(p, iso);
   if (!lp) return null;
-  const hab = [...new Set(p.libra || [])].sort((a, b) => a - b), dias = [...new Set(lp.dias)].sort((a, b) => a - b);
-  const nuevos = dias.filter(d => !hab.includes(d)), liberados = hab.filter(d => !dias.includes(d));
-  const cuadra = nuevos.length === liberados.length;
-  return { semana: lp.semana, dias, habituales: hab, nuevos, liberados, cuadra, pares: cuadra ? nuevos.map((d, i) => [d, liberados[i]]) : [] };
+  const c = cambioLibreCrudo(p, lp);
+  const cuadra = c.nuevos.length === c.liberados.length;
+  return Object.assign(c, { cuadra, pares: cuadra ? c.nuevos.map((d, i) => [d, c.liberados[i]]) : [] });
 }
 // ¿Puede hacer partido ese día? Los días declarados en la ficha y, la semana de un cambio de
 // día libre, el partido del día que ahora libra pasa al día que ahora trabaja (D9, 24/09: el
@@ -1445,7 +1601,7 @@ function estadoDia(cfg, p, iso, franja) {
   let texto = '';
   if (ausencia) texto = motivoAusencia(ausencia);
   else if (standby) texto = 'en standby';
-  else if (libra && puntual) texto = `libra ${textoDiasEl([dow])} esta semana${hab.length ? ` (en vez de ${textoDiasPl(hab)})` : ''}`;
+  else if (libra && puntual) texto = textoLibraDia(p, puntual, dow, true);   // (30/09, A3) con el «en vez de» solo de lo que libera
   else if (libra) texto = `libra ${DOW_PL[dow]}`;
   else if (cierre && cierre.tipo !== 'REFUERZA') texto = motivoSinTrabajo(cfg, cierre.cierre);
   else if (puntual && hab.includes(dow)) texto = `esta semana trabaja (libra ${textoDiasEl(puntual.dias)})`;
@@ -2769,9 +2925,12 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
       // días que no se pueden emparejar: solo se avisa si tenía días de siempre y no se sabe cuál
       // trabaja a cambio (24/09, revisión: a Dulce, Susi o Laura, sin día fijo, o a quien solo
       // añade un día, no había nada que emparejar y el aviso confundía)
+      // (30/09, revisión de A2, cliente 4) el aviso dice lo que pasa esa semana con lo que da cambioLibreCrudo (los días de siempre
+      // que trabaja y los nuevos que libra): «Lavinia esta semana trabaja el jueves» y no «libra el lunes y el martes esta
+      // semana en vez de los lunes, los martes y los jueves» (seguía librando lunes y martes). Sin «y … y» en la misma frase.
       if (!c.cuadra && c.liberados.length && !avisados.has(pid + c.semana)) {
         avisados.add(pid + c.semana);
-        r.avisos.push({ pid, semana: c.semana, tipo: 'emparejar', texto: `${p.nombre} libra ${textoDiasEl(c.dias)} esta semana en vez de ${textoDiasPl(c.habituales)}: no se sabe qué día trabaja a cambio, así que ${c.nuevos.length ? `solo se le quita ${textoDiasEl(c.nuevos)}` : 'no se le pone nada más'} y el resto de su semana tipo no se mueve` });
+        r.avisos.push({ pid, semana: c.semana, tipo: 'emparejar', texto: `${p.nombre} esta semana trabaja ${textoDiasEl(c.liberados)}${c.nuevos.length ? ` (libra ${textoDiasEl(c.nuevos)})` : ''}: no se sabe qué turno hace a cambio, así que ${c.nuevos.length ? `solo se le quita ${textoDiasEl(c.nuevos)}` : 'no se le pone nada más'}; el resto de su semana tipo no se mueve` });
       }
       // un día del cambio ya pasado (con «solo desde hoy») no se toca: el cambio se aplica a medias
       // y se dice (24/09, revisión)
@@ -3833,7 +3992,17 @@ const VARIABLES = [
   { campo: 'libra', clave: 'libra', trato: 'forzable', lbl: 'Días que libra',
     texto: (ctx, p) => {
       const lp = ctx.lunes ? libraPuntualDe(p, ctx.lunes) : null;
-      if (lp) return [{ id: `p:${p.id}:libra`, texto: `${p.nombre} libra ${textoDiasEl(lp.dias)} esta semana${(p.libra || []).length ? ` (en vez de ${textoDiasPl(p.libra)})` : ''}`, k: 'libra', puntual: true }];
+      // (revisión de A2, modelo 3) un cambio guardado igual a sus días de siempre (dato de antes de cambiar p.libra) no es un
+      // cambio: el texto de siempre (antes «trabaja  (libra el miércoles)»)
+      const c = lp ? cambioLibreCrudo(p, lp) : null;
+      if (c && (c.nuevos.length || c.liberados.length)) {
+        // (30/09, auditoría A3) el «en vez de» solo con los días de siempre que esa semana trabaja; si el cambio los
+        // mantiene y añade otro, «libra los miércoles y esta semana además el viernes»; si solo quita, «esta semana trabaja»
+        const t = !c.nuevos.length ? `${p.nombre} esta semana trabaja ${textoDiasEl(c.liberados)} (libra ${textoDiasEl(c.dias)})`
+          : !c.liberados.length && c.habituales.length ? `${p.nombre} libra ${textoDiasPl(c.habituales)} y esta semana además ${textoDiasEl(c.nuevos)}`
+          : `${p.nombre} libra ${textoDiasEl(c.nuevos)} esta semana${c.liberados.length ? ` (en vez de ${textoDiasPl(c.liberados)})` : ''}`;
+        return [{ id: `p:${p.id}:libra`, texto: t, k: 'libra', puntual: true }];
+      }
       return (p.libra || []).length ? [{ id: `p:${p.id}:libra`, texto: `${p.nombre} libra ${textoDiasPl(p.libra)}${p.libreVariable ? ' (día libre variable)' : ''}`, k: 'libra' }] : [];
     },
     verificar: (ctx, p, iso, mis) => fallos(mis.length && libraEn(p, iso) ? [`${diaV(iso)}: trabaja`] : []) },
@@ -4116,12 +4285,20 @@ function generarSemana(cfg, staff, est, lunes, opts) {
     for (const x of apoyosSinSitio(cfg, staff, target, iso)) if (!apoyoSinSitio[iso].includes(x.pid) && !turnosDe(cfg).some(t => pidsEn(target, iso, t.id).includes(x.pid))) apoyoSinSitio[iso].push(x.pid);
   }
   // la baja se mira día a día (24/09, S6): quien estuvo de baja solo el lunes libra el sábado
-  const libran = {}, diasPorPersona = {};
+  // (30/09, revisión de A2, cliente 4) quien esta semana trabaja un día de siempre (un día liberado por su cambio de día libre:
+  // Lavinia, que libra lunes, martes y jueves, esta semana trabaja el jueves) y se quedó sin turno NO «libra» ese día: va en
+  // sinPlaza, aparte, y la tabla «Quién libra cada día» lo enseña como «sin plaza». Antes salía como si librara.
+  const libran = {}, sinPlaza = {}, diasPorPersona = {};
   for (const iso of dias) {
     const trabajan = new Set();
     for (const t of turnosDe(cfg)) for (const pid of pidsEn(target, iso, t.id)) trabajan.add(pid);
-    // (S0, 30/09) quien ya no está con nosotros ese día no «libra»: se fue
-    libran[iso] = staff.filter(p => !trabajan.has(p.id) && !haSalido(p, iso) && !ausenciaEn(p, iso) && !p.standby && !sinTrabajo[iso].includes(p.id) && !apoyoSinSitio[iso].includes(p.id)).map(p => p.id);
+    libran[iso] = []; sinPlaza[iso] = [];
+    for (const p of staff) {
+      // (S0, 30/09) quien ya no está con nosotros ese día no «libra»: se fue
+      if (trabajan.has(p.id) || haSalido(p, iso) || ausenciaEn(p, iso) || p.standby || sinTrabajo[iso].includes(p.id) || apoyoSinSitio[iso].includes(p.id)) continue;
+      const c = cambioDeLibre(cfg, p, iso);
+      (c && c.liberados.includes(isoDow(iso)) ? sinPlaza : libran)[iso].push(p.id);
+    }
     for (const pid of trabajan) diasPorPersona[pid] = (diasPorPersona[pid] || 0) + 1;
   }
   const huecos = g.huecos.filter(h => dias.includes(h.iso)).map(h => Object.assign({ pos: null, tipo: 'faltan' }, h));
@@ -4130,7 +4307,7 @@ function generarSemana(cfg, staff, est, lunes, opts) {
   const plazas = dias.reduce((a, iso) => a + turnosDe(cfg).reduce((b, t) => b + pidsEn(target, iso, t.id).length, 0), 0);
   // de baja = los siete días; una baja de parte de la semana sale aparte («de baja el lunes»)
   const bajaDias = staff.map(p => ({ pid: p.id, dias: dias.filter(iso => deBaja(p, iso)) }));
-  return { lunes, dias, locales, libran, sinTrabajo, sinTrabajoParcial, apoyoSinSitio, refuerzos, huecos, cambios, relevos, desmarcados, condiciones, aplicados: g.aplicados.length, rechazados: g.rechazados, retirados: g.retirados, avisos: g.avisos,
+  return { lunes, dias, locales, libran, sinPlaza, sinTrabajo, sinTrabajoParcial, apoyoSinSitio, refuerzos, huecos, cambios, relevos, desmarcados, condiciones, aplicados: g.aplicados.length, rechazados: g.rechazados, retirados: g.retirados, avisos: g.avisos,
     resumen: { turnos, plazas, condiciones: condiciones.length, condicionesRotas: condiciones.filter(c => !c.ok).length, huecos: huecos.length, descansos: Object.values(libran).reduce((a, x) => a + x.length, 0), maxDias: Math.max(0, ...Object.values(diasPorPersona)), cambios: cambios.length, retirados: g.retirados.length,
       deBaja: bajaDias.filter(x => x.dias.length === 7).map(x => x.pid), bajasParciales: bajaDias.filter(x => x.dias.length && x.dias.length < 7) },
     estado: target };
@@ -4878,15 +5055,35 @@ function registroApoyos(cfg, staff, meses, y, m) {
 }
 // Días de un tipo de ausencia en un mes, con las fechas (José, 17/09: «que dándole a un
 // botón vea los cinco días que se ha ido para ponérselo en su nómina»).
-function diasAusenciaMes(p, y, m, tipo) {
-  const out = [];
+// 30/09 (auditoría G7): solo cuentan las franjas en las que la persona TRABAJA (franjasDeTrabajo). Unas vacaciones «solo
+// de mañana» de Iván, que solo hace tardes, no le quitan nada: ni medio día de vacaciones ni descuento del contrato
+// (antes, 0,5 días y medio día menos de contrato). Una sola lectura para los días del mes, las medias jornadas y Horas.
+// (revisión de A2, modelo 6) una sola pasada por las ausencias del día (antes, una por franja: ausenciaEn dos veces)
+function franjasAusenteDia(p, iso, tipo) {
+  const mias = franjasDeTrabajo(p);
+  if (!p || haSalido(p, iso)) return [];
+  const fuera = new Set();
+  for (const a of p.ausencias || []) {
+    if (!ausenciaCubre(a, iso, tipo)) continue;
+    for (const f of franjasAusencia(a) || mias) fuera.add(f);
+    if (fuera.size >= mias.length) break;
+  }
+  return mias.filter(f => fuera.has(f));
+}
+// los días del mes en que falta (a alguna franja suya) y, de esos, las medias jornadas con su franja; las franjas ausentes
+// se miran UNA vez por día (revisión de A2, modelo 6: diasAusenciaMes y mediasAusenciaMes las miraban dos y tres veces)
+function ausenciasMes(p, y, m, tipo) {
+  const dias = [], medias = {};
   const n = diasDelMes(y, m);
   for (let d = 1; d <= n; d++) {
-    const iso = isoDe(y, m, d);
-    if (ausenciaEn(p, iso, null, tipo)) out.push(iso);
+    const iso = isoDe(y, m, d), fs = franjasAusenteDia(p, iso, tipo);
+    if (!fs.length) continue;
+    dias.push(iso);
+    if (esMediaJornada(p, fs)) medias[iso] = fs;
   }
-  return out;
+  return { dias, medias };
 }
+function diasAusenciaMes(p, y, m, tipo) { return ausenciasMes(p, y, m, tipo).dias; }
 // 24/09 (revisión F3, D10): las fechas de ese mes en que la ausencia es solo de media jornada, con su
 // franja ({ '2026-09-28': ['T'] }), y los días que cuentan: media jornada = medio día. Al cerrar el
 // Mónaco, Hojan coge vacaciones solo de la tarde y la nómina se las contaba como un día entero.
@@ -4894,18 +5091,12 @@ function diasAusenciaMes(p, y, m, tipo) {
 // y coge vacaciones «solo de tarde» no trabaja nada ese día: es un día entero, como las que pone el cierre (VAC de
 // día entero cuando el turno cerrado era el único del día). Antes Horas le contaba 1,5 días por tres tardes, y a
 // Susana Capón, en el mismo caso pero puestas por el cierre, 3.
-function mediasAusenciaMes(p, y, m, tipo) {
-  const out = {};
-  for (const iso of diasAusenciaMes(p, y, m, tipo)) {
-    const fs = FRANJAS.filter(f => ausenciaEn(p, iso, f, tipo));
-    if (esMediaJornada(p, fs)) out[iso] = fs;
-  }
-  return out;
-}
-// Las franjas en que trabaja (su ficha; sin franjas, las dos) y si faltar a `fs` es media jornada: falta a alguna,
-// pero no a todas las suyas. Una sola lectura para las vacaciones del mes y del año y para el contrato de Horas.
+function mediasAusenciaMes(p, y, m, tipo) { return ausenciasMes(p, y, m, tipo).medias; }
+// Las franjas en que trabaja (su ficha; sin franjas, las dos) y si faltar a `fs` es media jornada: falta a alguna de las
+// suyas, pero no a todas (30/09, G7: una franja que no es suya no cuenta). Una sola lectura para las vacaciones del mes y
+// del año y para el contrato de Horas.
 function franjasDeTrabajo(p) { const fs = ((p && p.franjas) || []).filter(f => FRANJAS.includes(f)); return fs.length ? fs : FRANJAS.slice(); }
-function esMediaJornada(p, fs) { return fs.length > 0 && !franjasDeTrabajo(p).every(f => fs.includes(f)); }
+function esMediaJornada(p, fs) { const mias = franjasDeTrabajo(p), falta = (fs || []).filter(f => mias.includes(f)); return falta.length > 0 && falta.length < mias.length; }
 function jornadasAusencia(dias, medias) { return dias.length - Object.keys(medias || {}).length / 2; }
 // Las vacaciones de toda la plantilla en un año, mes a mes, para pasarlas a nómina. `meses` son las
 // fechas de cada mes y `dias` lo que cuentan (media jornada = 0,5); `medias`, las de media jornada.
@@ -4914,7 +5105,7 @@ function vacacionesAno(staff, y, tipo) {
   return (staff || []).map(p => {
     const meses = [], dias = [], medias = {};
     let total = 0;
-    for (let m = 1; m <= 12; m++) { const d = diasAusenciaMes(p, y, m, t), md = mediasAusenciaMes(p, y, m, t); meses.push(d); dias.push(jornadasAusencia(d, md)); Object.assign(medias, md); total += jornadasAusencia(d, md); }
+    for (let m = 1; m <= 12; m++) { const { dias: d, medias: md } = ausenciasMes(p, y, m, t); meses.push(d); dias.push(jornadasAusencia(d, md)); Object.assign(medias, md); total += jornadasAusencia(d, md); }
     return { pid: p.id, nombre: p.nombre, meses, dias, medias, total, fechas: meses.flat() };
   }).filter(x => x.total > 0).sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre, 'es'));
 }
@@ -4966,7 +5157,7 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
     }
     // 24/09 (D10): una ausencia de media jornada es media jornada (descuenta medio día del contrato). (revisión final,
     // 25/09) Media jornada de SU jornada: las tardes de vacaciones de quien solo hace tardes son días enteros
-    const fsAus = p ? FRANJAS.filter(f => ausenciaEn(p, iso, f)) : [];
+    const fsAus = p ? franjasAusenteDia(p, iso) : [];   // (30/09, G7) solo sus franjas
     const media = !!p && esMediaJornada(p, fsAus);
     // (fase 6, S40 y D4) un turno continuo no es un partido: cuenta en «continuos», no en «Partidos» (antes, en los dos)
     if (mias.length) { out.dias++; if (partido && !continuo) out.partidos++; if (festivo) { out.festivas++; out.festivasMin += minDia; } if (dow === 7) { out.domingos++; out.domingosMin += minDia; } }
@@ -4975,11 +5166,12 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
   }
   if (p) {
     // media jornada = medio día (revisión F3, D10); las fechas siguen todas, y las medias con su franja
-    out.vacacionesDias = diasAusenciaMes(p, y, m, 'VAC');
-    out.vacacionesMedias = mediasAusenciaMes(p, y, m, 'VAC');
+    const vac = ausenciasMes(p, y, m, 'VAC'), ld = ausenciasMes(p, y, m, 'LD');
+    out.vacacionesDias = vac.dias;
+    out.vacacionesMedias = vac.medias;
     out.vacaciones = jornadasAusencia(out.vacacionesDias, out.vacacionesMedias);
-    out.libresDias = diasAusenciaMes(p, y, m, 'LD');
-    out.libresMedias = mediasAusenciaMes(p, y, m, 'LD');
+    out.libresDias = ld.dias;
+    out.libresMedias = ld.medias;
     out.libres = jornadasAusencia(out.libresDias, out.libresMedias);
     out.bajaDias = diasAusenciaMes(p, y, m, 'BAJ').length;
   } else { out.vacacionesDias = []; out.vacacionesMedias = {}; out.vacaciones = 0; out.libresDias = []; out.libresMedias = {}; out.libres = 0; out.bajaDias = 0; }
@@ -5482,7 +5674,9 @@ function mesesSinCerrar(estado, hastaIso) {
   return Object.keys(estado.meses).filter(k => /^\d{4}-\d{2}$/.test(k) && k < tope && !(estado.cierres && estado.cierres[k]) && conTurnos(k)).sort();
 }
 function mesVisibleParaPersonal(mesesPublicados, clave, hoyClave) {
-  if (clave <= (hoyClave || fechaMadrid().slice(0, 7))) return true;
+  // (30/09, auditoría A5/G15) el mes de hoy (AAAA-MM) es obligatorio: sin él se miraba el reloj
+  if (!hoyClave) throw new TypeError('mesVisibleParaPersonal(mesesPublicados, clave, hoyClave): falta la fecha (el modelo no mira el reloj)');
+  if (clave <= hoyClave) return true;
   return Array.isArray(mesesPublicados) ? mesesPublicados.includes(clave) : true;
 }
 function mesesVisibles(estado, hoyClave) {
@@ -5711,7 +5905,9 @@ function migrarHorarios(estado) {
 // Hoy, Semana, Mes y Horas enseñen algo real desde el primer minuto. Nunca pisa
 // un mes que ya tenga algo; si no había nada que generar, tampoco añade el partido.
 function sembrarDemo(S, hoyIso) {
-  const hoy = hoyIso || fechaMadrid();
+  // (30/09, auditoría A5/G15) la fecha es obligatoria: sin ella se miraba el reloj
+  if (!hoyIso) throw new TypeError('sembrarDemo(S, hoyIso): falta la fecha (el modelo no mira el reloj)');
+  const hoy = hoyIso;
   const r = { meses: [], aplicados: 0, evento: null };
   S.meses = S.meses || {};
   let y = +hoy.slice(0, 4), m = +hoy.slice(5, 7);
@@ -5773,7 +5969,8 @@ if (typeof module !== 'undefined') {
     plazaOcupa, salaDelDia, salaFirmeDelDia, siSeFuerza, cocinasTitular,
     posicionCocina, quitarCocinaAMano, textoCambiosCasillas, migrarSinCocina, cocinaQuitadaAMano,
     estadoInterruptor, parejasNuncaCon, ponerNuncaCon, quitarNuncaCon, migrarNuncaCon, migrarComodin, migrarInactivas,
-    localHabitualDe, alternarLocal, ponerLocalHabitual, vetoRepetido, seriaContinuo, textoVeto, dowsVeto,
+    localHabitualDe, alternarLocal, ponerLocalHabitual, vetoRepetido, seriaContinuo, textoVeto, dowsVeto, vetoDe, franjasAusenteDia, compararAusencias,
+    ausenciasDia, etiquetaAusenciasDia, normalizarAusencias,
     RELAJABLE, buscarRelajando, TEXTO_PAREJA_FLEXIBLE,
     skillCocina, instanciarFijo, huecosDeCasilla,
   };

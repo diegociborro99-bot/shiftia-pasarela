@@ -103,6 +103,10 @@ function pintaCob(root, modo) {
   const personas = S.staff.filter(q => q.id === COB.pid || (!haSalido(q, dias[0]) && !dias.every(iso => deBaja(q, iso)))).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   if (!COB.pid || !personaDeId(COB.pid)) COB.pid = personas[0] ? personas[0].id : null;
   const p = personaDeId(COB.pid);
+  // 30/09 (revisión de A2, sospecha del modelo; decisión del coordinador): los turnos afectados se ofrecen por las franjas que
+  // la persona trabaja (franjasDeTrabajo, como el «Cuándo» de Equipo, la ficha y el Mes): a Iván, «Todos» y «Tarde». Antes
+  // «Mañana» de Iván contaba 0 turnos sin avisar. Una franja marcada con otra persona que no es suya se quita al cambiar
+  if (p && COB.franjas.some(f => !franjasDeTrabajo(p).includes(f))) COB.franjas = [];
   const cambio = COB.tipo === 'CAMBIO';
   const hoy = isoHoy();
   const bajaTira = p ? dias.filter(iso => deBaja(p, iso)) : [];
@@ -114,9 +118,13 @@ function pintaCob(root, modo) {
     const libra = p && estadoDia(S, p, iso).libra;   // el día libre de ESA semana
     const on = COB.dias.includes(iso);
     const dots = ts.map(t => `<i style="--lc:${colorLocal(t.localId)}" title="${esc(nombreLocal(t.localId) + ' · ' + FRANJA_LBL[t.franja].toLowerCase() + (t.abre ? ' · abre' : '') + (t.cocina ? ' · cocina' : ''))}">${t.franja}${t.cocina ? SVG_COCINA : ''}</i>`).join('');
-    // una ausencia de media jornada (D10) deja ver el turno de la otra franja
-    const media = aus && franjasAusencia(aus);
-    const pie = aus && !media ? `<em class="a-${esc(aus.tipo)}">${esc((AUS_LBL[aus.tipo] || {}).label || aus.tipo)}</em>` : ts.length ? dots + (media ? `<em class="a-${esc(aus.tipo)}" title="${esc(motivoAusencia(aus))}">½</em>` : '') : aus ? `<em class="a-${esc(aus.tipo)}">${esc((AUS_LBL[aus.tipo] || {}).label || aus.tipo)} ½</em>` : `<em>${libra ? 'libra' : 'sin turno'}</em>`;
+    // una ausencia de media jornada (D10) deja ver el turno de la otra franja. 30/09 (revisión de A2, cliente 2): se enseñan
+    // TODAS las del día (etiquetaAusenciasDia) y, si entre ellas cubren todas las franjas que trabaja (permiso por la mañana y
+    // vacaciones por la tarde), es el día entero: sin «½»
+    const as = p ? ausenciasDia(p, iso) : [], fsAus = p ? franjasAusenteDia(p, iso) : [];
+    const entera = aus && (!franjasAusencia(aus) || franjasDeTrabajo(p).every(f => fsAus.includes(f)));
+    const lblAus = a => (AUS_LBL[a.tipo] || {}).label || a.tipo;
+    const pie = entera ? `<em class="a-${esc(aus.tipo)}" title="${esc(etiquetaAusenciasDia(p, iso))}">${esc(as.map(lblAus).join(' · '))}</em>` : ts.length ? dots + (aus ? `<em class="a-${esc(aus.tipo)}" title="${esc(etiquetaAusenciasDia(p, iso))}">½</em>` : '') : aus ? `<em class="a-${esc(aus.tipo)}" title="${esc(etiquetaAusenciasDia(p, iso))}">${esc(as.map(lblAus).join(' · '))} ½</em>` : `<em>${libra ? 'libra' : 'sin turno'}</em>`;
     return `<button type="button" class="cobdia${on ? ' on' : ''}${iso === hoy ? ' hoy' : ''}${iso < hoy ? ' pasado' : ''}${ts.length ? '' : ' vacio'}${isoDow(iso) >= 6 ? ' finde' : ''}" data-dia="${iso}" aria-pressed="${on ? 'true' : 'false'}" title="${esc(fmtLargo(iso))}"><small>${DIAS_L[isoDow(iso)].slice(0, 3)}</small><b>${+iso.slice(8, 10)}</b><span class="cobdots">${pie}</span></button>`;
   };
   const dejadas = cambio ? [] : dejadasCob();
@@ -125,7 +133,7 @@ function pintaCob(root, modo) {
     ${modo === 'tab' ? `<div class="cobpick" role="listbox" aria-label="Persona">${personas.map(q => `<button type="button" class="cobpk${q.id === COB.pid ? ' on' : ''}" data-pk="${esc(q.id)}" style="--pc:${avColor(q.id)}" role="option" aria-selected="${q.id === COB.pid}"><span class="av">${esc(initials(q.nombre))}</span>${esc(nombreCorto(q.nombre))}</button>`).join('')}</div>` : ''}
     ${p ? `<div class="cobhead">
       <span class="av cobav" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span>
-      <div class="cobwho"><span class="micro">QUIÉN VA A FALTAR</span><b>${esc(p.nombre)}</b><small>${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${esc((p.locales || []).length ? p.locales.map(nombreLocal).join(', ') : 'sin local fijo, cualquier local')}${(p.libra || []).length ? ' · libra ' + p.libra.map(d => DIAS_L[d].toLowerCase()).join(' y ') : ''}${lpTira.map(x => ` (semana del ${fmtDDMM(x.l)}: ${textoCambioLibre(p, x.lp, true)})`).join('')}${bajaTira.length ? ` · de baja ${bajaTira.length === 1 ? 'el ' + fmtDM(bajaTira[0]) : `del ${fmtDM(bajaTira[0])} al ${fmtDM(bajaTira[bajaTira.length - 1])}`}` : ''}${salidaDe(p) ? ` · <b style="color:var(--bad)">${esc(textoSalida(p))}</b>` : ''}</small>${modo === 'ovl' ? `<select class="logininp cobsel2" id="cobPid" data-libre aria-label="Cambiar de persona">${personas.map(q => `<option value="${esc(q.id)}"${q.id === COB.pid ? ' selected' : ''}>${esc(q.nombre)}</option>`).join('')}</select>` : ''}</div>
+      <div class="cobwho"><span class="micro">QUIÉN VA A FALTAR</span><b>${esc(p.nombre)}</b><small>${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${esc((p.locales || []).length ? p.locales.map(nombreLocal).join(', ') : 'sin local fijo, cualquier local')}${(p.libra || []).length ? ' · libra ' + textoDias(p.libra) : ''}${lpTira.map(x => ` (semana del ${fmtDDMM(x.l)}: ${textoCambioLibre(p, x.lp, true)})`).join('')}${bajaTira.length ? ` · de baja ${bajaTira.length === 1 ? 'el ' + fmtDM(bajaTira[0]) : `del ${fmtDM(bajaTira[0])} al ${fmtDM(bajaTira[bajaTira.length - 1])}`}` : ''}${salidaDe(p) ? ` · <b style="color:var(--bad)">${esc(textoSalida(p))}</b>` : ''}</small>${modo === 'ovl' ? `<select class="logininp cobsel2" id="cobPid" data-libre aria-label="Cambiar de persona">${personas.map(q => `<option value="${esc(q.id)}"${q.id === COB.pid ? ' selected' : ''}>${esc(q.nombre)}</option>`).join('')}</select>` : ''}</div>
       <div class="cobtipos" role="radiogroup" aria-label="Qué le pasa"><span class="micro">QUÉ LE PASA</span>${TIPOS_INCIDENCIA.map(t => `<button type="button" class="abschip a-${esc(t.id)}${COB.tipo === t.id ? ' on' : ''}" data-tipo="${esc(t.id)}" role="radio" aria-checked="${COB.tipo === t.id}">${esc(t.label)}</button>`).join('')}</div>
     </div>` : '<div class="genvacio">No hay nadie en activo.</div>'}
     ${dejadas.length ? `<p class="cobdejadas" role="note">Ya está apuntado en su ficha y quien le cubre ya entró donde pudo: aquí se busca quién cubre lo que quedó (${esc(pl(dejadas.length, 'turno', 'turnos'))}).</p>` : ''}
@@ -140,7 +148,7 @@ function pintaCob(root, modo) {
       <div class="cobleg"><span><i class="cobli" style="--lc:var(--ink3)">M</i> mañana · <i class="cobli" style="--lc:var(--ink3)">T${SVG_COCINA}</i> tarde con cocina, en el color del local</span><span><em>libra</em> / <em>sin turno</em> no hace falta cubrir nada</span><span class="cobli2">pulsa un día para marcarlo o quitarlo</span></div>
     </div>
     <div class="cobopts">
-      <div class="cobfr" role="group" aria-label="Turnos afectados"><span class="micro">${cambio ? 'QUÉ TURNO' : 'TURNOS AFECTADOS'}</span><button type="button" class="dowk${!COB.franjas.length ? ' on' : ''}" data-fr="">Todos</button><button type="button" class="dowk${COB.franjas.length === 1 && COB.franjas[0] === 'M' ? ' on' : ''}" data-fr="M">Mañana</button><button type="button" class="dowk${COB.franjas.length === 1 && COB.franjas[0] === 'T' ? ' on' : ''}" data-fr="T">Tarde</button></div>
+      <div class="cobfr" role="group" aria-label="Turnos afectados"><span class="micro">${cambio ? 'QUÉ TURNO' : 'TURNOS AFECTADOS'}</span><button type="button" class="dowk${!COB.franjas.length ? ' on' : ''}" data-fr="">Todos</button>${(p ? franjasDeTrabajo(p) : FRANJAS).map(f => `<button type="button" class="dowk${COB.franjas.length === 1 && COB.franjas[0] === f ? ' on' : ''}" data-fr="${f}">${FRANJA_LBL[f]}</button>`).join('')}</div>
       ${COB.tipo === 'BAJ' ? `<label class="genopt"><input type="checkbox" id="cobSinFin" ${COB.sinFin ? 'checked' : ''} data-libre> <span><b>Baja sin fecha de fin</b> · queda abierta desde el primer día marcado; se cubren los días marcados</span></label>` : ''}
       ${cambio ? `<label class="genopt"><input type="checkbox" id="cobInter" ${COB.intercambio ? 'checked' : ''} data-libre> <span><b>Proponer intercambio</b> · a cambio, ${p ? esc(nombreCorto(p.nombre)) : 'la persona'} hace un turno cercano de quien le cubre</span></label>` : `<label class="pinlbl cobdet">Detalle <small>(opcional)</small><input type="text" id="cobDet" class="logininp" value="${esc(COB.detalle)}" placeholder="p. ej. médico, boda" data-libre></label>`}
       <label class="genopt"><input type="checkbox" id="cobSiempre" ${COB.siempre ? 'checked' : ''} data-libre> <span><b>Reemplazar siempre</b> · aunque la casilla siga completa sin esa persona</span></label>

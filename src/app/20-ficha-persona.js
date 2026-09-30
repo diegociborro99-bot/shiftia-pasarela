@@ -18,7 +18,11 @@ function openFicha(pid, opts) {
   const lpTxt = q => {
     const d = lpDias(q);
     const sem = `semana del ${fmtDDMM(lpSem)}`;
-    return d.length ? `La ${sem} libra ${d.map(x => lblDowPl(x)).join(' y ')} en vez de ${(q.libra || []).length ? q.libra.map(x => lblDowPl(x)).join(' y ') : 'nada'}.` : `Sin cambios en la ${sem}: libra ${(q.libra || []).length ? q.libra.map(x => lblDowPl(x)).join(' y ') : 'como siempre'}.`;
+    // (30/09, auditoría A3) el texto del cambio es el del modelo (textoCambioLibre): «libra martes (en vez de miércoles)»,
+    // «libra además el viernes», «trabaja el jueves (libra solo lunes y martes)»; antes «libra los miércoles y los viernes
+    // en vez de los miércoles» cuando el cambio incluía su día de siempre
+    // (revisión de A2, cliente 3) la lista de días del modelo (textoDias): «lunes, martes y jueves», no «lunes y martes y jueves»
+    return d.length ? `La ${sem} ${textoCambioLibre(q, { semana: lpSem, dias: d })}.` : `Sin cambios en la ${sem}: libra ${(q.libra || []).length ? textoDias(q.libra) : 'como siempre'}.`;
   };
   const lpOtras = q => librasPuntuales(q).filter(x => x.semana !== lpSem && x.dias.length && x.semana >= lunesDe(isoHoy()));
   // campos que la ficha da por existentes: los pone migrarEstado al cargar (normalizarFicha); aquí solo
@@ -157,13 +161,14 @@ function openFicha(pid, opts) {
       car('prefs', '', '', `<div class="pinlbl">Prefiere no trabajar los…</div><div class="dowset">${dowSet(p.prefs.evitaDows || [], 'tevita')}</div>
        <label class="pinlbl">Criterio personal<input type="text" class="logininp" data-txt="prefsNota" data-libre value="${esc(p.prefs.nota || '')}" placeholder="p. ej. concilia los lunes"></label>`));
     h += sec('aus', 'Ausencias', p.ausencias.length ? `${p.ausencias.length} registrada(s)` : 'ninguna',
-      (p.ausencias.map((a, i) => fila(`<span class="abschip a-${esc(a.tipo)}">${esc((AUS_LBL[a.tipo] || { label: a.tipo }).label)}</span> del ${fmtDM(a.desde)}${a.hasta ? (a.hasta !== a.desde ? ' al ' + fmtDM(a.hasta) : '') : ' sin fecha de fin'}${esc(textoFranjasAusencia(a))}`, esc(a.detalle || ''), '', `data-rmaus="${i}"`)).join('') || '<div class="festvacio">Sin ausencias registradas.</div>') +
+      // (revisión de A2, cliente 6) «Permiso el 8/10 por la mañana» para un día; «del 1/10 al 20/10»; «del 28/9 sin fecha de fin»
+      (p.ausencias.map((a, i) => fila(`<span class="abschip a-${esc(a.tipo)}">${esc((AUS_LBL[a.tipo] || { label: a.tipo }).label)}</span> ${a.hasta === a.desde ? 'el ' + fmtDM(a.desde) : 'del ' + fmtDM(a.desde) + (a.hasta ? ' al ' + fmtDM(a.hasta) : ' sin fecha de fin')}${esc(textoFranjasAusencia(a))}`, esc(a.detalle || ''), '', `data-rmaus="${i}"`)).join('') || '<div class="festvacio">Sin ausencias registradas.</div>') +
       `<div class="absform ausalta" style="display:grid">
         <div class="row2"><span><label>Tipo</label><select id="fAusTipo" data-libre>${TIPOS_AUSENCIA.map(t => `<option value="${t.id}"${t.id === 'VAC' ? ' selected' : ''}>${esc(t.label)}</option>`).join('')}</select></span>
         <span><label>Detalle</label><input type="text" id="fAusDet" data-libre placeholder="opcional"></span></div>
         <div class="row2"><span><label>Desde</label><input type="date" id="fAusD1" data-libre value="${isoHoy()}"></span>
         <span><label>Hasta <small>(en blanco: un día; una baja, sin fin)</small></label><input type="date" id="fAusD2" data-libre value="${isoHoy()}"></span></div>
-        <div class="row2"><span><label>Cuándo</label>${selFranjaAusencia('id="fAusFr"')}</span><span></span></div>
+        <div class="row2"><span><label>Cuándo</label>${selFranjaAusencia('id="fAusFr"', p)}</span><span></span></div>
         <div class="bar"><button type="button" class="btn-mini" data-addaus>Guardar ausencia</button></div></div>`);
     h += sec('notas', 'Notas y supuestos', p.supuestos.length ? `${p.supuestos.length} supuesto(s) por confirmar` : 'sin supuestos',
       `<label class="pinlbl">Nota <small>(lo que hay que saber de esta persona, con sus palabras)</small><textarea class="logininp" rows="3" data-txt="nota" data-libre>${esc(p.nota || '')}</textarea></label>
@@ -394,8 +399,8 @@ function lineasMoverDiaLibre(p, r, e) {
   return lineas;
 }
 function textoMoverDiaLibre(p, lunes, dias, r, e) {
-  const txtD = ds => ds.map(d => DIAS_L[d].toLowerCase()).join(' y ');
-  const que = dias.length ? `${p.nombre} libra ${txtD(dias)}${(p.libra || []).length ? ' en vez de ' + txtD(p.libra) : ''}` : `${p.nombre} vuelve a su día libre de siempre`;
+  // (30/09, auditoría A3) el cambio en palabras, del modelo: el «en vez de» solo con los días de siempre que esa semana trabaja
+  const que = dias.length ? `${p.nombre} ${textoCambioLibre(p, { semana: lunes, dias })}` : `${p.nombre} vuelve a su día libre de siempre`;
   return `La semana del ${fmtDDMM(lunes)} ya está en la planilla. Si ${que}:\n· ${lineasMoverDiaLibre(p, r, e).join('\n· ')}\n\n¿Cambiarlo? (${comoDeshacer()} lo deshace)`;
 }
 // Guarda el día libre de una semana (dias = [] lo quita). Si la semana ya está en la planilla,
@@ -410,7 +415,7 @@ function cambiarDiaLibreUI(pid, lunes, dias) {
   const prueba = JSON.parse(JSON.stringify(p));
   ponerLibraPuntual(prueba, l0, dias);
   if (JSON.stringify(librasPuntuales(prueba)) === JSON.stringify(librasPuntuales(p))) {
-    if (dias.length) toast(`${p.nombre} ya libra ${dias.map(d => DIAS_L[d].toLowerCase()).join(' y ')} de siempre: no hay nada que cambiar`, 'ok');
+    if (dias.length) toast(`${p.nombre} ya libra ${textoDias(dias)} de siempre: no hay nada que cambiar`, 'ok');
     return false;
   }
   let volcar = false;
@@ -428,9 +433,8 @@ function cambiarDiaLibreUI(pid, lunes, dias) {
   const real = volcar ? estadoSemana(l0, true) : null;
   const r = volcar ? moverDiaLibre(S, S.staff, real, pid, l0, dias, { desdeIso, meses: S.meses }) : null;
   if (!volcar) ponerLibraPuntual(p, l0, dias);
-  const txtD = ds => ds.map(d => DIAS_L[d].toLowerCase()).join(' y ');
   const nRech = r ? r.rechazados.length : 0;
-  registrarCambio(`Ficha de ${p.nombre}: ${dias.length ? `la semana del ${fmtDDMM(l0)} libra ${txtD(dias)}${(p.libra || []).length ? ' en vez de ' + txtD(p.libra) : ''}` : `la semana del ${fmtDDMM(l0)} vuelve a su día libre de siempre`}${r ? ` · planilla: ${r.quitados.length} plaza(s) fuera, ${r.puestos.length} dentro${r.huecos.length ? `, ${r.huecos.length} hueco(s) por cubrir` : ''}${nRech ? `, ${nRech} que no se ${nRech === 1 ? 'pudo' : 'pudieron'} poner (${r.rechazados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${r.avisos.length ? ` · ${r.avisos.map(a => a.texto).join(' · ')}` : ''}` : ''}`, 'equipo');
+  registrarCambio(`Ficha de ${p.nombre}: ${dias.length ? `la semana del ${fmtDDMM(l0)} ${textoCambioLibre(p, { semana: l0, dias })}` : `la semana del ${fmtDDMM(l0)} vuelve a su día libre de siempre`}${r ? ` · planilla: ${r.quitados.length} plaza(s) fuera, ${r.puestos.length} dentro${r.huecos.length ? `, ${r.huecos.length} hueco(s) por cubrir` : ''}${nRech ? `, ${nRech} que no se ${nRech === 1 ? 'pudo' : 'pudieron'} poner (${r.rechazados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${r.avisos.length ? ` · ${r.avisos.map(a => a.texto).join(' · ')}` : ''}` : ''}`, 'equipo');
   saveState();
   if (typeof GEN !== 'undefined' && GEN.previa && GEN.previa.semana && GEN.lunes === l0) GEN.previa = null;   // la vista previa de esa semana ya no vale
   if (r) toast(`${p.nombre}: la semana del ${fmtDDMM(l0)} ya está cambiada en la planilla${r.huecos.length ? ` · ${pl(r.huecos.length, 'hueco', 'huecos')} por cubrir` : ''}${nRech ? ` · ${nRech === 1 ? 'una plaza no se pudo poner' : `${nRech} plazas no se pudieron poner`}` : ''} · ${comoDeshacer()} para deshacer`, r.huecos.length || nRech ? 'warn' : 'ok');

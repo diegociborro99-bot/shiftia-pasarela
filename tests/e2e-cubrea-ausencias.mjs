@@ -283,7 +283,8 @@ try {
     await clic(pg, '#diaPersPop [data-dp="aus"]');
     await llega(pg, () => !!document.getElementById('ausPop'), null, 3000);
     const hay = !!(await pg.$('#ausPop #ausFr'));
-    ok('el alta del Mes tiene «Día entero / Solo mañana / Solo tarde»', hay && await pg.evaluate(() => [...document.querySelectorAll('#ausPop #ausFr option')].map(o => o.textContent.trim()).join('|') === 'Día entero|Solo mañana|Solo tarde'));
+    // (30/09, auditoría G7) solo las franjas que trabaja: Iván solo hace tardes, así que «Día entero / Solo tarde»
+    ok('el alta del Mes tiene «Día entero / Solo tarde» (Iván solo hace tardes: sin «Solo mañana»)', hay && await pg.evaluate(() => [...document.querySelectorAll('#ausPop #ausFr option')].map(o => o.textContent.trim()).join('|') === 'Día entero|Solo tarde'), await pg.evaluate(() => [...document.querySelectorAll('#ausPop #ausFr option')].map(o => o.textContent.trim()).join('|')));
     if (hay) await pg.selectOption('#ausPop #ausFr', 'T');
     await clic(pg, '#ausPop #ausOk');
     if (await llega(pg, () => !!document.getElementById('ausOvl'), null, 3000) >= 0) await clic(pg, '#ausOvl [data-ausok="guardar"]');
