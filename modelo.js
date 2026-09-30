@@ -686,6 +686,9 @@ function aplicarCierre(cfg, staff, est, c, decisiones) {
   }
   c.decisiones = dec;
   c.retirados = [];
+  // 30/09 (A1; auditoría B3): las marcas a mano de cada casilla que se retira (sale primero, cocina, orden), por casilla
+  // ('iso|tid'), para reponerlas al reabrir; antes se borraban con la casilla y al reabrir no volvían
+  c.marcas = {};
   // los días que aún no tenían planilla al cerrar: solo en ellos cuenta la semana tipo (estabaEnCierre)
   c.deSemanaTipo = diasDeCierre(c).filter(iso => !diaConPlanilla(est, iso) && !pendientes.some(r => r.iso === iso));
   if (!Array.isArray(cfg.cierresPuntuales)) cfg.cierresPuntuales = [];
@@ -696,9 +699,13 @@ function aplicarCierre(cfg, staff, est, c, decisiones) {
     if (!lista.length) continue;
     for (const entry of lista) c.retirados.push({ iso, tid, entry: JSON.parse(JSON.stringify(entry)) });
     res.retirados += lista.length;
+    const man = est.manual && est.manual[iso] && est.manual[iso][tid];
+    if (man && Object.keys(man).length) c.marcas[iso + '|' + tid] = JSON.parse(JSON.stringify(man));
     // solo la casilla: el día sigue enlazado con su mes aunque est sea un estado virtual del rango
     delete est.asig[iso][tid];
     if (est.manual && est.manual[iso]) delete est.manual[iso][tid];
+    // (A1, 30/09) quien sale de la casilla cerrada puede ahora abrir su otra casilla del día (el eco de normalizarCasilla)
+    ecoCasilla(est, cfg, staff, iso, tid, lista.map(x => x.pid));
   }
   for (const r of pendientes) c.retirados.push({ iso: r.iso, tid: r.tid, entry: JSON.parse(JSON.stringify(r.entry)) });
   const detalle = `cierre de ${l.nombre} · ${motivoCierreTxt(c) || etiquetaCierre(c).toLowerCase()}`;
@@ -788,17 +795,34 @@ function quitarCierre(cfg, staff, est, id, opts) {
       res.vacacionesQuitadas.push({ pid, iso, tipo: d.tipo });
     }
   }
-  if (o.devolver) for (const r of c.retirados || []) {
-    const e = r.entry;
-    if (!e || !e.pid || pidsEn(est, r.iso, r.tid).includes(e.pid)) continue;
-    // (revisión de la fase 6, principio 4) con lo que se relajó al ponerla (RELAJABLE): lo puesto a mano «con aviso»
-    // (la pareja flexible desde el selector) vuelve igual que lo forzado; antes se quedaba fuera
-    const pe = turnoAbierto(cfg, est, r.iso, r.tid) ? puedeEstar(cfg, staff, est, r.iso, r.tid, e.pid, Object.assign({ forzar: !!e.forzado }, RELAJABLE)) : { ok: false, motivo: motivoCerrado(cfg, r.iso, r.tid).motivo };
-    if (!pe.ok) { res.noDevueltos.push({ iso: r.iso, tid: r.tid, pid: e.pid, motivo: pe.motivo, entry: JSON.parse(JSON.stringify(e)) }); continue; }
-    const lista = ((est.asig[r.iso] = est.asig[r.iso] || {})[r.tid] = est.asig[r.iso][r.tid] || []);
-    lista.push(JSON.parse(JSON.stringify(e)));
-    normalizarCasilla(est, cfg, staff, r.iso, r.tid);
-    res.devueltos.push({ iso: r.iso, tid: r.tid, pid: e.pid });
+  if (o.devolver) {
+    // 30/09 (A1; auditoría B3): las marcas a mano de la casilla vuelven ANTES que la gente, así lo devuelto respeta el «sale
+    // primero», la cocina y el orden de entonces (con la marca de orden, cada entrada vuelve en su sitio: c.retirados va en
+    // el orden de la casilla). Una marca que se quede sin nadie (quien abría no ha podido volver) la limpia normalizarCasilla
+    const repuestas = [];
+    for (const [k, man] of Object.entries(c.marcas || {})) {
+      const [iso, tid] = k.split('|');
+      if (asignados(est, iso, tid).length) continue;
+      est.manual = est.manual || {}; (est.manual[iso] = est.manual[iso] || {})[tid] = JSON.parse(JSON.stringify(man));
+      repuestas.push([iso, tid]);
+    }
+    // la casilla se recalcula cuando ha vuelto todo el mundo (si no, al volver la primera persona la marca «abre» de la
+    // segunda aún no tiene a nadie y se limpiaría como huérfana)
+    const tocadas = new Map();
+    for (const r of c.retirados || []) {
+      const e = r.entry;
+      if (!e || !e.pid || pidsEn(est, r.iso, r.tid).includes(e.pid)) continue;
+      // (revisión de la fase 6, principio 4) con lo que se relajó al ponerla (RELAJABLE): lo puesto a mano «con aviso»
+      // (la pareja flexible desde el selector) vuelve igual que lo forzado; antes se quedaba fuera
+      const pe = turnoAbierto(cfg, est, r.iso, r.tid) ? puedeEstar(cfg, staff, est, r.iso, r.tid, e.pid, Object.assign({ forzar: !!e.forzado }, RELAJABLE)) : { ok: false, motivo: motivoCerrado(cfg, r.iso, r.tid).motivo };
+      if (!pe.ok) { res.noDevueltos.push({ iso: r.iso, tid: r.tid, pid: e.pid, motivo: pe.motivo, entry: JSON.parse(JSON.stringify(e)) }); continue; }
+      const lista = ((est.asig[r.iso] = est.asig[r.iso] || {})[r.tid] = est.asig[r.iso][r.tid] || []);
+      lista.push(JSON.parse(JSON.stringify(e)));
+      const k = r.iso + '|' + r.tid; tocadas.set(k, (tocadas.get(k) || []).concat([e.pid]));
+      res.devueltos.push({ iso: r.iso, tid: r.tid, pid: e.pid });
+    }
+    for (const [k, pids] of tocadas) { const [iso, tid] = k.split('|'); normalizarCasilla(est, cfg, staff, iso, tid, false, pids); }
+    for (const [iso, tid] of repuestas) if (!asignados(est, iso, tid).length && est.manual[iso]) delete est.manual[iso][tid];
   }
   res.ok = true;
   return res;
@@ -931,8 +955,12 @@ function estadoDesde(meses, festivos, y, m) {
   }
   return e;
 }
+// (A1, 30/09; auditoría H10) days y festivos también se copian: la copia de la vista previa o de una simulación no
+// comparte listas con el mes de verdad (nadie las mutaba, pero una copia que no lo es del todo es una trampa)
 function clonarEstado(est) {
-  return Object.assign({}, est, { asig: JSON.parse(JSON.stringify(est.asig || {})), apertura: JSON.parse(JSON.stringify(est.apertura || {})), manual: JSON.parse(JSON.stringify(est.manual || {})) });
+  const copia = x => JSON.parse(JSON.stringify(x));
+  return Object.assign({}, est, { asig: copia(est.asig || {}), apertura: copia(est.apertura || {}), manual: copia(est.manual || {}) },
+    est.days ? { days: copia(est.days) } : {}, est.festivos ? { festivos: copia(est.festivos) } : {});
 }
 function asignados(est, iso, tid) { return ((est.asig[iso] || {})[tid]) || []; }
 function pidsEn(est, iso, tid) { return asignados(est, iso, tid).map(x => x.pid); }
@@ -1725,6 +1753,12 @@ function salaDelDia(cfg, est, iso, pid, excepto) {
 // persona o no se busca— no se lleva esta cocina por su orden. Jenny entraba de sala en la mañana y en la tarde
 // de El 33 y la tarde le daba la cocina. (Quien está en dos casillas sin cocina, como Roberto en la mañana y la
 // tarde de Zapatillera, puede llevar las dos.) La casilla donde está de sala, o null.
+// 30/09 (revisión de A1, cliente S1 = modelo 3; decisiones.md, principio 4): lo decidido A MANO no provoca retiradas en otras
+// casillas. Si la cocina de la casilla donde está de sala la puso el encargado a otra persona (man.cocina) o la quitó a propósito
+// (sinCocina), esa persona NO cuenta como «sala firme»: conserva la cocina que lleva en su otra casilla y la Revisión y la
+// condición cocinaSala avisan del cruce, que decide el encargado. Antes, «Lleva la cocina» a Victoria en la mañana de El 33
+// dejaba a Jenny de sala allí, le quitaba la cocina de la tarde, Noe pasaba a la cocina y Jenny a abrir mañana y tarde (17 h).
+// Lo automático (la «c» de la semana tipo, el Generador, la Cobertura) sigue sin crear cruces
 function salaFirmeDelDia(cfg, staff, est, iso, p, tid) {
   const dia = p && est.asig[iso];
   if (!dia) return null;
@@ -1732,6 +1766,7 @@ function salaFirmeDelDia(cfg, staff, est, iso, p, tid) {
     if (t2 === tid) continue;
     const lista = dia[t2], e = lista && lista.find(x => x.pid === p.id);
     if (!e || e.cocina || !(lista.some(x => x.cocina) || !seBuscaCocina(cfg, staff, t2)) || !plazaOcupa(cfg, est, iso, t2)) continue;
+    if (manualDe(est, iso, t2).cocina) continue;
     if (activa(cfg, p, 'cocina')) return t2;
   }
   return null;
@@ -2010,9 +2045,20 @@ function revisarEntrada(cfg, staff, est, iso, tid, pid, opts) {
 function avisosVigentes(cfg, staff, est, iso, tid, pid) { return revisarEntrada(cfg, staff, est, iso, tid, pid).avisos; }
 
 // ---------- casilla: orden, cocina, abre ----------
-function ordenarCasilla(cfg, iso, tid, entries) {
+// En qué posición va la cocina de esa casilla con `nPersonas` dentro: la del local (l.cocina.posicion) y, si el local
+// dice «3.ª con 3 o más» (posicionSiDesde) y hay menos gente, la 2.ª. 30/09 (A1; auditoría C5/E3): UNA sola cuenta para
+// la casilla (ordenarCasilla) y para la condición del Generador («la cocina va en 3.ª»); cada una tenía la suya y la
+// casilla contaba el hueco de la 1.ª como una persona (con hueco + dos personas ponía la cocina 3.ª y la condición
+// decía ✗ «cocina en 3.ª»). El hueco no es una persona: se cuentan las personas
+function posicionCocina(cfg, tid, nPersonas) {
   const { localId, franja } = partirTurno(tid);
   const l = localDe(cfg, localId);
+  let pos = (l && l.cocina && l.cocina.posicion && l.cocina.posicion[franja]) || 2;
+  const desde = l && l.cocina && l.cocina.posicionSiDesde && l.cocina.posicionSiDesde[franja];
+  if (desde && nPersonas < desde) pos = Math.min(pos, 2);
+  return pos;
+}
+function ordenarCasilla(cfg, iso, tid, entries) {
   const lista = entries.slice();
   const iAbre = lista.findIndex(e => e.abre);
   const abre = iAbre >= 0 ? lista.splice(iAbre, 1)[0] : null;
@@ -2020,12 +2066,9 @@ function ordenarCasilla(cfg, iso, tid, entries) {
   const coc = iCoc >= 0 ? lista.splice(iCoc, 1)[0] : null;
   const out = [];
   if (abre) out.push(abre);
-  if (coc && abre && coc === abre) { /* la misma persona */ }
   const total = entries.length;
   if (coc && coc !== abre) {
-    let pos = (l && l.cocina && l.cocina.posicion && l.cocina.posicion[franja]) || 2;
-    const desde = l && l.cocina && l.cocina.posicionSiDesde && l.cocina.posicionSiDesde[franja];
-    if (desde && total < desde) pos = Math.min(pos, 2);
+    const pos = posicionCocina(cfg, tid, entries.filter(e => !e.hueco).length);
     const idx = Math.max(abre ? 1 : 0, Math.min(pos - 1, total - 1));
     while (out.length < idx && lista.length) out.push(lista.shift());
     out.push(coc);
@@ -2063,8 +2106,10 @@ function puedePrimero(cfg, staff, est, iso, tid, pid, opts) {
   if (imp) return Object.assign({ ok: false }, imp);
   if (franja === 'T' && regla(cfg, 'primeroCompleto')) {
     for (const t of turnosDe(cfg)) {
-      if (t.franja !== 'M' || !pidsEn(est, iso, t.id).includes(pid)) continue;
-      if (t.local.id === localId && primeroDe(cfg, staff, est, iso, t.id) === pid) return { ok: true, continuo: true };
+      // 30/09 (A1; auditoría C4): la mañana solo cuenta si su plaza la ocupa (plazaOcupa: no en una casilla cerrada ese día
+      // a mano o por fechas), como la puerta; y es continuo solo con las dos casillas abiertas, como esContinuo
+      if (t.franja !== 'M' || !pidsEn(est, iso, t.id).includes(pid) || !plazaOcupa(cfg, est, iso, t.id)) continue;
+      if (t.local.id === localId && turnoAbierto(cfg, est, iso, t.id) && turnoAbierto(cfg, est, iso, tid) && primeroDe(cfg, staff, est, iso, t.id) === pid) return { ok: true, continuo: true };
       if (partidoAbre(cfg, l, p, iso, franja)) return { ok: true, partido: true };
       if (l && l.partidoAbre && l.partidoAbre[franja]) {
         // solo con el partido autorizado, es decir, en la casilla concreta de X (revisión F3)
@@ -2113,6 +2158,10 @@ function primeroDe(cfg, staff, est, iso, tid, opts) {
   if (delLocal && fijo(delLocal) && okP(delLocal)) return delLocal.pid;
   { const e = lista.find(x => fijo(x) && okP(x)); if (e) return e.pid; }
   if (!o.sinPreferencia) { const e = lista.find(x => x.abrePatron && activa(cfg, personaDe(staff, x.pid), 'abre') && okP(x)); if (e) return e.pid; }
+  // 30/09 (revisión de A1, cliente 3a): estabilidad. Después de los fijos y antes de «el primero de la lista», quien ya abría
+  // (e.abre, lo que decidió la casilla la última vez) sigue abriendo si aún puede: bajar a Cris al 3.º de la casilla del Mónaco
+  // no tiene por qué pasarle el «abre» a Yilian, y un rebote desde otra casilla no cambia quién abre sin un motivo
+  if (!o.sinPreferencia) { const e = lista.find(x => x.abre && !x.cocina && okP(x)); if (e) return e.pid; }
   // la cocina tiene su propia posición: solo abre si nadie más puede (o si es la fija del local, como Susana Capón el martes)
   const e = lista.find(x => !x.cocina && okP(x)) || lista.find(okP);
   return e ? e.pid : null;
@@ -2136,22 +2185,31 @@ function porQueNadiePrimero(cfg, staff, est, iso, tid) {
 }
 // orden completo de una casilla: el primero (o un hueco si nadie puede), la cocina en su
 // posición, y el resto en su orden; con hueco, quien viene de partido va al final
+// 30/09 (revisión de A1, cliente 1): con el orden a mano (▲/▼, man.orden) manda la lista tal como la dejó el encargado (lo guardado);
+// solo se antepone el hueco si nadie puede abrir. Antes Hoy y la Semana volvían a ordenar (quien abre delante, la cocina en su
+// posición) y el Excel y el menú de la casilla leían lo guardado: dos lecturas distintas de la misma casilla
 function ordenCompleto(cfg, staff, est, iso, tid) {
   const lista = asignados(est, iso, tid);
   if (!lista.length) return { orden: [], primero: null, motivoHueco: null };
-  const { franja } = partirTurno(tid);
   const primero = primeroDe(cfg, staff, est, iso, tid);
-  const otra = franja === 'M' ? 'T' : 'M';
-  const enOtra = pid => turnosDe(cfg).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(pid));
   const entradas = lista.map(e => Object.assign({}, e, { abre: !!primero && e.pid === primero }));
-  let base = entradas, motivoHueco = null;
+  const motivoHueco = primero ? null : motivoSinPrimero(cfg, staff, est, iso, tid);
+  const hueco = { hueco: true, abre: true, pid: null };
+  if (manualDe(est, iso, tid).orden) return { orden: primero ? entradas : [hueco, ...entradas], primero, motivoHueco };
+  let base = entradas;
   if (!primero) {
-    motivoHueco = motivoSinPrimero(cfg, staff, est, iso, tid);
     const coc = entradas.filter(e => e.cocina), resto = entradas.filter(e => !e.cocina);
-    resto.sort((a, b) => (enOtra(a.pid) ? 1 : 0) - (enOtra(b.pid) ? 1 : 0));
-    base = [{ hueco: true, abre: true, pid: null }, ...coc, ...resto];
+    resto.sort((a, b) => (enOtraFranja(cfg, est, iso, tid, a.pid) ? 1 : 0) - (enOtraFranja(cfg, est, iso, tid, b.pid) ? 1 : 0));
+    base = [hueco, ...coc, ...resto];
   }
   return { orden: ordenarCasilla(cfg, iso, tid, base), primero, motivoHueco };
+}
+// ¿Está esa persona en la otra franja ese día, en una plaza que la ocupa? (A1, 30/09; auditoría C4) La misma lectura que
+// la puerta (plazaOcupa): una casilla cerrada ese día con gente dentro no cuenta. La usan el orden con hueco (quien viene
+// de partido va al final) y el «partido» que pinta la planilla (posicionesDe)
+function enOtraFranja(cfg, est, iso, tid, pid) {
+  const otra = partirTurno(tid).franja === 'M' ? 'T' : 'M';
+  return turnosDe(cfg).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(pid) && plazaOcupa(cfg, est, iso, t.id));
 }
 function esContinuo(cfg, staff, est, iso, localId, pid) {
   const tm = turnoId(localId, 'M'), tt = turnoId(localId, 'T');
@@ -2186,54 +2244,157 @@ function posicionesDe(cfg, staff, est, iso, tid) {
   const { localId, franja } = partirTurno(tid);
   const l = localDe(cfg, localId);
   const { orden, primero, motivoHueco } = ordenCompleto(cfg, staff, est, iso, tid);
-  const otra = franja === 'M' ? 'T' : 'M';
-  const enOtra = pid => turnosDe(cfg).some(t => t.franja === otra && pidsEn(est, iso, t.id).includes(pid));
+  // (revisión de A1, cliente 5) una casilla cerrada ese día no ocupa (plazaOcupa): no es un partido ni un continuo, como en Horas
+  const ocupa = plazaOcupa(cfg, est, iso, tid);
   return orden.map((e, i) => {
     if (e.hueco) return { pos: i + 1, hueco: true, motivo: motivoHueco, abre: true };
     const p = personaDe(staff, e.pid) || { id: e.pid, nombre: e.pid };
-    const continuo = e.pid === primero && esContinuo(cfg, staff, est, iso, localId, e.pid);
+    const continuo = ocupa && e.pid === primero && esContinuo(cfg, staff, est, iso, localId, e.pid);
     const fijo = abreFijo(cfg, l, p, franja);   // la misma lectura que la puntuación (fase 4)
     const por = porDe(staff, e);
     const { avisos, autorizados, abreNoApto } = revisarEntrada(cfg, staff, est, iso, tid, e.pid);
     // (fase 5, S18) abreNoApto: el porqué, si sale primero porque se marcó a mano y no puede abrir
     // (S0, 30/09) `salido`: la salida de quien tiene una, también en días anteriores a la fecha (es el sombreado rojo
     // de «ya no trabaja con nosotros» en Hoy, la Semana, el Mes, la hoja impresa y la imagen de compartir)
-    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && fijo, abreNoApto: abreNoApto ? abreNoApto.motivo : null, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: esComodin(p), por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, autorizados, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null, salido: salidaDe(p) };
+    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && fijo, abreNoApto: abreNoApto ? abreNoApto.motivo : null, cocina: !!e.cocina, partido: ocupa && enOtraFranja(cfg, est, iso, tid, e.pid) && !continuo, continuo, comodin: esComodin(p), por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, autorizados, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null, salido: salidaDe(p) };
   });
 }
-// recalcula cocina, abre y orden salvo lo que el encargado haya fijado a mano
-function normalizarCasilla(est, cfg, staff, iso, tid, eco) {
+// ¿El encargado quitó la cocina de esa casilla a propósito («Quitar la marca de cocina» del menú) en los datos de ANTES de la
+// marca sinCocina? Lo dice la línea «X deja la cocina de L [franja] del d/m» del historial. Solo la leen las migraciones
+// (migrarMarcasHuerfanas, migrarSinCocina), una vez; desde el 30/09 (revisión de A1, modelo 4) la casilla no la mira: una marca
+// de cocina a mano sin nadie que la lleve y sin sinCocina es una huérfana y se vuelve a decidir. La lectura es estricta: la fecha
+// de la línea (ts) del mismo año que la casilla (antes «del 7/10» de 2025 valía para 2026), y si la línea lleva la franja, solo esa
+// (la app la escribe desde hoy; las de antes, sin franja, valen para las dos del día)
+function cocinaQuitadaAMano(cfg, iso, tid) {
+  const hist = cfg && Array.isArray(cfg.historial) ? cfg.historial : [];
+  if (!hist.length) return false;
+  const { localId, franja } = partirTurno(tid);
+  const l = localDe(cfg, localId);
+  const dm = `del ${+iso.slice(8, 10)}/${+iso.slice(5, 7)}`, ano = +iso.slice(0, 4);
+  const conFranja = ` deja la cocina de ${l ? l.nombre : localId} ${FRANJA_LBL[franja].toLowerCase()} ${dm}`;
+  const sinFranja = ` deja la cocina de ${l ? l.nombre : localId} ${dm}`;
+  const dice = (t, x) => t.endsWith(x) || t.includes(x + ' ');
+  return hist.some(h => {
+    if (!h || !h.ts || new Date(h.ts).getFullYear() !== ano) return false;
+    const t = String(h.txt || '');
+    return dice(t, conFranja) || dice(t, sinFranja);
+  });
+}
+// recalcula cocina, abre y orden salvo lo que el encargado haya fijado a mano. eco: es la llamada de rebote de otra
+// casilla del día (no rebota más); tocados: quien acaba de entrar o salir de esta casilla (A1, ver el eco al final)
+function normalizarCasilla(est, cfg, staff, iso, tid, eco, tocados) {
   const lista = asignados(est, iso, tid);
-  if (!lista.length) return;
+  if (!lista.length) return eco ? [] : ecoCasilla(est, cfg, staff, iso, tid, tocados);
   const c0 = (lista.find(e => e.cocina) || {}).pid;
   const { localId, franja } = partirTurno(tid);
   const l = localDe(cfg, localId);
+  // 30/09 (A1; auditoría C1/H7): red de seguridad contra las marcas huérfanas. «Abre a mano» sin nadie marcado (quien
+  // abría salió por un camino que no se llevó la marca: datos de antes) no fija a nadie: se borra y la casilla decide.
+  // La cocina a mano sin nadie, igual, salvo la que el encargado quitó a propósito (sinCocina, que pone quitarCocinaAMano; en
+  // los datos de antes la apunta una vez la migración sinCocina3009 leyendo el historial: la casilla no lo lee, revisión de A1)
+  const man0 = est.manual && est.manual[iso] && est.manual[iso][tid];
+  if (man0) {
+    if (man0.abre && !lista.some(e => e.abre)) delete man0.abre;
+    if (man0.cocina && !lista.some(e => e.cocina) && !man0.sinCocina) delete man0.cocina;
+    if (!Object.keys(man0).length) delete est.manual[iso][tid];
+  }
   const man = manualDe(est, iso, tid);
+  const a0 = (lista.find(e => e.abre) || {}).pid;
   // la cocina: la preferencia de lo automático (cocinaAuto) si puede llevarla ese día; si no, por el orden del
   // local (rangoCocina). Con «Cocina» apagada no se marca sola (fase 5, D5)
   if (!man.cocina && l && cocinaExigida(cfg, staff, l, franja)) {
-    let mejor = null, mejorR = Infinity, pref = false;
+    let mejor = null, mejorR = Infinity, mejorN = -1;
     for (const e of lista) {
-      const q = personaDe(staff, e.pid), r = rangoCocina(cfg, l, q, franja, iso), pe = !!e.cocinaAuto;
-      if (r < 0 || (!pe && salaFirmeDelDia(cfg, staff, est, iso, q, tid))) continue;
-      if ((pe && !pref) || (pe === pref && r < mejorR)) { mejorR = r; mejor = e; pref = pe; }
+      const q = personaDe(staff, e.pid), r = rangoCocina(cfg, l, q, franja, iso);
+      // 30/09 (A1; auditoría H3, S34): quien ese día está de sala en otra casilla no se lleva esta cocina, tampoco con la
+      // preferencia de lo automático (la «c» de la semana tipo o del Generador se la daba igual: Noe de sala en la mañana
+      // de El 33 y de cocina en la tarde). Si es la única que podría, la casilla se queda sin cocina (la Revisión lo dice
+      // y el Generador busca a otra persona): dársela con aviso dejaría el cruce hecho
+      if (r < 0 || salaFirmeDelDia(cfg, staff, est, iso, q, tid)) continue;
+      // entre los aptos: la preferencia de lo automático (cocinaAuto); si no, quien ya la llevaba (30/09, revisión de A1, cliente
+      // 3a: estabilidad, que entrar alguien con mejor orden en la lista del local o un rebote no la muevan sin motivo); si no,
+      // el orden del local
+      const nivel = e.cocinaAuto ? 2 : e.cocina ? 1 : 0;
+      if (nivel > mejorN || (nivel === mejorN && r < mejorR)) { mejorR = r; mejor = e; mejorN = nivel; }
     }
     for (const e of lista) e.cocina = e === mejor;
   } else if (!man.cocina) for (const e of lista) e.cocina = false;
-  // si la cocina cambia de manos, las otras casillas de ese día sin cocina donde está quien la deja o la coge se
-  // miran otra vez (salaFirmeDelDia: Roberto, en la mañana y la tarde de Zapatillera, recupera la de la mañana
-  // cuando Adrián deja la de la tarde). Un solo eco, sin cadena
-  const c1 = (lista.find(e => e.cocina) || {}).pid;
-  if (!eco && c0 !== c1) for (const t2 of Object.keys(est.asig[iso] || {})) {
-    const l2 = est.asig[iso][t2];
-    if (t2 !== tid && l2 && !l2.some(x => x.cocina) && l2.some(x => x.pid === c0 || x.pid === c1)) normalizarCasilla(est, cfg, staff, iso, t2, true);
-  }
   if (!man.abre) { const pr = primeroDe(cfg, staff, est, iso, tid); for (const e of lista) e.abre = !!pr && e.pid === pr; }
   if (!man.orden) {
     const { orden } = ordenCompleto(cfg, staff, est, iso, tid);
     const porPid = {}; for (const e of lista) porPid[e.pid] = e;
     est.asig[iso][tid] = orden.filter(e => !e.hueco).map(e => porPid[e.pid]);
   }
+  // El eco (30/09, A1; auditoría H2): lo que decide esta casilla depende de las otras del día (quién abre la tarde, de si
+  // hace la mañana y de si allí abre: puedePrimero; la cocina, de quién está de sala en otra casilla: salaFirmeDelDia), así
+  // que las otras casillas del día donde esté quien entra o sale (tocados) y, si aquí cambia quién abre o quién lleva la
+  // cocina, cualquiera de esta casilla, se miran otra vez. Hasta ahora el eco solo existía para la cocina y solo hacia las
+  // casillas sin cocina: el Generador ponía a Hojan en la mañana de El 33 DESPUÉS de decidir que abría la tarde del Mónaco
+  // y nadie volvía a mirar la tarde (e.abre, que leen el Mes, el Excel, Horas y su app, decía una cosa y Hoy otra).
+  // 30/09 (revisión de A1, modelo 1): un solo rebote no bastaba. Al dar de baja a Adrián, retirarlo de la mañana de Zapatillera
+  // daba a Roberto la cocina de la tarde (Adrián ya no podía llevarla) mientras seguía de sala en la mañana, y la mañana no se
+  // volvía a mirar: 10 cruces cocina/sala en octubre hasta el siguiente refresco. Ahora el eco sigue la cadena hasta que ninguna
+  // casilla del día cambie (ecoCasilla, con tope), y devuelve las casillas que cambiaron por rebote (quién abre o lleva la cocina,
+  // antes → ahora) para que la app lo diga (cliente 3b)
+  if (eco) return [];
+  const c1 = (lista.find(e => e.cocina) || {}).pid, a1 = (lista.find(e => e.abre) || {}).pid;
+  const pids = new Set(tocados || []);
+  for (const pid of afectadosPorCambio(lista, a0, a1, c0, c1)) pids.add(pid);
+  return ecoCasilla(est, cfg, staff, iso, tid, [...pids]);
+}
+// A quién hay que volver a mirar en sus otras casillas cuando en esta cambia quién abre (a0 → a1) o quién lleva la cocina (c0 → c1):
+// si la cocina aparece o desaparece, a todos los de la casilla (con la cocina puesta, los demás pasan a ser «sala firme» en sus
+// otras casillas; sin ella, dejan de serlo); si solo cambia de manos, o solo cambia quién abre, a quien la gana y a quien la pierde
+// (su tarde o su mañana: el continuo, la otra cocina). Mirar a todos por cualquier cambio encarecía generarPlanilla un 25 %
+function afectadosPorCambio(lista, a0, a1, c0, c1) {
+  if (c0 !== c1 && (!c0 || !c1)) return lista.map(e => e.pid);
+  const out = [];
+  if (a0 !== a1) out.push(a0, a1);
+  if (c0 !== c1) out.push(c0, c1);
+  return out.filter(Boolean);
+}
+// vuelve a decidir UNA casilla sin rebote y dice qué cambió: { iso, tid, abre?: { antes, ahora }, cocina?: { antes, ahora } } o
+// null si sigue igual. La pieza de ecoCasilla y de refrescarCasillas
+function normalizarYCambio(est, cfg, staff, iso, tid) {
+  const quien = k => { const e = asignados(est, iso, tid).find(x => x[k]); return e ? e.pid : null; };
+  const a0 = quien('abre'), c0 = quien('cocina');
+  normalizarCasilla(est, cfg, staff, iso, tid, true);
+  const a1 = quien('abre'), c1 = quien('cocina');
+  if (a0 === a1 && c0 === c1) return null;
+  const x = { iso, tid };
+  if (a0 !== a1) x.abre = { antes: a0, ahora: a1 };
+  if (c0 !== c1) x.cocina = { antes: c0, ahora: c1 };
+  return x;
+}
+// Vueltas como mucho del eco y del refresco de un día: cada casilla depende de las otras del día por dos hilos (quién abre la tarde
+// depende de la mañana; la cocina, de quién está de sala en otra casilla) y en la práctica el punto fijo llega a la segunda vuelta;
+// el tope es por si dos casillas se pasaran la cocina una a otra sin parar (no debería, pero un bucle sin fin sería peor)
+const VUELTAS_ECO = 4;
+// vuelve a decidir las otras casillas del día en las que esté alguna de esas personas, y sigue la cadena: si una cambia de abre o de
+// cocina, las casillas de la gente de esa también, hasta que nada cambie (o VUELTAS_ECO). Devuelve las casillas cambiadas por rebote,
+// cada una con su antes → ahora final (ver normalizarCasilla)
+function ecoCasilla(est, cfg, staff, iso, tid, pids) {
+  const dia = est.asig && est.asig[iso];
+  if (!dia || !pids || !pids.length) return [];
+  const cambios = new Map();   // tid → { iso, tid, abre?, cocina? } acumulado desde el primer rebote
+  let pendientes = new Set(pids), evita = tid;
+  for (let vuelta = 0; vuelta < VUELTAS_ECO && pendientes.size; vuelta++) {
+    const siguientes = new Set();
+    for (const t2 of Object.keys(dia)) {
+      const l2 = dia[t2];
+      if (t2 === evita || !l2 || !l2.length || !l2.some(x => pendientes.has(x.pid))) continue;
+      const x = normalizarYCambio(est, cfg, staff, iso, t2);
+      if (!x) continue;
+      const acum = cambios.get(t2) || { iso, tid: t2 };
+      for (const k of ['abre', 'cocina']) if (x[k]) acum[k] = { antes: acum[k] ? acum[k].antes : x[k].antes, ahora: x[k].ahora };
+      cambios.set(t2, acum);
+      const a = x.abre || {}, c = x.cocina || {};
+      for (const pid of afectadosPorCambio(l2, x.abre ? a.antes : null, x.abre ? a.ahora : null, x.cocina ? c.antes : null, x.cocina ? c.ahora : null)) siguientes.add(pid);
+    }
+    // la casilla de la que salió el eco también puede cambiar por rebote (su cocina depende de dónde está su gente de sala)
+    pendientes = siguientes; evita = null;
+  }
+  return [...cambios.values()].filter(x => (x.abre && x.abre.antes !== x.abre.ahora) || (x.cocina && x.cocina.antes !== x.cocina.ahora)).map(x => { const y = { iso: x.iso, tid: x.tid }; if (x.abre && x.abre.antes !== x.abre.ahora) y.abre = x.abre; if (x.cocina && x.cocina.antes !== x.cocina.ahora) y.cocina = x.cocina; return y; });
 }
 // 24/09 (revisión de la fase 5; Diego: «que lea todas las variables»). Quién abre y quién lleva la cocina se
 // guardan en cada casilla (e.abre y e.cocina, que leen el Mes, el perfil del empleado, el Excel, las horas y el
@@ -2244,22 +2405,45 @@ function normalizarCasilla(est, cfg, staff, iso, tid, eco) {
 // calcularlas entre dos fechas de un estado (con normalizarCasilla: lo puesto a mano no se toca) y dice qué ha
 // cambiado: [{ iso, tid, abre?: { antes, ahora }, cocina?: { antes, ahora } }]. La usa el Generador al
 // regenerar; refrescarMarcas, la app tras un cambio de configuración.
+// 30/09 (revisión de A1, modelo 1): cada día se repasa hasta que ninguna casilla cambie (con tope, VUELTAS_ECO): una sola pasada
+// dependía del orden de las casillas (Jenny de cocina en El 33 tarde y de sala en Pasarela mañana, donde Tere acababa de pasar a
+// titular, hasta la siguiente pasada que nadie hacía). Refrescar dos veces es lo mismo que una
 function refrescarCasillas(cfg, staff, est, desde, hasta) {
   const out = [];
   const dias = Object.keys((est && est.asig) || {}).filter(iso => (!desde || iso >= desde) && (!hasta || iso <= hasta)).sort();
-  for (const iso of dias) for (const tid of Object.keys(est.asig[iso] || {})) {
-    if (!asignados(est, iso, tid).length) continue;
-    const quien = k => { const e = asignados(est, iso, tid).find(x => x[k]); return e ? e.pid : null; };
-    const a0 = quien('abre'), c0 = quien('cocina');
-    normalizarCasilla(est, cfg, staff, iso, tid);
-    const a1 = quien('abre'), c1 = quien('cocina');
-    if (a0 === a1 && c0 === c1) continue;
-    const x = { iso, tid };
-    if (a0 !== a1) x.abre = { antes: a0, ahora: a1 };
-    if (c0 !== c1) x.cocina = { antes: c0, ahora: c1 };
-    out.push(x);
+  for (const iso of dias) {
+    const tids = Object.keys(est.asig[iso] || {}).filter(tid => asignados(est, iso, tid).length);
+    const quien = (tid, k) => { const e = asignados(est, iso, tid).find(x => x[k]); return e ? e.pid : null; };
+    const antes = Object.fromEntries(tids.map(tid => [tid, { a: quien(tid, 'abre'), c: quien(tid, 'cocina') }]));
+    for (let vuelta = 0; vuelta < VUELTAS_ECO; vuelta++) {
+      let cambia = false;
+      for (const tid of tids) if (normalizarYCambio(est, cfg, staff, iso, tid)) cambia = true;
+      if (!cambia) break;
+    }
+    for (const tid of tids) {
+      const a1 = quien(tid, 'abre'), c1 = quien(tid, 'cocina');
+      if (antes[tid].a === a1 && antes[tid].c === c1) continue;
+      const x = { iso, tid };
+      if (antes[tid].a !== a1) x.abre = { antes: antes[tid].a, ahora: a1 };
+      if (antes[tid].c !== c1) x.cocina = { antes: antes[tid].c, ahora: c1 };
+      out.push(x);
+    }
   }
   return out;
+}
+// Lo que cambió por rebote, en español llano para el toast y el historial (30/09, revisión de A1, cliente 3b): «en El 33 tarde
+// abre Jenny (antes Noe) y la cocina pasa a Noe (antes Jenny); en Pasarela mañana se queda sin cocina (antes Tere)». La app pone
+// delante el porqué («Por la cocina de Victoria: …»)
+function textoCambiosCasillas(cfg, staff, cambios) {
+  const nom = pid => pid ? nombreDe(staff, pid) : 'nadie';
+  return (cambios || []).map(x => {
+    const { localId, franja } = partirTurno(x.tid);
+    const l = localDe(cfg, localId);
+    const partes = [];
+    if (x.abre) partes.push(`${x.abre.ahora ? 'abre ' + nom(x.abre.ahora) : 'nadie puede abrir'} (antes ${nom(x.abre.antes)})`);
+    if (x.cocina) partes.push(`${x.cocina.ahora ? 'la cocina pasa a ' + nom(x.cocina.ahora) : 'se queda sin cocina'} (antes ${nom(x.cocina.antes)})`);
+    return `en ${l ? l.nombre : localId} ${FRANJA_LBL[franja].toLowerCase()} ${partes.join(' y ')}`;
+  }).join('; ');
 }
 // La planilla guardada entera (S.meses) de desdeIso en adelante: lo pasado es lo que se trabajó (sus horas
 // no cambian porque hoy se cambie «Quién abre»)
@@ -2288,17 +2472,22 @@ function asignar(est, cfg, staff, iso, tid, pid, opts) {
   // 24/09 (fase 5, S18): la marca «a» de la semana tipo, como preferencia (primeroDe), no como «abre» a mano
   if (o.abrePatron) entry.abrePatron = true;
   const lista = ((est.asig[iso] = est.asig[iso] || {})[tid] = est.asig[iso][tid] || []);
+  // 30/09 (revisión de A1, modelo 5): quien abría o llevaba la cocina ANTES de tocar las marcas también es «tocado»: si pierde
+  // el abre de la mañana por el «sale primero» de quien entra, su tarde se vuelve a decidir (ya no hace continuo). Antes las
+  // marcas se cambiaban antes de recalcular y el eco no lo veía (solo volcarPrevia lo usa, con el «abre» a mano de la vista previa)
+  const tocados = [pid].concat(lista.filter(e => e.abre || e.cocina).map(e => e.pid));
   // 24/09 (revisión de la fase 5, S38): la cocina que da lo automático (la «c» de la semana tipo, el Generador,
   // la Cobertura, el volcado del Periodo) es una preferencia (cocinaAuto) que normalizarCasilla usa mientras esa
   // persona pueda llevarla y la regla «Cocina» esté encendida; la última que se pone manda, como antes. Antes
   // quedaba fijada «a mano»: Susana Capón, con «cocina solo los miércoles», seguía llevando la del martes en la
   // semana ya volcada, y apagar «Cocina» no quitaba ninguna. Lo que pone el encargado sí se fija a mano.
   if (o.cocina && ORIGENES_AUTO.includes(entry.origen)) { for (const e of lista) delete e.cocinaAuto; entry.cocinaAuto = true; entry.cocina = false; }
-  else if (o.cocina) { for (const e of lista) e.cocina = false; marcarManual(est, iso, tid, 'cocina'); }
+  // (revisión de A1, modelo 6) la cocina a mano de quien entra sustituye al «nadie a propósito» (sinCocina), como marcarCocina
+  else if (o.cocina) { for (const e of lista) e.cocina = false; marcarManual(est, iso, tid, 'cocina'); delete est.manual[iso][tid].sinCocina; }
   if (o.abre) { for (const e of lista) e.abre = false; marcarManual(est, iso, tid, 'abre'); }
   lista.push(entry);
-  normalizarCasilla(est, cfg, staff, iso, tid);
-  return { ok: true, motivo: null, avisos: r.avisos, autorizados: r.autorizados, entry };
+  const eco = normalizarCasilla(est, cfg, staff, iso, tid, false, tocados);
+  return { ok: true, motivo: null, avisos: r.avisos, autorizados: r.autorizados, entry, eco };
 }
 // D3 (fase 3): quien ya estaba en la casilla de X pasa a cubrirle (el relevo). Su plaza es la suya:
 // solo se le apunta el «por X» y la razón, y se recuerda la razón de antes para devolvérsela cuando
@@ -2339,7 +2528,9 @@ function motivoNoRelevo(cfg, staff, est, iso, tid, xid, e, opts) {
   const av = revisarEntrada(cfg, staff, est, iso, tid, e.pid, { cubrePor: xid, cubreSuCasilla: true, cubreAusente: !!o.aqui, sinPrimero: true }).avisos;
   return av.length ? av.join(', ') : null;
 }
-function desasignar(est, iso, tid, pid) {
+// cfg y staff (A1, 30/09): con ellos, la casilla y las otras del día donde esté esa persona se vuelven a decidir (el eco de
+// normalizarCasilla). Sin ellos es la operación cruda de siempre (retirarEntrada, que además se lleva las marcas, la usa así)
+function desasignar(est, iso, tid, pid, cfg, staff) {
   const lista = asignados(est, iso, tid);
   const i = lista.findIndex(x => x.pid === pid);
   if (i < 0) return false;
@@ -2347,35 +2538,59 @@ function desasignar(est, iso, tid, pid) {
   // 30/09 (S0; auditoría del 25/09, B2/H1): la casilla vacía se va, el DÍA se queda ({}). En un estado virtual de un
   // rango (el que usan la Cobertura, Equipo, la ficha y el cierre para escribir) el día es el mismo objeto que el del
   // mes: borrarlo lo desenganchaba, y lo que se ponía después en ese día (la cobertura del único turno del día) se
-  // quedaba en la pantalla y no llegaba a S.meses ni al servidor
-  if (!lista.length) delete est.asig[iso][tid];
-  return true;
+  // quedaba en la pantalla y no llegaba a S.meses ni al servidor.
+  // 30/09 (A1, C10): con la casilla se van sus marcas a mano (abre, cocina, orden): sin nadie dentro no marcan a nadie, y
+  // quien entrara después heredaba un «abre a mano» huérfano
+  if (!lista.length) { delete est.asig[iso][tid]; if (est.manual && est.manual[iso]) delete est.manual[iso][tid]; }
+  // (revisión de A1, cliente 3b) con cfg devuelve las casillas del día cambiadas por rebote (la app lo dice); sin cfg, true
+  return cfg ? normalizarCasilla(est, cfg, staff || cfg.staff, iso, tid, false, [pid]) : true;
 }
-function moverEnCasilla(est, iso, tid, pid, nuevaPos) {
+// 30/09 (A1; auditoría C3): lo que el encargado toca en la casilla (el orden, la cocina, «sale primero», quitar una marca)
+// termina en normalizarCasilla, que respeta lo puesto a mano y recalcula el resto (quién abre y su e.abre, que leen el
+// Mes, el Excel, Horas y el tramo del empleado; la cocina; el orden) y hace eco en las otras casillas del día. Antes
+// marcarCocina no recalculaba quién abre (e.abre se quedaba en quien pasaba a la cocina y Hoy decía otra persona) y la
+// app reordenaba por su cuenta. cfg y staff: si no vienen (llamadas viejas), se hace lo de siempre sin recalcular
+function moverEnCasilla(est, iso, tid, pid, nuevaPos, cfg, staff) {
   const lista = asignados(est, iso, tid);
   const i = lista.findIndex(x => x.pid === pid);
   if (i < 0) return false;
   const [e] = lista.splice(i, 1);
   lista.splice(Math.max(0, Math.min(nuevaPos, lista.length)), 0, e);
   marcarManual(est, iso, tid, 'orden');
-  return true;
+  return cfg ? normalizarCasilla(est, cfg, staff || cfg.staff, iso, tid, false, pidsEn(est, iso, tid)) : true;
 }
-function marcarCocina(est, iso, tid, pid) {
+function marcarCocina(est, iso, tid, pid, cfg, staff) {
   const lista = asignados(est, iso, tid);
   if (!lista.some(x => x.pid === pid)) return false;
   for (const e of lista) e.cocina = e.pid === pid;
   marcarManual(est, iso, tid, 'cocina');
-  return true;
+  delete est.manual[iso][tid].sinCocina;
+  // (la marca ya está cambiada cuando se recalcula: el eco sale con todos los de la casilla)
+  return cfg ? normalizarCasilla(est, cfg, staff || cfg.staff, iso, tid, false, pidsEn(est, iso, tid)) : true;
 }
-function marcarAbre(est, iso, tid, pid, cfg) {
+function marcarAbre(est, iso, tid, pid, cfg, staff) {
   const lista = asignados(est, iso, tid);
   if (!lista.some(x => x.pid === pid)) return false;
   for (const e of lista) e.abre = e.pid === pid;
   marcarManual(est, iso, tid, 'abre');
-  if (cfg && !manualDe(est, iso, tid).orden) est.asig[iso][tid] = ordenarCasilla(cfg, iso, tid, lista);
-  return true;
+  return cfg ? normalizarCasilla(est, cfg, staff || cfg.staff, iso, tid, false, pidsEn(est, iso, tid)) : true;
 }
-function quitarMarcaManual(est, iso, tid) { if (est.manual && est.manual[iso]) delete est.manual[iso][tid]; }
+function quitarMarcaManual(est, iso, tid, cfg, staff) {
+  if (est.manual && est.manual[iso]) delete est.manual[iso][tid];
+  return cfg && asignados(est, iso, tid).length ? normalizarCasilla(est, cfg, staff || cfg.staff, iso, tid, false, pidsEn(est, iso, tid)) : [];
+}
+// «Quitar la marca de cocina» del menú de la casilla (A1, 30/09): nadie lleva la cocina, a propósito. Queda la cocina a
+// mano (nadie) con la marca sinCocina, que es lo que distingue esta casilla de una con la marca huérfana (ver
+// normalizarCasilla). false si ya estaba así
+function quitarCocinaAMano(est, cfg, staff, iso, tid) {
+  const lista = asignados(est, iso, tid);
+  if (!lista.length) return false;
+  const man = manualDe(est, iso, tid);
+  if (man.sinCocina && !lista.some(e => e.cocina)) return false;
+  for (const e of lista) e.cocina = false;
+  marcarManual(est, iso, tid, 'cocina'); marcarManual(est, iso, tid, 'sinCocina');
+  return normalizarCasilla(est, cfg, staff, iso, tid, false, pidsEn(est, iso, tid));
+}
 // «Quitar “sale primero” a mano» del menú de la casilla (revisión de la fase 5): la casilla vuelve a decidir sola
 // quién abre (primeroDe: «Quién abre» del local, la ficha, la semana tipo y el orden). Hasta ahora no había forma
 // de quitarlo sin vaciar y volver a generar
@@ -2384,8 +2599,7 @@ function quitarAbreAMano(est, cfg, staff, iso, tid) {
   if (!m || !m.abre) return false;
   delete m.abre;
   if (!Object.keys(m).length) delete est.manual[iso][tid];
-  normalizarCasilla(est, cfg, staff, iso, tid);
-  return true;
+  return normalizarCasilla(est, cfg, staff, iso, tid, false, pidsEn(est, iso, tid));
 }
 
 // ---------- revisión ----------
@@ -2597,7 +2811,31 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
       // «cocina solo los miércoles» seguía llevando la del martes) —si no, la casilla la elige por orden y, si
       // nadie puede, el Generador la da como hueco (S37)—, y abre solo si puede (abrePatron, S18). Las dos las
       // decide normalizarCasilla (asignar), también al refrescar la planilla ya volcada (revisión F5)
-      const a = asignar(est, cfg, staff, iso, pl.t, pl.p, { origen: 'patron', razon, supuesto: !!pl.s, cocina: pl.c ? true : undefined, abrePatron: !!pl.a, por, nota: pl.n });
+      // 30/09 (A1; auditoría H3, D9): dos «c» en la misma casilla (el traslado del día libre de Hojan cae en la mañana de
+      // El 33, donde ya tiene la cocina Noe): la primera se queda con la preferencia y se avisa; antes «la última mandaba»
+      // sin decirlo
+      let cocina = pl.c ? true : undefined;
+      const otraC = pl.c ? asignados(est, iso, pl.t).find(x => x.cocinaAuto && x.origen === 'patron') : null;
+      if (otraC) {
+        cocina = undefined;
+        const l = localDe(cfg, partirTurno(pl.t).localId), f = partirTurno(pl.t).franja;
+        const laLleva = `la ${f === 'M' ? 'de' : 'del'} ${l ? l.nombre : pl.t} por la ${FRANJA_LBL[f].toLowerCase()} la lleva ${nombreDe(staff, otraC.pid)}`;
+        // 30/09 (revisión de A1, modelo 2 = cliente 4): quien pierde la «c» no se pone de sala si solo hace cocina o ya lleva otra
+        // cocina ese día (Jenny, con la de El 33: de sala en el Mónaco quedaba «sala firme» y perdía la de El 33, que se quedaba sin
+        // cocina; Hojan, solo cocina, quedaba de sala en dos casillas). Se rechaza con el motivo y el aviso lo dice; el Generador rellena
+        // la casilla con otra persona
+        const tc = cocinaDelDia(cfg, est, iso, p.id);
+        const fuera = p.soloCocina && activa(cfg, p, 'cocina') ? 'solo hace cocina' : tc ? `ya lleva la cocina de ${(localDe(cfg, partirTurno(tc).localId) || {}).nombre || tc} ese día` : null;
+        r.avisos.push({ pid: pl.p, semana: lunesDe(iso), tipo: 'dosCocinas', texto: `${p.nombre} y ${nombreDe(staff, otraC.pid)} traen la cocina de ${l ? l.nombre : pl.t} el ${diaYNum(iso)} por la ${FRANJA_LBL[f].toLowerCase()}${pl.traslado ? ` (${p.nombre} cambia su día libre esta semana)` : ''}: la lleva ${nombreDe(staff, otraC.pid)}${fuera ? `; ${p.nombre} se queda fuera de ese turno` : ''}` });
+        if (fuera) { r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: `${fuera}, y ${laLleva}` }); continue; }
+      }
+      // la «c» que no puede ser (otra plaza la trae, o la cocina de esa casilla la decidió el encargado: otra persona o «nadie»):
+      // la plaza entra de sala y pasa por la puerta COMO sala (revisión de A1): quien ya lleva otra cocina ese día o solo hace cocina
+      // se rechaza con su motivo. Antes entraba sin puesto (sin esa lectura) y Adrián quedaba de sala en la tarde de Zapatillera,
+      // con «sin cocina» a mano, llevando la cocina de la mañana
+      const puesto = pl.c && (otraC || manualDe(est, iso, pl.t).cocina) ? 'sala' : undefined;
+      if (puesto) cocina = undefined;
+      const a = asignar(est, cfg, staff, iso, pl.t, pl.p, { origen: 'patron', razon, supuesto: !!pl.s, cocina, puesto, abrePatron: !!pl.a, por, nota: pl.n });
       if (a.ok) r.aplicados.push({ iso, turnoId: pl.t, pid: pl.p, origen: 'patron', razon: a.entry.razon, supuesto: !!pl.s });
       else r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: a.motivo });
     }
@@ -2829,9 +3067,8 @@ function migrarMarcasHuerfanas(estado, hoyIso) {
   estado.migraciones = estado.migraciones || {};
   if (estado.migraciones.huerfanas2509) return r;
   const cfg = estado, staff = estado.staff;
-  const hist = (Array.isArray(estado.historial) ? estado.historial : []).map(h => String((h && h.txt) || ''));
-  const dm = iso => `${+iso.slice(8, 10)}/${+iso.slice(5, 7)}`;
-  const laQuitoElEncargado = (iso, tid) => { const l = localDe(cfg, partirTurno(tid).localId); const txt = ` deja la cocina de ${l ? l.nombre : partirTurno(tid).localId} del ${dm(iso)}`; return hist.some(h => h.endsWith(txt) || h.includes(txt + ' ')); };
+  // (A1, 30/09) la misma lectura del historial que la red de seguridad de normalizarCasilla (cocinaQuitadaAMano)
+  const laQuitoElEncargado = (iso, tid) => cocinaQuitadaAMano(cfg, iso, tid);
   for (const k of Object.keys(estado.meses).sort()) {
     if (!/^\d{4}-\d{2}$/.test(k) || k < hoyIso.slice(0, 7)) continue;
     const est = estadoDesde(estado.meses, estado.festivos || [], +k.slice(0, 4), +k.slice(5, 7));
@@ -2842,13 +3079,44 @@ function migrarMarcasHuerfanas(estado, hoyIso) {
         const lista = asignados(est, iso, tid);
         let toca = false;
         if (man.abre && !lista.some(e => e.abre)) { delete man.abre; r.abre++; toca = true; }
-        if (man.cocina && !lista.some(e => e.cocina) && !laQuitoElEncargado(iso, tid)) { delete man.cocina; r.cocina++; toca = true; }
+        if (man.cocina && !lista.some(e => e.cocina) && !man.sinCocina) { if (laQuitoElEncargado(iso, tid)) man.sinCocina = true; else { delete man.cocina; r.cocina++; toca = true; } }
         if (!Object.keys(man).length) delete porT[tid];
         if (toca && lista.length) normalizarCasilla(est, cfg, staff, iso, tid);
       }
     }
   }
   estado.migraciones.huerfanas2509 = 1;
+  return r;
+}
+// 30/09 (revisión de A1, modelo 4). «Quitar la marca de cocina» dejaba la cocina a mano sin nadie y la casilla lo distinguía de
+// una marca huérfana leyendo el historial cada vez (la línea «X deja la cocina de L del d/m»): valía con líneas de otra franja y de
+// otro año, y se perdía con el local renombrado o el historial rotado (400 líneas); y en producción migrarMarcasHuerfanas ya corrió
+// sin apuntar sinCocina. Una sola vez, de hoy en adelante: la marca de cocina sin nadie que reconozca el historial (mismo año; la
+// franja si la línea la lleva, las dos si no) queda apuntada como sinCocina; la que no, es huérfana: se quita y la casilla decide.
+// Desde aquí la casilla no lee el historial. Devuelve { sinCocina, cocina } (apuntadas, quitadas)
+function migrarSinCocina(estado, hoyIso) {
+  const r = { sinCocina: 0, cocina: 0 };
+  if (!estado || !estado.meses || typeof estado.meses !== 'object' || !Array.isArray(estado.staff) || !Array.isArray(estado.locales) || !hoyIso) return r;
+  estado.migraciones = estado.migraciones || {};
+  if (estado.migraciones.sinCocina3009) return r;
+  const cfg = estado, staff = estado.staff;
+  for (const k of Object.keys(estado.meses).sort()) {
+    if (!/^\d{4}-\d{2}$/.test(k) || k < hoyIso.slice(0, 7)) continue;
+    const est = estadoDesde(estado.meses, estado.festivos || [], +k.slice(0, 4), +k.slice(5, 7));
+    for (const [iso, porT] of Object.entries(est.manual || {})) {
+      if (iso < hoyIso || !porT) continue;
+      for (const [tid, man] of Object.entries(porT)) {
+        if (!man || typeof man !== 'object' || !man.cocina || man.sinCocina) continue;
+        const lista = asignados(est, iso, tid);
+        if (lista.some(e => e.cocina)) continue;
+        if (cocinaQuitadaAMano(cfg, iso, tid)) { man.sinCocina = true; r.sinCocina++; continue; }
+        delete man.cocina; r.cocina++;
+        if (!Object.keys(man).length) delete porT[tid];
+        if (lista.length) normalizarCasilla(est, cfg, staff, iso, tid);
+      }
+    }
+  }
+  estado.migraciones.sinCocina3009 = 1;
   return r;
 }
 
@@ -2927,11 +3195,10 @@ const PESOS = {
   evitado: -1000,         // el plan B busca otra persona si la hay
 };
 // Lo que suma (o resta) por lo que es: apoyo (resta, José 18/09; revisión final) o, en la plantilla, sin local
-// fijo. Lo del apoyo va primero y siempre: antes, con la casilla que se quedaría solo con apoyos (S33) no contaba,
-// lo que con un peso negativo le quitaría la resta justo donde menos conviene; ese caso ya lleva su aviso.
-function puntosPuesto(p, soloApoyos) {
+// fijo. (A1, 30/09; auditoría D7) Sin el parámetro «solo apoyos» de antes: quien es apoyo ya ha devuelto, y quien no lo es
+// no deja la casilla solo con apoyos, así que nunca decidía nada
+function puntosPuesto(p) {
   if (p.puesto === 'apoyo') return { puntos: PESOS.apoyo, razon: 'apoyo' };
-  if (soloApoyos) return null;
   if (esComodin(p)) return { puntos: PESOS.sinLocalFijo, razon: 'sin local fijo' };
   return null;
 }
@@ -2957,7 +3224,7 @@ function puntuar(ctx, p, iso, tid, opts) {
   if (o.cubre) suma(PESOS.cubreA, `cubre a ${nombreDe(staff, o.cubre)}`);
   const pc = puntosCierre(cfg, p, iso, tid);   // apoyo por el cierre de su local (D11)
   if (pc) suma(pc.puntos, pc.razon);
-  const pp = puntosPuesto(p, !!o.solo);
+  const pp = puntosPuesto(p);
   if (pp) suma(pp.puntos, pp.razon);
   if (localHabitualDe(p) === localId) suma(PESOS.localHabitual, `su local habitual es ${l.nombre}`);   // (fase 6, S31)
   let libre = null;
@@ -3231,8 +3498,9 @@ function retirarEntrada(est, cfg, staff, iso, tid, pid) {
   if (!e || !desasignar(est, iso, tid, pid)) return false;
   const man = est.manual && est.manual[iso] && est.manual[iso][tid];
   if (man) { if (e.cocina) delete man.cocina; if (e.abre) delete man.abre; }
-  if (asignados(est, iso, tid).length) normalizarCasilla(est, cfg, staff, iso, tid);
-  return true;
+  // (A1) con la casilla vacía también: quien sale puede ahora abrir su otra casilla del día (el eco). Devuelve las casillas del día
+  // cambiadas por rebote (revisión de A1, cliente 3b: la app lo dice), o false si no estaba
+  return normalizarCasilla(est, cfg, staff, iso, tid, false, [pid]);
 }
 // El relevo (D3) cuya persona ya no falta (vuelve de vacaciones, se quita la ausencia) deja de ir
 // «por» ella y recupera su razón: la plaza era suya. No se retira nada; lo hace el generador antes
@@ -3261,7 +3529,7 @@ function desmarcarRelevos(cfg, staff, est, iso, tid) {
 // de la vista previa de ese día }. Devuelve { aplicadas, fallos, retiradas, relevos }.
 function volcarPrevia(cfg, staff, estDe, previa, opts) {
   const o = opts || {};
-  const r = { aplicadas: 0, fallos: 0, retiradas: 0, relevos: 0 };
+  const r = { aplicadas: 0, fallos: 0, retiradas: 0, relevos: 0, marcas: [] };
   for (const x of previa.retirados || []) {
     const e = estDe(x.iso);
     const en = asignados(e, x.iso, x.turnoId).find(y => y.pid === x.pid);
@@ -3294,6 +3562,12 @@ function volcarPrevia(cfg, staff, estDe, previa, opts) {
     if (en.por !== c.por) r.relevos++;
     marcarRelevo(en, staff, c.por);
     normalizarCasilla(e, cfg, staff, c.iso, c.turnoId);
+  }
+  // 30/09 (A1; auditoría H2 y E11): 5) pasada final por la planilla real de los días volcados, como al generar: lo que la
+  // vista previa recalculó de lo que ya estaba (previa.marcas) llega a la planilla real, y nada queda desfasado
+  if (o.desde && o.hasta) for (const iso of rangoIso(o.desde, o.hasta)) {
+    if (o.desdeIso && iso < o.desdeIso) continue;
+    r.marcas.push(...refrescarCasillas(cfg, staff, estDe(iso), iso, iso));
   }
   return r;
 }
@@ -3438,6 +3712,9 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
       r.huecos.push(huecoPrimero(cfg, staff, target, iso, t.id));
     }
   }
+  // 30/09 (A1; auditoría H2): pasada final por lo generado. El eco de normalizarCasilla no encadena; lo que haya quedado
+  // desfasado (e.abre, la cocina, el orden) frente a lo que dice la casilla se recoge aquí, y va en r.marcas
+  r.marcas.push(...refrescarCasillas(cfg, staff, target, desdeEfectivo(desde, o.desdeIso), hasta));
   return r;
 }
 // Paso 1 de todo generador: lo fijo del periodo, por la puerta (asignar): la semana tipo (instanciarPatron, con sus
@@ -3682,7 +3959,8 @@ const VARIABLES = [
         if (r.sinCocina) { if (r.cocinaObligatoria || r.n) v.push(`${diaV(iso)} ${FRANJA_LBL[f].toLowerCase()}: sin cocina`); continue; }
         if (r.cocinaNoApta) v.push(`${diaV(iso)} ${FRANJA_LBL[f].toLowerCase()}: la cocina no es de este local`);
         const sl = ctx.slots(iso, tid); const coc = sl.find(x => x.cocina);
-        if (coc && !coc.abre) { let pos = (l.cocina.posicion && l.cocina.posicion[f]) || 2; const desde = l.cocina.posicionSiDesde && l.cocina.posicionSiDesde[f]; if (desde && sl.filter(x => !x.hueco).length < desde) pos = Math.min(pos, 2); if (coc.pos !== Math.min(pos, sl.length)) v.push(`${diaV(iso)} ${FRANJA_LBL[f].toLowerCase()}: cocina en ${coc.pos}.ª`); }
+        // (A1, C5/E3) la misma cuenta que la casilla: posicionCocina, con las personas (el hueco de la 1.ª no lo es)
+        if (coc && !coc.abre) { const pos = posicionCocina(ctx.cfg, tid, sl.filter(x => !x.hueco).length); if (coc.pos !== Math.min(pos, sl.length)) v.push(`${diaV(iso)} ${FRANJA_LBL[f].toLowerCase()}: cocina en ${coc.pos}.ª`); }
       }
       return fallos(v);
     } },
@@ -4346,10 +4624,22 @@ function ponerPlanCobertura(cfg, staff, est, inc, plan, res0) {
     if (r.ok) res.asignados.push({ iso: as.iso, tid: as.tid, pid: as.pid, avisos: r.avisos }); else { res.rechazados.push({ iso: as.iso, tid: as.tid, pid: as.pid, motivo: r.motivo }); continue; }
     if (as.intercambio && inc.tipo === 'CAMBIO') {
       const x = as.intercambio;
-      if (desasignar(est, x.iso, x.tid, as.pid)) {
+      // 30/09 (A1; auditoría C1/H7): quien cede su turno sale con retirarEntrada, que se lleva su «sale primero» o su cocina
+      // a mano (con desasignar la casilla quedaba «fijada a mano» sin nadie que abriera: Hoy decía que abría uno y el Mes,
+      // el Excel, Horas y la app del empleado que nadie). Si el cambio no puede hacerse, vuelve con SU entrada de antes (su
+      // origen, su razón, sus marcas), en su sitio, no con una nueva «a mano»
+      const listaX = asignados(est, x.iso, x.tid), iX = listaX.findIndex(y => y.pid === as.pid);
+      const original = iX >= 0 ? listaX[iX] : null, marcasX = original ? JSON.parse(JSON.stringify(manualDe(est, x.iso, x.tid))) : null;
+      if (original && retirarEntrada(est, cfg, staff, x.iso, x.tid, as.pid)) {
         const r2 = asignar(est, cfg, staff, x.iso, x.tid, inc.pid, { origen: 'cobertura', razon: `cambio con ${nombreDe(staff, as.pid)}`, permitirPartido: true });
         if (r2.ok) res.intercambios.push({ iso: x.iso, tid: x.tid, pid: inc.pid, quita: as.pid });
-        else { asignar(est, cfg, staff, x.iso, x.tid, as.pid, { origen: 'manual' }); res.rechazados.push({ iso: x.iso, tid: x.tid, pid: inc.pid, motivo: r2.motivo }); }
+        else {
+          const lista = ((est.asig[x.iso] = est.asig[x.iso] || {})[x.tid] = est.asig[x.iso][x.tid] || []);
+          lista.splice(Math.min(iX, lista.length), 0, original);
+          if (Object.keys(marcasX).length) { est.manual = est.manual || {}; (est.manual[x.iso] = est.manual[x.iso] || {})[x.tid] = marcasX; }
+          normalizarCasilla(est, cfg, staff, x.iso, x.tid);
+          res.rechazados.push({ iso: x.iso, tid: x.tid, pid: inc.pid, motivo: r2.motivo });
+        }
       } else {
         // revisión F3: antes se perdía sin avisar (la pestaña aplicaba sobre los días marcados y el turno
         // a cambio era de otro día). Ahora se dice: o ese día no está en la planilla que se aplica, o
@@ -4442,7 +4732,8 @@ function vaciarPlanilla(est, desde, hasta) {
   for (const iso of rangoIso(desde, hasta || desde)) {
     const porT = est.asig[iso];
     // (S0, 30/09; auditoría B2) las casillas se van, el día se queda: el estado virtual sigue enlazado con su mes
-    if (porT) { for (const lista of Object.values(porT)) r.plazas += lista.length; if (r.plazas) r.dias++; for (const tid of Object.keys(porT)) delete porT[tid]; }
+    // (A1, F8) `dias` son los días que tenían plazas: se contaba con el acumulado y el segundo día vacío también contaba
+    if (porT) { const n = Object.values(porT).reduce((a, lista) => a + lista.length, 0); r.plazas += n; if (n) r.dias++; for (const tid of Object.keys(porT)) delete porT[tid]; }
     if (est.manual && est.manual[iso]) delete est.manual[iso];
   }
   return r;
@@ -4528,7 +4819,9 @@ function repartoDelDia(mias, cerradas) {
 // lo mismo para las vistas, que parten de la persona y el día en vez de la planilla del mes
 function turnoDelDia(cfg, est, iso, pid) {
   const mias = [];
-  for (const t of turnosDe(cfg)) { const e = asignados(est, iso, t.id).find(x => x.pid === pid); if (e) mias.push({ e, localId: t.local.id, franja: t.franja }); }
+  // (A1, 30/09; auditoría G3) solo las plazas que la ocupan (plazaOcupa), como Horas y el registro de apoyos: con la tarde
+  // cerrada a mano ese día, Hoy y su app enseñaban el tramo del partido (4 h) y la nómina contaba la mañana entera
+  for (const t of turnosDe(cfg)) { const e = asignados(est, iso, t.id).find(x => x.pid === pid); if (e && plazaOcupa(cfg, est, iso, t.id)) mias.push({ e, localId: t.local.id, franja: t.franja }); }
   return repartoDelDia(mias, mitadesCerradas(cfg, pid, iso));
 }
 // ---------- apoyos: el registro de horas para pagarles ----------
@@ -5477,7 +5770,8 @@ if (typeof module !== 'undefined') {
     cubreEnCasilla, rangoNecesario, revisarEntrada, relevoEn, marcarRelevo, desmarcarRelevos, volcarPrevia, porDeSuCasilla, MOTIVO_SOLO_APOYOS, etiquetaAusencia, quedariaSoloApoyos, puntosPuesto, cocinaDelDia, franjasAusencia, textoFranjasAusencia,
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,
     crearContexto, evaluarPlaza, primerBloqueo, incompatibles, evita, abreFijo, PESOS, puntuar, candidatos, VARIABLES, SOLO_TEXTO, gruposSelector, destrapa, fraseBloqueo,
-    plazaOcupa, salaDelDia, siSeFuerza, cocinasTitular,
+    plazaOcupa, salaDelDia, salaFirmeDelDia, siSeFuerza, cocinasTitular,
+    posicionCocina, quitarCocinaAMano, textoCambiosCasillas, migrarSinCocina, cocinaQuitadaAMano,
     estadoInterruptor, parejasNuncaCon, ponerNuncaCon, quitarNuncaCon, migrarNuncaCon, migrarComodin, migrarInactivas,
     localHabitualDe, alternarLocal, ponerLocalHabitual, vetoRepetido, seriaContinuo, textoVeto, dowsVeto,
     RELAJABLE, buscarRelajando, TEXTO_PAREJA_FLEXIBLE,

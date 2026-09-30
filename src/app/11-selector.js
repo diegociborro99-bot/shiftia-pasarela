@@ -141,13 +141,16 @@ function openMenuTurno(iso, tid, pid, anchor) {
   // siendo «horario distinto este día», al final. Las horas se apuntan en la asignación
   // (ini/fin) y son las que cuenta la nómina y las que enseña Hoy; en el papel no salen.
   const tramoTxt = entry.ini ? `${esc(entry.ini)}–${esc(entry.fin)}` : '';
+  // (30/09, revisión de A1, cliente 1) «posición N de M» es la que enseña Hoy (posicionesDe: con el hueco delante si nadie puede
+  // abrir); antes contaba sobre lo guardado y con el hueco decía una posición menos. Subir y bajar siguen moviendo lo guardado (i)
+  const posiciones = posicionesDe(S, S.staff, e, iso, tid), posDe = posiciones.find(x => x.pid === pid) || { pos: i + 1 };
   // (revisión S0) la plaza de antes de su salida: se dice, y si ya se ha ido no hay nada que cubrir desde hoy
   const seFue = !!salidaDe(p), yaFuera = seFue && haSalido(p, isoHoy());
   const btnTramo = `<button class="popb full${esApoyo(p) ? ' rec' : ''}" data-mt="hora">${esApoyo(p) ? 'Ajustar apoyo' : 'Horario distinto este día'}${tramoTxt ? `<small>${tramoTxt}</small>` : esApoyo(p) ? '<small>de qué hora a qué hora, hoy</small>' : ''}</button>`;
   const pop = document.createElement('div');
   pop.className = 'pop'; pop.id = 'menuTurnoPop'; pop.setAttribute('role', 'dialog');
   pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div>
-    <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${i + 1} de ${lista.length}${seFue ? `<br><small style="color:var(--bad)">${esc(textoSalida(p))}</small>` : ''}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${avisosAhora.length ? `<br><small style="color:var(--warn)">Incumple ${esc(avisosAhora.join(' · '))}</small>` : ''}</div>
+    <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${posDe.pos} de ${posiciones.length}${seFue ? `<br><small style="color:var(--bad)">${esc(textoSalida(p))}</small>` : ''}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${avisosAhora.length ? `<br><small style="color:var(--warn)">Incumple ${esc(avisosAhora.join(' · '))}</small>` : ''}</div>
     ${esApoyo(p) ? btnTramo : ''}
     <button class="popb full" data-mt="ficha">Ver y editar su ficha</button>
     ${yaFuera ? '' : '<button class="popb full rec" data-mt="cobertura">Falta estos días… buscar quién cubre</button>'}
@@ -205,7 +208,11 @@ function openMenuTurno(iso, tid, pid, anchor) {
     if (a === 'cerrar') { openCierre({ localId, iso, franja }); return; }
     if (!confirmarSiCerrado(iso)) return;
     const ew = estadoDeIso(iso, true);
-    if (a === 'subir' || a === 'bajar') { pushUndo('reordenar casilla'); moverEnCasilla(ew, iso, tid, pid, i + (a === 'subir' ? -1 : 1)); registrarCambio(`${p.nombre} ${a === 'subir' ? 'sube' : 'baja'} en la casilla de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); }
+    // 30/09 (A1; auditoría C3): lo que se toca en la casilla (orden, cocina, «sale primero») lo recalcula el modelo
+    // (normalizarCasilla, con eco en las otras casillas del día): la app ya no reordena por su cuenta. Y lo que cambie en otras
+    // casillas por ese eco se dice (anunciarEco; revisión de A1, cliente 3b)
+    const lf = `${l.nombre} ${FRANJA_LBL[franja].toLowerCase()}`;
+    if (a === 'subir' || a === 'bajar') { pushUndo('reordenar casilla'); const eco = moverEnCasilla(ew, iso, tid, pid, i + (a === 'subir' ? -1 : 1), S, S.staff); registrarCambio(`${p.nombre} ${a === 'subir' ? 'sube' : 'baja'} en la casilla de ${lf} del ${fmtDM(iso)}`, 'asig'); anunciarEco(eco, `el orden de ${lf}`); }
     else if (a === 'abre') {
       // 24/09 (fase 5, S18): sobre quien no puede abrir (Leo, «nunca de primero»; Cristian, que no abre El 33;
       // quien viene de hacer la mañana) avisa igual que «forzar», con la regla y el motivo (puedePrimero, la
@@ -216,14 +223,18 @@ function openMenuTurno(iso, tid, pid, anchor) {
         motivo = prompt(`Vas a poner a ${p.nombre} de primero (abre ${l.nombre} por la ${FRANJA_LBL[franja].toLowerCase()}) incumpliendo esta regla:\n\n${pr.regla ? nombreRegla(pr.regla) + ' — ' : ''}${pr.motivo}\n\nSi la equivocada es la ficha, se corrige en Equipo. Escribe por qué lo haces (quedará en el historial):`);
         if (motivo === null) return;
       }
-      pushUndo('quién abre'); marcarAbre(ew, iso, tid, pid, S);
-      registrarCambio(`${p.nombre} abre ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}${pr.ok ? '' : ` · puesto a la fuerza (incumple ${pr.regla ? nombreRegla(pr.regla) + ': ' : ''}${pr.motivo})${motivo.trim() ? ' · ' + motivo.trim() : ''}`}`, 'asig');
+      pushUndo('quién abre'); const eco = marcarAbre(ew, iso, tid, pid, S, S.staff);
+      registrarCambio(`${p.nombre} abre ${lf} del ${fmtDM(iso)}${pr.ok ? '' : ` · puesto a la fuerza (incumple ${pr.regla ? nombreRegla(pr.regla) + ': ' : ''}${pr.motivo})${motivo.trim() ? ' · ' + motivo.trim() : ''}`}`, 'asig');
       if (!pr.ok) toast(`${p.nombre} sale primero a la fuerza · incumple ${pr.regla ? nombreRegla(pr.regla) + ': ' : ''}${pr.motivo}`, 'warn');
+      anunciarEco(eco, `el «sale primero» de ${p.nombre}`);
     }
     // (revisión de la fase 5) quitar el «sale primero» puesto a mano: la casilla vuelve a decidir quién abre
-    else if (a === 'noabre') { pushUndo('quién abre'); quitarAbreAMano(ew, S, S.staff, iso, tid); registrarCambio(`${p.nombre} ya no sale primero a mano en ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}: abre ${nombrePid(primeroDe(S, S.staff, ew, iso, tid) || '') || 'nadie'}`, 'asig'); }
-    else if (a === 'cocina') { pushUndo('cocina'); marcarCocina(ew, iso, tid, pid); if (!manualDe(ew, iso, tid).orden) ew.asig[iso][tid] = ordenarCasilla(S, iso, tid, ew.asig[iso][tid]); registrarCambio(`${p.nombre} lleva la cocina de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); }
-    else if (a === 'nococina') { pushUndo('cocina'); entry.cocina = false; marcarManual(ew, iso, tid, 'cocina'); registrarCambio(`${p.nombre} deja la cocina de ${l.nombre} del ${fmtDM(iso)}`, 'asig'); }
+    else if (a === 'noabre') { pushUndo('quién abre'); const eco = quitarAbreAMano(ew, S, S.staff, iso, tid); registrarCambio(`${p.nombre} ya no sale primero a mano en ${lf} del ${fmtDM(iso)}: abre ${nombrePid(primeroDe(S, S.staff, ew, iso, tid) || '') || 'nadie'}`, 'asig'); anunciarEco(eco, `quitar el «sale primero» de ${p.nombre}`); }
+    else if (a === 'cocina') { pushUndo('cocina'); const eco = marcarCocina(ew, iso, tid, pid, S, S.staff); registrarCambio(`${p.nombre} lleva la cocina de ${lf} del ${fmtDM(iso)}`, 'asig'); anunciarEco(eco, `la cocina de ${p.nombre}`); }
+    // (A1) «Quitar la marca de cocina»: nadie la lleva a propósito (quitarCocinaAMano deja la marca sinCocina, que es lo que la
+    // distingue de una marca huérfana). La línea del historial lleva la franja (30/09, revisión de A1, modelo 4: la de antes, sin
+    // franja, valía para la otra franja del día; la migración sinCocina3009 la sigue entendiendo, para las dos)
+    else if (a === 'nococina') { pushUndo('cocina'); const eco = quitarCocinaAMano(ew, S, S.staff, iso, tid); registrarCambio(`${p.nombre} deja la cocina de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); anunciarEco(eco, `quitar la cocina de ${p.nombre}`); }
     else if (a === 'quitar') { pushUndo(`quitar a ${p.nombre}`); desasignarUI(iso, tid, pid); }
     saveState(); renderVistaActiva();
   });

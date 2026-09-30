@@ -161,7 +161,10 @@ function migrarEstado(estado) {
     const mm = migrarMarcasAutomaticas(estado, isoHoy());
     migrarAbrePatron(estado, isoHoy());
     const mh = migrarMarcasHuerfanas(estado, isoHoy());
-    if (mm.abre || mm.cocina || mh.abre || mh.cocina) refrescarMarcas(estado, estado.staff, estado.meses, isoHoy());
+    // 30/09 (revisión de A1, modelo 4): la cocina que quitó el encargado en los datos de antes queda apuntada (sinCocina) una vez,
+    // leyendo el historial; la que no reconoce es huérfana y la casilla decide. Desde aquí la casilla no lee el historial
+    const ms = migrarSinCocina(estado, isoHoy());
+    if (mm.abre || mm.cocina || mh.abre || mh.cocina || ms.cocina) refrescarMarcas(estado, estado.staff, estado.meses, isoHoy());
   }
   // 17/09: la base de entrevistas de Notion (entrevistas + alerta interna)
   if (!Array.isArray(estado.entrevistas) || !estado.entrevistas.length) estado.entrevistas = JSON.parse(JSON.stringify(ENTREVISTAS_SEMILLA));
@@ -353,6 +356,16 @@ function confirmarSiCerrado(iso) {
   const c = S.cierres[iso.slice(0, 7)];
   return confirm(`${MESES[+iso.slice(5, 7) - 1]} está cerrado para la nómina (cerrado el ${new Date(c.ts).toLocaleDateString('es-ES')}${c.usuario ? ' por ' + c.usuario : ''}). ¿Cambiarlo de todas formas? Quedará constancia en el historial.`);
 }
+// 30/09 (revisión de A1, cliente 3b): lo que cambia en OTRAS casillas del día al tocar una (el eco de normalizarCasilla: quién
+// abre o lleva la cocina) se dice en un toast y se apunta en el historial, en español llano: «Por la cocina de Victoria: en El 33
+// tarde abre Jenny (antes Noe)». Antes cambiaba sin decirlo (hasta un continuo de 17 h). eco: lo que devuelven asignar (r.eco),
+// retirarEntrada, moverEnCasilla, marcarCocina, marcarAbre, quitarCocinaAMano y quitarAbreAMano; porQue: la acción, en minúscula
+function anunciarEco(eco, porQue) {
+  if (!Array.isArray(eco) || !eco.length) return;
+  const txt = `Por ${porQue}: ${textoCambiosCasillas(S, S.staff, eco)}`;
+  registrarCambio(txt, 'asig');
+  toast(txt, 'warn');
+}
 // asignar desde la interfaz: undo + historial + guardado + repintado
 function asignarUI(iso, tid, pid, opts) {
   if (!confirmarSiCerrado(iso)) return { ok: false, motivo: 'mes cerrado' };
@@ -362,6 +375,7 @@ function asignarUI(iso, tid, pid, opts) {
   if (!r.ok) return r;
   const { localId, franja } = partirTurno(tid);
   registrarCambio(`${nombrePid(pid)} → ${nombreLocal(localId)} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}${o.forzar && r.avisos.length ? ' (forzado: ' + r.avisos.join(', ') + ')' : ''}${o.razon ? ' · ' + o.razon : ''}`, o.forzar ? 'forzado' : 'asig');
+  anunciarEco(r.eco, `poner a ${nombrePid(pid)} en ${nombreLocal(localId)} ${FRANJA_LBL[franja].toLowerCase()}`);
   if (mesCerrado(iso)) registrarCambio(`Cambio en un mes cerrado (${iso.slice(0, 7)})`, 'aviso');
   saveState();
   return r;
@@ -371,9 +385,11 @@ function desasignarUI(iso, tid, pid) {
   const e = estadoDeIso(iso, true);
   // 24/09 (D13): con retirarEntrada su marca de «abre» o de cocina se va con ella y la casilla se recalcula;
   // con desasignar la casilla seguía «fijada» sin nadie marcado
-  if (!retirarEntrada(e, S, S.staff, iso, tid, pid)) return false;
+  const eco = retirarEntrada(e, S, S.staff, iso, tid, pid);
+  if (!eco) return false;
   const { localId, franja } = partirTurno(tid);
   registrarCambio(`${nombrePid(pid)} sale de ${nombreLocal(localId)} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig');
+  anunciarEco(eco, `quitar a ${nombrePid(pid)} de ${nombreLocal(localId)} ${FRANJA_LBL[franja].toLowerCase()}`);
   saveState();
   return true;
 }

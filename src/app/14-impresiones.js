@@ -134,9 +134,9 @@ function pxNombre(pid, marcas) {
   // mk.cierre: «cierre» o «apoyo · sin sitio» en el pie de descansos (marcaCierreDia, revisión F2)
   return `<span class="nm${mk.tipo ? ' a-' + esc(mk.tipo) : ''}"><i style="background:${avColor(pid)}"></i>${mk.abre ? '<b class="pxg-mk abre">▸</b>' : ''}${esc(nombrePid(pid))}${tipo ? `<em>${esc(tipo)}</em>` : ''}${mk.cierre ? `<em class="cie">${esc(mk.cierre)}</em>` : ''}</span>`;
 }
-// la posición 1 de la casilla es quien abre / sale primero (vocabulario del grupo): si
-// nadie lleva la marca puesta, en el Excel se señala al primero para que no salga sin abre
-function abreEn(lista, i) { return !!(lista[i] && (lista[i].abre || (i === 0 && !lista.some(e => e.abre)))); }
+// quién lleva la marca «abre» en la casilla (e.abre, lo que decide la casilla). 30/09 (revisión de A1, cliente 2): sin el
+// parche que señalaba al primero cuando nadie la llevaba: si nadie puede abrir (el hueco de la 1.ª), nadie abre, también en la hoja
+function abreEn(lista, i) { return !!(lista[i] && lista[i].abre); }
 // «11:00–16:00 y 21:00–00:00»: los dos tramos en los que se reparte un turno partido
 function tramoTxt(tr) {
   const p = f => tr && tr[f] && tr[f].ini && tr[f].fin ? `${tr[f].ini}–${tr[f].fin}` : '';

@@ -2,6 +2,50 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **La casilla decide sola quién abre y quién lleva la cocina, y lo vuelve a decidir cuando cambia algo del día
+  (30/09; auditoría del modelo del 25/09, fase A1).** Lo que se nota:
+  - Lo que dice Hoy de quién abre es lo mismo que dicen el Mes, el Excel, Horas y la app del empleado, también
+    después de generar sin semana tipo, de una Cobertura, de apuntar una ausencia en Equipo o de cambiar un día
+    libre: poner o quitar a alguien en una mañana vuelve a mirar su tarde (si viene de la mañana ya no abre la tarde,
+    y su tramo es el del partido), y al generar o volcar se hace una pasada final por todo lo generado.
+  - **Marcar la cocina a mano** vuelve a calcular quién abre (antes quien pasaba a la cocina seguía «abriendo» para el
+    Mes y Horas, y Hoy decía otra persona; si quien pasaba a abrir hacía partido, su tramo empezaba a las 11:00 en
+    vez de a la apertura). «Sale primero» a mano, igual. **Subir o bajar** a alguien deja la casilla tal como la dejas,
+    y así la enseñan Hoy, la Semana, el Excel y el menú de la casilla («posición N de M»); antes Hoy la volvía a
+    ordenar por su cuenta y el Excel y el menú decían otra cosa.
+  - **La casilla no cambia sin motivo**: quien ya abría sigue abriendo y quien ya llevaba la cocina la conserva mientras
+    puedan (bajar a Cris al 2.º no le pasa el «abre» a Yilian). Y **si tocar una casilla cambia otra del mismo día**
+    (quién abre, quién lleva la cocina), la app lo dice en un aviso y lo apunta en el historial: «Por poner a Noe en
+    El 33 mañana: en El 33 tarde abre Victoria (antes Noe)».
+  - **Lo que decides a mano no provoca retiradas en otras casillas**: si pones la cocina a Victoria por la mañana y
+    Jenny queda de sala en esa casilla, Jenny conserva la cocina de la tarde (y no pasa a abrir mañana y tarde); lo
+    mismo con «Quitar la marca de cocina». La Revisión y la condición del Generador avisan del cruce y decides tú.
+    Lo automático (semana tipo, Generador, Cobertura) sigue sin crear cruces.
+  - **Quien está de sala en otra casilla ese día no se lleva la cocina** de esta aunque la semana tipo o el Generador la
+    señalen (Noe de sala en la mañana de El 33 y de cocina en la tarde; Aroa, 17/09): la casilla se queda sin cocina
+    y el Generador busca a otra persona. Si dos plazas de la semana tipo traen la cocina a la misma casilla (el
+    traslado del día libre de Hojan), la lleva la de siempre y el Generador lo avisa; y quien pierde la cocina no se
+    pone de sala si solo hace cocina o ya lleva otra cocina ese día: «…la lleva Noe; Hojan se queda fuera de ese
+    turno» (antes Hojan quedaba de sala en dos casillas y Jenny perdía la cocina de El 33 por quedar de sala en el
+    Mónaco).
+  - **Dar de baja a alguien** (o cualquier cambio en cadena) ya no deja a nadie de cocina en una franja y de sala en
+    otra: la casilla vuelve a mirar el día hasta que nada cambie (al retirar a Adrián, Roberto quedaba de cocina en la
+    tarde de Zapatillera y de sala en la mañana hasta el siguiente guardado).
+  - **El cambio de turno de la Cobertura** ya no deja una casilla «fijada a mano» sin nadie que abra (Hoy decía que
+    abría uno y el Mes que nadie); y si el cambio no puede hacerse, quien cedía el turno vuelve con su plaza de antes,
+    no con una nueva puesta a mano. Una marca huérfana que viniera de antes se limpia sola al tocar la casilla (la
+    cocina que quitó el encargado a propósito, no: «Quitar la marca de cocina» se guarda como decisión, y en el
+    historial con la franja; las quitadas con la versión de antes se reconocen una sola vez al abrir la app).
+  - **Las marcas a mano sobreviven al cierre por fechas**: al reabrir, «sale primero», la cocina y el orden vuelven tal
+    cual estaban (antes la casilla volvía «sola» y desordenada).
+  - **Una casilla cerrada ese día (a mano o por fechas) con alguien dentro no cuenta** para quién abre, para el
+    «partido» de la planilla ni para el tramo de Hoy, igual que ya pasaba en Horas y en la puerta (Cristian con la
+    tarde cerrada: Hoy decía 4 h y la nómina 8); y la app del empleado no la lista como un turno suyo.
+  - **El Excel** no dice «(abre)» de nadie cuando nadie de la casilla puede abrir (el hueco de la 1.ª).
+  - **El hueco de la 1.ª no es una persona**: con dos personas y el hueco, la cocina de Zapatillera por la mañana va
+    2.ª, y la casilla y la condición del Generador lo cuentan igual (antes una decía 3.ª y la otra ✗).
+  - Y por dentro: vaciar la casilla se lleva sus marcas, «Vaciar» cuenta bien los días, la copia de la vista previa no
+    comparte listas con el mes, y dos trozos de código muertos se han quitado.
 - **«Ya no está con nosotros»: quien deja el grupo no se borra (30/09; Diego: «cuando un trabajador lo deja, no
   deberíamos eliminarlo de la aplicación»).** En la ficha, el botón «Quitar del equipo» pasa a **«Ya no está con
   nosotros…»**: se dice desde qué día (por defecto hoy) y, si se quiere, por qué; la app cuenta cuántos turnos se

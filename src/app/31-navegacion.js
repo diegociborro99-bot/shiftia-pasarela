@@ -56,7 +56,9 @@ function activarModoEmpleado() {
   const evPor = {}; for (const ev of eventosMes(est)) (evPor[ev.iso] = evPor[ev.iso] || []).push(ev);
   let dias = '';
   for (const d of est.days) {
-    const cas = casillasDe(est, d.iso, p.id);
+    // (30/09, revisión de A1, cliente 5) solo las plazas que la ocupan ese día: una casilla cerrada a mano o por fechas con la persona
+    // dentro no es un turno suyo (Horas no la cuenta; el cierre por fechas ya sale abajo con su decisión)
+    const cas = casillasDe(est, d.iso, p.id).filter(c => plazaOcupa(S, est, d.iso, c.tid));
     const aus = ausenciaEn(p, d.iso);
     // 24/09 (D11): su local cerrado por fechas ese día: «Bar Mónaco · tarde: cerrado por reforma» y lo
     // que hace él (el servidor solo le manda su propia decisión, nunca las de los compañeros)

@@ -25,13 +25,15 @@ let exportando = false;
 // ---------- piezas de la semana ----------
 // «Victoria (abre) + Hojan (cocina)»: en el orden de la casilla, con las marcas en texto
 // (S0, 30/09) el Excel no lleva estilos de celda: la plaza de quien ya no está con nosotros lo dice en texto
+// (30/09, revisión de A1, cliente 1 y 2) lo que se escribe es lo que enseña Hoy (posicionesDe: el orden a mano, quién abre); antes
+// leía lo guardado y ponía «(abre)» al primero aunque nadie pudiera abrir (el hueco). Sin el hueco: en el Excel no hay casilla vacía
 function xlsxNombres(lista) {
-  return lista.map((e, i) => nombrePid(e.pid) + (salidaDe(personaDeId(e.pid)) ? ' (ya no está)' : '') + (abreEn(lista, i) ? ' (abre)' : '') + (e.cocina ? ' (cocina)' : '')).join(' + ');
+  return lista.filter(e => !e.hueco).map(e => nombrePid(e.pid) + (salidaDe(personaDeId(e.pid)) ? ' (ya no está)' : '') + (e.abre ? ' (abre)' : '') + (e.cocina ? ' (cocina)' : '')).join(' + ');
 }
 function xlsxCasilla(c, l, franja) {
   const tid = turnoId(l.id, franja);
   if (!turnoAbierto(S, c.est, c.iso, tid)) { const ci = cierreEn(S, c.iso, tid); return ci ? `CERRADO · ${etiquetaCierre(ci)}` : '—'; }   // el motivo, como en la hoja (24/09, D11)
-  return xlsxNombres(asignados(c.est, c.iso, tid));
+  return xlsxNombres(posicionesDe(S, S.staff, c.est, c.iso, tid));
 }
 // «mañana 1 · tarde 2»: personas que faltan ese día para el mínimo de cada franja
 function xlsxFaltan(c, l) {

@@ -118,7 +118,8 @@ function generarSobre(meses, desde, hasta, simular) {
     if (d1 > d2) continue;
     const r = generarPlanilla(S, S.staff, e, d1, d2, { simular: false, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron, meses: todos });
     total.aplicados.push(...r.aplicados); total.huecos.push(...r.huecos); total.coberturas.push(...r.coberturas); total.rechazados.push(...r.rechazados);
-    total.retirados.push(...r.retirados); for (const a of r.avisos) if (!total.avisos.some(x => x.pid === a.pid && x.semana === a.semana)) total.avisos.push(a);
+    // (30/09, revisión de A1, S3) un aviso por persona, semana, tipo y texto: por persona y semana tapaba el segundo «dos cocinas» de Hojan
+    total.retirados.push(...r.retirados); for (const a of r.avisos) if (!total.avisos.some(x => x.pid === a.pid && x.semana === a.semana && x.tipo === a.tipo && x.texto === a.texto)) total.avisos.push(a);
   }
   return total;
 }
