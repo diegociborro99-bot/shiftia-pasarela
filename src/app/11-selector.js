@@ -141,14 +141,16 @@ function openMenuTurno(iso, tid, pid, anchor) {
   // siendo «horario distinto este día», al final. Las horas se apuntan en la asignación
   // (ini/fin) y son las que cuenta la nómina y las que enseña Hoy; en el papel no salen.
   const tramoTxt = entry.ini ? `${esc(entry.ini)}–${esc(entry.fin)}` : '';
+  // (revisión S0) la plaza de antes de su salida: se dice, y si ya se ha ido no hay nada que cubrir desde hoy
+  const seFue = !!salidaDe(p), yaFuera = seFue && haSalido(p, isoHoy());
   const btnTramo = `<button class="popb full${esApoyo(p) ? ' rec' : ''}" data-mt="hora">${esApoyo(p) ? 'Ajustar apoyo' : 'Horario distinto este día'}${tramoTxt ? `<small>${tramoTxt}</small>` : esApoyo(p) ? '<small>de qué hora a qué hora, hoy</small>' : ''}</button>`;
   const pop = document.createElement('div');
   pop.className = 'pop'; pop.id = 'menuTurnoPop'; pop.setAttribute('role', 'dialog');
   pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div>
-    <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${i + 1} de ${lista.length}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${avisosAhora.length ? `<br><small style="color:var(--warn)">Incumple ${esc(avisosAhora.join(' · '))}</small>` : ''}</div>
+    <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${i + 1} de ${lista.length}${seFue ? `<br><small style="color:var(--bad)">${esc(textoSalida(p))}</small>` : ''}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${avisosAhora.length ? `<br><small style="color:var(--warn)">Incumple ${esc(avisosAhora.join(' · '))}</small>` : ''}</div>
     ${esApoyo(p) ? btnTramo : ''}
     <button class="popb full" data-mt="ficha">Ver y editar su ficha</button>
-    <button class="popb full rec" data-mt="cobertura">Falta estos días… buscar quién cubre</button>
+    ${yaFuera ? '' : '<button class="popb full rec" data-mt="cobertura">Falta estos días… buscar quién cubre</button>'}
     ${i > 0 ? '<button class="popb full" data-mt="subir">▲ Subir en la casilla</button>' : ''}
     ${i < lista.length - 1 ? '<button class="popb full" data-mt="bajar">▼ Bajar en la casilla</button>' : ''}
     ${entry.abre ? (manualDe(e, iso, tid).abre ? '<button class="popb full" data-mt="noabre">Quitar «sale primero» a mano<small>que la casilla decida quién abre</small></button>' : '') : '<button class="popb full" data-mt="abre">Sale primero (abre el local)</button>'}

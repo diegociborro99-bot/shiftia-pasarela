@@ -42,18 +42,22 @@ function renderMes() {
   // «De baja» = de baja todo el mes que se mira (24/09: antes, quien lo estaba HOY); una baja de
   // unos días se ve en su fila, día a día
   const bajaMes = p => est.days.every(d => deBaja(p, d.iso));
+  // 30/09 (S0): las filas son las personas del mes (personasDelMes, lo mismo que Horas): quien ya no está con nosotros
+  // sale mientras ese mes tenga algo suyo, en su grupo y con su fila marcada; si se fue antes y no tiene nada, no
+  const delMes = personasDelMes(S, S.staff, S.meses, est.y, est.m);
   // (revisión final, 25/09) con su local habitual (localHabitualDe, fase 6: el elegido en la ficha o el primero), el
   // mismo que suma en el Generador; antes, el primero de su lista: Roberto, habitual de Pasarela, salía en Zapatillera
-  for (const l of S.locales) grupos.push([l.nombre, S.staff.filter(p => !bajaMes(p) && localHabitualDe(p) === l.id), l.color]);
-  grupos.push(['Sin local fijo y varios locales', S.staff.filter(p => !bajaMes(p) && !(p.locales || []).length), 'var(--ink3)']);
-  grupos.push(['De baja', S.staff.filter(bajaMes), 'var(--bad)']);
+  for (const l of S.locales) grupos.push([l.nombre, delMes.filter(p => !bajaMes(p) && localHabitualDe(p) === l.id), l.color]);
+  grupos.push(['Sin local fijo y varios locales', delMes.filter(p => !bajaMes(p) && !(p.locales || []).length), 'var(--ink3)']);
+  grupos.push(['De baja', delMes.filter(bajaMes), 'var(--bad)']);
   // los que tienen varios locales van con su local habitual; se listan ahí
   for (const [nombre, gente, color] of grupos) {
     if (!gente.length) continue;
     h += `<tr class="ghdr"><td colspan="${est.days.length + 1}"><span class="ghl"><span class="lp" style="background:${esc(color)};display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px"></span>${esc(nombre)}</span></td></tr>`;
     for (const p of gente) {
       const n = turnosMes(est, p.id);
-      h += `<tr class="prow"><td class="pname"><span class="pn" data-ficha="${p.id}" style="cursor:pointer"><b><span class="dot2" style="background:${avColor(p.id)}"></span>${esc(p.nombre)}</b><small>${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${n} turnos</small></span><button class="pnaus" data-mesaus="${p.id}" title="Ausencia (vacaciones, baja, día libre)" aria-label="Ausencia de ${esc(p.nombre)}">＋</button></td>`;
+      const sal = salidaDe(p);   // (S0) su fila y sus pastillas, con el sombreado rojo y el aviso
+      h += `<tr class="prow${sal ? ' salido' : ''}"><td class="pname"><span class="pn" data-ficha="${p.id}" style="cursor:pointer"><b><span class="dot2" style="background:${avColor(p.id)}"></span>${esc(p.nombre)}</b><small>${sal ? esc(textoSalido(sal)) : `${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${n} turnos`}</small></span><button class="pnaus" data-mesaus="${p.id}" title="Ausencia (vacaciones, baja, día libre)" aria-label="Ausencia de ${esc(p.nombre)}">＋</button></td>`;
       for (const d of est.days) {
         const cas = casillasDe(est, d.iso, p.id);
         const aus = ausenciaEn(p, d.iso);
@@ -81,8 +85,8 @@ function renderMes() {
         // cerrada): un punto en la pastilla y la franja en el aviso (24/09, revisión F2)
         const edc = cierresDe(S).length ? estadoDia(S, p, d.iso) : null;
         const cieF = edc && edc.cierre && edc.cierre.tipo !== 'REFUERZA' && !edc.libra ? edc : null;
-        const tip = cas.map(c => `${FRANJA_LBL[partirTurno(c.tid).franja]}: ${nombreLocal(partirTurno(c.tid).localId)}${c.entry.abre ? ' (abre)' : ''}${c.entry.cocina ? ' (cocina)' : ''}${c.entry.avisos && c.entry.avisos.length ? ' · ' + c.entry.avisos.join(', ') : ''}`).concat(abreNo.map(x => `⚠ ${textoAbreNoApto(x.na.motivo)}`)).concat(cieF ? [`${cieF.cierre.franjas.map(f => FRANJA_LBL[f]).join(' y ')}: ${cieF.texto}`] : []).join('\n');
-        h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill ${cls}${evPor[d.iso] ? ' ev' : ''}" style="--lc:${esc((lm || lt).color)};--lc2:${esc((lt || lm).color)}" data-tipstr="${esc(tip)}">${forz ? '<i class="fz"></i>' : abreNo.length ? '<i class="fz aw"></i>' : ''}${cieF ? '<i class="cief"></i>' : ''}${esc(txt)}</span></td>`;
+        const tip = (sal ? [textoSalido(sal)] : []).concat(cas.map(c => `${FRANJA_LBL[partirTurno(c.tid).franja]}: ${nombreLocal(partirTurno(c.tid).localId)}${c.entry.abre ? ' (abre)' : ''}${c.entry.cocina ? ' (cocina)' : ''}${c.entry.avisos && c.entry.avisos.length ? ' · ' + c.entry.avisos.join(', ') : ''}`)).concat(abreNo.map(x => `⚠ ${textoAbreNoApto(x.na.motivo)}`)).concat(cieF ? [`${cieF.cierre.franjas.map(f => FRANJA_LBL[f]).join(' y ')}: ${cieF.texto}`] : []).join('\n');
+        h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill ${cls}${evPor[d.iso] ? ' ev' : ''}${sal ? ' salido' : ''}" style="--lc:${esc((lm || lt).color)};--lc2:${esc((lt || lm).color)}" data-tipstr="${esc(tip)}">${forz ? '<i class="fz"></i>' : abreNo.length ? '<i class="fz aw"></i>' : ''}${cieF ? '<i class="cief"></i>' : ''}${esc(txt)}</span></td>`;
       }
       h += '</tr>';
     }
@@ -134,14 +138,17 @@ function openDiaPersona(pid, iso, anchor) {
   const e = estadoDeIso(iso);
   const cas = casillasDe(e, iso, pid);
   const aus = ausenciaEn(p, iso);
+  // 30/09 (revisión S0): desde su salida no se le puede poner en ningún sitio (la puerta lo bloquea sin forzar): se dice y
+  // no se ofrece «Poner en…»
+  const fuera = haSalido(p, iso);
   const pop = document.createElement('div');
   pop.className = 'pop'; pop.id = 'diaPersPop'; pop.setAttribute('role', 'dialog');
-  pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div><div class="pd">${fmtLargo(iso)}${aus ? ` · <b>${esc(etiquetaAusencia(aus))}</b>` : ''}</div>
+  pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div><div class="pd">${fmtLargo(iso)}${aus ? ` · <b>${esc(etiquetaAusencia(aus))}</b>` : ''}${fuera ? `<br><small style="color:var(--bad)">${esc(textoSalida(p))}</small>` : ''}</div>
     ${cas.map(c => { const { localId, franja } = partirTurno(c.tid); return `<div class="festrow" style="border-left-color:${colorLocal(localId)}"><span class="festinfo"><b>${esc(nombreLocal(localId))} · ${FRANJA_LBL[franja].toLowerCase()}</b><small>${c.entry.abre ? 'abre · ' : ''}${c.entry.cocina ? 'cocina · ' : ''}${esc(c.entry.razon || ORIGEN_LBL[c.entry.origen] || '')}</small></span><button class="festrm" data-quita="${c.tid}" aria-label="Quitar">✕</button></div>`; }).join('') || '<div class="festvacio">Sin turno este día.</div>'}
     <button class="popb full" data-dp="dia">Ir al día</button>
     ${aus ? `<button class="popb full" data-dp="quitaraus">Quitar la ausencia de este día</button>` : `<button class="popb full" data-dp="aus">Marcar ausencia</button>`}
     ${cas.length ? `<button class="popb full rec" data-dp="cobertura">Buscar quién cubre este día…</button>` : ''}
-    ${S.locales.map(l => FRANJAS.filter(f => turnoAbierto(S, e, iso, turnoId(l.id, f)) && !cas.some(c => c.tid === turnoId(l.id, f))).map(f => `<button class="popb full" data-pon="${turnoId(l.id, f)}" style="border-left:4px solid ${esc(l.color)}">Poner en ${esc(l.nombre)} · ${FRANJA_LBL[f].toLowerCase()}</button>`).join('')).join('')}`;
+    ${fuera ? '' : S.locales.map(l => FRANJAS.filter(f => turnoAbierto(S, e, iso, turnoId(l.id, f)) && !cas.some(c => c.tid === turnoId(l.id, f))).map(f => `<button class="popb full" data-pon="${turnoId(l.id, f)}" style="border-left:4px solid ${esc(l.color)}">Poner en ${esc(l.nombre)} · ${FRANJA_LBL[f].toLowerCase()}</button>`).join('')).join('')}`;
   document.body.appendChild(pop);
   colocarPop(pop, anchor);
   cierraFuera(pop);
@@ -160,10 +167,13 @@ function openDiaPersona(pid, iso, anchor) {
       // incumplirían forzándola, cada una con la suya (siSeFuerza, como el selector)
       const f = r0.ok ? null : siSeFuerza(S, S.staff, e, iso, tid, pid, RELAJABLE);
       const inc = f && f.forzable && f.incumple.length ? f.incumple : (r0.ok ? [] : [{ k: r0.regla, motivo: r0.motivo }]);
+      // (revisión S0) lo que no se puede forzar (la salida, lo cerrado) no se pregunta: se dice y ya
+      if (!r0.ok && f && !f.forzable) { toast(`${nombreRegla(r0.regla)} — ${r0.motivo}`, 'bad'); return; }
       if (!r0.ok) { if (!confirm(`${p.nombre} incumpliría ${inc.length > 1 ? 'estas reglas' : 'esta regla'}:\n\n${lineasIncumple(inc)}\n\n¿Ponerlo de todas formas? Quedará constancia.`)) return; opts.forzar = true; opts.razon = `forzado desde el mes · ${inc.map(x => nombreRegla(x.k)).join(', ')}`; }
       pushUndo(`poner a ${p.nombre}`);
       const r = asignarUI(iso, tid, pid, opts);
-      if (r.ok) { renderVistaActiva(); toast(r.avisos.length ? `Con aviso: ${conSuRegla(r.avisos, f ? f.incumple : [])}` : 'Añadido', r.avisos.length ? 'warn' : 'ok'); } else toast(r.motivo, 'bad');
+      // si no entra, no queda una entrada vacía en Deshacer (Ctrl+Z «poner a X» no deshacía nada; revisión S0)
+      if (r.ok) { renderVistaActiva(); toast(r.avisos.length ? `Con aviso: ${conSuRegla(r.avisos, f ? f.incumple : [])}` : 'Añadido', r.avisos.length ? 'warn' : 'ok'); } else { undoStack.pop(); actualizarUndoBtn(); toast(r.motivo, 'bad'); }
       return;
     }
     const b = ev.target.closest('[data-dp]'); if (!b) return;

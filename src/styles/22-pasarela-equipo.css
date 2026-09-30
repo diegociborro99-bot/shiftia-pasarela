@@ -64,6 +64,10 @@
 .fichtop{margin-bottom:8px}
 .fichtop .colorset{margin-top:6px}
 .fichfoot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid var(--border2)}
+/* 30/09 (revisión S0): la ficha mide más de 3.000 px y «Ya no está con nosotros…» / «Listo» quedaban al final. El pie se
+   queda pegado abajo dentro de la tarjeta (que es la que se desplaza: .ovcard.big, 09-ficha…css), ocupando el relleno
+   de la tarjeta (24px 26px en escritorio) para que el fondo llegue hasta el borde */
+.ovcard.big .fichfoot{position:sticky;bottom:-24px;z-index:4;background:var(--surface);margin:16px -26px -24px;padding:12px 26px 24px}
 .fsec summary{display:flex;align-items:center;gap:8px;font-size:12px;min-height:36px}
 .fsec summary small{font-weight:600;color:var(--ink3);font-size:11px;letter-spacing:0;text-transform:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .fsecb{padding:2px 4px 6px}
@@ -192,6 +196,8 @@
   .festrow .festinfo{flex:1 1 160px}
   .fichnombre{font-size:19px}
   .fichfoot .btn{flex:1;justify-content:center}
+  /* en el móvil la tarjeta rellena 14px a los lados y 18px + la zona segura abajo (20-movil.css) */
+  .ovcard.big .fichfoot{bottom:calc(-18px - env(safe-area-inset-bottom));margin:16px calc(-14px - env(safe-area-inset-right)) calc(-18px - env(safe-area-inset-bottom)) calc(-14px - env(safe-area-inset-left));padding:10px calc(14px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));box-shadow:0 -6px 14px rgba(0,0,0,.08)}
   .eqsec .sechdr .eqajustes{margin-left:0;flex:1 1 100%;justify-content:center;min-height:44px}
   .pcfoot .btn-mini{width:100%;justify-content:center}
   .hortab input[type=time]{min-height:44px;min-width:104px}

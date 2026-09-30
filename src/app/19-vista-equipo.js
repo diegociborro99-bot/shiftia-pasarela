@@ -105,8 +105,10 @@ function chipsCondiciones(p) {
   // que en la ficha, y por los dos lados: en la de quien cubre «Cubre a Iván · siempre que falte · hasta que
   // lo quites»; en la de quien falta, «Si falta, le cubre Mari Luz». La designación le autoriza el partido
   // para cubrirle (D1, y solo eso)
-  for (const cb of p.cubreA || []) h.push(tc('cubreA', 'Cubre a', `${esc(nombrePid(cb.pid))} · ${esc(cuandoCubre(S, cb))} · hasta que lo quites`, 'fix cubrea', `ocupa el sitio de ${nombrePid(cb.pid)} cuando falta, hasta que se quite en esta ficha; si hace falta, puede hacer partido para cubrirle`));
-  for (const d of quienLeCubre(S, S.staff, p.id)) h.push(tchip('Si falta, le cubre', `${esc(d.nombre)}${d.cuando !== 'siempre que falte' ? ` <small>(${esc(d.cuando)})</small>` : ''}`, 'fix cubrea' + (d.activa ? '' : ' off'), d.activa ? `${d.nombre} ocupa su sitio cuando falta (se cambia en la ficha de ${d.nombre})` : `«Cubre a» está apagado en la ficha de ${d.nombre} o en las reglas del grupo: ahora no se aplica`));
+  // (revisión S0) si a quien cubre ya no está con nosotros, la designación no se aplica: se dice
+  for (const cb of p.cubreA || []) { const x = personaDeId(cb.pid), fuera = x && haSalido(x, isoHoy()); h.push(tc('cubreA', 'Cubre a', `${esc(nombrePid(cb.pid))} · ${fuera ? 'ya no está con nosotros' : `${esc(cuandoCubre(S, cb))} · hasta que lo quites`}`, 'fix cubrea' + (fuera ? ' off' : ''), fuera ? `${nombrePid(cb.pid)} ${textoSalida(x)}: ya no hay a quien cubrir (se quita en esta ficha)` : `ocupa el sitio de ${nombrePid(cb.pid)} cuando falta, hasta que se quite en esta ficha; si hace falta, puede hacer partido para cubrirle`)); }
+  // 30/09 (S0): si quien le cubre ya no está con nosotros, se dice y sale tachado (la designación ya no vale)
+  for (const d of quienLeCubre(S, S.staff, p.id)) h.push(tchip('Si falta, le cubre', `${esc(d.nombre)}${d.salido ? ' · ya no está con nosotros' : d.cuando !== 'siempre que falte' ? ` <small>(${esc(d.cuando)})</small>` : ''}`, 'fix cubrea' + (d.activa && !d.salido ? '' : ' off'), d.salido ? `${d.nombre} ya no trabaja con nosotros desde el ${fmtDM(d.salido.desde)}: no le cubre nadie mientras no se cambie en Equipo` : d.activa ? `${d.nombre} ocupa su sitio cuando falta (se cambia en la ficha de ${d.nombre})` : `«Cubre a» está apagado en la ficha de ${d.nombre} o en las reglas del grupo: ahora no se aplica`));
   // (fase 6, S30) con su día: el veto de Mari Luz es de los lunes, no de todos los días
   for (const v of p.vetos || []) { const ds = dowsVeto(v); h.push(tc('vetos', 'No hace', chipLocal(v.localId, `${v.franja === 'M' ? 'mañanas' : 'tardes'}${ds ? ' · ' + ds.map(d => DOW_PL[d]).join(' y ') : ''}`), 'loc warn')); }
   // (fase 6, S17 y D6) el contrato no se apaga: lo compara el contador de horas
@@ -152,12 +154,31 @@ function htmlTarjetaPersona(p, baja) {
   </div>`;
 }
 
+// 30/09 (S0): la tarjeta de quien ya no está con nosotros (la sección plegada del final): cuándo se fue, por qué,
+// «Restaurar» y, solo para el programador (con servidor: SRV.rol; sin servidor es Diego probando), «Borrar del todo»
+function htmlTarjetaSalido(p) {
+  const s = salidaDe(p) || { desde: isoHoy() };
+  const prog = typeof esProgramador === 'function' && esProgramador();
+  // (revisión S0) sus plazas de la semana tipo siguen ahí: el Generador las salta cada semana y las lista; se avisa
+  const nPatron = plazasPatronDe(p.id);
+  return `<div class="pcard scard salido" data-scard="${esc(p.id)}">
+    <div class="pchead"><span class="av" data-ficha="${esc(p.id)}" style="cursor:pointer;background:${avColor(p.id)}">${esc(initials(p.nombre))}</span>
+      <span data-ficha="${esc(p.id)}" style="min-width:0;cursor:pointer"><b>${esc(p.nombre)}</b><small>${esc(lblPuesto(p.puesto))} · ya no trabaja con nosotros desde el ${esc(fmtDM(s.desde))}${s.motivo ? ' · ' + esc(s.motivo) : ''}</small></span></div>
+    <p class="filltxt sctxt">Sus turnos de antes del ${esc(fmtDM(s.desde))} siguen en la planilla y en Horas. No entra en ninguna casilla nueva ni sale en las listas.${nPatron ? ` <b>Sigue en la semana tipo (${nPatron} ${nPatron === 1 ? 'plaza' : 'plazas'})</b>: el Generador las salta cada semana; si ya no hacen falta, quítalas de la semana tipo.` : ''}</p>
+    <div class="pcfoot"><button type="button" class="btn-mini" data-restaurar="${esc(p.id)}" title="Vuelve al equipo desde hoy; sus turnos pasados siguen. Los retirados desde el ${esc(fmtDM(s.desde))} no vuelven solos: Ctrl+Z si acabas de darle la salida, o vuelve a generar">Restaurar</button>${prog ? `<button type="button" class="btn-mini ghost" data-borrartodo="${esc(p.id)}" title="Solo el programador: desaparece de la plantilla y de todos los meses">Borrar del todo</button>` : ''}</div>
+  </div>`;
+}
+// cuántas plazas de la semana tipo son de esa persona (la tarjeta de quien ya no está lo avisa; revisión S0)
+function plazasPatronDe(pid) { return [1, 2, 3, 4, 5, 6, 7].reduce((a, d) => a + plazasDe(S, d).filter(pl => pl.p === pid).length, 0); }
 // ---------- la vista ----------
 function renderEquipo() {
   const root = $('#equipoRoot'); if (!root) return;
   const hoy = isoHoy();   // Equipo enseña el equipo de hoy
-  const enActivo = S.staff.filter(p => !deBaja(p, hoy));
-  const deBajaHoy = S.staff.filter(p => deBaja(p, hoy));
+  // 30/09 (S0): quien ya no está con nosotros hoy no cuenta ni se lista con los demás: va en su sección, plegada
+  const enPlantillaHoy = staffEnPlantilla(S.staff, hoy);
+  const salidos = S.staff.filter(p => haSalido(p, hoy)).sort((a, b) => { const da = salidaDe(a).desde, db = salidaDe(b).desde; return da === db ? a.nombre.localeCompare(b.nombre, 'es') : (db > da ? 1 : -1); });   // las salidas más recientes primero
+  const enActivo = enPlantillaHoy.filter(p => !deBaja(p, hoy));
+  const deBajaHoy = enPlantillaHoy.filter(p => deBaja(p, hoy));
   const seccion = (titulo, gente, opts) => {
     const o = opts || {};
     return `<section class="eqsec"${o.color ? ` style="--lc:${esc(o.color)}"` : ''}>
@@ -174,12 +195,13 @@ function renderEquipo() {
   const varios = enActivo.filter(p => (p.locales || []).length !== 1);
   h += seccion('Sin local fijo y varios locales', varios, { sub: 'sin local fijo o con más de uno', vacio: 'Nadie trabaja en varios locales.' });
   if (deBajaHoy.length) h += seccion('De baja', deBajaHoy, { baja: true, sub: 'no cuentan para el generador' });
+  if (salidos.length) h += `<details class="eqsec eqsalidos" id="eqSalidos"><summary class="sechdr"><h2>Ya no están con nosotros (${salidos.length})</h2><span class="micro">sus turnos pasados siguen · no cuentan para nada nuevo</span></summary><div class="cards">${salidos.map(htmlTarjetaSalido).join('')}</div></details>`;
   root.innerHTML = h;
   const stats = $('#eqStats');
   if (stats) {
     const sinLocal = enActivo.filter(esComodin).length;
     const cocineros = enActivo.filter(p => p.puesto === 'cocina' || cocinasTitular(p).length).length;   // la capa de lectura (revisión F4)
-    stats.innerHTML = `<span class="dstat"><b>${enActivo.length}</b> en activo</span>${deBajaHoy.length ? `<span class="dstat warn"><b>${deBajaHoy.length}</b> de baja</span>` : ''}<span class="dstat"><b>${sinLocal}</b> sin local fijo</span><span class="dstat"><b>${cocineros}</b> cocina</span>`;
+    stats.innerHTML = `<span class="dstat"><b>${enActivo.length}</b> en activo</span>${deBajaHoy.length ? `<span class="dstat warn"><b>${deBajaHoy.length}</b> de baja</span>` : ''}<span class="dstat"><b>${sinLocal}</b> sin local fijo</span><span class="dstat"><b>${cocineros}</b> cocina</span>${salidos.length ? `<span class="dstat sal"><b>${salidos.length}</b> ya no están</span>` : ''}`;
     stats.querySelectorAll('b').forEach(countUp);
   }
 }
@@ -329,11 +351,31 @@ function idParaPersona(nombre) {
   let n = 1; while (usados.includes('p' + n)) n++;
   return 'p' + n;
 }
+// 30/09 (S0; Diego: «solo que cierre antes de echar o meter workers»): antes de dar de baja o de alta a alguien se
+// recuerda cerrar en Horas los meses anteriores con turnos que siguen abiertos (mesesSinCerrar). Una línea con
+// «Ir a Horas»; no bloquea nada. '' si no hay ninguno.
+function avisoMesesSinCerrar(iso) {
+  const ks = mesesSinCerrar(S, iso);
+  if (!ks.length) return '';
+  const nombres = ks.map(k => MESES[+k.slice(5, 7) - 1]);
+  const lista = nombres.length === 1 ? nombres[0] : nombres.slice(0, -1).join(', ') + ' y ' + nombres[nombres.length - 1].toLowerCase();
+  const pl2 = nombres.length > 1;
+  return `<div class="haviso warn salaviso" data-mesessincerrar="${esc(ks.join(','))}"><span><b>${esc(lista)} no ${pl2 ? 'están cerrados' : 'está cerrado'} en Horas: ${pl2 ? 'ciérralos' : 'ciérralo'} antes para que la nómina quede guardada.</b></span><button type="button" class="btn-mini ghost" data-irhoras="${esc(ks[ks.length - 1])}">Ir a Horas</button></div>`;
+}
+// Ir a Horas del mes que se dice (desde los avisos), cerrando el diálogo que lo pide y la ficha que hubiera debajo
+// (revisión S0: desde el diálogo de la salida, la ficha se quedaba abierta encima de Horas)
+function irAHorasDe(k, ov) {
+  if (ov) ov.remove();
+  const f = document.getElementById('fichaOvl'); if (f) f.remove();
+  S.hY = +k.slice(0, 4); S.hM = +k.slice(5, 7);
+  switchTab('horas');
+}
 function openPersonas() {
   const locChips = S.locales.map(l => `<button type="button" class="locchip" data-loc="${esc(l.id)}" style="--lc:${esc(l.color)}"><i class="ldot"></i>${esc(l.nombre)}</button>`).join('');
   const ov = abrirOverlay('persOvl', `<span class="micro">EQUIPO</span>
     <h2 class="revh2">Añadir persona</h2>
     <p class="revsub">Lo básico para que salga en la planilla. El resto (libra, cocina, quién cubre a quién…) se rellena en su ficha, que se abre al guardar.</p>
+    ${avisoMesesSinCerrar(isoHoy())}
     <form id="persForm" class="absform" style="display:grid">
       <div class="row2"><span><label>Nombre y apellidos</label><input type="text" id="persNombre" placeholder="Ana Morales" autocomplete="off" spellcheck="false" required></span>
       <span><label>Puesto</label><select id="persPuesto">${PUESTOS.map(x => `<option value="${x.id}">${esc(x.label)}</option>`).join('')}</select></span></div>
@@ -348,6 +390,7 @@ function openPersonas() {
     ov.querySelector('#persPrev').innerHTML = n ? `Identificador: <b>${esc(idParaPersona(n))}</b>` : 'Escribe el nombre: el identificador (y su usuario, si entra en la app) se calcula solo.';
   });
   ov.addEventListener('click', e => {
+    const ih = e.target.closest('[data-irhoras]'); if (ih) { irAHorasDe(ih.dataset.irhoras, ov); return; }
     const lc = e.target.closest('[data-loc]'); if (lc) { lc.classList.toggle('on'); return; }
     const fk = e.target.closest('[data-franja]'); if (fk) { fk.classList.toggle('on'); }
   });
@@ -402,16 +445,48 @@ function quitarPidDeTodo(pid) {
   }
   return turnos;
 }
-function bajaPersona(pid) {
-  const p = personaDeId(pid); if (!p) return false;
-  if (!confirm(`¿Quitar a ${p.nombre} del equipo?\n\nSale de la plantilla y de sus turnos en TODOS los meses guardados. Si solo está de baja temporal, ponle una ausencia «Baja» en su lugar.`)) return false;
-  pushUndo(`baja de ${p.nombre}`, { staff: true, otrosMeses: true });
-  const turnos = quitarPidDeTodo(pid);
-  S.staff = S.staff.filter(x => x.id !== pid);
-  registrarCambio(`Baja del equipo: ${p.nombre}${turnos ? ` · ${turnos} turno(s) retirados de la planilla` : ''}`, 'cambio');
+// 30/09 (S0): «Ya no está con nosotros» desde una fecha (darSalida del modelo): la ficha queda con su salida, sus
+// plazas desde esa fecha se retiran (las de a mano también: lo ha decidido el encargado en el diálogo) y lo de
+// antes se queda. Todo en un solo Ctrl+Z (ficha y todos los meses) y una línea del historial.
+function darSalidaUI(pid, desde, motivo) {
+  const p = personaDeId(pid); if (!p || !desde) return null;
+  pushUndo(`salida de ${p.nombre}`, { staff: true, otrosMeses: true });
+  const r = darSalida(S, S.staff, S.meses, pid, desde, motivo);
+  const aMano = r.retirados.filter(x => x.entry.origen === 'manual' || x.entry.forzado).length;
+  registrarCambio(`Ya no está con nosotros: ${p.nombre} desde el ${fmtDM(desde)} · ${r.retirados.length} turnos retirados${aMano ? ` (${aMano} a mano)` : ''}${motivo ? ' · ' + motivo : ''}`, 'equipo');
+  const cerrados = [...new Set(r.retirados.map(x => x.iso.slice(0, 7)))].filter(k => S.cierres && S.cierres[k]);
+  if (cerrados.length) registrarCambio(`Cambio en un mes cerrado (${cerrados.join(', ')})`, 'aviso');
   saveState();
   repintarTrasEquipo();
-  toast(`${p.nombre} ya no está en el equipo`, 'warn');
+  toast(`${p.nombre} ya no está con nosotros desde el ${fmtDM(desde)} · ${pl(r.retirados.length, 'turno retirado', 'turnos retirados')} · ${comoDeshacer()} para deshacer`, 'warn');
+  return r;
+}
+// Restaurar: vuelve al equipo (quitarSalida). Sus turnos pasados siguen; los retirados no vuelven solos (Ctrl+Z o regenerar)
+function restaurarSalidaUI(pid) {
+  const p = personaDeId(pid); if (!p || !salidaDe(p)) return false;
+  const desde = salidaDe(p).desde;
+  pushUndo(`restaurar a ${p.nombre}`, { staff: true });
+  quitarSalida(S.staff, pid);
+  registrarCambio(`Vuelve al equipo: ${p.nombre} (se quita la salida; sus turnos pasados siguen)`, 'equipo');
+  saveState();
+  repintarTrasEquipo();
+  // (revisión S0) que se sepa que los retirados no vuelven solos (Hoy se quedaba «sin cocina» y la Revisión subía)
+  toast(`${p.nombre} vuelve al equipo; sus turnos pasados siguen. Los que se retiraron desde el ${fmtDM(desde)} no vuelven solos: ${comoDeshacer()} si acabas de darle la salida, o vuelve a generar la semana`, 'ok');
+  return true;
+}
+// «Borrar del todo» (solo el programador; 30/09, S0): lo de antes —fuera de la plantilla y de todos los meses—, con
+// doble confirmación. Lo normal ya no es esto: es «Ya no está con nosotros», que conserva sus turnos pasados.
+function borrarDelTodo(pid) {
+  const p = personaDeId(pid); if (!p) return false;
+  if (!confirm(`¿Borrar del todo a ${p.nombre}?\n\nDesaparece de la plantilla y de sus turnos en TODOS los meses guardados, también los pasados (dejan de verse y de contar en Horas). Lo normal es «Ya no está con nosotros», que los conserva.`)) return false;
+  if (!confirm(`Última comprobación: se borra del todo a ${p.nombre}. Con servidor se puede recuperar desde Cuenta → Personas borradas mientras el servidor conserve una versión con ella. ¿Seguir?`)) return false;
+  pushUndo(`borrar del todo a ${p.nombre}`, { staff: true, otrosMeses: true });
+  const turnos = quitarPidDeTodo(pid);
+  S.staff = S.staff.filter(x => x.id !== pid);
+  registrarCambio(`Borrada del todo: ${p.nombre}${turnos ? ` · ${turnos} turno(s) retirados de la planilla` : ''}`, 'cambio');
+  saveState();
+  repintarTrasEquipo();
+  toast(`${p.nombre} se ha borrado del todo`, 'warn');
   return true;
 }
 
@@ -457,7 +532,12 @@ function openAjustesLocales(localId, cambiosPrevios) {
   const pintaTabs = () => {
     ov.querySelector('#locTabs').innerHTML = S.locales.map(l => `<button type="button" class="segk${l.id === actual ? ' on' : ''}" data-loctab="${esc(l.id)}" style="--lc:${esc(l.color)}"><i class="ldot"></i>${esc(l.nombre)}</button>`).join('');
   };
-  const personasSel = (sel, vacio) => `<option value="">${esc(vacio)}</option>` + activos(isoHoy()).map(p => `<option value="${esc(p.id)}"${sel === p.id ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('');
+  // 30/09 (S0): quien ya no está con nosotros no se ofrece; si es quien está elegido («Quién abre»), se enseña elegido
+  // pero diciendo que ya no está (el dato se queda; desde su fecha no manda: quienAbreFijo con la fecha)
+  const personasSel = (sel, vacio) => {
+    const ps = personaDeId(sel), fuera = ps && haSalido(ps, isoHoy()) ? `<option value="${esc(ps.id)}" selected>${esc(ps.nombre)} · ya no está con nosotros desde el ${esc(fmtDM(salidaDe(ps).desde))} (no manda)</option>` : '';
+    return `<option value="">${esc(vacio)}</option>` + fuera + activos(isoHoy()).map(p => `<option value="${esc(p.id)}"${sel === p.id ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('');
+  };
   // candidatos a cocina: primero quien ya puede llevar la de ese local (puedeCocina: su ficha, esta lista o
   // ser de cocina); luego el resto, avisando de que al añadirlas pasan a serlo en su ficha (24/09, fase 5, S36:
   // la lista de Ajustes y la ficha son una sola cosa; antes se añadía a Victoria aquí y nadie le daba la cocina)
@@ -491,8 +571,10 @@ function openAjustesLocales(localId, cambiosPrevios) {
     anota(l, `${o.lista === 'reservas' ? 'reservas de cocina' : `cocina de ${FRANJA_LBL[o.franja].toLowerCase()}`}${p && antes !== ahora ? ` (${p.nombre}: en su ficha, ${ahora || 'ya no es de cocina de este local'})` : ''}`);
     return true;
   };
-  const listaOrdenada = (ids, attr, pref) => ids.length ? ids.map((pid, i) => `<div class="festrow coc"><span class="av" style="background:${avColor(pid)}">${esc(initials(nombrePid(pid)))}</span>
-      <span class="festinfo"><b>${i + 1}. ${esc(nombrePid(pid))}</b><small>${i === 0 ? 'primera opción' : 'si falta quien va antes'}</small></span>
+  // (S0) quien ya no está con nosotros sigue en la lista (no se borra), tachado y con el motivo: desde su fecha no la lleva
+  const fueraHoy = pid => { const p = personaDeId(pid); return p && haSalido(p, isoHoy()) ? salidaDe(p) : null; };
+  const listaOrdenada = (ids, attr, pref) => ids.length ? ids.map((pid, i) => `<div class="festrow coc${fueraHoy(pid) ? ' salido' : ''}"><span class="av" style="background:${avColor(pid)}">${esc(initials(nombrePid(pid)))}</span>
+      <span class="festinfo"><b>${i + 1}. ${esc(nombrePid(pid))}</b><small>${fueraHoy(pid) ? `ya no está con nosotros desde el ${esc(fmtDM(fueraHoy(pid).desde))}: no se le cuenta` : i === 0 ? 'primera opción' : 'si falta quien va antes'}</small></span>
       <button type="button" class="pmini" data-${attr}="${pref || ''}up|${i}" title="Subir" ${i === 0 ? 'disabled' : ''}>↑</button>
       <button type="button" class="pmini" data-${attr}="${pref || ''}down|${i}" title="Bajar" ${i === ids.length - 1 ? 'disabled' : ''}>↓</button>
       <button type="button" class="festrm" data-${attr}="${pref || ''}rm|${i}" aria-label="Quitar">✕</button></div>`).join('') : '<div class="festvacio">Nadie todavía.</div>';
@@ -913,6 +995,9 @@ document.addEventListener('click', e => {
   const root = $('#equipoRoot'); if (!root || !root.contains(e.target)) return;
   const t = e.target;
   const aj = t.closest('[data-locajustes]'); if (aj) { openAjustesLocales(aj.dataset.locajustes); return; }
+  // 30/09 (S0): la sección «Ya no están con nosotros»
+  const rs = t.closest('[data-restaurar]'); if (rs) { restaurarSalidaUI(rs.dataset.restaurar); return; }
+  const bt = t.closest('[data-borrartodo]'); if (bt) { borrarDelTodo(bt.dataset.borrartodo); return; }
   const rm = t.closest('[data-rmabs]');
   if (rm) {
     const [pid, i] = rm.dataset.rmabs.split(':');

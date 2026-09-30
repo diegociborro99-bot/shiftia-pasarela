@@ -18,6 +18,19 @@ let sesionCaducada = false, saliendo = false;
 function marcarRolProgramador() { document.body.classList.toggle('rol-programador', !SRV.on || SRV.rol === 'programador'); }
 const NAV_NULL = { y: null, m: null, day: null, semLunes: null, guiaOff: null, hY: null, hM: null };
 const sinNav = e => JSON.stringify(Object.assign({}, e, NAV_NULL));   // huella del estado sin la navegación local
+// 30/09 (S0): el servidor cierra la puerta a un empleado cuya persona ya no está con nosotros (login y sesión abierta,
+// 403 con `salida`): un aviso claro con «Cerrar sesión»; no se sigue pidiendo nada
+function sinAccesoSalida(msg) {
+  saliendo = true;
+  const ov = document.createElement('div');
+  ov.className = 'ovl'; ov.id = 'salidaAppOvl';
+  ov.innerHTML = `<div class="ovcard" style="max-width:420px;text-align:left"><span class="micro">ACCESO</span>
+    <h2 class="revh2" style="margin-top:8px">${esc(msg || 'Ya no tienes acceso a la app')}</h2>
+    <p class="revsub">Tu cuenta está ligada a una persona que ya no está en el equipo. Si es un error, habla con el encargado.</p>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn btn-cta" id="salidaAppSalir">Cerrar sesión</button></div></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#salidaAppSalir').addEventListener('click', () => cerrarSesion(true));
+}
 function sesionPerdida() {
   if (sesionCaducada) return;
   sesionCaducada = true;
@@ -35,6 +48,8 @@ async function api(metodo, ruta, cuerpo) {
   try { datos = await r.json(); } catch (e) {}
   // el servidor no deja hacer nada con la contraseña genérica: se pide aquí mismo
   if (r.status === 403 && datos && datos.cambiar && ruta !== '/api/password' && !document.getElementById('cambioPassOvl')) pedirCambioPass(null).then(() => location.reload());
+  // 30/09 (S0): el empleado que ya no está con nosotros (403 salida): se le dice y se le da salir
+  if (r.status === 403 && datos && datos.salida && !document.getElementById('salidaAppOvl')) sinAccesoSalida(datos.error);
   // sesión caducada o revocada a mitad de uso (30 días, cambio de contraseña en otro
   // dispositivo, reset del admin): a la pantalla de acceso, no un toast mudo
   if (r.status === 401 && SRV.on && ruta !== '/api/login' && ruta !== '/api/password') sesionPerdida();

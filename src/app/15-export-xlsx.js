@@ -24,8 +24,9 @@ let exportando = false;
 
 // ---------- piezas de la semana ----------
 // «Victoria (abre) + Hojan (cocina)»: en el orden de la casilla, con las marcas en texto
+// (S0, 30/09) el Excel no lleva estilos de celda: la plaza de quien ya no está con nosotros lo dice en texto
 function xlsxNombres(lista) {
-  return lista.map((e, i) => nombrePid(e.pid) + (abreEn(lista, i) ? ' (abre)' : '') + (e.cocina ? ' (cocina)' : '')).join(' + ');
+  return lista.map((e, i) => nombrePid(e.pid) + (salidaDe(personaDeId(e.pid)) ? ' (ya no está)' : '') + (abreEn(lista, i) ? ' (abre)' : '') + (e.cocina ? ' (cocina)' : '')).join(' + ');
 }
 function xlsxCasilla(c, l, franja) {
   const tid = turnoId(l.id, franja);
@@ -131,7 +132,7 @@ async function exportarExcelHoras() {
       tot.dias += f.dias; tot.mananas += f.mananas; tot.tardes += f.tardes; tot.partidos += f.partidos; tot.horas += f.horas; tot.extras += f.extrasMin / 60;
       tot.festivas += f.festivas; tot.domingos += f.domingos; tot.noct += f.horasNocturnas;
       if (f.contratoHoras !== null) { tot.contrato += f.contratoHoras; tot.saldo += f.saldo; tot.conContrato++; }
-      const obs = [baja ? 'de baja' : '', f.ausencias ? `${pl(f.ausencias, 'día', 'días')} de ausencia` : '', f.forzados ? `${pl(f.forzados, 'asignación forzada', 'asignaciones forzadas')}` : ''].filter(Boolean).join(' · ');
+      const obs = [f.salido ? `ya no está (desde el ${fmtDM(f.salido.desde)})` : '', baja ? 'de baja' : '', f.ausencias ? `${pl(f.ausencias, 'día', 'días')} de ausencia` : '', f.forzados ? `${pl(f.forzados, 'asignación forzada', 'asignaciones forzadas')}` : ''].filter(Boolean).join(' · ');
       aoa.push([p.nombre, puestoLbl(p), f.dias, f.mananas, f.tardes, f.partidos, r1(f.horas), r1(f.extrasMin / 60), f.festivas, f.domingos, r1(f.horasNocturnas), f.contratoHoras === null ? '' : f.contratoHoras, f.saldo === null ? '' : f.saldo, obs]);
     }
     aoa.push(['TOTAL', '', tot.dias, tot.mananas, tot.tardes, tot.partidos, r1(tot.horas), r1(tot.extras), tot.festivas, tot.domingos, r1(tot.noct), tot.conContrato ? r1(tot.contrato) : '', tot.conContrato ? r1(tot.saldo) : '', '']);

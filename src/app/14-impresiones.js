@@ -181,6 +181,7 @@ function pxDescansos(cols, personas) {
   const porDia = cols.map(c => {
     const libran = [], ausentes = [], marcas = {};
     for (const p of resto) {
+      if (haSalido(p, c.iso)) continue;   // (S0) quien ya no está con nosotros ese día ni libra ni está ausente: se fue
       const a = ausenciaEn(p, c.iso);
       if (a) { ausentes.push({ p, a }); continue; }
       if (!casillasDe(c.est, c.iso, p.id).length) libran.push(p);
@@ -208,12 +209,15 @@ function pxFilasDescansos(cols, personas, colspan) {
 function pxSlot(s, franja) {
   // en la hoja del equipo, una posición es un nombre y nada más. El hueco sin cubrir no se
   // imprime: no es cosa del bar, es de la oficina, y en el papel solo confundiría.
-  if (PX.soloNombres) return s.hueco ? '' : `<div class="pxg-s"><div class="pxg-b"><span class="pxg-nm">${esc(s.nombre)}</span></div></div>`;
+  // (S0, 30/09) la posición de quien ya no está con nosotros lleva el sombreado (clase salido, una trama que se ve
+  // también en blanco y negro) en las dos hojas, y en la de la oficina lo dice
+  const sal = s.salido ? ' salido' : '';
+  if (PX.soloNombres) return s.hueco ? '' : `<div class="pxg-s${sal}"><div class="pxg-b"><span class="pxg-nm">${esc(s.nombre)}</span></div></div>`;
   if (s.hueco) return `<div class="pxg-s hueco" title="${esc(s.motivo || '')}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-hb">Hueco disponible</span><small class="pxg-sub bad">abre la ${franja === 'M' ? 'mañana' : 'tarde'} · turno completo</small></div></div>`;
   const mk = (s.abreFijo ? '<b class="pxg-mk abre" title="Sale el primero (fijo)">▸</b>' : '') + (s.comodin ? '<b class="pxg-mk com" title="Sin local fijo">□</b>' : '');
   const tags = (s.continuo ? '<em class="pxg-tag c" title="Turno continuo: sale el primero de mañana y de tarde">C</em>' : s.partido ? '<em class="pxg-tag p" title="Turno partido: mañana y tarde">P</em>' : '');
-  const subs = (s.por ? `<small class="pxg-sub">por ${esc(nombrePid(s.por))}</small>` : '') + (s.nota ? `<small class="pxg-sub">${esc(s.nota)}</small>` : '') + (s.forzado ? '<small class="pxg-sub warn">forzado a mano</small>' : '');
-  return `<div class="pxg-s${s.abre ? ' abre' : ''}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-nm">${mk}${esc(s.nombre)}</span>${tags}${subs}</div></div>`;
+  const subs = (s.por ? `<small class="pxg-sub">por ${esc(nombrePid(s.por))}</small>` : '') + (s.nota ? `<small class="pxg-sub">${esc(s.nota)}</small>` : '') + (s.forzado ? '<small class="pxg-sub warn">forzado a mano</small>' : '') + (s.salido ? `<small class="pxg-sub salido">${esc(textoSalido(s.salido))}</small>` : '');
+  return `<div class="pxg-s${s.abre ? ' abre' : ''}${sal}"><i class="pxg-n">${s.pos}</i><div class="pxg-b"><span class="pxg-nm">${mk}${esc(s.nombre)}</span>${tags}${subs}</div></div>`;
 }
 // la cuenta «n/min*» de arriba a la izquierda: * = mínimo supuesto; «+1 hueco» si la
 // 1.ª posición está vacante; «faltan n» si no llega al mínimo; «corregido» si cambió
@@ -478,7 +482,8 @@ function pxgPreguntas(res) {
   for (const l of S.locales) for (const f of FRANJAS) {
     if (!(l.abre && l.abre[f] && l.abre[f].length)) continue;
     // 24/09 (fase 5, S19): el fijo con sus interruptores, la misma lectura que la planilla (abreFijo)
-    const fijo = quienAbreFijo(S, S.staff, l, f);
+    // (revisión S0) con el lunes de la semana: quien ya no está esa semana no abre nada
+    const fijo = quienAbreFijo(S, S.staff, l, f, res.lunes || null);
     if (fijo) con.push(`${l.nombre} (${FRANJA_LBL[f].toLowerCase()})`); else sin[f].push(l.nombre);
   }
   if (sin.M.length || sin.T.length) out.push(`<b>¿Quién sale el primero ${[sin.M.length ? `por la mañana en ${esc(pxgLista(sin.M))}` : '', sin.T.length ? `por la tarde en ${esc(pxgLista(sin.T))}` : ''].filter(Boolean).join(', y ')}?</b> ${con.length ? `Ya consta en ${esc(pxgLista(con))}. ` : ''}Ahora pesa más, porque el primero de la casilla define quién hace turno completo.`);
@@ -614,7 +619,7 @@ function abrirImpresionHoras() {
     tot.festivas += f.festivas; tot.domingos += f.domingos; tot.noct += f.horasNocturnas;
     if (f.contratoHoras !== null) { tot.contrato += f.contratoHoras; tot.saldo += f.saldo; tot.conContrato++; }
     const sc = f.saldo === null ? 'mut' : f.saldo > 0 ? 'pos' : f.saldo < 0 ? 'neg' : '';
-    h += `<tr${baja ? ' class="baja"' : ''}><td class="nom">${pxNombre(p.id)}${baja ? '<small class="mut"> · de baja</small>' : ''}</td><td class="num">${f.dias}</td><td class="num">${f.mananas}</td><td class="num">${f.tardes}</td><td class="num">${f.partidos}</td><td class="num hh">${numHoras(f.horas)}</td><td class="num">${f.extrasMin ? numHoras(f.extrasMin / 60) : mut}</td><td class="num">${f.festivas || mut}</td><td class="num">${f.domingos || mut}</td><td class="num">${f.nocturnosMin ? numHoras(f.horasNocturnas) : mut}</td><td class="num">${f.contratoHoras === null ? '<span class="mut">—</span>' : numHoras(f.contratoHoras)}</td><td class="num ${sc}">${f.saldo === null ? '—' : (f.saldo > 0 ? '+' : '') + numHoras(f.saldo)}</td></tr>`;
+    h += `<tr${baja || f.salido ? ' class="baja"' : ''}><td class="nom">${pxNombre(p.id)}${f.salido ? `<small class="mut"> · ya no está (desde el ${esc(fmtDM(f.salido.desde))})</small>` : baja ? '<small class="mut"> · de baja</small>' : ''}</td><td class="num">${f.dias}</td><td class="num">${f.mananas}</td><td class="num">${f.tardes}</td><td class="num">${f.partidos}</td><td class="num hh">${numHoras(f.horas)}</td><td class="num">${f.extrasMin ? numHoras(f.extrasMin / 60) : mut}</td><td class="num">${f.festivas || mut}</td><td class="num">${f.domingos || mut}</td><td class="num">${f.nocturnosMin ? numHoras(f.horasNocturnas) : mut}</td><td class="num">${f.contratoHoras === null ? '<span class="mut">—</span>' : numHoras(f.contratoHoras)}</td><td class="num ${sc}">${f.saldo === null ? '—' : (f.saldo > 0 ? '+' : '') + numHoras(f.saldo)}</td></tr>`;
   }
   h += `</tbody><tfoot><tr><td>Total · ${pl(orden.length, 'persona', 'personas')}</td><td class="num">${tot.dias}</td><td class="num">${tot.mananas}</td><td class="num">${tot.tardes}</td><td class="num">${tot.partidos}</td><td class="num hh">${numHoras(tot.horas)}</td><td class="num">${numHoras(tot.extras)}</td><td class="num">${tot.festivas}</td><td class="num">${tot.domingos}</td><td class="num">${numHoras(tot.noct)}</td><td class="num">${tot.conContrato ? numHoras(tot.contrato) : '—'}</td><td class="num ${tot.saldo > 0 ? 'pos' : tot.saldo < 0 ? 'neg' : ''}">${tot.conContrato ? (tot.saldo > 0 ? '+' : '') + numHoras(tot.saldo) : '—'}</td></tr></tfoot></table>`;
   h += '<p class="pxnota">Horas = turnos + extras. Contrato = horas semanales del contrato × días del mes, descontados los días de ausencia. Saldo = horas − contrato. Festivos y domingos son días trabajados; nocturnas, las horas entre las 22:00 y las 06:00.</p>';

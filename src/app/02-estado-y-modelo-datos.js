@@ -344,7 +344,8 @@ const personaDeId = pid => S.staff.find(p => p.id === pid) || null;
 const nombrePid = pid => (personaDeId(pid) || { nombre: pid }).nombre;
 // quien no está de baja EL DÍA QUE SE MIRA (24/09, S6): hasta entonces se miraba siempre hoy,
 // y quien estaba de baja hoy desaparecía de los descansos y de la Cobertura de otras semanas
-const activos = iso => S.staff.filter(p => !deBaja(p, iso));
+// 30/09 (S0): y quien ya no está con nosotros ese día (staffEnPlantilla) tampoco cuenta: ni libra ni se le elige
+const activos = iso => staffEnPlantilla(S.staff, iso).filter(p => !deBaja(p, iso));
 // el mes está cerrado para la nómina: se avisa antes de tocarlo
 function mesCerrado(iso) { return !!(S.cierres && S.cierres[iso.slice(0, 7)]); }
 function confirmarSiCerrado(iso) {

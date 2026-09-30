@@ -2,6 +2,55 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **«Ya no está con nosotros»: quien deja el grupo no se borra (30/09; Diego: «cuando un trabajador lo deja, no
+  deberíamos eliminarlo de la aplicación»).** En la ficha, el botón «Quitar del equipo» pasa a **«Ya no está con
+  nosotros…»**: se dice desde qué día (por defecto hoy) y, si se quiere, por qué; la app cuenta cuántos turnos se
+  retiran desde esa fecha y, si hay un mes anterior con turnos sin cerrar en Horas, lo recuerda antes («Septiembre no
+  está cerrado en Horas: ciérralo antes para que la nómina quede guardada», con «Ir a Horas» y «Seguir igualmente»;
+  «Añadir persona» avisa igual). Lo que se nota:
+  - Sus turnos de antes de esa fecha se quedan donde estaban, con un **sombreado rojo** y el aviso «ya no trabaja con
+    nosotros (desde el d/m)» en Hoy, la Semana, el Mes, la hoja impresa y la imagen de compartir (en papel, una trama
+    que se ve en blanco y negro); en el Excel, «(ya no está)». En Horas siguen contando, y su fila sale marcada
+    mientras el mes tenga algo suyo.
+  - Desde esa fecha no entra en ninguna casilla (ni forzando) ni sale en ningún selector, candidato, hueco o
+    Cobertura; la semana tipo salta sus plazas y lo dice; su «cubre a» deja de valer y la casilla de Susi lo dice
+    («Adrián · ya no está con nosotros»); la cocina y «Quién abre» de los locales le dejan de contar (las listas se
+    quedan, y en Ajustes salen tachadas con el motivo). Lo automático que había suyo, o «por» él, se retira al
+    regenerar («X ya no está con nosotros»). Todo con un solo Ctrl+Z.
+  - En Equipo no cuenta ni sale con los demás: va en la sección plegada **«Ya no están con nosotros (n)»** al final,
+    con «Restaurar» (vuelve al equipo; sus turnos pasados siguen) y, solo para el programador, «Borrar del todo».
+  - Con servidor, el empleado cuya persona ya no está no puede entrar en la app (ni seguir con la sesión abierta):
+    «Ya no tienes acceso a la app».
+  - **Recuperar a quien se borró del todo** (Diego: «restaura en la aplicación el trabajador eliminado y vuelve a
+    retomar su planilla»): en Cuenta, «Personas borradas» lista a quien está en alguna versión anterior del servidor y
+    no en la de ahora; «Recuperar» vuelve a poner su ficha (como «ya no está con nosotros» desde el día en que se
+    borró) y sus turnos de antes de ese día, sin tocar nada más, y todos los dispositivos lo ven.
+  - Dos arreglos de la auditoría del 25/09 que hacían falta para esto: quitar la única plaza de un día ya no
+    «desengancha» ese día de la planilla guardada (una Cobertura sobre el único turno del día llegaba a la pantalla y
+    no al servidor, B2/H1), y el tramo del partido del sábado con horario propio solo para la mañana ya no cuenta la
+    tarde con las ocho horas de apertura (G1).
+  - **Revisión de S0 (30/09), lo que se nota tras las dos revisiones (modelo y cliente):** en el móvil, «Ya no está
+    con nosotros…» y «Confirmar» responden al primer toque (el sitio para el teclado sale ahora de lo que el teclado
+    tapa de verdad, no del foco de un campo: al tocar un botón la tarjeta encogía y el botón se movía bajo el dedo);
+    el pie de la ficha (con ese botón y «Listo») va pegado abajo y se ve sin bajar 3.000 px. Las ausencias apuntadas
+    para después de la salida ya no cuentan (Susi, con la baja abierta, salía en Horas de diciembre con 31 días y el
+    Generador la decía «de baja» tras irse). El Generador agrupa sus plazas de la semana tipo en una línea («12 plazas
+    de la semana tipo de Adrián · ya no trabaja con nosotros…») en vez de doce, cuenta «ninguna de las N personas» sin
+    ella, deja de comprobar «Roberto cubre a Adrián» cuando Adrián ya no está y, la semana en la que se va, la cocina
+    del local y «Quién abre» dicen «Adrián (hasta el 22/9)». La tarjeta de «Ya no están» avisa de que sigue en la
+    semana tipo. La Cobertura no la propone como designada ni la ofrece en «Quién va a faltar» si ya no está el primer
+    día de la tira (y si se va durante la tira, la cabecera lo dice). Las fichas: en la de Susi, «Si falta, le cubre
+    Adrián (ya no está con nosotros: no le cubre)», en la de Adrián su «Cubre a Susi» dice que no se aplica, y los
+    selectores de «nunca con» y «cubre a» no ofrecen a quien ya no está. En el Mes, la casilla vacía de quien ya no
+    está no ofrece «Poner en…» (y ninguna regla que no se pueda forzar pregunta «¿Ponerlo de todas formas?» ni deja una
+    entrada vacía en Deshacer); el menú de una plaza suya de antes lo dice y no ofrece «Falta estos días…». «Ir a
+    Horas» desde el diálogo cierra también la ficha; «Restaurar» avisa de que los turnos retirados no vuelven solos
+    (Ctrl+Z si acabas de darle la salida, o volver a generar). Recuperar a quien se borró del todo conserva su salida
+    real (fecha y motivo) si ya la tenía, vuelve sin parejas «nunca con» ni «cubre a» (ya no aplican) y con las marcas
+    a mano de entonces en sus casillas; Cuenta dice que el servidor guarda las últimas 60 versiones. Con servidor, el
+    empleado que ya no está no puede tampoco cambiar la contraseña, pedir la clave push ni abrir el canal de eventos
+    con la sesión abierta (solo salir y ver la versión), y una fecha de salida imposible (mes 13) da 400, no un error
+    interno. `darSalida` exige la fecha en AAAA-MM-DD.
 - **Revisión final de todo lo del 24/09 (25/09).** Tres revisiones con el caso completo (el Mónaco cerrado del
   domingo 27 por la tarde al martes 29, Mari Luz libra el martes 29, «cubre a Iván» y sus vacaciones del 2 al 4 por
   la tarde), con la base de datos de producción abierta con la versión nueva y con el servidor. Lo que se arregla:

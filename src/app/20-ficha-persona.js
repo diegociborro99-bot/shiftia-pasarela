@@ -49,13 +49,14 @@ function openFicha(pid, opts) {
       <div><div class="pinlbl">Color en la planilla</div><div class="colorset" id="fichColores"></div></div>
     </div>
     <div id="fichBody"></div>
-    <div class="fichfoot"><button type="button" class="btn btn-ghost" data-baja>Quitar del equipo</button><button type="button" class="btn btn-cta" data-ovx>Listo</button></div>`, { ancho: 640, vigila: 'staff:' + p.id, reabrir: () => openFicha(p.id, { lpSem }) });
+    <div class="fichfoot">${salidaDe(p) ? `<button type="button" class="btn btn-ghost" data-restaurar="${esc(p.id)}" title="Vuelve al equipo; sus turnos pasados siguen. Los retirados desde el ${esc(fmtDM(salidaDe(p).desde))} no vuelven solos: Ctrl+Z si acabas de darle la salida, o vuelve a generar">Restaurar</button>` : `<button type="button" class="btn btn-ghost" data-salida title="Se va del equipo desde una fecha: sus turnos de antes se conservan">Ya no está con nosotros…</button>`}<button type="button" class="btn btn-cta" data-ovx>Listo</button></div>`, { ancho: 640, vigila: 'staff:' + p.id, reabrir: () => openFicha(p.id, { lpSem }) });
 
   const body = ov.querySelector('#fichBody');
   const locChips = (sel, attr, opts) => S.locales.map(l => `<button type="button" class="locchip${sel.includes(l.id) ? ' on' : ''}" data-${attr}="${esc(l.id)}" data-libre style="--lc:${esc(l.color)}"><i class="ldot"></i>${esc(opts && opts.corto ? l.corto : l.nombre)}</button>`).join('');
   const franjaChips = (sel, attr) => FRANJAS.map(f => `<button type="button" class="segk${sel.includes(f) ? ' on' : ''}" data-${attr}="${f}" data-libre>${FRANJA_LBL[f]}</button>`).join('');
   const chk = (attr, on, txt) => `<label class="singchk chkrow"><input type="checkbox" data-chk="${attr}" data-libre${on ? ' checked' : ''}> ${txt}</label>`;
-  const selPersonas = (id, excl) => `<select class="logininp" id="${id}" data-libre><option value="">— elegir persona —</option>${S.staff.filter(q => q.id !== p.id && !(excl || []).includes(q.id)).map(q => `<option value="${esc(q.id)}">${esc(q.nombre)}</option>`).join('')}</select>`;
+  // (revisión S0) sin quien ya no está con nosotros: no se le designa para nada nuevo
+  const selPersonas = (id, excl) => `<select class="logininp" id="${id}" data-libre><option value="">— elegir persona —</option>${S.staff.filter(q => q.id !== p.id && !(excl || []).includes(q.id) && !haSalido(q, isoHoy())).map(q => `<option value="${esc(q.id)}">${esc(q.nombre)}</option>`).join('')}</select>`;
   const selDia = (attr, sel) => `<select class="logininp" ${attr} data-libre><option value="">cualquier día</option>${TODOS.map(d => `<option value="${d}"${+sel === d ? ' selected' : ''}>${esc(DIAS_L[d])}</option>`).join('')}</select>`;
   const selTurno = (attr, sel) => `<select class="logininp" ${attr} data-libre><option value="">cualquier turno</option>${turnosDe(S).map(t => `<option value="${esc(t.id)}"${sel === t.id ? ' selected' : ''}>${esc(lblTurno(t.id))}</option>`).join('')}</select>`;
   const sec = (id, titulo, sub, html) => `<details class="pmore fsec" data-sec="${id}" open><summary>${esc(titulo)}${sub ? ` <small>${esc(sub)}</small>` : ''}</summary><div class="fsecb">${html}</div></details>`;
@@ -127,7 +128,7 @@ function openFicha(pid, opts) {
     // tarjeta); la condición solo se dice si la hay («cuando falte los viernes»)
     const leCubren = quienLeCubre(S, S.staff, p.id);
     const bloqueLeCubre = `<div class="lecubre" data-lecubre>${leCubren.length
-      ? `<b>Si falta, le cubre${leCubren.length > 1 ? 'n' : ''}</b> ${leCubren.map(d => { const nota = [d.cuando !== 'siempre que falte' ? d.cuando : '', d.activa ? '' : '«Cubre a» apagado: ahora no se aplica'].filter(Boolean).join(' · '); return `<button type="button" class="glink" data-irficha="${esc(d.pid)}">${esc(d.nombre)}</button>${nota ? ` <small>(${esc(nota)})</small>` : ''}`; }).join(' y ')}<small class="lecubrepie">Se pone y se quita en la ficha de quien cubre. Vale hasta que se quite.</small>`
+      ? `<b>Si falta, le cubre${leCubren.length > 1 ? 'n' : ''}</b> ${leCubren.map(d => { const nota = [d.salido ? 'ya no está con nosotros: no le cubre' : '', d.cuando !== 'siempre que falte' ? d.cuando : '', d.activa ? '' : '«Cubre a» apagado: ahora no se aplica'].filter(Boolean).join(' · '); return `<button type="button" class="glink" data-irficha="${esc(d.pid)}">${esc(d.nombre)}</button>${nota ? ` <small>(${esc(nota)})</small>` : ''}`; }).join(' y ')}<small class="lecubrepie">Se pone y se quita en la ficha de quien cubre. Vale hasta que se quite.</small>`
       : `<b>Nadie le cubre en concreto.</b> <small>Si falta, se busca quién en la Cobertura. Para que alguien le cubra siempre, ponlo en la ficha de esa persona, en «Cubre a».</small>`}</div>`;
     // 24/09 (fase 6, S21 y S24): cada pareja una vez, también la que puso la otra ficha, con su «flexible» y su
     // interruptor; ponerla, quitarla, apagarla o hacerla flexible toca las dos fichas (ponerNuncaCon, quitarNuncaCon)
@@ -140,7 +141,8 @@ function openFicha(pid, opts) {
       bloqueLeCubre +
       car('nuncaCon', 'Nunca coincide con', '(es de las dos: se pone, se quita y se apaga en las dos fichas)', `${parejas.map(filaPar).join('') || '<div class="festvacio">Con nadie en especial.</div>'}
        <span class="addrow">${selPersonas('fNuncaSel', parejas.map(x => x.pid))}<label class="singchk parflex"><input type="checkbox" id="fNuncaFlex" data-libre> flexible</label><button type="button" class="btn-mini" data-addnunca>Añadir</button></span>`) +
-      car('cubreA', 'Cubre a', '(ocupa su sitio cuando falta, hasta que lo quites, y si hace falta puede hacer partido para cubrirle; no se salta nada más)', `${p.cubreA.map((cb, i) => fila(`Cubre a ${esc(nombrePid(cb.pid))}`, `${esc(cuandoCubre(S, cb))} · hasta que lo quites`, `<span class="cubrectl">${selDia(`data-cubred="${i}"`, cb.dow)}${selTurno(`data-cubret="${i}"`, cb.turnoId)}</span>`, `data-rmcubre="${i}"`)).join('') || '<div class="festvacio">No cubre a nadie en concreto.</div>'}
+      // (revisión S0) la designación de quien ya no está, o de cubrir a quien ya no está, no se aplica: se dice en la fila
+      car('cubreA', 'Cubre a', '(ocupa su sitio cuando falta, hasta que lo quites, y si hace falta puede hacer partido para cubrirle; no se salta nada más)', `${p.cubreA.map((cb, i) => { const x = personaDeId(cb.pid); const noAplica = salidaDe(p) ? `no se aplica: ${textoSalida(p)}` : x && haSalido(x, isoHoy()) ? `no se aplica: ${nombrePid(cb.pid)} ${textoSalida(x)}` : ''; return fila(`Cubre a ${esc(nombrePid(cb.pid))}`, noAplica ? `<span style="color:var(--bad)">${esc(noAplica)}</span>` : `${esc(cuandoCubre(S, cb))} · hasta que lo quites`, `<span class="cubrectl">${selDia(`data-cubred="${i}"`, cb.dow)}${selTurno(`data-cubret="${i}"`, cb.turnoId)}</span>`, `data-rmcubre="${i}"`); }).join('') || '<div class="festvacio">No cubre a nadie en concreto.</div>'}
        <span class="addrow addrow3">${selPersonas('fCubreP')}${selDia('id="fCubreD"')}${selTurno('id="fCubreT"')}<button type="button" class="btn-mini" data-addcubre>Añadir</button></span>`));
     // 24/09 (fase 6, S30): el veto con su día («no hace mañanas los lunes») y el alta con el día; repetido es el mismo
     // local, franja y día (vetoRepetido), o uno de todos los días que ya lo cubre
@@ -176,7 +178,7 @@ function openFicha(pid, opts) {
     ov.querySelector('#fichAv').style.background = avColor(p.id);
     ov.querySelector('#fichAv').textContent = initials(p.nombre);
     const locs = p.locales.length ? p.locales.map(nombreLocal).join(' y ') : 'cualquier local (sin local fijo)';
-    ov.querySelector('#fichSub').textContent = `${lblPuesto(p.puesto)} · ${locs} · ${lblFranjas(p.franjas).toLowerCase()}${deBaja(p, isoHoy()) ? ' · de baja' : ''}`;
+    ov.querySelector('#fichSub').textContent = `${lblPuesto(p.puesto)} · ${locs} · ${lblFranjas(p.franjas).toLowerCase()}${deBaja(p, isoHoy()) ? ' · de baja' : ''}${salidaDe(p) ? ` · ${textoSalida(p)}` : ''}`;
     ov.querySelector('#fichColores').innerHTML = PALETA_PERSONAS.map((col, i) => {
       const otros = S.staff.filter(q => q.id !== p.id && q.color === i).map(q => q.nombre);
       return `<button type="button" class="colsw${p.color === i ? ' on' : ''}${otros.length ? ' usado' : ''}" data-color="${i}" data-libre style="--pc:${col}" title="${otros.length ? 'Lo usa ' + esc(otros.join(', ')) : 'Libre'}" aria-label="Color ${i + 1}"></button>`;
@@ -199,7 +201,9 @@ function openFicha(pid, opts) {
   ov.addEventListener('click', e => {
     const t = e.target;
     if (t === ov || t.closest('[data-ovx]')) { cerrar(); return; }
-    if (t.closest('[data-baja]')) { if (bajaPersona(p.id)) { tocada = false; ov.remove(); } return; }
+    // 30/09 (S0): «Ya no está con nosotros…» abre el diálogo de la salida; «Restaurar» la quita
+    if (t.closest('[data-salida]')) { openSalida(p.id, () => { tocada = false; ov.remove(); }); return; }
+    if (t.closest('[data-restaurar]')) { if (restaurarSalidaUI(p.id)) { tocada = false; ov.remove(); } return; }
     const cs = t.closest('[data-color]');
     if (cs) { guarda('color', x => { x.color = +cs.dataset.color; }); pintaCabecera(); return; }
     const d = t.dataset || {};
@@ -431,4 +435,45 @@ function cambiarDiaLibreUI(pid, lunes, dias) {
   if (typeof GEN !== 'undefined' && GEN.previa && GEN.previa.semana && GEN.lunes === l0) GEN.previa = null;   // la vista previa de esa semana ya no vale
   if (r) toast(`${p.nombre}: la semana del ${fmtDDMM(l0)} ya está cambiada en la planilla${r.huecos.length ? ` · ${pl(r.huecos.length, 'hueco', 'huecos')} por cubrir` : ''}${nRech ? ` · ${nRech === 1 ? 'una plaza no se pudo poner' : `${nRech} plazas no se pudieron poner`}` : ''} · ${comoDeshacer()} para deshacer`, r.huecos.length || nRech ? 'warn' : 'ok');
   return true;
+}
+
+// ---------- «Ya no está con nosotros…» (S0, 30/09) ----------
+// Diego, 30/09: «cuando un trabajador lo deja, no deberíamos eliminarlo de la aplicación». El diálogo pequeño desde la
+// ficha: la fecha de salida (por defecto hoy), el motivo (opcional) y lo que va a pasar («se retiran N turnos desde
+// el d/m (M a mano)»); si hay meses anteriores con turnos sin cerrar en Horas, el aviso de cerrarlos antes, con «Ir a
+// Horas» y «Seguir igualmente» (no bloquea). Confirmar → darSalidaUI (un solo Ctrl+Z). hecho() cierra la ficha.
+function openSalida(pid, hecho) {
+  const p = personaDeId(pid); if (!p) return null;
+  const cuenta = desde => { let n = 0, aMano = 0; for (const k of Object.keys(S.meses)) { if (k < desde.slice(0, 7)) continue; for (const [iso, porT] of Object.entries(S.meses[k].asig || {})) { if (iso < desde) continue; for (const l of Object.values(porT)) { const e = l.find(x => x.pid === pid); if (e) { n++; if (e.origen === 'manual' || e.forzado) aMano++; } } } } return { n, aMano }; };
+  const ov = abrirOverlay('salidaOvl', `<span class="micro">EQUIPO · ${esc(p.nombre.toUpperCase())}</span>
+    <h2 class="revh2">Ya no está con nosotros</h2>
+    <p class="revsub">Desde la fecha que digas, ${esc(p.nombre)} deja de contar: no entra en ninguna casilla ni sale en las listas, y se retiran sus turnos desde ese día. Lo de antes se queda tal cual (se ve en la planilla, con sombreado rojo, y cuenta en Horas). Se puede restaurar desde Equipo.</p>
+    <div class="row2"><span><label class="pinlbl">Desde<input type="date" id="salDesde" class="logininp" data-libre value="${esc(isoHoy())}"></label></span>
+    <span><label class="pinlbl">Motivo (opcional)<input type="text" id="salMotivo" class="logininp" data-libre placeholder="p. ej. se va a otro trabajo" maxlength="120"></label></span></div>
+    <p class="filltxt" id="salResumen" style="margin:6px 0 0"></p>
+    <div id="salAviso"></div>
+    <div class="pvbar ausbar"><button type="button" class="btn btn-ghost" data-ovx>Cancelar</button><button type="button" class="btn btn-cta" id="salOk">Confirmar</button></div>`, { ancho: 560 });
+  const desdeEl = ov.querySelector('#salDesde'), okBtn = ov.querySelector('#salOk');
+  const pinta = () => {
+    const desde = desdeEl.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde)) { ov.querySelector('#salResumen').textContent = 'Escribe la fecha desde la que ya no está.'; okBtn.disabled = true; return; }
+    okBtn.disabled = false;
+    const { n, aMano } = cuenta(desde);
+    ov.querySelector('#salResumen').textContent = n ? `Se retiran ${n} turnos desde el ${fmtDM(desde)}${aMano ? ` (${aMano} a mano)` : ''}. Los anteriores se quedan.` : `No tiene turnos desde el ${fmtDM(desde)}: solo se apunta la salida.`;
+    const av = avisoMesesSinCerrar(desde);
+    ov.querySelector('#salAviso').innerHTML = av;
+    okBtn.textContent = av ? 'Seguir igualmente' : 'Confirmar';
+  };
+  desdeEl.addEventListener('input', pinta); desdeEl.addEventListener('change', pinta);
+  pinta();
+  ov.addEventListener('click', e => {
+    const ih = e.target.closest('[data-irhoras]'); if (ih) { irAHorasDe(ih.dataset.irhoras, ov); return; }
+    if (!e.target.closest('#salOk')) return;
+    const desde = desdeEl.value, motivo = ov.querySelector('#salMotivo').value.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde)) { toast('Falta la fecha', 'warn'); return; }
+    ov.remove();
+    if (darSalidaUI(pid, desde, motivo) && typeof hecho === 'function') hecho();
+  });
+  setTimeout(() => desdeEl.focus(), 50);
+  return ov;
 }

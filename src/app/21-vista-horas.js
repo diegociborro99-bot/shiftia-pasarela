@@ -98,8 +98,9 @@ function renderHoras() {
     if (f.contratoHoras !== null) { tot.contrato += f.contratoHoras; tot.saldo += f.saldo; tot.conContrato++; }
     const abierta = HORAS_ABIERTAS.has(p.id);
     const sc = f.saldo === null ? '' : f.saldo > 0 ? 'pos' : f.saldo < 0 ? 'neg' : '';
-    h += `<tr class="hrow${baja ? ' baja' : ''}${abierta ? ' open' : ''}" data-hx="${esc(p.id)}" role="button" tabindex="0" aria-expanded="${abierta}" title="Ver el desglose por local y las extras">
-      <td class="per"><span class="av" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span><span class="pn2"><b>${esc(p.nombre)}</b><small>${baja ? 'de baja' : esc(puestoLbl(p)) || '&nbsp;'}</small></span><span class="caret" aria-hidden="true">›</span></td>
+    // (S0, 30/09) quien ya no está con nosotros sale mientras ese mes tenga algo suyo (horasEquipoMes), con su fila marcada
+    h += `<tr class="hrow${baja ? ' baja' : ''}${f.salido ? ' salido' : ''}${abierta ? ' open' : ''}" data-hx="${esc(p.id)}" role="button" tabindex="0" aria-expanded="${abierta}" title="Ver el desglose por local y las extras">
+      <td class="per"><span class="av" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span><span class="pn2"><b>${esc(p.nombre)}</b><small>${f.salido ? `ya no está (desde el ${esc(fmtDM(f.salido.desde))})` : baja ? 'de baja' : esc(puestoLbl(p)) || '&nbsp;'}</small></span><span class="caret" aria-hidden="true">›</span></td>
       <td class="num">${f.dias || mut}</td><td class="num">${f.mananas || mut}</td><td class="num">${f.tardes || mut}</td><td class="num">${f.partidos || mut}</td>
       <td class="num hh"><b>${numHoras(f.horas)}</b></td>
       <td class="num">${f.extrasMin ? numHoras(f.extrasMin / 60) : mut}</td>

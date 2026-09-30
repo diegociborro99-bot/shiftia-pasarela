@@ -1,0 +1,42 @@
+/* ============ «YA NO ESTÁ CON NOSOTROS» (S0, 30/09) ============
+   Diego, 30/09: «mantén en la planilla como con un sombreado rojo para indicar que ya no trabaja con nosotros».
+   La plaza de quien tiene salida en la ficha (posicionesDe → salido) en Hoy, la Semana, el Mes, el perfil y la
+   hoja impresa: sombreado rojo suave y borde rojo, sin tachar; en papel (y en la imagen de compartir, que es la
+   misma hoja), una trama que se ve también en blanco y negro. Los colores salen de los tokens (--bad, --surface):
+   el tema oscuro los cambia solo. Va ANTES de 26-pasarela-movil.css (los estilos táctiles van los últimos). */
+/* Hoy */
+.pchip.salido{background:color-mix(in srgb, var(--bad) 14%, var(--surface));border-color:color-mix(in srgb, var(--bad) 60%, var(--border));border-left-color:var(--bad)}
+.pchip.salido .pnom{color:color-mix(in srgb, var(--bad) 70%, var(--ink))}
+.pchip.salido .pnom::after{content:"ya no está";margin-left:6px;font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.06em;color:var(--bad);border:1px solid color-mix(in srgb, var(--bad) 60%, transparent);border-radius:5px;padding:1px 5px;vertical-align:middle}
+/* Semana: la píldora conserva el color de la persona debajo de la trama roja */
+.wav.salido{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--bad);background-image:repeating-linear-gradient(135deg, rgba(176,51,51,.55) 0 3px, transparent 3px 8px)}
+/* Mes: borde rojo y la pastilla apagada (la fila lo dice en el nombre) */
+.pill.salido{box-shadow:inset 0 0 0 2.5px var(--bad),0 0 0 2px color-mix(in srgb, var(--bad) 35%, transparent);filter:saturate(.35) brightness(1.05)}
+.prow.salido td.pname .pn b{color:var(--bad)}
+.prow.salido td.pname .pn small{color:var(--bad)}
+/* perfil del empleado */
+.festrow.salido{border-left-color:var(--bad) !important;background:color-mix(in srgb, var(--bad) 8%, var(--surface))}
+/* Equipo: la sección plegada del final y sus tarjetas */
+.eqsalidos{margin-top:18px;border-top:1px dashed var(--border);padding-top:6px}
+.eqsalidos summary{cursor:pointer;list-style:none}
+.eqsalidos summary::-webkit-details-marker{display:none}
+.eqsalidos summary::before{content:"▸";color:var(--bad);font-size:15px;line-height:1}
+.eqsalidos[open] summary::before{content:"▾"}
+.eqsalidos summary h2{color:var(--bad)}
+.pcard.scard.salido{border-color:color-mix(in srgb, var(--bad) 45%, var(--border));background:color-mix(in srgb, var(--bad) 6%, var(--surface))}
+.pcard.scard .sctxt{margin:8px 0 4px;color:var(--ink2)}
+.pcard.scard .pcfoot{display:flex;gap:8px;flex-wrap:wrap}
+.dstat.sal b{color:var(--bad)}
+/* los avisos de «cierra el mes antes» (la salida y el alta) */
+.salaviso{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 4px}
+.salaviso .btn-mini{flex:none}
+/* Horas: la fila de quien ya no está */
+.htab tr.salido td.per .pn2 small{color:var(--bad)}
+.htab tr.salido{opacity:.85}
+/* Ajustes del local: en la lista de cocina se queda, tachado y con el motivo */
+.festrow.coc.salido{opacity:.75;border-left-color:var(--bad) !important}
+.festrow.coc.salido .festinfo b{text-decoration:line-through;text-decoration-color:var(--bad)}
+.festrow.coc.salido .festinfo small{color:var(--bad)}
+/* hoja impresa e imagen de compartir: trama y borde (fijos: el papel no tiene tema) */
+.pxg-s.salido{background:repeating-linear-gradient(135deg, rgba(176,51,51,.22) 0 3px, transparent 3px 7px);box-shadow:inset 0 0 0 1.5px #b03333;border-radius:4px;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.pxg-sub.salido{color:#b03333}

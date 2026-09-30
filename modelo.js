@@ -567,7 +567,7 @@ function afectadosPorCierre(cfg, staff, est, c, opts) {
     const cerradas = c.dias[iso];
     const planilla = diaConPlanilla(est, iso) || pend.some(r => r.iso === iso);
     const fuente = planilla ? 'planilla' : 'semana tipo';
-    const enDia = planilla
+    let enDia = planilla
       ? turnosDe(cfg).flatMap(t => asignados(est, iso, t.id).map(e => ({ pid: e.pid, tid: t.id, localId: t.localId, franja: t.franja, cocina: !!e.cocina, abre: !!e.abre })))
       : (() => {
         const pls = plazasDelDia(cfg, staff, iso).plazas.filter(pl => { const p = personaDe(staff, pl.p); return p && !ausenciaEn(p, iso, partirTurno(pl.t).franja) && !p.standby; });
@@ -575,6 +575,8 @@ function afectadosPorCierre(cfg, staff, est, c, opts) {
         return pls.map(pl => Object.assign({ pid: pl.p, tid: pl.t, cocina: !!pl.c, abre: abre[pl.t] === pl.p }, partirTurno(pl.t)));
       })();
     for (const r of pend) if (r.iso === iso && r.entry && !enDia.some(x => x.pid === r.entry.pid && x.tid === r.tid)) enDia.push(Object.assign({ pid: r.entry.pid, tid: r.tid, cocina: !!r.entry.cocina, abre: !!r.entry.abre }, partirTurno(r.tid)));
+    // (S0, 30/09) quien ya no está con nosotros ese día no es afectado por el cierre: no hay nada que decidir de ella
+    enDia = enDia.filter(x => { const p = personaDe(staff, x.pid); return !p || !haSalido(p, iso); });
     const cerrada = x => x.localId === c.localId && cerradas.includes(x.franja);
     for (const x of enDia) if (cerrada(x)) tomar(x.pid).turnos.push({ iso, tid: x.tid, franja: x.franja, cocina: x.cocina, abre: x.abre, fuente });
     for (const a of porPid.values()) {
@@ -962,6 +964,10 @@ function franjasAusencia(a) {
 // Con tipo, solo las de ese tipo (la nómina: un permiso por la mañana y vacaciones por la tarde el
 // mismo día son dos cosas; revisión F3).
 function ausenciaEn(persona, iso, franja, tipo) {
+  // 30/09 (revisión S0): desde su salida, quien ya no está con nosotros no está «ausente»: se fue. Una sola lectura
+  // para todo lo que cuenta ausencias (deBaja, Horas, las vacaciones del año, Cobertura): la baja abierta de Susi
+  // seguía contando 31 días en Horas de diciembre y el Generador la decía «de baja» tras irse
+  if (haSalido(persona, iso)) return null;
   for (const a of persona.ausencias || []) {
     if (iso < a.desde || (a.hasta && iso > a.hasta)) continue;
     if (tipo && a.tipo !== tipo) continue;
@@ -1026,6 +1032,34 @@ function deBaja(persona, iso) {
   const a = ausenciaEn(persona, iso);
   return !!(a && a.tipo === 'BAJ');
 }
+// ---------- «Ya no está con nosotros»: la salida con fecha (S0, 30/09) ----------
+// Diego, 30/09: «cuando un trabajador lo deja, no deberíamos eliminarlo de la aplicación… que el administrador y el
+// oficinista puedan seguir viendo los trabajadores que ya no están trabajando con nosotros en los turnos pasados».
+// La ficha lleva p.salida = { desde: 'AAAA-MM-DD', motivo? }; sin el campo, está en plantilla. Desde esa fecha no
+// entra en ninguna casilla (la puerta lo bloquea sin que se pueda forzar) ni sale en ninguna lista; lo de antes de
+// la fecha se queda tal cual (sus turnos pasados, sus horas). Una sola lectura del campo: estas funciones.
+// haSalido pide la fecha, como deBaja (decisiones.md, principio 3: el modelo no mira el reloj).
+function salidaDe(p) {
+  if (!p || !p.salida || !p.salida.desde) return null;
+  const s = { desde: p.salida.desde };
+  if (p.salida.motivo) s.motivo = p.salida.motivo;
+  return s;
+}
+function haSalido(p, iso) {
+  if (!iso) throw new TypeError('haSalido(p, iso): falta la fecha (el modelo no mira el reloj)');
+  const s = salidaDe(p);
+  return !!s && iso >= s.desde;
+}
+function enPlantilla(p, iso) { return !haSalido(p, iso); }
+// «ya no trabaja con nosotros desde el 7/10»: el mismo texto en la puerta, el selector, la Revisión y las vistas
+function textoSalida(p) { const s = salidaDe(p); return s ? `ya no trabaja con nosotros desde el ${+s.desde.slice(8, 10)}/${+s.desde.slice(5, 7)}` : ''; }
+function staffEnPlantilla(staff, iso) { return (staff || []).filter(p => enPlantilla(p, iso)); }
+// «AAAA-MM-DD» y que exista (ni 2026-13-01 ni 2026-02-30): lo que exige darSalida (30/09, revisión S0)
+function fechaIsoValida(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + 'T00:00:00Z');
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
 
 // ---------- cocina ----------
 // 24/09 (fase 5, S36; Diego: «que lea todas las variables»). La cocina se configuraba en dos sitios que no se
@@ -1065,6 +1099,9 @@ function cocinaDe(cfg, persona, localId) {
 // cocina de ese local.
 function puedeCocina(cfg, persona, localId, iso) {
   if (!persona) return false;
+  // (S0, 30/09) con la fecha, quien ya no está con nosotros no lleva ninguna cocina desde ese día: la lista del local
+  // (l.cocina.titulares) no se borra, se ignora aquí, que es la única lectura de quién puede llevarla
+  if (iso && haSalido(persona, iso)) return false;
   const c = persona.cocina || {};
   const limites = activa(cfg, persona, 'cocina');
   if (limites && c.nunca) return false;
@@ -1244,6 +1281,7 @@ const REGLA_NOMBRE = {
   cocina: 'Cocina',   // 24/09 (S34): solo hace cocina, o ya lleva la cocina ese día, y el puesto es de sala
   // 24/09 (fase 4): lo que la puerta evalúa además (el selector y la hoja impresa las nombran)
   soloApoyos: 'Dos apoyos no se quedan solos', noPrimero: 'Nunca de primero', noAbre: 'No abre', primeroCompleto: 'El primero hace turno completo',
+  salida: 'Ya no está con nosotros',   // 30/09 (S0): la salida con fecha; no se fuerza nunca
 };
 function nombreRegla(k) { return REGLA_NOMBRE[k] || k || ''; }
 function regla(cfg, k) { return !(cfg && cfg.reglas && cfg.reglas[k] === false); }
@@ -1398,8 +1436,11 @@ function estadoDia(cfg, p, iso, franja) {
 // Antes «flexible» era de la persona (nuncaConFlexible) y el interruptor apagaba la característica entera en
 // cascada; migrarNuncaCon pasa lo de antes a esta forma sin cambiar lo que se aplicaba.
 const enLista = (xs, id) => Array.isArray(xs) && xs.includes(id);
-function incompatibles(cfg, a, b) {
+// (S0, 30/09) con la fecha (iso), la pareja no cuenta si uno de los dos ya no está con nosotros ese día: la puerta,
+// la Revisión, el núcleo y las condiciones la pasan; sin fecha (la ficha, Equipo), la pareja tal como está guardada
+function incompatibles(cfg, a, b, iso) {
   if (!a || !b || a.id === b.id || !regla(cfg, 'nuncaCon')) return null;
+  if (iso && (haSalido(a, iso) || haSalido(b, iso))) return null;
   const mio = caracteristicaActiva(a, 'nuncaCon') && enLista(a.nuncaCon, b.id);
   const suyo = caracteristicaActiva(b, 'nuncaCon') && enLista(b.nuncaCon, a.id);
   if (!mio && !suyo) return null;
@@ -1533,11 +1574,14 @@ function abreFijo(cfg, l, p, franja) {
 }
 // Quién tiene fijo abrir ese local y franja: el de «Quién abre» del local y, si no, el primero de la
 // plantilla con «sale el primero» en su ficha (abreFijo). null si nadie. Lo pregunta la hoja impresa.
-function quienAbreFijo(cfg, staff, l, franja) {
+// (S0, 30/09) con la fecha (iso), «Quién abre» del local no cuenta si esa persona ya no está con nosotros ese día:
+// el dato se queda en Ajustes (tachado), pero no manda; sin fecha, el dato tal cual
+function quienAbreFijo(cfg, staff, l, franja, iso) {
   if (!l) return null;
+  const sigue = q => !!q && (!iso || !haSalido(q, iso));
   const dl = l.primero && l.primero[franja];
-  if (dl && abreFijo(cfg, l, personaDe(staff || [], dl), franja)) return dl;
-  const p = (staff || []).find(q => abreFijo(cfg, l, q, franja));
+  if (dl && sigue(personaDe(staff || [], dl)) && abreFijo(cfg, l, personaDe(staff || [], dl), franja)) return dl;
+  const p = (staff || []).find(q => sigue(q) && abreFijo(cfg, l, q, franja));
   return p ? p.id : null;
 }
 // Cómo abre quien sale el primero, según puedePrimero (24/09, fase 5, S32): el plan A decía de Mari Luz
@@ -1569,13 +1613,15 @@ function razonPrimero(pr) {
 function cubreEnCasilla(cfg, staff, est, p, iso, tid, opts) {
   const o = opts || {};
   if (!p || !Array.isArray(p.cubreA) || !p.cubreA.length || !activa(cfg, p, 'cubreA')) return null;
+  // (S0, 30/09) quien ya no está con nosotros no cubre a nadie, y a quien ya no está no hay que cubrirle
+  if (haSalido(p, iso)) return null;
   const { localId, franja } = partirTurno(tid);
   const dow = isoDow(iso);
   for (const c of p.cubreA) {
     if (!c || !c.pid || c.pid === p.id || (o.falta && c.pid !== o.falta)) continue;
     if (c.turnoId && c.turnoId !== tid) continue;
     const x = personaDe(staff, c.pid);
-    if (!x) continue;
+    if (!x || haSalido(x, iso)) continue;
     // la semana de un cambio de día libre, «cubre a X los miércoles» vale para el martes que ahora libra X
     const cl = cambioDeLibre(cfg, x, iso);
     const libraAhora = cl ? cl.pares.find(y => y[0] === dow) : null, trabajaAhora = cl ? cl.pares.find(y => y[1] === dow) : null;
@@ -1625,7 +1671,8 @@ function quienLeCubre(cfg, staff, xid) {
   const out = [];
   for (const q of staff || []) for (const c of q.cubreA || []) {
     if (!c || c.pid !== xid || q.id === xid) continue;
-    out.push({ pid: q.id, nombre: q.nombre, dow: c.dow || null, turnoId: c.turnoId || null, cuando: cuandoCubre(cfg, c), activa: activa(cfg, q, 'cubreA') });
+    // (S0) `salido`: quien cubre ya no está con nosotros (la ficha y Equipo lo dicen; desde esa fecha no aplica)
+    out.push({ pid: q.id, nombre: q.nombre, dow: c.dow || null, turnoId: c.turnoId || null, cuando: cuandoCubre(cfg, c), activa: activa(cfg, q, 'cubreA'), salido: salidaDe(q) });
   }
   return out;
 }
@@ -1643,6 +1690,7 @@ function porQueNoCubre(cfg, staff, est, q, iso, tid, xid, opts) {
   const x = personaDe(staff, xid), nx = x ? x.nombre : xid;
   const cs = (q.cubreA || []).filter(c => c && c.pid === xid);
   if (!cs.length) return `no tiene «Cubre a» ${nx}`;
+  if (haSalido(q, iso)) return textoSalida(q);   // (S0) ya no está con nosotros: su designación no vale
   if (!activa(cfg, q, 'cubreA')) return '«Cubre a» está apagado';
   // la designación es de otro día o de otro turno
   const dow = isoDow(iso);
@@ -1753,6 +1801,9 @@ function evaluarPlaza(ctx, iso, tid, pid, opts) {
   // auditoría L1): con el Mónaco cerrado el martes 29 por la tarde, Cristian ya no está «ya en Bar Mónaco
   // esta tarde». Con «Cuándo abre» sí la ocupa, como en Horas (plazaOcupa; revisión F4 del modelo)
   const enOtra = f => turnosDe(cfg).find(t => t.franja === f && t.id !== tid && pidsEn(est, iso, t.id).includes(pid) && plazaOcupa(cfg, est, iso, t.id));
+  // 0) (S0, 30/09) quien ya no está con nosotros desde ese día: antes que cualquier otra regla y sin forzar nunca
+  if (haSalido(p, iso)) bloquea('salida', textoSalida(p));
+  if (corte) return res;
   // 1) las que no se fuerzan
   if (!turnoAbierto(cfg, est, iso, tid)) { const mc = motivoCerrado(cfg, iso, tid); bloquea(mc.regla, mc.motivo); }
   if (corte) return res;
@@ -1828,7 +1879,7 @@ function evaluarPlaza(ctx, iso, tid, pid, opts) {
   for (const q of asignados(est, iso, tid)) {
     if (pareja && o.corto) break;
     const qp = q.pid === pid ? null : personaDe(staff, q.pid);
-    const inc = incompatibles(cfg, p, qp);
+    const inc = incompatibles(cfg, p, qp, iso);
     if (!inc) continue;
     const extra = pareja ? { extra: true } : null;
     // (fase 6, S24) el aviso lo dice igual en el relleno, el selector, la Cobertura y la Revisión
@@ -2145,7 +2196,9 @@ function posicionesDe(cfg, staff, est, iso, tid) {
     const por = porDe(staff, e);
     const { avisos, autorizados, abreNoApto } = revisarEntrada(cfg, staff, est, iso, tid, e.pid);
     // (fase 5, S18) abreNoApto: el porqué, si sale primero porque se marcó a mano y no puede abrir
-    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && fijo, abreNoApto: abreNoApto ? abreNoApto.motivo : null, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: esComodin(p), por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, autorizados, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null };
+    // (S0, 30/09) `salido`: la salida de quien tiene una, también en días anteriores a la fecha (es el sombreado rojo
+    // de «ya no trabaja con nosotros» en Hoy, la Semana, el Mes, la hoja impresa y la imagen de compartir)
+    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && fijo, abreNoApto: abreNoApto ? abreNoApto.motivo : null, cocina: !!e.cocina, partido: enOtra(e.pid) && !continuo, continuo, comodin: esComodin(p), por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, autorizados, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null, salido: salidaDe(p) };
   });
 }
 // recalcula cocina, abre y orden salvo lo que el encargado haya fijado a mano
@@ -2291,7 +2344,11 @@ function desasignar(est, iso, tid, pid) {
   const i = lista.findIndex(x => x.pid === pid);
   if (i < 0) return false;
   lista.splice(i, 1);
-  if (!lista.length) { delete est.asig[iso][tid]; if (!Object.keys(est.asig[iso]).length) delete est.asig[iso]; }
+  // 30/09 (S0; auditoría del 25/09, B2/H1): la casilla vacía se va, el DÍA se queda ({}). En un estado virtual de un
+  // rango (el que usan la Cobertura, Equipo, la ficha y el cierre para escribir) el día es el mismo objeto que el del
+  // mes: borrarlo lo desenganchaba, y lo que se ponía después en ese día (la cobertura del único turno del día) se
+  // quedaba en la pantalla y no llegaba a S.meses ni al servidor
+  if (!lista.length) delete est.asig[iso][tid];
   return true;
 }
 function moverEnCasilla(est, iso, tid, pid, nuevaPos) {
@@ -2376,9 +2433,12 @@ function revisarTurno(cfg, staff, est, iso, tid) {
   // de nivel alta: si se relajó porque no había nadie más, o se puso a mano, queda su aviso (media)
   for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
     const a = personaDe(staff, lista[i].pid), b = personaDe(staff, lista[j].pid);
-    const inc = incompatibles(cfg, a, b);
+    const inc = incompatibles(cfg, a, b, iso);
     if (inc && !inc.flexible) out.incompatibles.push([a.nombre, b.nombre]);
   }
+  // (S0, 30/09) quien ya no está con nosotros desde ese día y sigue en la casilla (una plaza de antes de apuntar la
+  // salida, o puesta desde otro dispositivo): la Revisión lo dice
+  out.salidos = lista.map(e => personaDe(staff, e.pid)).filter(q => q && haSalido(q, iso)).map(q => q.id);
   return out;
 }
 function revisionMes(cfg, staff, est, opts) {
@@ -2413,6 +2473,8 @@ function revisionMes(cfg, staff, est, opts) {
       // solo lo pintaba Hoy; también con un solo apoyo
       if (r.soloApoyos) out.push({ iso: d.iso, turnoId: t.id, tipo: 'solo-apoyos', nivel: 'alta', msg: `${donde}: solo apoyos (${pidsEn(est, d.iso, t.id).map(pid => nombreDe(staff, pid)).join(', ')}): hace falta alguien de sala o de cocina` });
       for (const [a, b] of r.incompatibles) out.push({ iso: d.iso, turnoId: t.id, tipo: 'incompatibles', nivel: 'alta', msg: `${donde}: ${a} y ${b} no pueden coincidir` });
+      // (S0, 30/09) ya no trabaja con nosotros y sigue puesta: fallo alto, con la persona
+      for (const pid of r.salidos) out.push({ iso: d.iso, turnoId: t.id, pid, tipo: 'salida', nivel: 'alta', msg: `${donde}: ${nombreDe(staff, pid)} ${textoSalida(personaDe(staff, pid)).replace(/ desde el (\S+)$/, ' (desde el $1)')} y sigue en la casilla` });
       if (r.forzados) out.push({ iso: d.iso, turnoId: t.id, tipo: 'forzado', nivel: 'media', msg: `${donde}: ${r.forzados} asignación(es) forzada(s) a mano — ${r.avisos.join(' · ')}` });
       else if (r.avisos.length) out.push({ iso: d.iso, turnoId: t.id, tipo: 'aviso', nivel: 'media', msg: `${donde}: ${r.avisos.join(' · ')}` });
       // D1 (fase 3): el partido para cubrir a quien falta está autorizado; se dice, en informativo. Una
@@ -2508,26 +2570,34 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
         }
       }
     }
-    // quien esta semana libra este día: su plaza se cubre como la de un ausente
+    // quien esta semana libra este día: su plaza se cubre como la de un ausente (si sigue con nosotros, S0)
     for (const pl of libres) {
       if (!toca(pl) || (o.sinSupuestos && pl.s)) continue;
-      ausentes.push({ pl, p: personaDe(staff, pl.p) });
+      const p = personaDe(staff, pl.p);
+      if (p && haSalido(p, iso)) continue;
+      ausentes.push({ pl, p });
       r.ausentes.push({ iso, turnoId: pl.t, pid: pl.p, tipo: 'libraPuntual' });
     }
     for (const pl of plazas) {
       if (!toca(pl) || (o.sinSupuestos && pl.s)) continue;
       const p = personaDe(staff, pl.p);
       if (!p) { r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: 'no existe' }); continue; }
+      // (S0, 30/09) quien ya no está con nosotros: su plaza se salta, con el motivo, y no hay que cubrirla
+      if (haSalido(p, iso)) { r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: textoSalida(p) }); continue; }
       const aus = ausenciaEn(p, iso, partirTurno(pl.t).franja);   // por franja (D10)
       if (aus) { ausentes.push({ pl, p, aus }); r.ausentes.push({ iso, turnoId: pl.t, pid: pl.p, tipo: aus.tipo }); continue; }
       if (pidsEn(est, iso, pl.t).includes(pl.p)) continue;
-      const razon = pl.traslado ? 'esta semana cambia su día libre' : pl.por ? `cubre a ${nombreDe(staff, pl.por)}` : 'plaza fija de la semana tipo';
+      // (S0) una plaza fija «por X» con X que ya no está con nosotros sigue siendo su plaza (D12), pero ya no va «por»
+      // nadie: entra sin el «por» (así motivoRetirada no la retira una y otra vez por «X ya no está con nosotros»)
+      const porX = pl.por ? personaDe(staff, pl.por) : null;
+      const por = pl.por && !(porX && haSalido(porX, iso)) ? pl.por : undefined;
+      const razon = pl.traslado ? 'esta semana cambia su día libre' : por ? `cubre a ${nombreDe(staff, por)}` : 'plaza fija de la semana tipo';
       // 24/09 (fase 5). La «c» y la «a» de la plaza son preferencias, no marcas puestas a mano: la cocina es suya
       // solo si su ficha la deja llevarla ese día y la regla «Cocina» está encendida (S38, D5: Susana Capón con
       // «cocina solo los miércoles» seguía llevando la del martes) —si no, la casilla la elige por orden y, si
       // nadie puede, el Generador la da como hueco (S37)—, y abre solo si puede (abrePatron, S18). Las dos las
       // decide normalizarCasilla (asignar), también al refrescar la planilla ya volcada (revisión F5)
-      const a = asignar(est, cfg, staff, iso, pl.t, pl.p, { origen: 'patron', razon, supuesto: !!pl.s, cocina: pl.c ? true : undefined, abrePatron: !!pl.a, por: pl.por, nota: pl.n });
+      const a = asignar(est, cfg, staff, iso, pl.t, pl.p, { origen: 'patron', razon, supuesto: !!pl.s, cocina: pl.c ? true : undefined, abrePatron: !!pl.a, por, nota: pl.n });
       if (a.ok) r.aplicados.push({ iso, turnoId: pl.t, pid: pl.p, origen: 'patron', razon: a.entry.razon, supuesto: !!pl.s });
       else r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: a.motivo });
     }
@@ -2937,6 +3007,7 @@ function candidatos(ctx, iso, tid, opts) {
   for (const p of staff) {
     if (cob && p.id === o.faltaPid) continue;
     if ((o.excluir || []).includes(p.id)) continue;
+    if (haSalido(p, iso)) continue;   // (S0, 30/09) ya no está con nosotros: ni candidata ni descartada (no se la nombra)
     // «cubre a» (cubreEnCasilla): en la Cobertura se sabe quién falta y que la casilla es la suya
     const cubre = cob
       ? (falta && !o.sinCubre ? cubreEnCasilla(cfg, staff, est, p, iso, tid, { cocina, falta: o.faltaPid, suCasilla: true, ausente: true, faltaCocina }) : null)
@@ -2984,6 +3055,7 @@ function porQueNadie(cfg, staff, est, iso, tid, opts) {
   const ctx = crearContexto(cfg, staff, est);
   const out = {};
   for (const p of staff) {
+    if (haSalido(p, iso)) continue;   // (S0) quien ya no está con nosotros no explica ningún hueco
     const sab = !!o.falta;
     const cubre = o.sinCubre ? null : cubreEnCasilla(cfg, staff, est, p, iso, tid, { cocina: !!o.cocina, falta: o.falta, suCasilla: sab, ausente: sab });
     const r = primerBloqueo(evaluarPlaza(ctx, iso, tid, p.id, { puesto: o.cocina ? 'cocina' : 'sala', apoyos: true, cubrePor: cubre || undefined, cubreSuCasilla: sab, cubreAusente: sab, corto: true }));
@@ -3032,7 +3104,8 @@ function gruposSelector(cfg, staff, est, iso, tid, opts) {
   const conAviso = conAvisoCocina.concat(conAvisoSala);
   const noPueden = [];
   for (const p of staff) {
-    if (ya.has(p.id) || dentro.has(p.id)) continue;
+    // (S0, 30/09) quien ya no está con nosotros no sale ni en «no pueden»: no es una regla que se fuerce
+    if (ya.has(p.id) || dentro.has(p.id) || haSalido(p, iso)) continue;
     const comoCocina = sinCocina && puedeCocina(cfg, p, localId, iso);
     const f = siSeFuerza(cfg, staff, est, iso, tid, p.id, Object.assign({ permitirPartido: true }, comoCocina ? { puesto: 'cocina', cocina: true } : { puesto: 'sala' }));
     noPueden.push({ pid: p.id, nombre: p.nombre, motivo: f.motivo || 'no sale entre los candidatos', regla: f.regla, forzable: f.forzable, incumple: f.incumple, cocina: !!comoCocina });
@@ -3114,6 +3187,8 @@ function motivoRetirada(cfg, staff, est, iso, tid, e) {
   if (dc && dc.tipo !== 'REFUERZA') return motivoSinTrabajo(cfg, dc.cierre);
   const p = personaDe(staff, e.pid);
   const franja = partirTurno(tid).franja;
+  // (S0, 30/09) quien ya no está con nosotros desde ese día no sigue en ninguna plaza automática
+  if (p && haSalido(p, iso)) return textoSalida(p);
   if (p && activa(cfg, p, 'libra') && libraEn(p, iso)) return motivoLibra(p, iso);
   // 24/09 (D13, principio 4): quien está ausente esa franja no sigue en su plaza automática. Una ausencia
   // apuntada por otro camino que no la quitó de la planilla (otro usuario, datos de antes) dejaba a Iván
@@ -3125,6 +3200,8 @@ function motivoRetirada(cfg, staff, est, iso, tid, e) {
   if (e.relevo) return null;
   const x = personaDe(staff, porDe(staff, e));
   if (!x) return null;
+  // (S0) «por X» con X que ya no está con nosotros: X ya no falta, se fue; la plaza vuelve sin el «por» (instanciarPatron)
+  if (haSalido(x, iso)) return `${x.nombre} ya no está con nosotros`;
   const c = cambioDeLibre(cfg, x, iso);
   // 24/09 (D13: «hasta nueva orden»): lo que puso la designación «cubre a» —y nada más la mantiene ahí—
   // sobra cuando ya no aplica en esa casilla: se quitó la designación, se apagó «Cubre a», o quien faltaba
@@ -3219,6 +3296,44 @@ function volcarPrevia(cfg, staff, estDe, previa, opts) {
     normalizarCasilla(e, cfg, staff, c.iso, c.turnoId);
   }
   return r;
+}
+// ---------- «Ya no está con nosotros»: la operación (S0, 30/09) ----------
+// Apunta la salida en la ficha y retira TODAS sus plazas (las de a mano también: lo decide el encargado en el
+// diálogo) de todos los meses guardados en los días desde la fecha, casilla a casilla con retirarEntrada (se lleva
+// sus marcas a mano y la casilla se recalcula) y sin borrar nunca el día. Lo anterior a la fecha no se toca: cuenta
+// en Horas y se ve en la planilla. Quien cubría a esta persona («por ella», relevos) se queda: al regenerar,
+// motivoRetirada lo retira con «X ya no está con nosotros». Devuelve lo retirado, para el historial y Ctrl+Z.
+function darSalida(cfg, staff, meses, pid, desde, motivo) {
+  const r = { retirados: [], meses: [] };
+  const p = personaDe(staff, pid);
+  if (!p || !desde) return r;
+  // 30/09 (revisión S0): con «7/10/2026» se apuntaba la salida tal cual y no se retiraba nada (y el servidor rechazaba el PUT)
+  if (!fechaIsoValida(desde)) throw new TypeError('darSalida: la fecha tiene que ser AAAA-MM-DD (' + desde + ')');
+  p.salida = { desde };
+  if (motivo) p.salida.motivo = String(motivo);
+  for (const k of Object.keys(meses || {}).sort()) {
+    if (!/^\d{4}-\d{2}$/.test(k) || k < desde.slice(0, 7)) continue;
+    const e = estadoDesde(meses, (cfg && cfg.festivos) || [], +k.slice(0, 4), +k.slice(5, 7));
+    let n = 0;
+    for (const iso of Object.keys(e.asig).sort()) {
+      if (iso < desde) continue;
+      for (const tid of Object.keys(e.asig[iso] || {})) {
+        const entry = asignados(e, iso, tid).find(x => x.pid === pid);
+        if (!entry) continue;
+        r.retirados.push({ iso, tid, entry: JSON.parse(JSON.stringify(entry)) });
+        if (retirarEntrada(e, cfg, staff, iso, tid, pid)) n++;
+      }
+    }
+    if (n) r.meses.push(k);
+  }
+  return r;
+}
+// Restaurar: borra la salida. Sus turnos pasados siguen; nada más cambia (los retirados vuelven con Ctrl+Z o al regenerar)
+function quitarSalida(staff, pid) {
+  const p = personaDe(staff, pid);
+  if (!p || !p.salida) return false;
+  delete p.salida;
+  return true;
 }
 // opts: { desdeIso, soloPid, soloDias: [iso] } → [{ iso, turnoId, pid, origen, por, motivo }]
 function retirarQueIncumplen(cfg, staff, est, desde, hasta, opts) {
@@ -3415,6 +3530,17 @@ const laPrimera = p => (/a$/.test(p.nombre.split(' ')[0]) ? 'la primera' : 'el p
 // «en la posición 2»: sin género (revisión F5: «Lola sale la primera … — lunes 28: sale 2.º»)
 const enPosicion = n => `en la posición ${n}`;
 const deBajaLaSemana = (ctx, p) => !!ctx.lunes && [0, 1, 2, 3, 4, 5, 6].every(k => deBaja(p, addDias(ctx.lunes, k)));
+// (S0, 30/09) fuera de esa semana entera: de baja los siete días, o ya no está con nosotros desde su lunes (o antes):
+// sin condiciones, y sin nombrarla en las del local («Quién abre», la cocina)
+const fueraLaSemana = (ctx, p) => deBajaLaSemana(ctx, p) || (!!ctx.lunes && haSalido(p, ctx.lunes));
+// (30/09, revisión S0) la semana en la que se va (aún está el lunes, ya no el domingo): «Adrián (hasta el 6/10)» en las
+// condiciones del local; las demás semanas, el nombre tal cual
+const nombreEnSemana = (ctx, p) => {
+  const s = salidaDe(p);
+  if (!s || !ctx.lunes || !haSalido(p, addDias(ctx.lunes, 6))) return p.nombre;
+  const u = addDias(s.desde, -1);
+  return `${p.nombre} (hasta el ${+u.slice(8, 10)}/${+u.slice(5, 7)})`;
+};
 const nombreLocalV = (cfg, id) => (localDe(cfg, id) || { nombre: id }).nombre;
 const fallos = xs => ({ fallos: xs, notas: [] });
 const VARIABLES = [
@@ -3464,14 +3590,16 @@ const VARIABLES = [
   // una condición por pareja (la tenga quien la tenga, una sola vez), si se aplica (incompatibles: con el
   // interruptor del grupo y el de la pareja, fase 6); la flexible dice que se relaja
   { campo: 'nuncaCon', clave: 'nuncaCon', trato: 'forzable', lbl: '«Nunca con»',
-    texto: (ctx, p) => (p.nuncaCon || []).filter(q => { const key = [p.id, q].sort().join('|'); if (ctx.parejas.has(key)) return false; const inc = incompatibles(ctx.cfg, p, personaDe(ctx.staff, q)); if (!inc) return false; ctx.parejas.add(key); return true; })
+    // (S0) con el lunes de la semana: la pareja con quien ya no está con nosotros no se lista
+    texto: (ctx, p) => (p.nuncaCon || []).filter(q => { const key = [p.id, q].sort().join('|'); if (ctx.parejas.has(key)) return false; const inc = incompatibles(ctx.cfg, p, personaDe(ctx.staff, q), ctx.lunes || undefined); if (!inc) return false; ctx.parejas.add(key); return true; })
       .map(q => ({ id: `p:${p.id}:nuncaCon:${q}`, texto: `${p.nombre} y ${nombreDe(ctx.staff, q)} no coinciden${incompatibles(ctx.cfg, p, personaDe(ctx.staff, q)).flexible ? ' (pareja flexible: si no hay nadie más, se puede juntar con aviso)' : ''}`, k: 'nuncaCon', otro: q })),
     verificar: (ctx, p, iso, mis, c) => fallos(mis.filter(t => pidsEn(ctx.est, iso, t.id).includes(c.otro)).map(t => `${diaV(iso)}: juntos en ${t.local.nombre}`)) },
   // (fase 6, S21 y S24) «flexible» es de la pareja y está en las dos fichas
   { campo: 'nuncaConFlex', clave: 'nuncaCon', trato: 'relajable', lbl: '«Nunca con» flexible (por pareja)', condicion: 'nuncaCon' },
   // «cubre a» (D13): informativa, prioridad en el sitio de quien falta
   { campo: 'cubreA', clave: 'cubreA', trato: 'punt', lbl: 'Cubre a',
-    texto: (ctx, p) => (p.cubreA || []).map(c => ({ id: `p:${p.id}:cubre:${c.pid}:${c.dow || ''}`, texto: `${p.nombre} cubre a ${nombreDe(ctx.staff, c.pid)}${lugarCubre(ctx.cfg, c) ? ' ' + lugarCubre(ctx.cfg, c) : ''}`, k: 'cubreA', informativa: true })) },
+    // (30/09, revisión S0) sin la designación de cubrir a quien ya no está con nosotros desde el lunes de esa semana
+    texto: (ctx, p) => (p.cubreA || []).filter(c => !(ctx.lunes && personaDe(ctx.staff, c.pid) && haSalido(personaDe(ctx.staff, c.pid), ctx.lunes))).map(c => ({ id: `p:${p.id}:cubre:${c.pid}:${c.dow || ''}`, texto: `${p.nombre} cubre a ${nombreDe(ctx.staff, c.pid)}${lugarCubre(ctx.cfg, c) ? ' ' + lugarCubre(ctx.cfg, c) : ''}`, k: 'cubreA', informativa: true })) },
   // la cocina de la ficha (puedeCocina). El interruptor «Cocina» de la ficha apaga estos límites (fase 5, S15)
   { campo: 'cocina.soloDias', clave: 'cocina', trato: 'forzable', lbl: 'Cocina solo unos días',
     texto: (ctx, p) => {
@@ -3508,6 +3636,12 @@ const VARIABLES = [
     verificar: (ctx, p, iso, mis) => fallos(mis.filter(t => p.noPrimero.includes(t.franja)).filter(t => { const s = ctx.slots(iso, t.id).find(x => x.pid === p.id); return s && s.pos === 1; }).map(t => `${diaV(iso)}: primero en ${t.local.nombre} ${FRANJA_LBL[t.franja].toLowerCase()}`)) },
   // sin condición propia: la puerta las aplica y la Revisión las avisa
   { campo: 'ausencias', clave: null, trato: 'duro', lbl: 'Ausencias (por franja, D10)' },
+  // (S0, 30/09) la salida con fecha: dura, no se fuerza. La semana en la que se va se enseña («Adrián ya no trabaja con
+  // nosotros desde el 7/10») y se comprueba que desde ese día no tiene ninguna plaza; quien ya se fue antes del lunes
+  // no tiene condiciones esa semana (fueraLaSemana)
+  { campo: 'salida', clave: null, trato: 'duro', lbl: 'Ya no está con nosotros',
+    texto: (ctx, p) => salidaDe(p) ? [{ id: `p:${p.id}:salida`, texto: `${p.nombre} ${textoSalida(p)}`, k: 'salida' }] : [],
+    verificar: (ctx, p, iso, mis) => fallos(mis.length && haSalido(p, iso) ? mis.map(t => `${diaV(iso)}: sigue en ${t.local.nombre} ${FRANJA_LBL[t.franja].toLowerCase()}`) : []) },
   // (revisión F4, cliente) el standby de Dulce: sus otras condiciones salían como si estuviera activa
   { campo: 'standby', clave: null, trato: 'forzable', lbl: 'En standby',
     texto: (ctx, p) => p.standby ? [{ id: `p:${p.id}:standby`, texto: `${p.nombre} está en standby: aún no entra en la planilla`, k: 'standby' }] : [],
@@ -3530,8 +3664,9 @@ const VARIABLES = [
   { campo: 'local.cocina.titulares', ambito: 'local', clave: 'cocina', trato: 'forzable', lbl: 'Cocina del local: quién la lleva',
     texto: (ctx, l) => {
       if (!(localTieneCocina(l, 'M', ctx.cfg, ctx.staff) || localTieneCocina(l, 'T', ctx.cfg, ctx.staff))) return [];
-      const nom = id => nombreDe(ctx.staff, id);
-      const puede = id => puedeCocina(ctx.cfg, personaDe(ctx.staff, id), l.id, null);
+      const nom = id => { const p = personaDe(ctx.staff, id); return p ? nombreEnSemana(ctx, p) : nombreDe(ctx.staff, id); };
+      // (S0) sin nombrar a quien ya no está con nosotros esa semana: la lista del local se queda, pero no manda
+      const puede = id => { const p = personaDe(ctx.staff, id); return puedeCocina(ctx.cfg, p, l.id, null) && !fueraLaSemana(ctx, p); };
       const tit = [...new Set([...(l.cocina.titulares.M || []), ...(l.cocina.titulares.T || [])])].filter(puede).map(nom);
       const res = (l.cocina.reservas || []).filter(puede).filter(id => !tit.includes(nom(id))).map(nom);
       const ob = l.cocina.obligatoria || {};
@@ -3561,8 +3696,8 @@ const VARIABLES = [
   { campo: 'local.primero', ambito: 'local', clave: 'abre', trato: 'punt', lbl: 'Quién abre',
     // (si su ficha ya dice «sale el primero» ahí, esa condición lo dice y lo comprueba igual: no se repite)
     // (revisión F5: ni si esa persona está de baja toda la semana, como las condiciones de su ficha)
-    texto: (ctx, l) => FRANJAS.map(f => ({ f, p: l.primero && l.primero[f] ? personaDe(ctx.staff, l.primero[f]) : null })).filter(x => x.p && activa(ctx.cfg, x.p, 'abre') && !(x.p.abre && (x.p.abre[l.id] || []).includes(x.f)) && !deBajaLaSemana(ctx, x.p))
-      .map(({ f, p }) => ({ id: `loc:${l.id}:primero:${f}`, texto: `En ${l.nombre}, por la ${FRANJA_LBL[f].toLowerCase()}, abre ${p.nombre} («Quién abre» del local)`, tipo: 'primero', k: 'abre', pid: p.id, localId: l.id, franja: f })),
+    texto: (ctx, l) => FRANJAS.map(f => ({ f, p: l.primero && l.primero[f] ? personaDe(ctx.staff, l.primero[f]) : null })).filter(x => x.p && activa(ctx.cfg, x.p, 'abre') && !(x.p.abre && (x.p.abre[l.id] || []).includes(x.f)) && !fueraLaSemana(ctx, x.p))
+      .map(({ f, p }) => ({ id: `loc:${l.id}:primero:${f}`, texto: `En ${l.nombre}, por la ${FRANJA_LBL[f].toLowerCase()}, abre ${nombreEnSemana(ctx, p)} («Quién abre» del local)`, tipo: 'primero', k: 'abre', pid: p.id, localId: l.id, franja: f })),
     verificar: (ctx, l, iso, mis, c) => { const tid = turnoId(c.localId, c.franja); if (!pidsEn(ctx.est, iso, tid).includes(c.pid)) return fallos([]); const s = ctx.slots(iso, tid).find(x => x.pid === c.pid); return fallos(s && s.pos !== 1 ? [`${diaV(iso)}: ${enPosicion(s.pos)}`] : []); } },
   { campo: 'local.partidoAbre', ambito: 'local', clave: null, trato: 'relajable', lbl: 'Quien hace partido puede abrir la tarde', alFinal: true,
     // (fase 6, S22) es una casilla de Ajustes del local, no una regla del grupo: su botón lleva allí
@@ -3592,7 +3727,7 @@ function condicionesDe(cfg, staff, lunes) {
   const delLocal = alFinal => { for (const v of VARIABLES) if (v.ambito === 'local' && v.texto && !!v.alFinal === alFinal && (!v.clave || regla(cfg, v.clave))) for (const l of cfg.locales) for (const c of v.texto(ctx, l)) add(c, { variable: v.campo }); };
   delLocal(false);
   for (const p of st) {
-    if (deBajaLaSemana(ctx, p)) continue;
+    if (fueraLaSemana(ctx, p)) continue;
     for (const v of VARIABLES) if (v.ambito === 'persona' && v.texto && (!v.clave || activa(cfg, p, v.clave))) for (const c of v.texto(ctx, p)) add(c, { tipo: 'persona', pid: p.id, variable: v.campo });
   }
   // las reglas del grupo que no son de una ficha ni de un local
@@ -3707,7 +3842,8 @@ function generarSemana(cfg, staff, est, lunes, opts) {
   for (const iso of dias) {
     const trabajan = new Set();
     for (const t of turnosDe(cfg)) for (const pid of pidsEn(target, iso, t.id)) trabajan.add(pid);
-    libran[iso] = staff.filter(p => !trabajan.has(p.id) && !ausenciaEn(p, iso) && !p.standby && !sinTrabajo[iso].includes(p.id) && !apoyoSinSitio[iso].includes(p.id)).map(p => p.id);
+    // (S0, 30/09) quien ya no está con nosotros ese día no «libra»: se fue
+    libran[iso] = staff.filter(p => !trabajan.has(p.id) && !haSalido(p, iso) && !ausenciaEn(p, iso) && !p.standby && !sinTrabajo[iso].includes(p.id) && !apoyoSinSitio[iso].includes(p.id)).map(p => p.id);
     for (const pid of trabajan) diasPorPersona[pid] = (diasPorPersona[pid] || 0) + 1;
   }
   const huecos = g.huecos.filter(h => dias.includes(h.iso)).map(h => Object.assign({ pos: null, tipo: 'faltan' }, h));
@@ -4115,7 +4251,9 @@ function planesCobertura(cfg, staff, est, inc, opts) {
   const dejadas = !p || inc.tipo === 'CAMBIO' ? [] : (inc.dejadas || []).concat(casillasDejadas(cfg, staff, est, inc.pid, desde, hasta, { dias, franjas: inc.franjas }));
   const afectados = p ? turnosAfectados(cfg, staff, est, inc.pid, desde, hasta, { franjas: inc.franjas, turnos: inc.turnos, dias, dejadas }) : [];
   // 24/09 (D13): quién tiene la designación de cubrirla («Iván tiene quien le cubra: Mari Luz»)
-  const designados = quienLeCubre(cfg, staff, inc.pid).filter(d => d.activa);
+  // (30/09, revisión S0) quien ya no está con nosotros el primer día de la incidencia no es designado: la cabecera decía
+  // «tiene quien le cubra: Adrián» y dos líneas después que no podía; si se va a mitad, sigue y cada día dice lo suyo
+  const designados = quienLeCubre(cfg, staff, inc.pid).filter(d => d.activa && !(personaDe(staff, d.pid) && haSalido(personaDe(staff, d.pid), desde)));
   const out = { pid: inc.pid, nombre: p ? p.nombre : inc.pid, tipo: inc.tipo, desde, hasta, dias, afectados: [], planes: [], posible: true, necesarios: 0, designados };
   if (!p) return Object.assign(out, { posible: false, error: 'no existe' });
   // qué le pasa a cada casilla sin la persona
@@ -4303,7 +4441,8 @@ function vaciarPlanilla(est, desde, hasta) {
   const r = { plazas: 0, dias: 0 };
   for (const iso of rangoIso(desde, hasta || desde)) {
     const porT = est.asig[iso];
-    if (porT) { for (const lista of Object.values(porT)) r.plazas += lista.length; if (r.plazas) r.dias++; delete est.asig[iso]; }
+    // (S0, 30/09; auditoría B2) las casillas se van, el día se queda: el estado virtual sigue enlazado con su mes
+    if (porT) { for (const lista of Object.values(porT)) r.plazas += lista.length; if (r.plazas) r.dias++; for (const tid of Object.keys(porT)) delete porT[tid]; }
     if (est.manual && est.manual[iso]) delete est.manual[iso];
   }
   return r;
@@ -4320,8 +4459,12 @@ function hhmm(min) { const t = ((min % 1440) + 1440) % 1440; return `${String(Ma
 function tramoPartidoDe(l, dow, franja, abre) {
   const hp = l && l.horarioPartido;
   if (!hp) return null;
-  const base = (hp.porDow && hp.porDow[dow]) || hp;
-  const mio = base[franja], otro = base[franja === 'M' ? 'T' : 'M'];
+  // 30/09 (S0; auditoría del 25/09, G1): el tramo propio de ese día de la semana, franja a franja; la franja que no
+  // tenga tramo propio cae al general del partido. Antes, con porDow[6] = { M } el sábado, la tarde caía al horario de
+  // apertura entero (ocho horas) y el partido sumaba doce
+  const base = (hp.porDow && hp.porDow[dow]) || null;
+  const otraF = franja === 'M' ? 'T' : 'M';
+  const mio = (base && base[franja]) || hp[franja], otro = (base && base[otraF]) || hp[otraF];
   if (!mio || !mio.ini || !mio.fin) return null;
   let dur = minutosEntre(mio.ini, mio.fin);
   if (abre === 'M' || abre === 'T') {
@@ -4553,13 +4696,25 @@ function horasPersonaMes(cfg, staff, meses, pid, y, m) {
   for (const x of cfg.extras || []) if (x.pid === pid && x.iso && x.iso.startsWith(k)) out.extrasMin += +x.min || 0;
   out.horas = Math.round((out.minutos + out.extrasMin) / 6) / 10;
   out.horasNocturnas = Math.round(out.nocturnosMin / 6) / 10;
+  out.salido = salidaDe(p);   // (S0, 30/09) la fila se marca «ya no está»
   if (p && p.contrato && +p.contrato.horasSemana > 0) {
     out.contratoHoras = Math.round((+p.contrato.horasSemana / 7) * (n - out.ausencias - out.ausenciasMedias / 2) * 10) / 10;
     out.saldo = Math.round((out.horas - out.contratoHoras) * 10) / 10;
   }
   return out;
 }
-function horasEquipoMes(cfg, staff, meses, y, m) { return staff.map(p => horasPersonaMes(cfg, staff, meses, p.id, y, m)); }
+// (S0, 30/09) quién sale en la tabla de Horas de un mes: la plantilla de ese mes y, de quien ya no está con nosotros,
+// solo si ese mes tiene algo suyo (turnos, una ausencia o una extra apuntada); quien se fue antes del día 1 y no
+// tiene nada, no sale. Sus meses de antes siguen enteros: lo trabajado no se borra.
+function personasDelMes(cfg, staff, meses, y, m) {
+  const k = claveMes(y, m), primero = isoDe(y, m, 1);
+  const asig = (meses && meses[k] && meses[k].asig) || {};
+  const tieneAlgo = p => Object.values(asig).some(d => Object.values(d || {}).some(l => (l || []).some(x => x.pid === p.id)))
+    || ((cfg && cfg.extras) || []).some(x => x.pid === p.id && x.iso && x.iso.startsWith(k))
+    || diasAusenciaMes(p, y, m).length > 0;
+  return (staff || []).filter(p => !haSalido(p, primero) || tieneAlgo(p));
+}
+function horasEquipoMes(cfg, staff, meses, y, m) { return personasDelMes(cfg, staff, meses, y, m).map(p => horasPersonaMes(cfg, staff, meses, p.id, y, m)); }
 // Qué ha cambiado en Horas desde que se cerró el mes para la nómina: la copia guardada (S.cierres[k].tabla) frente
 // a la tabla de ahora, columna a columna. 25/09 (revisión final): antes se comparaban solo días, turnos, minutos y
 // extras, y en agosto (cerrado) la pantalla decía «La tabla coincide con la copia guardada» con los partidos de Noe
@@ -4750,7 +4905,8 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
   const juntos = (a, b) => indices.some((x, i) => a.fixed[i] && a.fixed[i] === b.fixed[i]);
   const pares = { hard: [], soft: [] };
   for (let a = 0; a < staff.length; a++) for (let b = a + 1; b < staff.length; b++) {
-    const inc = incompatibles(cfg, staff[a], staff[b]);
+    // (S0) con el primer día del periodo: la pareja con quien ya no está con nosotros no entra en el problema
+    const inc = incompatibles(cfg, staff[a], staff[b], desde);
     if (!inc) continue;
     pares[(inc.flexible && relajado) || juntos(porId.get(staff[a].id), porId.get(staff[b].id)) ? 'soft' : 'hard'].push([staff[a].id, staff[b].id].sort());
   }
@@ -4968,6 +5124,69 @@ function fusionarEstado(base, servidor, local) {
   estado.avisos = avisos;
   const nuevas = [...ps.keys()].filter(id => !pb.has(id) && !pl.has(id)).length;
   return { ok: true, estado, nuevasPeticiones: nuevas };
+}
+// ---------- recuperar a quien se borró del todo (S0, 30/09) ----------
+// Diego, 30/09: «Restaura en la aplicación el trabajador eliminado y vuelve a retomar su planilla». Pura sobre dos
+// estados completos (los que guarda el servidor: el de ahora y una versión anterior que aún la tenía): añade su
+// ficha del viejo si no existe (con la salida en salidaDesde, el día en que se borró; conserva sus ausencias) y
+// vuelve a poner sus plazas de todos los meses del viejo que hoy no la tengan, solo en días anteriores a la salida,
+// con todos sus campos y en el mismo índice si cabe. No renormaliza los días pasados (las marcas son las de
+// entonces) ni toca nada más. Idempotente. Devuelve { ficha, turnos, meses }.
+function recuperarPersona(actual, viejo, pid, salidaDesde, opts) {
+  const r = { ficha: false, turnos: 0, meses: [] };
+  if (!actual || !viejo || !pid || !salidaDesde || !Array.isArray(viejo.staff)) return r;
+  const clon = x => JSON.parse(JSON.stringify(x));
+  const pv = personaDe(viejo.staff, pid);
+  if (!pv) return r;
+  if (!Array.isArray(actual.staff)) actual.staff = [];
+  // 30/09 (revisión S0): quien se borró del todo casi siempre ya tenía su salida apuntada; esa fecha (y su motivo) es la
+  // real y manda sobre el día del borrado si es anterior. El corte de los turnos es el mismo
+  const sv = salidaDe(pv);
+  const corte = sv && sv.desde < salidaDesde ? sv.desde : salidaDesde;
+  if (!personaDe(actual.staff, pid)) {
+    const p = clon(pv);
+    p.salida = sv && sv.desde < salidaDesde ? sv : { desde: salidaDesde, motivo: (opts && opts.motivo) || 'recuperada de una versión anterior' };
+    // sin parejas «nunca con» ni «cubre a»: ya no aplican, y la otra ficha ya no las tiene (la Revisión sacaba «no
+    // pueden coincidir» con una pareja de un solo lado; revisión S0)
+    p.nuncaCon = []; p.nuncaConFlex = []; p.nuncaConOff = []; p.cubreA = [];
+    actual.staff.push(p);
+    r.ficha = true;
+  }
+  if (!actual.meses || typeof actual.meses !== 'object') actual.meses = {};
+  for (const k of Object.keys(viejo.meses || {}).sort()) {
+    const mv = viejo.meses[k];
+    if (!mv || !mv.asig) continue;
+    let n = 0;
+    for (const iso of Object.keys(mv.asig).sort()) {
+      if (iso >= corte) continue;
+      for (const [tid, lista] of Object.entries(mv.asig[iso] || {})) {
+        const i = (lista || []).findIndex(x => x && x.pid === pid);
+        if (i < 0) continue;
+        const ma = actual.meses[k] = actual.meses[k] || { asig: {}, apertura: {}, manual: {} };
+        ma.asig = ma.asig || {};
+        const dia = ma.asig[iso] = ma.asig[iso] || {};
+        const dest = dia[tid] = dia[tid] || [];
+        if (dest.some(x => x && x.pid === pid)) continue;
+        dest.splice(Math.min(i, dest.length), 0, clon(lista[i]));
+        // las marcas a mano (abre/cocina) de esa casilla de entonces, si hoy no tiene ninguna: lo que se ve no cambia
+        // (revisión S0; si hoy alguien ha marcado algo, se queda lo de hoy)
+        const mm = mv.manual && mv.manual[iso] && mv.manual[iso][tid];
+        if (mm && Object.keys(mm).length && !Object.keys(manualDe(ma, iso, tid)).length) { ma.manual = ma.manual || {}; (ma.manual[iso] = ma.manual[iso] || {})[tid] = clon(mm); }
+        n++;
+      }
+    }
+    if (n) { r.turnos += n; r.meses.push(k); }
+  }
+  return r;
+}
+// Los meses anteriores al de la fecha que tienen turnos y no están cerrados para la nómina (S.cierres, «Cerrar mes» de
+// Horas): es lo que se recuerda antes de dar de baja o de alta a alguien (Diego, 30/09: «solo que cierre antes de
+// echar o meter workers»)
+function mesesSinCerrar(estado, hastaIso) {
+  if (!estado || !estado.meses || typeof estado.meses !== 'object' || !hastaIso) return [];
+  const tope = hastaIso.slice(0, 7);
+  const conTurnos = k => Object.values((estado.meses[k] && estado.meses[k].asig) || {}).some(d => Object.values(d || {}).some(l => l && l.length));
+  return Object.keys(estado.meses).filter(k => /^\d{4}-\d{2}$/.test(k) && k < tope && !(estado.cierres && estado.cierres[k]) && conTurnos(k)).sort();
 }
 function mesVisibleParaPersonal(mesesPublicados, clave, hoyClave) {
   if (clave <= (hoyClave || fechaMadrid().slice(0, 7))) return true;
@@ -5206,7 +5425,8 @@ function sembrarDemo(S, hoyIso) {
   for (let i = 0; i < 2; i++) {
     const k = claveMes(y, m);
     const e = estadoDesde(S.meses, S.festivos || [], y, m);
-    if (!Object.keys(e.asig).length) {
+    // (S0, 30/09) «vacío» = sin ninguna plaza: desde que desasignar deja el día como {}, las claves no lo dicen
+    if (!Object.values(e.asig).some(d => Object.values(d || {}).some(l => l && l.length))) {
       const g = generarPlanilla(S, S.staff, e, e.days[0].iso, e.days[e.days.length - 1].iso, {});
       S.meses[k] = { apertura: e.apertura, asig: e.asig, manual: e.manual };
       r.meses.push(k); r.aplicados += g.aplicados.length;
@@ -5232,6 +5452,7 @@ if (typeof module !== 'undefined') {
     turnoAbierto, toggleApertura, abrirCasilla, motivoCerrado, turnosAbiertosSemana, turnosAbiertosMes, turnosConSupuesto, eventosDe, minimoDe,
     nuevoEstado, estadoDesde, clonarEstado, asignados, pidsEn, casillasDe, manualDe, marcarManual, quitarMarcaManual, primerDiaPlanificable,
     ausenciaEn, quitarDiaDeAusencia, anadirAusencia, deBaja,
+    salidaDe, haSalido, enPlantilla, textoSalida, staffEnPlantilla, fechaIsoValida, darSalida, quitarSalida, recuperarPersona, mesesSinCerrar, personasDelMes,
     localTieneCocina, puedeCocina, rangoCocina, cocinaDe, nuncaCocina, cocinaExigida, cocinaObligatoriaEn, razonCocina, ponerCocinaFicha, ponerCocinaLocal, migrarCocinaLocales, migrarAbrePatron, migrarMarcasAutomaticas, migrarMarcasHuerfanas, cocinaQueCrea, fichaImpideAbrir, quitarAbreAMano, quienAbreFijo, razonPrimero,
     puedeEstar, ordenarCasilla, normalizarCasilla, asignar, desasignar, moverEnCasilla, marcarCocina, marcarAbre,
     revisarTurno, revisionMes,
@@ -5240,7 +5461,7 @@ if (typeof module !== 'undefined') {
     minutosTurno, minutosNocturnos, minutosEntre, horarioDe, tramoPartidoDe, turnoDelDia,
     migrarPuestos, migrarAltas, esApoyo, libraEn, libraPuntualVigente, limpiarLibrePuntual, lunesDe,
     activa, librasPuntuales, libraPuntualDe, ponerLibraPuntual, textoCambioLibre, cambioDeLibre, partidoEn, estadoDia,
-    plazasDelDia, esAutomatica, retirarQueIncumplen, moverDiaLibre, porDe, retirarEntrada, motivoLibra,
+    plazasDelDia, esAutomatica, retirarQueIncumplen, moverDiaLibre, porDe, retirarEntrada, motivoLibra, motivoRetirada,
     LISTAS_CAND, VALORACIONES, PUESTOS_CAND, BUSCA, MOTIVOS_ALERTA, HABILIDADES, HAB_ESTADO, CAMPOS_ENTREVISTA, tieneEntrevista, VAL_LBL, etiquetaCandidato, filtrarCandidatos, fechaCandidato, ORDENES_CAND, ordenarCandidatos, resumenCandidatos,
     puestosDe, textoPuestos, migrarCandidatos, fundirSemillaEntrevistas, textoCampo,
     diasAusenciaMes, mediasAusenciaMes, jornadasAusencia, franjasDeTrabajo, esMediaJornada, vacacionesAno, horasPersonaMes, horasEquipoMes, diferenciasHoras, horasLocalMes, cierreDe, tramoDe, registroApoyos,

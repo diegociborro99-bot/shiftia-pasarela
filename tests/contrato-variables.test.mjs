@@ -93,6 +93,10 @@ function obsCasilla(w, e, huecos) {
 }
 // forzar a Xavi en la casilla (lo que haría el encargado a mano)
 function forzarX(w, e) { return M.asignar(e, w.cfg, w.st, ISO, w.tid, 'x', Object.assign({ origen: 'manual', forzar: true, permitirPartido: true, puesto: 'sala' }, w.esc.forzarOpts || {})).ok; }
+// (S0, 30/09) lo que hay puesto cuando el Generador verifica y la Revisión mira: forzado por el encargado (lo de
+// siempre) o, si el escenario lo dice (puesta), la entrada tal cual, sin pasar por la puerta: una plaza que se quedó
+// de antes de apuntar la salida no se puede volver a poner ni forzando, y aun así hay que avisar de ella
+const ponerX = (w, e) => (w.esc.puesta ? w.esc.puesta(w, e) : forzarX(w, e));
 
 // ---------- los caminos: cada uno devuelve lo que DECIDE sobre Xavi (no los textos de puntos) ----------
 const CAMINOS = {
@@ -126,7 +130,7 @@ const CAMINOS = {
   },
   verificar(w) {
     const e = semanaEst(w);
-    const puesta = forzarX(w, e);
+    const puesta = ponerX(w, e);
     return { puesta, conds: M.verificarSemana(w.cfg, w.st, e, LUNES).map(c => `${c.id}:${c.ok ? 'ok' : 'KO'}`) };
   },
   cobertura(w) {
@@ -154,7 +158,7 @@ const CAMINOS = {
   },
   revision(w) {
     const e = semanaEst(w);
-    const puesta = forzarX(w, e);
+    const puesta = ponerX(w, e);
     return { puesta, lineas: M.revisionMes(w.cfg, w.st, e, { desde: ISO, hasta: ISO }).filter(l => l.turnoId === w.tid || l.pid === 'x').map(l => `${l.tipo}|${l.nivel}|${l.msg}`) };
   },
   condiciones(w) { return M.condicionesDe(w.cfg, w.st, LUNES).filter(c => c.pid === 'x' || c.otro === 'x').map(c => `${c.id}${c.puntual ? '|puntual' : ''}`); },
@@ -287,6 +291,16 @@ const COMPROBAR = {
     return false;
   },
   noCocina(camino, c, s) { return COMPROBAR.cocina(camino, s, c); },
+  // (S0, 30/09) fuera: desde la salida no está y nadie la nombra: ni candidata, ni en «no pueden» del selector, ni
+  // en el porqué de un hueco, ni descartada en la Cobertura (no es una condición que se levante: ya no trabaja aquí)
+  fuera(camino, c, s) {
+    switch (camino) {
+      case 'relleno': case 'semana': return !c.en.includes('x') && s.en.includes('x') && !c.motivoX;
+      case 'cobertura': return c.planes.every(p => !p.asig.some(a => a.includes('|x'))) && s.planes.some(p => p.asig.some(a => a.includes('|x'))) && !c.candX.sale && !c.candX.motivo && s.candX.sale;
+      case 'selector': return c.grupo === null && s.grupo !== null;
+    }
+    return false;
+  },
   habilita(camino, c, s, esc) { return c.ok && !s.ok && s.regla === esc.regla; },
   cerrado(camino, c) { return !c.en.includes('x') && !c.huecos.length; },
   // (fase 7) la casilla pide gente en el problema del núcleo (su mínimo)
@@ -318,6 +332,12 @@ const ESCENARIOS = [
     celdas: duro({ verificar: '–', revision: '–', condiciones: 'nada', destrapa: 'sinPista' }) },
   // D10: el permiso de la tarde no le quita la mañana
   { id: 'ausencias por franja', campo: 'ausencias', clave: null, trato: 'duro', con: x => { x.ausencias = [{ tipo: 'PERM', desde: ISO, hasta: ISO, franjas: ['T'] }]; }, celdas: nada() },
+  // S0 (30/09; Diego: «cuando un trabajador lo deja, no deberíamos eliminarlo de la aplicación»): p.salida = { desde }.
+  // Desde esa fecha es un bloqueo duro que no se fuerza y no sale en NINGUNA lista (fuera); con una plaza que se quedó
+  // puesta de antes (puesta: la entrada tal cual), el Generador la marca como no cumplida y la Revisión avisa
+  { id: 'salida', campo: 'salida', clave: null, regla: 'salida', trato: 'duro', cond: 'p:x:salida', con: x => { x.salida = { desde: ISO }; },
+    puesta: (w, e) => { (e.asig[ISO] = e.asig[ISO] || {})[w.tid] = [{ pid: 'x', cocina: false, abre: true, origen: 'manual' }]; return true; },
+    celdas: duro({ relleno: 'fuera', semana: 'fuera', cobertura: 'fuera', selector: 'fuera', condiciones: 'lista', destrapa: 'sinPista' }) },
   // (revisión F4) el standby es una condición del Generador: salía como si estuviera activa
   { id: 'standby', campo: 'standby', clave: null, regla: 'standby', trato: 'forzable', cond: 'p:x:standby', con: x => { x.standby = true; }, celdas: duro() },
   { id: 'vetos', campo: 'vetos', clave: 'vetos', regla: 'vetos', trato: 'forzable', cond: 'p:x:veto:PASARELA:M', con: x => { x.vetos = [{ localId: 'PASARELA', franja: 'M', dow: DOW }]; }, celdas: duro() },
@@ -559,6 +579,8 @@ const PERMITIDOS = {
     // lectura y una sola escritura de cada una
     parejasNuncaCon: 'capa', ponerNuncaCon: 'capa (escribe las dos fichas)', quitarNuncaCon: 'capa (escribe las dos fichas)', migrarNuncaCon: 'migración: parejas mutuas, flexibles y apagadas por pareja',
     localHabitualDe: 'capa', alternarLocal: 'capa (escribe la ficha sin cambiar el habitual)', ponerLocalHabitual: 'capa', vetoRepetido: 'capa',
+    // (S0, 30/09) la salida con fecha: una sola lectura (haSalido, salidaDe, textoSalida) y una sola escritura
+    haSalido: 'capa', salidaDe: 'capa', textoSalida: 'capa', darSalida: 'capa (escribe la ficha y retira sus plazas)', quitarSalida: 'capa (borra la salida)', recuperarPersona: 'capa (la ficha recuperada nace con su salida)',
     // los datos de partida
     semillaPasarela: 'semilla',
   },
@@ -574,10 +596,11 @@ const PERMITIDOS = {
 // (revisión F4) también la lectura con un objeto vacío por defecto: ((p.partido || {}).dias || []) y
 // (p.cocina || {}).titular, que la comprobación no veía
 // (fase 6) también las parejas «nunca con» (flexible y apagada, S21 y S24) y el local habitual (S31)
-const RE_CAMPO = /([A-Za-z_$][\w$]*)\.(libra|nuncaCon(?:Flex|Off)?|cubreA|prefs|vetos|localHabitual)\b(?!\s*=[^=])|([A-Za-z_$][\w$]*)\.partido\.dias\b|([A-Za-z_$][\w$]*)\.cocina\.(titular|reserva|soloDias|nunca)\b|([A-Za-z_$][\w$]*)\.abre\[|\(\s*([A-Za-z_$][\w$]*)\.(?:partido|cocina)\s*\|\|\s*\{\}\s*\)\s*\.\s*(?:dias|siempre|titular|reserva|soloDias|nunca)\b/g;
+const RE_CAMPO = /([A-Za-z_$][\w$]*)\.(libra|nuncaCon(?:Flex|Off)?|cubreA|prefs|vetos|localHabitual|salida)\b(?!\s*=[^=])|([A-Za-z_$][\w$]*)\.partido\.dias\b|([A-Za-z_$][\w$]*)\.cocina\.(titular|reserva|soloDias|nunca)\b|([A-Za-z_$][\w$]*)\.abre\[|\(\s*([A-Za-z_$][\w$]*)\.(?:partido|cocina)\s*\|\|\s*\{\}\s*\)\s*\.\s*(?:dias|siempre|titular|reserva|soloDias|nunca)\b/g;
 const receptor = x => x[1] || x[3] || x[4] || x[6] || x[7];
-// receptores que no son una ficha: el local (l.abre[franja] es «Cuándo abre») y el resultado de estadoDia
-const NO_FICHA = new Set(['l', 'loc', 'local', 'lc', 'ed', 'edc', 'PESOS']);
+// receptores que no son una ficha: el local (l.abre[franja] es «Cuándo abre»), el resultado de estadoDia y (S0) la
+// respuesta del servidor (datos.salida es el 403 de «ya no tienes acceso», no el campo de una ficha)
+const NO_FICHA = new Set(['l', 'loc', 'local', 'lc', 'ed', 'edc', 'PESOS', 'datos']);
 function sinComentarios(src) {
   let out = '', cad = null;
   for (let i = 0; i < src.length; i++) {
@@ -619,6 +642,8 @@ test('lint: la comprobación ve una lectura a pelo y deja pasar el local y estad
   assert.deepEqual(vistas('const d = ((p.partido || {}).dias || []); const t = (q.cocina || {}).titular; const u = ( r.cocina||{} ).nunca;'), ['p', 'q', 'r']);
   assert.deepEqual(vistas('const f = l.abre[franja]; if (ed.libra) {} // p.libra en un comentario'), []);
   assert.deepEqual(vistas('const a = p.nuncaConFlex.includes(q); const b = (q.nuncaConOff || []); const c = r.localHabitual;'), ['p', 'q', 'r']);
+  // (S0) la salida con fecha también: leerla es una lectura; escribirla, no
+  assert.deepEqual(vistas('if (p.salida) x = q.salida.desde; r.salida = { desde: iso };'), ['p', 'q']);
 });
 
 // En el navegador el modelo y la interfaz comparten el ámbito global: una función de src/app con el mismo

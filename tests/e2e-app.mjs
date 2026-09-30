@@ -182,6 +182,10 @@ try {
   const evDemo = await pg.evaluate(() => (S.eventos || []).map(e => ({ id: e.id, iso: e.iso, nombre: e.nombre }))[0] || null);
   ok('hay un partido de muestra en el mes (sembrado con ?demo=1)', !!evDemo, JSON.stringify(await pg.evaluate(() => S.eventos)));
   if (evDemo) {
+    // 30/09: el partido de muestra cae el próximo sábado, que puede ser del mes siguiente (el 30/09 lo es: 3/10); el
+    // Mes en pantalla es el en curso y el ⚽ de su cabecera no existe. Se mira el mes del partido y luego se vuelve
+    const mesAntes = await pg.evaluate(iso => { const k = mesKey(S.y, S.m); if (k !== iso.slice(0, 7)) { S.y = +iso.slice(0, 4); S.m = +iso.slice(5, 7); S.day = 1; cargarMes(); renderMes(); } return k; }, evDemo.iso);
+    await pg.waitForSelector(`#mesRoot th.day .evd[data-evpop="${evDemo.iso}"]`, { timeout: 5000 });
     await pg.click(`#mesRoot th.day .evd[data-evpop="${evDemo.iso}"]`);
     ok('el ⚽ de la cabecera del mes abre el detalle del evento (#evDiaPop) sin ir al día', await llega(pg, () => !!document.querySelector('#evDiaPop') && !document.getElementById('view-mes').classList.contains('hidden'), null, 3000) >= 0);
     ok('el detalle ofrece «Quitar el evento»', await pg.$$eval('#evDiaPop [data-rmev]', x => x.length >= 1));
@@ -197,6 +201,7 @@ try {
     await pg.keyboard.press('Escape');
     await pg.evaluate(() => cerrarPops());
     if (asig) await pg.evaluate(iso => irAIso(iso), asig.iso);   // de vuelta al día de la asignación de Hoy (la persistencia lo comprueba al final)
+    await pg.evaluate(k => { if (mesKey(S.y, S.m) !== k) { S.y = +k.slice(0, 4); S.m = +k.slice(5, 7); S.day = 1; cargarMes(); } }, mesAntes);   // y al mes en curso, que es lo que miran 4c y 4d
   }
 
   // 4c) Vaciar la semana y el mes: todas las plazas fuera, las ausencias se quedan, Ctrl+Z lo deshace

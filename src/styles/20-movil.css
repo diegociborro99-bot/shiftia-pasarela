@@ -361,12 +361,15 @@
   .perslist{max-height:none;overflow:visible}
   .popfondo{display:block;position:fixed;inset:0;z-index:119;background:rgba(20,24,30,.28);touch-action:none}
   .pop.sheet{bottom:calc(64px + env(safe-area-inset-bottom) + var(--kb,0px))}
-  /* sitio para el teclado, solo con un campo de TEXTO con el foco: con :focus-within bastaba tocar un
-     botón (en Android toma el foco) para que la ventana creciera 30vh entre el toque y el levantar el
-     dedo, y el clic caía fuera: «Cerrar Bar Mónaco» no respondía al primer toque (24/09, revisión F2).
-     Las fechas y las horas tampoco: abren su selector, no el teclado, y al tocar «Guardar ausencia» justo
-     después de elegir el «Hasta» la barra de abajo saltaba 34 px y el toque se perdía (24/09, D13) */
-  .ovcard:has(:is(input:not([type=button]):not([type=checkbox]):not([type=radio]):not([type=date]):not([type=time]):not([type=month]),textarea):focus){padding-bottom:calc(18px + env(safe-area-inset-bottom) + 30vh)}
+  /* sitio para el teclado: lo que el teclado tapa de verdad (--kb, de visualViewport en 32-arranque.js), no
+     el foco de un campo. Con :focus (30vh de más mientras un campo de texto tenía el foco) el sitio
+     desaparecía en el mismo toque que lo quitaba: la ficha abre con el nombre enfocado y el motivo de la
+     salida es un campo justo encima de los botones, así que al tocar «Ya no está con nosotros…» o
+     «Confirmar» la tarjeta encogía 253 px entre el toque y el clic y el botón se movía bajo el dedo: había
+     que tocar dos veces (30/09, revisión S0). El teclado se abre y se cierra con su animación, después del
+     clic, así que con --kb la tarjeta cambia cuando ya no hay dedo encima. (Antes, 24/09, revisión F2 y
+     D13: el mismo fallo con :focus-within y con las fechas; la solución de entonces lo dejaba a medias) */
+  .ovcard,.ovcard.big{padding-bottom:calc(18px + env(safe-area-inset-bottom) + var(--kb,0px))}
 }
 
 /* ---------- 19. LA BARRA INFERIOR DEL PROFESIONAL ----------

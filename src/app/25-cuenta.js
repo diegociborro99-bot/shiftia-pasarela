@@ -50,9 +50,43 @@ const bloqueCopia = () => `
       <button type="button" class="btn btn-ghost" id="copiaSubir">Restaurar copia…</button>
       <input type="file" id="copiaFile" accept=".json,application/json" hidden>
     </div>
-    ${SRV.on && SRV.esAdmin ? '<div id="versionesSrv" style="margin-top:10px"><div class="festvacio">Cargando versiones anteriores…</div></div>' : ''}`;
+    ${SRV.on && SRV.esAdmin ? '<div id="versionesSrv" style="margin-top:10px"><div class="festvacio">Cargando versiones anteriores…</div></div>' : ''}
+    ${SRV.on && SRV.esAdmin ? '<div id="borradosSrv" style="margin-top:14px"><div class="festvacio">Buscando personas borradas…</div></div>' : ''}`;
+// 30/09 (S0; Diego: «restaura en la aplicación el trabajador eliminado y vuelve a retomar su planilla»): las personas
+// borradas del todo que aún están en alguna versión anterior del servidor (GET /api/estado/borrados). «Recuperar» trae
+// esa versión, vuelve a poner su ficha (como «ya no está con nosotros» desde el día en que se borró) y sus turnos de
+// antes de ese día (recuperarPersona, del modelo), en un solo Ctrl+Z y con su línea del historial. Sin servidor no hay
+// versiones: el bloque no existe.
+const enlazaBorrados = ov => {
+  const bs = ov.querySelector('#borradosSrv');
+  if (!bs) return;
+  const cab = '<div class="revgrp"><span class="dot" style="background:var(--bad)"></span>PERSONAS BORRADAS</div>';
+  api('GET', '/api/estado/borrados').then(r => {
+    if (!r.ok || !Array.isArray(r.datos)) { bs.innerHTML = ''; return; }
+    const lista = r.datos.filter(x => !S.staff.some(p => p.id === x.pid));
+    if (!lista.length) { bs.innerHTML = cab + '<p class="revsub">Nadie borrado del todo en las versiones que guarda el servidor (las últimas 60).</p>'; return; }
+    bs.innerHTML = cab + '<p class="revsub">Quien se borró del todo y aún está en alguna de las últimas 60 versiones que guarda el servidor. «Recuperar» vuelve a poner su ficha (como «ya no está con nosotros» desde el día en que se borró, o desde su salida si ya la tenía) y sus turnos de antes de ese día; lo demás no se toca.</p>' +
+      lista.map(x => `<div class="festrow" style="border-left-color:var(--bad)"><span class="festinfo"><b>${esc(x.nombre)}</b><small>borrada el ${esc(fmtDM(x.borradoEn))}${x.usuario ? ' por ' + esc(x.usuario) : ''} · última versión con ella: ${+x.version}</small></span><button class="btn btn-ghost" data-recuperar="${esc(x.pid)}" data-version="${+x.version}" data-borradoen="${esc(x.borradoEn)}" data-nombre="${esc(x.nombre)}">Recuperar</button></div>`).join('');
+    bs.querySelectorAll('[data-recuperar]').forEach(b => b.addEventListener('click', async () => {
+      const pid = b.dataset.recuperar, version = +b.dataset.version, desde = b.dataset.borradoen, nombre = b.dataset.nombre;
+      b.disabled = true;
+      const rv = await api('GET', '/api/estado/versiones?v=' + version);
+      if (!rv.ok || !rv.datos.estado) { toast('Esa versión ya no está en el servidor', 'bad'); b.disabled = false; return; }
+      pushUndo(`recuperar a ${nombre}`, { staff: true, otrosMeses: true });
+      const r = recuperarPersona(S, rv.datos.estado, pid, desde);
+      if (!r.ficha && !r.turnos) { undoStack.pop(); actualizarUndoBtn(); toast('No había nada que recuperar', 'warn'); b.disabled = false; return; }
+      cargarMes();   // los meses que han vuelto se enlazan con la pantalla
+      registrarCambio(`Recuperada ${nombre} de la versión ${version}: ficha y ${r.turnos} turnos`, 'equipo');
+      saveState();
+      ov.remove();
+      repintarTrasEquipo();
+      toast(`${nombre} recuperada: su ficha (ya no está con nosotros desde el ${fmtDM(desde)}) y ${pl(r.turnos, 'turno', 'turnos')} de antes · ${comoDeshacer()} para deshacer`, 'ok');
+    }));
+  });
+};
 const enlazaCopia = ov => {
   ov.querySelector('#copiaBajar').addEventListener('click', descargarCopia);
+  enlazaBorrados(ov);
   const vs = ov.querySelector('#versionesSrv');
   if (vs) api('GET', '/api/estado/versiones').then(r => {
     if (!r.ok) { vs.innerHTML = ''; return; }

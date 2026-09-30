@@ -1001,3 +1001,109 @@ test('renombrado del 17/09: el encargado pasa a «oficina» y el jefe a «admin�
     await s.parar();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ───────── 30/09 (S0): «Ya no está con nosotros» (la salida con fecha), el acceso de quien se fue y las personas borradas
+// hoy en hora de Madrid (el servidor decide «ya no está» con esa zona, como el mes en curso)
+const hoyMadrid = (d) => { const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d || new Date()); const g = t => p.find(x => x.type === t).value; return `${g('year')}-${g('month')}-${g('day')}`; };
+test('S0 · PUT /api/estado valida `salida`; quien ya no está no entra (403 salida), tampoco con la sesión abierta; con salida futura sí; al encargado con esa pid no le afecta', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shiftia-salida-'));
+  const s = await arrancar(dir);
+  try {
+    const a = cliente(s.base);
+    assert.equal((await a('POST', '/api/login', { usuario: 'oficina', password: ADMIN_PASS })).status, 200);
+    const ficha = salida => Object.assign({ id: 'adrian', nombre: 'Adrián', puesto: 'cocina', locales: ['ZAPA'] }, salida === undefined ? {} : { salida });
+    const est = salida => ({ staff: [ficha(salida), { id: 'lola', nombre: 'Lola', puesto: 'sala', locales: ['PASARELA'] }], locales: [], meses: {}, peticiones: [], avisos: [], esquema: 2 });
+    let v = 0;
+    const put = async salida => { const r = await a('PUT', '/api/estado', { baseVersion: v, estado: est(salida) }); if (r.status === 200) v = r.datos.version; return r.status; };
+    assert.equal(await put(undefined), 200);
+    assert.equal(await put('ups'), 400, 'salida es un objeto');
+    assert.equal(await put({}), 400, 'con su fecha');
+    assert.equal(await put({ desde: '7/10/2026' }), 400, 'en ISO');
+    assert.equal(await put({ desde: '2026-02-30' }), 400, 'y que exista');
+    // (revisión S0, 30/09) un mes 13 o un día 0 hacían saltar toISOString: 500 «error interno» en vez del 400
+    assert.equal(await put({ desde: '2026-13-01' }), 400, 'mes 13: 400, no 500');
+    assert.equal(await put({ desde: '0000-00-00' }), 400, 'día 0: 400, no 500');
+    assert.equal(await put({ desde: '2026-10-07', motivo: 5 }), 400, 'el motivo es texto');
+    assert.equal(await put(null), 200, 'null = sin salida');
+    assert.equal(await put({ desde: '2026-10-07', motivo: 'se va' }), 200);
+    assert.deepEqual((await a('GET', '/api/estado')).datos.estado.staff[0].salida, { desde: '2026-10-07', motivo: 'se va' }, 'y se guarda tal cual');
+    // el acceso: la cuenta de Adrián (empleado) y un encargado con su misma pid
+    assert.equal((await a('POST', '/api/usuarios', { usuario: 'adrian', rol: 'empleado', pid: 'adrian', password: 'adrianclave1' })).status, 200);
+    assert.equal((await a('POST', '/api/usuarios', { usuario: 'jefeadrian', rol: 'admin', pid: 'adrian', password: 'jefeclave12' })).status, 200);
+    const e = cliente(s.base);
+    assert.equal(await put({ desde: diaMas(3) }), 200, 'salida futura');
+    assert.equal((await e('POST', '/api/login', { usuario: 'adrian', password: 'adrianclave1' })).status, 200, 'con la salida en el futuro entra');
+    const mio = await e('GET', '/api/estado');
+    assert.equal(mio.status, 200);
+    assert.deepEqual(mio.datos.estado.staff.find(p => p.id === 'adrian').salida, { desde: diaMas(3) }, 'su ficha lleva la salida');
+    // desde hoy: la sesión que ya tenía abierta recibe lo mismo en el estado y en lo de empleado; salir sí puede
+    assert.equal(await put({ desde: hoyMadrid(), motivo: 'se va' }), 200);
+    for (const [m, ruta, cuerpo] of [['GET', '/api/estado'], ['GET', '/api/yo'], ['POST', '/api/peticiones', { tipo: 'VAC', desde: diaMas(20) }], ['POST', '/api/avisos/ocultar', { ids: [] }]]) {
+      const r = await e(m, ruta, cuerpo);
+      assert.equal(r.status, 403, `${m} ${ruta}: ${JSON.stringify(r.datos)}`);
+      assert.equal(r.datos.salida, true, `${m} ${ruta}`);
+      assert.match(r.datos.error, /Ya no tienes acceso a la app/);
+    }
+    // (revisión S0, 30/09) y en TODO lo demás con sesión (cambiar la contraseña, la clave push, el canal de eventos):
+    // fuera; solo puede salir y preguntar la versión
+    for (const [m, ruta, cuerpo] of [['POST', '/api/password', { actual: 'mala', nueva: 'otraclave123' }], ['GET', '/api/push/clave'], ['POST', '/api/push/suscribir', { endpoint: 'x' }]]) {
+      const r = await e(m, ruta, cuerpo);
+      assert.equal(r.status, 403, `${m} ${ruta}: ${JSON.stringify(r.datos)}`);
+      assert.equal(r.datos.salida, true, `${m} ${ruta}`);
+    }
+    {
+      const ac = new AbortController();
+      const r = await fetch(s.base + '/api/eventos', { headers: { Cookie: e.cookie() }, signal: ac.signal });
+      assert.equal(r.status, 403, 'GET /api/eventos (SSE): 403');
+      ac.abort();
+    }
+    assert.equal((await e('GET', '/api/version')).status, 200, 'la versión sí');
+    assert.equal((await e('POST', '/api/logout', {})).status, 200, 'cerrar sesión sí');
+    const l2 = await e('POST', '/api/login', { usuario: 'adrian', password: 'adrianclave1' });
+    assert.equal(l2.status, 403); assert.equal(l2.datos.salida, true); assert.match(l2.datos.error, /Ya no tienes acceso a la app/);
+    assert.equal(await put({ desde: diaMas(-1) }), 200, 'y si se fue ayer, igual');
+    assert.equal((await e('POST', '/api/login', { usuario: 'adrian', password: 'adrianclave1' })).status, 403);
+    // el encargado con esa misma pid entra y ve la planilla
+    const j = cliente(s.base);
+    assert.equal((await j('POST', '/api/login', { usuario: 'jefeadrian', password: 'jefeclave12' })).status, 200);
+    assert.equal((await j('GET', '/api/estado')).status, 200);
+    // los compañeros que se han ido siguen en la lista recortada del empleado (sus turnos pasados tienen nombre), sin más datos
+    assert.equal((await a('POST', '/api/usuarios', { usuario: 'lola', rol: 'empleado', pid: 'lola', password: 'lolaclave12' })).status, 200);
+    const lo = cliente(s.base);
+    assert.equal((await lo('POST', '/api/login', { usuario: 'lola', password: 'lolaclave12' })).status, 200);
+    const ad = (await lo('GET', '/api/estado')).datos.estado.staff.find(p => p.id === 'adrian');
+    assert.ok(ad && ad.nombre === 'Adrián', 'Adrián sigue en la lista');
+    assert.deepEqual(Object.keys(ad).sort(), ['id', 'locales', 'nombre', 'puesto'], 'solo lo de siempre: ni su salida');
+  } finally { await s.parar(); rmSync(dir, { recursive: true, force: true }); }
+});
+test('S0 · GET /api/estado/borrados: quien está en alguna versión anterior y no en la de ahora, con la última versión que la tenía, cuándo se borró y quién guardó; solo encargado y programador', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shiftia-borrados-'));
+  const s = await arrancar(dir);
+  try {
+    const a = cliente(s.base), p = cliente(s.base);
+    assert.equal((await a('POST', '/api/login', { usuario: 'oficina', password: ADMIN_PASS })).status, 200);
+    assert.equal((await p('POST', '/api/login', { usuario: 'diego', password: PROG_PASS })).status, 200);
+    const P = { adrian: { id: 'adrian', nombre: 'Adrián', puesto: 'cocina', locales: ['ZAPA'] }, lola: { id: 'lola', nombre: 'Lola', puesto: 'sala', locales: ['PASARELA'] }, tere: { id: 'tere', nombre: 'Tere', puesto: 'apoyo', locales: [] } };
+    let v = 0;
+    const guarda = async (quien, ids) => { const r = await quien('PUT', '/api/estado', { baseVersion: v, estado: { staff: ids.map(id => P[id]), locales: [], meses: {}, peticiones: [], avisos: [], esquema: 2 } }); assert.equal(r.status, 200); v = r.datos.version; return v; };
+    await guarda(a, ['adrian', 'lola', 'tere']);   // v1: los tres
+    await guarda(a, ['lola', 'tere']);             // v2 (oficina): Adrián borrado del todo
+    await guarda(p, ['lola']);                     // v3 (diego): Tere fuera
+    await guarda(a, ['lola', 'tere']);             // v4 (oficina): Tere vuelve
+    const r1 = await a('GET', '/api/estado/borrados');
+    assert.equal(r1.status, 200);
+    assert.deepEqual(r1.datos, [{ pid: 'adrian', nombre: 'Adrián', version: 1, borradoEn: hoyMadrid(), usuario: 'oficina' }], 'Adrián, con la última versión que le tenía (1) y quién guardó la primera sin él (oficina); Tere no, que ha vuelto');
+    await guarda(p, ['lola']);                     // v5 (diego): Tere fuera otra vez
+    const r2 = await a('GET', '/api/estado/borrados');
+    assert.deepEqual(r2.datos, [{ pid: 'tere', nombre: 'Tere', version: 4, borradoEn: hoyMadrid(), usuario: 'diego' }, { pid: 'adrian', nombre: 'Adrián', version: 1, borradoEn: hoyMadrid(), usuario: 'oficina' }], 'las más recientes primero');
+    assert.equal((await p('GET', '/api/estado/borrados')).status, 200, 'el programador también');
+    // y la versión que se le pide para recuperarla es la que se dice
+    const vieja = await a('GET', '/api/estado/versiones?v=4');
+    assert.ok(vieja.status === 200 && vieja.datos.estado.staff.some(x => x.id === 'tere'));
+    assert.equal((await a('POST', '/api/usuarios', { usuario: 'lola', rol: 'empleado', pid: 'lola', password: 'lolaclave12' })).status, 200);
+    const lo = cliente(s.base);
+    assert.equal((await lo('POST', '/api/login', { usuario: 'lola', password: 'lolaclave12' })).status, 200);
+    assert.equal((await lo('GET', '/api/estado/borrados')).status, 403, 'el empleado no');
+    assert.equal((await fetch(s.base + '/api/estado/borrados')).status, 401, 'sin sesión, 401');
+  } finally { await s.parar(); rmSync(dir, { recursive: true, force: true }); }
+});

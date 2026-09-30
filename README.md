@@ -35,7 +35,10 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   Horas, y las ausencias siempre cuentan),
   las reglas del grupo con interruptor, el catálogo numerado de condiciones que
   comprueba el generador, y los ajustes de cada local (aperturas, mínimos,
-  cocina, horarios, quién abre).
+  cocina, horarios, quién abre). Quien deja el grupo no se borra: **«Ya no está
+  con nosotros»** desde una fecha (sus turnos de antes se quedan, con sombreado
+  rojo, y cuentan en Horas; desde entonces no entra en nada), con «Restaurar»; y
+  a quien se borró del todo se le recupera desde Cuenta con sus turnos.
 - **Contador de horas**: horas del mes por persona a partir de la planilla y de
   los ajustes del encargado (horas extra, horario distinto), con los horarios del
   grupo (mañana 07:00–16:00, fines de semana desde las 08:00; tarde 16:00 hasta el

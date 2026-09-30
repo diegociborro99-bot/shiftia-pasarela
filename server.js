@@ -350,6 +350,23 @@ function leerEstado() {
   catch (e) { console.error('[shiftia] estado en BD corrupto'); return { version: fila.version, estado: null }; }
 }
 function versionActual() { const f = db.prepare('SELECT version FROM estado WHERE id=1').get(); return f ? f.version : 0; }
+// 30/09 (S0): quién ya no está con nosotros HOY (hora de Madrid), según la planilla guardada. Un empleado cuya persona
+// tiene la salida cumplida no entra en la app ni sigue usándola con una sesión abierta (el encargado y el programador,
+// aunque tengan una persona asociada, sí: la app es suya). Se lee una vez por versión de la planilla: la caché evita
+// abrir el JSON entero en cada petición de cada empleado.
+let salidasCache = { version: -1, dia: null, fuera: new Set() };
+function salidaVigente(pid) {
+  if (!pid) return false;
+  const version = versionActual(), dia = M.fechaMadrid();
+  if (salidasCache.version !== version || salidasCache.dia !== dia) {
+    const { estado } = leerEstado();
+    const fuera = new Set();
+    for (const p of (estado && Array.isArray(estado.staff)) ? estado.staff : []) if (p && typeof p.id === 'string' && M.haSalido(p, dia)) fuera.add(p.id);
+    salidasCache = { version, dia, fuera };
+  }
+  return salidasCache.fuera.has(pid);
+}
+const SIN_ACCESO_SALIDA = { error: 'Ya no tienes acceso a la app', salida: true };
 function guardarEstado(estado, version, antes, quien) {
   const txt = JSON.stringify(estado), ahora = Date.now();
   db.prepare(`INSERT INTO estado(id,version,json,actualizado) VALUES (1,?,?,?)
@@ -619,6 +636,8 @@ const server = http.createServer(async (req, res) => {
       }
       intentos.delete(ip + '|' + usu);
       { const g = intentos.get(ip); if (g && g.n > 0) g.n--; }   // un acceso correcto no deja lastre en la IP compartida
+      // 30/09 (S0): la contraseña es la suya, pero ya no trabaja con nosotros: no entra (y queda en la auditoría)
+      if (u.rol === 'empleado' && u.pid && salidaVigente(u.pid)) { auditar(u, ip, 'login-salida', 'ya no está con nosotros'); json(res, 403, SIN_ACCESO_SALIDA); return; }
       auditar(u, ip, 'login');
       const rec = recordar !== false;
       json(res, 200, { rol: u.rol, pid: u.pid, usuario: u.usuario, cambiar: !!u.cambiar }, { 'Set-Cookie': cookieSesion(req, emitirSesion(u, rec), false, rec) });
@@ -651,6 +670,10 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { app: APP_VER, build: APP_BUILD });
       return;
     }
+    // 30/09 (S0): el empleado que ya no está con nosotros, con la sesión abierta de antes: fuera de todo (salir y la
+    // versión, arriba, sí). Revisión S0: antes solo las rutas de la app y seguía pudiendo cambiar la contraseña,
+    // pedir la clave push o abrir el canal de eventos
+    if (yo.rol === 'empleado' && yo.pid && salidaVigente(yo.pid)) { json(res, 403, SIN_ACCESO_SALIDA); return; }
     if (ruta === '/api/yo') { json(res, 200, { rol: yo.rol, pid: yo.pid, usuario: yo.usuario, cambiar: !!yo.cambiar, verEntrevistas: veEntrevistas }); return; }
     // con la contraseña genérica solo se puede: ver quién soy, cambiarla y salir.
     // Lo impone el servidor: el botón «Ahora no» del cliente ya no existe.
@@ -679,7 +702,11 @@ const server = http.createServer(async (req, res) => {
         // 24/09 (fase 6, S21 y S31): en cada ficha, las parejas «nunca con» (con su «flexible» y su interruptor) son
         // listas de ids, y el local habitual, el id de un local
         const ids = v => v === undefined || v === null || (Array.isArray(v) && v.every(x => typeof x === 'string'));
-        const fichaBien = p => ['nuncaCon', 'nuncaConFlex', 'nuncaConOff'].every(k => ids(p[k])) && (p.localHabitual === undefined || p.localHabitual === null || typeof p.localHabitual === 'string');
+        // 30/09 (S0): la salida con fecha, ausente o { desde: 'AAAA-MM-DD' (que exista), motivo?: texto }
+        // (revisión S0) la misma comprobación que darSalida: con «2026-13-01» toISOString lanzaba y el PUT daba 500 en vez de 400
+        const fechaIso = s => M.fechaIsoValida(s);
+        const salidaBien = x => x === undefined || x === null || (!!x && typeof x === 'object' && !Array.isArray(x) && fechaIso(x.desde) && (x.motivo === undefined || typeof x.motivo === 'string'));
+        const fichaBien = p => ['nuncaCon', 'nuncaConFlex', 'nuncaConOff'].every(k => ids(p[k])) && (p.localHabitual === undefined || p.localHabitual === null || typeof p.localHabitual === 'string') && salidaBien(p.salida);
         const bien = ['locales', 'peticiones', 'avisos', 'historial', 'festivos', 'eventos', 'extras', 'mesesPublicados', 'cierresPuntuales'].every(lista)
           && estado.staff.every(p => p && typeof p === 'object' && typeof p.id === 'string' && fichaBien(p))
           && (!Array.isArray(estado.cierresPuntuales) || estado.cierresPuntuales.every(esCierre))
@@ -737,6 +764,31 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       json(res, 200, { versiones: db.prepare('SELECT version,actualizado,usuario,length(json) AS bytes FROM estado_hist ORDER BY version DESC').all() });
+      return;
+    }
+    // 30/09 (S0; Diego: «restaura en la aplicación el trabajador eliminado»): las personas borradas del todo. Se recorren
+    // las versiones guardadas (las últimas HIST_MAX) de la más nueva a la más vieja, abriendo cada JSON una sola vez:
+    // quien está en alguna y no en la planilla de ahora sale con la última versión que la tenía, el día (Madrid) de
+    // la primera versión sin ella y quién la guardó. Las más recientes primero. Encargado y programador.
+    if (ruta === '/api/estado/borrados' && req.method === 'GET') {
+      if (!esAdmin) { json(res, 403, { error: 'solo el encargado' }); return; }
+      const actual = leerEstado();
+      const hoyIds = new Set(((actual.estado && actual.estado.staff) || []).map(p => p && p.id));
+      const filaActual = db.prepare('SELECT actualizado FROM estado WHERE id=1').get();
+      const borrados = new Map();
+      let posterior = null;   // la versión más nueva ya recorrida (la primera sin la persona, yendo hacia atrás)
+      // fila a fila (iterate): con .all() se cargaban las 60 versiones de golpe (60 × 1,4 MB en memoria; revisión S0)
+      for (const f of db.prepare('SELECT version,json,actualizado,usuario FROM estado_hist ORDER BY version DESC').iterate()) {
+        let staff = [];
+        try { const e = JSON.parse(f.json); staff = e && Array.isArray(e.staff) ? e.staff : []; } catch (e) {}
+        for (const p of staff) {
+          if (!p || typeof p.id !== 'string' || hoyIds.has(p.id) || borrados.has(p.id)) continue;
+          const sin = posterior || { actualizado: filaActual ? filaActual.actualizado : Date.now(), usuario: null };
+          borrados.set(p.id, { pid: p.id, nombre: typeof p.nombre === 'string' ? p.nombre : p.id, version: f.version, borradoEn: M.fechaMadrid(new Date(sin.actualizado)), usuario: sin.usuario || null });
+        }
+        posterior = f;
+      }
+      json(res, 200, [...borrados.values()]);
       return;
     }
     // copia completa (encargado y programador): planilla + usuarios + suscripciones push
