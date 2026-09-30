@@ -380,11 +380,14 @@ function htmlSemanaGenerada(res) {
   // quien no trabaja por el cierre de su local sale en su propia fila, no en «libran» (24/09, D11); con
   // la revisión F2, también quien no trabaja solo una franja (Hojan · tarde) y quien apoya «donde haga
   // falta» y nadie ha colocado (apoyo sin sitio)
-  const sinT = res.sinTrabajo || {}, sinTP = res.sinTrabajoParcial || {}, sinSitio = res.apoyoSinSitio || {};
-  const haySinT = res.dias.some(iso => (sinT[iso] || []).length || (sinTP[iso] || []).length || (sinSitio[iso] || []).length);
+  // (30/09, corrección de A3; revisión del cliente 5) y el apoyo sin sitio de quien trabaja la otra franja (Adrián, cocina de
+  // Zapatillera por la mañana), por franja (apoyoSinSitioParcial), como el «sin trabajo» parcial
+  const sinT = res.sinTrabajo || {}, sinTP = res.sinTrabajoParcial || {}, sinSitio = res.apoyoSinSitio || {}, sinSitioP = res.apoyoSinSitioParcial || {};
+  const haySinT = res.dias.some(iso => (sinT[iso] || []).length || (sinTP[iso] || []).length || (sinSitio[iso] || []).length || (sinSitioP[iso] || []).length);
   const chipsCierre = iso => (sinT[iso] || []).map(pid => `<span class="glchip" style="--pc:${avColor(pid)}">${nc(pid)}</span>`)
     .concat((sinTP[iso] || []).map(x => `<span class="glchip" style="--pc:${avColor(x.pid)}">${nc(x.pid)} · ${esc(x.franjas.map(f => FRANJA_LBL[f].toLowerCase()).join(' y '))}</span>`))
-    .concat((sinSitio[iso] || []).map(pid => `<span class="glchip gsinsitio" style="--pc:${avColor(pid)}" title="De apoyo por un cierre: aún sin sitio">${nc(pid)} · apoyo sin sitio</span>`)).join('');
+    .concat((sinSitio[iso] || []).map(pid => `<span class="glchip gsinsitio" style="--pc:${avColor(pid)}" title="De apoyo por un cierre: aún sin sitio">${nc(pid)} · apoyo sin sitio</span>`))
+    .concat((sinSitioP[iso] || []).map(x => `<span class="glchip gsinsitio" style="--pc:${avColor(x.pid)}" title="De apoyo por un cierre esa franja: aún sin sitio">${nc(x.pid)} · ${esc(x.franjas.map(f => FRANJA_LBL[f].toLowerCase()).join(' y '))} · apoyo sin sitio</span>`)).join('');
   // 30/09 (revisión de A2, cliente 4): quien esta semana trabaja un día de siempre (su cambio de día libre) y se quedó sin
   // turno no «libra»: sale aparte como «sin plaza» (res.sinPlaza del modelo), para que Aroa vea que hay que ponerle
   const libran = `<table class="gsem glib" style="--lc:var(--ink3)"><thead><tr><th class="gl"><i></i>Quién libra cada día<small>de baja: ${esc(lblBajasSemana(res).join(' · ')) || 'nadie'}</small></th>${res.dias.map(iso => `<th>${dl(iso)}</th>`).join('')}</tr></thead><tbody><tr><th class="gfr">Libran</th>${res.dias.map(iso => `<td><small class="gln">${res.libran[iso].length} libran</small>${res.libran[iso].map(pid => `<span class="glchip" style="--pc:${avColor(pid)}">${nc(pid)}</span>`).join('') || '<em class="gnadie">nadie</em>'}${(res.sinPlaza[iso] || []).map(pid => `<span class="glchip gsinplaza" style="--pc:${avColor(pid)}" title="Esta semana trabaja este día (su cambio de día libre), pero no tiene turno: ponle uno o cambia su día libre">${nc(pid)} · sin plaza</span>`).join('')}</td>`).join('')}</tr>${haySinT ? `<tr class="gsint"><th class="gfr">Sin trabajo<small>por un cierre</small></th>${res.dias.map(iso => `<td>${chipsCierre(iso) || '<em class="gnadie">—</em>'}</td>`).join('')}</tr>` : ''}</tbody></table>`;

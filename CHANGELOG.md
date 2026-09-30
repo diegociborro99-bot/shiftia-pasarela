@@ -2,6 +2,41 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Los cierres por fechas y la semana tipo: editar un cierre, guardar la semana tipo con el Mónaco cerrado y los textos del
+  visor (30/09; auditoría del modelo del 25/09, fase A3).** Lo que se nota:
+  - **Editar un cierre** hecho antes de generar la semana (cambiarle el detalle, acortarlo, volver a marcar el día en «Cuándo
+    abre») ya no pierde lo decidido: Susana sigue de vacaciones, Cristian sin trabajo y Yilian de apoyo. Antes, con la semana
+    ya generada, el visor no encontraba a nadie en la casilla cerrada y se quitaban las vacaciones sin reponerlas.
+  - **«Guardar como semana tipo»** la semana en que un local está cerrado guarda el local como en la semana tipo de antes (los
+    de «sin trabajo» y los apoyos vuelven a su casilla del Mónaco) y no convierte al apoyo en plaza fija de otro local. La
+    confirmación nombra el cierre, avisa de los días que no tienen ninguna plaza (una semana a medio planificar dejaba la
+    semana tipo vacía de jueves a domingo sin decirlo) y de los «Sale primero» a mano que no van a mandar (Mari Luz frente a
+    Lola, que es «Quién abre» de Pasarela); el historial lo apunta.
+  - **El visor del cierre** dice lo que pasa de verdad con las vacaciones o el día libre de quien ese día tiene otro turno:
+    «lun 28: ese día también trabaja en El 33 por la mañana, así que las vacaciones son solo de la tarde» (antes decía que no
+    se le ponían y que la parte cerrada contaba como sin trabajo, y no era así). «Ver cierre» enseña la media jornada
+    («lun 28 (solo la tarde)») y «no se pudo poner» solo cuando ese día ya estaba ausente.
+  - Quien esa semana libra otro día ya no sale «sin trabajo por el cierre» en Horas ni en la Semana sin que el visor haya
+    preguntado por él; al editar, quien no pudo volver a su casilla (se le forzó en otra) tiene destino de apoyo («ya está
+    aquí»); el apoyo de un cierre respeta «quien lleva la cocina ese día no refuerza la sala» (Adrián, cocina de Zapatillera,
+    ya no se sugiere para el Mónaco); un destino de apoyo al propio local cerrado o a una casilla que no abre ese día no se
+    guarda (se decía en cada generación); el visor rechaza fechas que no existen (30/02) y franjas repetidas; «los domingos
+    del 27/09 al 18/10» solo cuando los cuatro son iguales (si uno es entero, se enumeran); al reabrir, las vacaciones propias
+    con las que se fundieron las del cierre se quedan con su detalle (sin el «cierre de Bar Mónaco · reforma» pegado).
+  - **Tras la revisión de A3 (30/09):** al **acortar o reabrir** un cierre hecho antes de generar, la casilla que vuelve a
+    abrir recupera a los suyos de la semana tipo (Susana Capón y Cristian el martes 3) y el resumen, el toast y el historial lo
+    dicen (antes se quedaba vacía sin avisar); al editar **añadiendo una franja** (la mañana) se lee la planilla de esa mañana
+    (quien estaba sale; quien no, no recibe «sin trabajo»); quien pasa a tener plaza en la casilla cerrada después de cerrar
+    (se le deshace el cambio de día libre, o entra en la semana tipo) sale «sin trabajo · cierre», no como si librara; **el
+    apoyo de quien no puede hacer sala** (Hojan, solo cocina; Adrián o Jenny cuando llevan una cocina ese día) ofrece cocinas
+    libres de otros locales («Zapatillera · tarde · cocina · …»), y si no hay ninguna la tarjeta dice el porqué y «Apoyo» queda
+    desactivado; el aviso del «Sale primero» que no se conserva dice qué hacer («para que abra siempre Mari Luz, cámbialo en
+    Ajustes de Pasarela → Quién abre (o «Sale el primero» en su ficha)») y sale también cuando quien abriría estaba de
+    vacaciones esa semana; un cierre de más de 62 días avisa y el selector de fin no deja pasar del tope; el Generador lista a
+    «Adrián · tarde · apoyo sin sitio»; la tarjeta de quien tiene vacaciones y otro turno ese día lo dice en una sola frase; al
+    cerrar sobre una semana sin planificar el toast dice «semana sin planificar: 4 personas con decisión» en vez de «0 plazas
+    retiradas»; con dos cierres del Mónaco por reforma, reabrir uno no borra el «cierre de Bar Mónaco · reforma» del otro; y
+    «Guardar como semana tipo» con el local cerrado no repone a quien ya no está con nosotros ni a quien está en standby.
 - **Las ausencias: un día suelto de una baja sin fecha de fin, las bajas que se pisan y las medias jornadas
   (30/09; auditoría del modelo del 25/09, fase A2).** Lo que se nota:
   - **«Quitar la ausencia de este día»** en el Mes sobre una baja sin fecha de fin (Laura, Maydeth, Susi) quita solo ese

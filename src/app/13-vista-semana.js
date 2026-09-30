@@ -74,12 +74,24 @@ $('#wPatron').addEventListener('click', () => {
   // siempre, y se avisa (24/09, revisión: guardaba a Mari Luz sin martes ni miércoles para siempre)
   const cambian = S.staff.filter(p => cambioDeLibre(S, p, lunes));
   const aviso = cambian.length ? `\n\nEsta semana ${cambian.map(p => `${p.nombre} ${textoCambioLibre(p, libraPuntualDe(p, lunes))}`).join(' y ')}: en la semana tipo se ${cambian.length > 1 ? 'guardan' : 'guarda'} con su día de siempre.` : '';
-  if (!confirm(`¿Guardar la semana del ${fmtDM(lunes)} al ${fmtDM(addDias(lunes, 6))} como nueva semana tipo? El generador la usará a partir de ahora como base (lo que hay ahora en la semana tipo se sustituye; ${comoDeshacer()} lo deshace).${aviso}`)) return;
+  // (30/09, A3) la semana tipo se calcula antes de preguntar, para decir lo que se pierde o se repone: la semana entera, aunque
+  // cruce de mes (estadoSemana), para poder deshacer cada cambio de día libre
+  const avisosAbre = [];
+  const nuevo = patronDesdeSemana(estadoSemana(lunes, false), lunes, S, S.staff, { avisos: avisosAbre });
+  // un cierre por fechas esa semana (auditoría D1): las plazas de las casillas cerradas se guardan como en la semana tipo de antes y
+  // lo que puso el cierre (los apoyos) no se guarda como plaza fija
+  const fin = addDias(lunes, 6);
+  const cierres = cierresDe(S).filter(c => diasDeCierre(c).some(iso => iso >= lunes && iso <= fin));
+  const avisoCierre = cierres.length ? `\n\nEsta semana hay un cierre por fechas (${cierres.map(c => textoCierre(S, c)).join('; ')}): en las casillas cerradas se guardan las plazas de la semana tipo de antes, y los apoyos por el cierre no se guardan como plazas fijas.` : '';
+  // los días sin ninguna plaza (auditoría D6): la semana tipo se queda vacía esos días (una semana a medio planificar)
+  const vacios = [1, 2, 3, 4, 5, 6, 7].filter(d => !(nuevo[d] || []).length);
+  const avisoVacios = vacios.length ? `\n\nOjo: ${textoDiasEl(vacios)} no ${vacios.length > 1 ? 'tienen' : 'tiene'} ninguna plaza: la semana tipo se queda vacía esos días.` : '';
+  // los «Sale primero» a mano que no se conservan (auditoría D3): con la semana tipo abriría otra persona
+  const avisoAbre = avisosAbre.length ? `\n\n${avisosAbre.join('\n')}` : '';
+  if (!confirm(`¿Guardar la semana del ${fmtDM(lunes)} al ${fmtDM(addDias(lunes, 6))} como nueva semana tipo? El generador la usará a partir de ahora como base (lo que hay ahora en la semana tipo se sustituye; ${comoDeshacer()} lo deshace).${aviso}${avisoCierre}${avisoVacios}${avisoAbre}`)) return;
   const antes = JSON.stringify(S.patron);
-  // la semana entera, aunque cruce de mes (estadoSemana), para poder deshacer cada cambio de día libre
-  const nuevo = patronDesdeSemana(estadoSemana(lunes, false), lunes, S, S.staff);
   S.patron = nuevo;
-  registrarCambio(`Semana tipo sustituida por la semana del ${fmtDM(lunes)} (${Object.values(nuevo).reduce((a, x) => a + x.length, 0)} plazas)`, 'cambio');
+  registrarCambio(`Semana tipo sustituida por la semana del ${fmtDM(lunes)} (${Object.values(nuevo).reduce((a, x) => a + x.length, 0)} plazas)${cierres.length ? ` · con el cierre de ${cierres.map(c => nombreLocal(c.localId)).join(' y ')}: las casillas cerradas, como en la semana tipo de antes` : ''}${vacios.length ? ` · sin plazas ${textoDiasEl(vacios)}` : ''}${avisosAbre.length ? ' · ' + avisosAbre.join(' · ') : ''}`, 'cambio');
   saveState();
   toast('Semana tipo actualizada', 'ok');
   undoStack.push({ label: 'semana tipo anterior', y: S.y, m: S.m, apertura: JSON.parse(JSON.stringify(est.apertura)), asig: JSON.parse(JSON.stringify(est.asig)), manual: JSON.parse(JSON.stringify(est.manual || {})), patron: JSON.parse(antes) });

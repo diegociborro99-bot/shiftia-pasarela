@@ -88,12 +88,66 @@ function contextoCierre() {
     // cierre: sigue contando como que estaba allí, como hace aplicarCierre (revisión F2)
     pend = quitarCierre(cfg, st, e, previo.id, { devolver: true, quitarVacaciones: true }).noDevueltos.filter(x => x.entry && dentroDeCierre(c, x.iso, x.tid));
   }
-  return { c, cfg, st, e, dias: ds, pend, afectados: afectadosPorCierre(cfg, st, e, c, { pendientes: pend }), sug: {} };
+  // los días que el cierre de antes leyó de la semana tipo se siguen leyendo de ella aunque ya tengan planilla, como hace
+  // aplicarCierre (30/09, A3; auditoría B1: al editar con la semana ya generada, quien salía de la semana tipo desaparecía del
+  // visor y perdía su decisión)
+  const deST = semanaTipoAlEditar(previo, c);
+  return { c, cfg, st, e, dias: ds, pend, deST, afectados: afectadosPorCierre(cfg, st, e, c, { pendientes: pend, semanaTipo: deST }), sug: {} };
 }
+// con los pendientes y los días de la semana tipo (30/09, A3; auditoría B6: al editar, quien no pudo volver a su casilla no tenía destinos)
 function sugerenciasDe(pid) {
   const x = CIE.ctx;
-  if (!x.sug[pid]) x.sug[pid] = sugerenciasRefuerzo(x.cfg, x.st, x.e, x.c, pid);
+  if (!x.sug[pid]) x.sug[pid] = sugerenciasRefuerzo(x.cfg, x.st, x.e, x.c, pid, { pendientes: x.pend, semanaTipo: x.deST });
   return x.sug[pid];
+}
+// Lo que el modelo hace con las vacaciones (o el día libre) de quien ese día tiene otro turno: la ausencia es solo de la franja
+// cerrada (D10). Un aviso por día, para la tarjeta del paso 2 y el resumen del paso 3 (30/09, A3; auditoría B5: la app decía que
+// no se le ponían vacaciones por ser de día entero y que la parte cerrada contaba como «sin trabajo»; el modelo hacía otra cosa).
+// Sustituye al aviso genérico del modelo de ese día («el lunes 28 también hace El 33 por la mañana (hacía partido: …)»), que se
+// reutiliza tal cual para no decir dos veces casi lo mismo (corrección de A3; revisión del cliente 6)
+function avisosParcialCierre(a, tipo) {
+  if (tipo !== 'VAC' && tipo !== 'LD') return [];
+  return Object.keys(a.soloTurno).filter(iso => !a.soloTurno[iso]).sort().map(iso => {
+    const fs = a.turnos.filter(t => t.iso === iso).map(t => FRANJA_LBL[t.franja].toLowerCase()).join(' y ');
+    const generico = a.avisos.find(t => t.startsWith(`el ${diaYNum(iso)} `));
+    const otros = a.otrosTurnos.filter(t => t.iso === iso).map(t => `${nombreLocal(t.localId)} por la ${FRANJA_LBL[t.franja].toLowerCase()}`).join(' y ');
+    return `${generico || `${cieFecha(iso)}: ese día también trabaja en ${otros}`}, así que ${tipo === 'VAC' ? 'las vacaciones son' : 'el día libre es'} solo de la ${fs}`;
+  });
+}
+// «el martes 3 por la tarde vuelven Susana Capón y Cristian de la semana tipo»: lo que quitarCierre repuso en las casillas que
+// reabren (r.repuestos) y lo que no cupo (r.noRepuestos), para el toast y el historial (corrección de A3; revisión del cliente 1)
+function textoRepuestos(r) {
+  const porCasilla = new Map();
+  for (const x of r.repuestos || []) { const k = x.iso + '|' + x.tid; if (!porCasilla.has(k)) porCasilla.set(k, []); porCasilla.get(k).push(nombrePid(x.pid)); }
+  const partes = [...porCasilla].map(([k, ns]) => { const [iso, tid] = k.split('|'); return `el ${diaYNum(iso)} por la ${FRANJA_LBL[partirTurno(tid).franja].toLowerCase()} ${ns.length > 1 ? 'vuelven' : 'vuelve'} ${enumerar(ns)} de la semana tipo`; });
+  for (const x of r.noRepuestos || []) partes.push(`${nombrePid(x.pid)} no ha podido volver el ${fmtDM(x.iso)} (${x.motivo})`);
+  return partes.join(' · ');
+}
+// Las casillas que el cierre de antes leyó de la semana tipo y que con el cierre del visor vuelven a abrir en un día que ya tiene
+// planilla: al guardar, quitarCierre repone ahí las plazas de la semana tipo (para el resumen del paso 3). [{ iso, tid, nombres }]
+function casillasQueReabren(previo, c) {
+  const out = [];
+  if (!previo) return out;
+  for (const iso of diasDeCierre(previo)) {
+    if (!diaConPlanilla(estadoDeIso(iso), iso)) continue;
+    for (const f of franjasSemanaTipo(previo, iso)) {
+      const tid = turnoId(previo.localId, f);
+      if (dentroDeCierre(c, iso, tid)) continue;
+      // la ausencia que puso este mismo cierre (sus vacaciones o libres de ese día) se quita al guardar: no cuenta como ausencia
+      const puso = p => { const d = (previo.decisiones || {})[p.id]; return !!d && (d.tipo === 'VAC' || d.tipo === 'LD') && (d.dias || []).includes(iso); };
+      const nombres = plazasDelDia(S, S.staff, iso).plazas.filter(pl => pl.t === tid).map(pl => personaDeId(pl.p)).filter(p => p && !p.standby && !haSalido(p, iso) && (!ausenciaEn(p, iso, f) || puso(p))).map(p => p.nombre);
+      out.push({ iso, tid, nombres });
+    }
+  }
+  return out;
+}
+// «lun 28 (solo la tarde) y mar 29»: los días de vacaciones o libres que puso el cierre, con la media jornada (d.parciales). Un día
+// de sus turnos cerrados que no está en d.dias es porque ya estaba ausente: lo único que hoy lo deja fuera (30/09, A3, B5)
+function diasAusenciaCierreTxt(d, turnos) {
+  const dias = d.dias || [], parc = d.parciales || {};
+  const isos = [...new Set(dias.concat(turnos.map(t => t.iso)))].sort();
+  if (!isos.length) return 'sin días';
+  return enumerar(isos.map(iso => `${cieFecha(iso)}${dias.includes(iso) ? (parc[iso] ? ` (solo la ${parc[iso].map(f => FRANJA_LBL[f].toLowerCase()).join(' y ')})` : '') : ' (no se pudo poner: ya estaba ausente)'}`));
 }
 const tipoDe = pid => (CIE.decisiones[pid] && CIE.decisiones[pid].tipo) || 'SIN';
 // «dom 27 tarde, lun 28 mañana y tarde»: los días de una persona en el cierre
@@ -108,16 +162,17 @@ function htmlDecisiones(lista) {
   if (!grupos.length) return '<p class="revsub">Nadie trabajaba en esas casillas.</p>';
   return `<ul class="cieres">${grupos.map(({ d, xs }) => `<li><b>${esc(d.largo)}:</b> ${xs.map(x => `${esc(x.nombre)}${x.extra ? ` (${esc(x.extra)})` : ''}`).join(', ')}.</li>`).join('')}</ul>`;
 }
+// «lun 28: Pasarela · tarde; mar 29: Zapatillera · tarde · cocina»: el destino guardado lleva su puesto (destinoCierre)
 function destinosTxt(destinos, turnos) {
   const ds = [...new Set((turnos || []).map(t => t.iso))];
   const todos = [...new Set(ds.concat(Object.keys(destinos || {})))].sort();
-  return todos.map(iso => { const t = destinos && destinos[iso]; const { localId, franja } = t ? partirTurno(t) : {}; return `${cieFecha(iso)}: ${t ? `${nombreLocal(localId)} · ${FRANJA_LBL[franja].toLowerCase()}` : 'donde haga falta'}`; }).join('; ');
+  return todos.map(iso => { const t = destinos && destinos[iso]; const { tid, puesto } = destinoCierre(t); const { localId, franja } = t ? partirTurno(tid) : {}; return `${cieFecha(iso)}: ${t ? `${nombreLocal(localId)} · ${FRANJA_LBL[franja].toLowerCase()}${puesto === 'cocina' ? ' · cocina' : ''}` : 'donde haga falta'}`; }).join('; ');
 }
 // resumen de las decisiones de un cierre ya guardado, para la lista de Ajustes y «Ver cierre»
 function listaDecisionesGuardadas(c) {
   return Object.entries(c.decisiones || {}).map(([pid, d]) => {
     const turnos = (d.turnos || []).map(k => { const [iso, franja] = k.split('|'); return { iso, franja }; });
-    const extra = d.tipo === 'REFUERZA' ? destinosTxt(d.destinos, turnos) : (d.tipo === 'VAC' || d.tipo === 'LD') ? ((d.dias || []).length ? d.dias.map(cieFecha).join(' y ') : 'no se pudo poner: ese día tenía otro turno') : diasTxt(turnos);
+    const extra = d.tipo === 'REFUERZA' ? destinosTxt(d.destinos, turnos) : (d.tipo === 'VAC' || d.tipo === 'LD') ? diasAusenciaCierreTxt(d, turnos) : diasTxt(turnos);
     return { pid, nombre: nombrePid(pid), tipo: d.tipo, extra };
   }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
@@ -192,6 +247,10 @@ function pintarCierre() {
       tira.push(`<div class="ciedia${cur === '0' ? ' abierto' : ''}" data-ciedia="${iso}"><b>${esc(cieFecha(iso))}<small>${esc(MES3[+iso.slice(5, 7) - 1])}</small></b>${CIE_FR.map(([k, t]) => `<button type="button" class="ciefr${cur === k ? ' on' : ''}" data-ciefr="${iso}|${k}">${t}</button>`).join('')}</div>`);
     }
     const v = validarCierre(S, cierreDelVisor());
+    // (corrección de A3; revisión del cliente 4) un cierre de más de 62 días se recortaba en silencio: la tira acaba en el tope,
+    // se dice, y el selector de fin no deja pasar de él
+    const tope = addDias(CIE.ini, MAX_DIAS_CIERRE - 1);
+    const largo = CIE.fin > tope ? `un cierre no puede pasar de ${MAX_DIAS_CIERRE} días: se cierra hasta el ${fechaCortaCierre(tope)}` : '';
     body.innerHTML = `${cab}
       <p class="revsub">Como unas vacaciones del local: tiene principio y fin, y cuando pasa el local vuelve a abrir solo, con su horario de siempre. «Cuándo abre» (en Ajustes) es el horario de todas las semanas; esto no lo toca.</p>
       ${pasos}
@@ -200,7 +259,7 @@ function pintarCierre() {
       <div class="cieint">
         <label class="pinlbl">Cierra el<input type="date" id="cieIni" class="logininp" data-libre value="${esc(CIE.ini)}"></label>
         <label class="pinlbl">desde<select id="cieIniF" class="logininp" data-libre><option value="M"${CIE.iniF === 'M' ? ' selected' : ''}>la mañana</option><option value="T"${CIE.iniF === 'T' ? ' selected' : ''}>la tarde</option></select></label>
-        <label class="pinlbl">hasta el<input type="date" id="cieFin" class="logininp" data-libre value="${esc(CIE.fin)}"></label>
+        <label class="pinlbl">hasta el<input type="date" id="cieFin" class="logininp" data-libre value="${esc(CIE.fin)}" max="${esc(tope)}"></label>
         <label class="pinlbl">incluida<select id="cieFinF" class="logininp" data-libre><option value="M"${CIE.finF === 'M' ? ' selected' : ''}>la mañana</option><option value="T"${CIE.finF === 'T' ? ' selected' : ''}>la tarde (todo el día)</option></select></label>
       </div>
       <div class="pinlbl">Cada día <small>(tócalo para dejarlo solo de mañana, solo de tarde, todo el día o abierto)</small></div>
@@ -210,6 +269,7 @@ function pintarCierre() {
       <label class="pinlbl">Detalle <small>(opcional; con «Otro», es lo que se enseña)</small><input type="text" id="cieDet" class="logininp" data-libre maxlength="80" value="${esc(CIE.detalle)}" placeholder="p. ej. obra en la cocina"></label>
       <div id="ciePrevia" class="ciepre">${esc(previaTxt())}</div>
       ${avisoPasados(cierreDelVisor()) ? `<p class="cieaviso ciepas">${esc(avisoPasados(cierreDelVisor()))}</p>` : ''}
+      ${largo ? `<p class="cieerr">${esc(largo)}</p>` : ''}
       ${v.ok ? '' : `<p class="cieerr">${esc(v.errores.join(' · '))}</p>`}
       <div class="ciebar">${CIE.id ? '<button type="button" class="btn btn-sec cierojo" id="cieReabrir">Reabrir el local</button>' : ''}<span style="flex:1"></span><button type="button" class="btn btn-cta" id="cieSig"${v.ok ? '' : ' disabled'}>Siguiente: quién trabajaba esos días</button></div>`;
     return;
@@ -219,19 +279,27 @@ function pintarCierre() {
   if (CIE.paso === 2) {
     const tarjetas = x.afectados.map(a => {
       const tipo = tipoDe(a.pid);
-      const noAus = (tipo === 'VAC' || tipo === 'LD') ? Object.entries(a.soloTurno).filter(([, v]) => !v).map(([iso]) => iso) : [];
-      const dest = tipo === 'REFUERZA' ? [...new Set(a.turnos.map(t => t.iso))].map(iso => {
+      const parciales = avisosParcialCierre(a, tipo);
+      const dias = [...new Set(a.turnos.map(t => t.iso))];
+      // (corrección de A3; revisión del cliente 2) quien no puede reforzar la sala (solo cocina, o lleva una cocina ese día) tiene
+      // cocinas de otros locales como destino (sug.motivos dice por qué no hay sala; si tampoco hay cocina, «Apoyo» se desactiva)
+      const sug = sugerenciasDe(a.pid);
+      const motivos = dias.map(iso => (sug.motivos || {})[iso]).filter(Boolean);
+      const sinApoyo = motivos.length > 0 && dias.every(iso => !(sug[iso] || []).length);
+      const dest = tipo === 'REFUERZA' ? dias.map(iso => {
         const sel = ((CIE.decisiones[a.pid] || {}).destinos || {})[iso] || '';
-        const ops = (sugerenciasDe(a.pid)[iso] || []).map(s => `<option value="${esc(s.tid)}"${s.tid === sel ? ' selected' : ''}>${esc(nombreLocal(s.localId))} · ${esc(FRANJA_LBL[s.franja].toLowerCase())} · ${esc(s.razon)}</option>`).join('');
+        const ops = (sug[iso] || []).map(s => { const v = s.puesto === 'cocina' ? `${s.tid}|cocina` : s.tid; return `<option value="${esc(v)}"${v === sel ? ' selected' : ''}>${esc(nombreLocal(s.localId))} · ${esc(FRANJA_LBL[s.franja].toLowerCase())} · ${esc(s.razon)}</option>`; }).join('');
         return `<label class="ciedest"><span>${esc(cieFecha(iso))}</span><select class="logininp" data-libre data-ciedest="${esc(a.pid)}|${iso}"><option value="">donde haga falta</option>${ops}</select></label>`;
       }).join('') : '';
+      // con vacaciones o día libre, el aviso de la media jornada sustituye al genérico del mismo día (revisión del cliente 6)
+      const avisos = parciales.length ? parciales.map(t => t + '.') : a.avisos;
       return `<div class="ciecard" data-ciepid="${esc(a.pid)}">
         <div class="ciehd"><span class="av" style="background:${avColor(a.pid)}">${esc(initials(a.nombre))}</span><b>${esc(a.nombre)}</b></div>
         <div class="ciechips">${a.turnos.map(t => `<span class="ciechip">${esc(cieFecha(t.iso))} · ${esc(FRANJA_LBL[t.franja].toLowerCase())}${t.abre ? ' · abre' : ''}${t.cocina ? ' · cocina' : ''}${t.fuente === 'semana tipo' ? ' · semana tipo' : ''}</span>`).join('')}</div>
-        ${a.avisos.map(t => `<p class="cieaviso">${esc(t.charAt(0).toUpperCase() + t.slice(1))}</p>`).join('')}
-        <div class="segrow ciedecs">${DECISIONES_CIERRE.map(d => `<button type="button" class="segk${tipo === d.id ? ' on' : ''}" data-ciedec="${esc(a.pid)}|${d.id}" title="${esc(d.largo)}">${esc(d.label)}</button>`).join('')}</div>
+        ${avisos.map(t => `<p class="cieaviso">${esc(t.charAt(0).toUpperCase() + t.slice(1))}</p>`).join('')}
+        ${motivos.map(t => `<p class="cieaviso ciemotivo">${esc(t)}.</p>`).join('')}
+        <div class="segrow ciedecs">${DECISIONES_CIERRE.map(d => `<button type="button" class="segk${tipo === d.id ? ' on' : ''}" data-ciedec="${esc(a.pid)}|${d.id}"${d.id === 'REFUERZA' && sinApoyo && tipo !== 'REFUERZA' ? ` disabled title="${esc(motivos.join('. '))}"` : ` title="${esc(d.largo)}"`}>${esc(d.label)}</button>`).join('')}</div>
         ${dest ? `<div class="ciedests"><small>Dónde apoya cada día (primero donde falta gente):</small>${dest}</div>` : ''}
-        ${noAus.length ? `<p class="cieaviso">${esc(noAus.map(cieFecha).join(' y '))}: ese día tiene otro turno, así que no se le pone ${tipo === 'VAC' ? 'vacaciones' : 'día libre'} (es de día entero): la parte cerrada cuenta como sin trabajo.</p>` : ''}
       </div>`;
     }).join('');
     body.innerHTML = `${cab}${CIE.abre ? '' : `<p class="revsub">${esc(textoCierre(S, x.c))}</p>`}${pasos}
@@ -248,14 +316,18 @@ function pintarCierre() {
     return { pid: a.pid, nombre: a.nombre, tipo, extra };
   });
   const plazas = x.dias.reduce((n, iso) => n + ((x.c.dias[iso] || []).reduce((m, f) => m + pidsEn(x.e, iso, turnoId(x.c.localId, f)).length, 0)), 0) + (x.pend || []).length;
-  const noAus = x.afectados.filter(a => ['VAC', 'LD'].includes(tipoDe(a.pid)) && Object.values(a.soloTurno).some(v => !v)).map(a => a.nombre);
+  const parciales = x.afectados.map(a => ({ a, xs: avisosParcialCierre(a, tipoDe(a.pid)) })).filter(x => x.xs.length);
+  // al acortar un cierre hecho antes de generar: las casillas que reabren en días ya generados recuperan las plazas de la semana
+  // tipo (corrección de A3; revisión del cliente 1: se quedaban vacías sin decirlo)
+  const reabren = casillasQueReabren(CIE.id ? cierresDe(S).find(c => c.id === CIE.id) : null, x.c);
   body.innerHTML = `${cab}${pasos}
     <div id="cieResumen" class="cieresumen">
       <p><b>${esc(textoCierre(S, x.c))}.</b> ${CIE.abre ? `Y desde ya, ${esc(l.nombre)} no abre ${esc(DOW_PL[CIE.abre.dow])} por la ${esc(FRANJA_LBL[CIE.abre.franja].toLowerCase())}.` : diasDeCierre(x.c).every(iso => iso < isoHoy()) ? '' : 'Cuando pase, el local vuelve a abrir con su horario de siempre.'}</p>
       ${avisoPasados(x.c) ? `<p class="cieaviso ciepas">${esc(avisoPasados(x.c))}</p>` : ''}
       <p>${plazas ? `Se ${plazas === 1 ? 'retira 1 plaza' : `retiran ${plazas} plazas`} de las casillas cerradas (si se reabre, vuelven a su sitio).` : 'No hay plazas que retirar.'}</p>
+      ${reabren.map(r => `<p>El ${esc(diaYNum(r.iso))} por la ${esc(FRANJA_LBL[partirTurno(r.tid).franja].toLowerCase())} ${esc(nombreLocal(partirTurno(r.tid).localId))} vuelve a abrir${r.nombres.length ? `: ${r.nombres.length > 1 ? 'vuelven' : 'vuelve'} ${esc(enumerar(r.nombres))} de la semana tipo (si pueden estar)` : ', sin nadie de la semana tipo ese día'}.</p>`).join('')}
       ${htmlDecisiones(lista)}
-      ${noAus.length ? `<p class="cieaviso">${esc(noAus.join(', '))}: algún día tiene otro turno; ese día no se le ponen vacaciones ni día libre y la parte cerrada cuenta como sin trabajo.</p>` : ''}
+      ${parciales.map(({ a, xs }) => `<p class="cieaviso">${esc(a.nombre)}: ${esc(xs.join('; '))}.</p>`).join('')}
       <p class="revsub">El generador y la cobertura lo tendrán en cuenta. ${esc(comoDeshacer())} lo deshace todo.</p>
     </div>
     <div class="ciebar"><button type="button" class="btn btn-sec" id="cieAtras">Atrás</button><span style="flex:1"></span><button type="button" class="btn btn-cta" id="cieOk">${CIE.id ? 'Guardar los cambios' : CIE.abre ? 'Cambiar el horario y retirar esas plazas' : `Cerrar ${esc(l.nombre)}`}</button></div>`;
@@ -352,14 +424,17 @@ function confirmarCierre() {
   const n = t => Object.values(c.decisiones).filter(d => d.tipo === t).map(d => d);
   const quien = t => Object.entries(c.decisiones).filter(([, d]) => d.tipo === t).map(([pid]) => nombrePid(pid));
   const partes = [['REFUERZA', 'apoyo'], ['SIN', 'sin trabajo'], ['VAC', 'vacaciones'], ['LD', 'día libre']].filter(([t]) => n(t).length).map(([t, lbl]) => `${lbl}: ${quien(t).join(', ')}`);
-  registrarCambio(`${textoCierre(S, c)}${previo ? ' (editado)' : ''} · ${pl(r.retirados, 'plaza retirada', 'plazas retiradas')}${partes.length ? ' · ' + partes.join(' · ') : ''}${r.rechazados.length ? ` · no se pudo poner: ${r.rechazados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)} (${x.motivo})`).join('; ')}` : ''}${r.avisos.length ? ' · ' + r.avisos.join(' · ') : ''}`, 'local');
+  // (corrección de A3; revisión del cliente 7) sobre una semana sin planificar no hay plazas que retirar: se dice eso, no «0 plazas»
+  const retiradas = !r.retirados && Object.keys(c.deSemanaTipo || {}).length ? `semana sin planificar: ${pl(Object.keys(c.decisiones).length, 'persona con decisión', 'personas con decisión')} (el generador lo respetará)` : pl(r.retirados, 'plaza retirada', 'plazas retiradas');
+  const repuestos = textoRepuestos(r);
+  registrarCambio(`${textoCierre(S, c)}${previo ? ' (editado)' : ''} · ${retiradas}${partes.length ? ' · ' + partes.join(' · ') : ''}${repuestos ? ' · ' + repuestos : ''}${r.rechazados.length ? ` · no se pudo poner: ${r.rechazados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)} (${x.motivo})`).join('; ')}` : ''}${r.avisos.length ? ' · ' + r.avisos.join(' · ') : ''}`, 'local');
   for (const k of mesesDe(ds)) if (mesCerrado(k + '-01')) registrarCambio(`Cambio en un mes cerrado (${k})`, 'aviso');
   saveState();
   if (typeof GEN !== 'undefined') GEN.previa = null;   // una vista previa del Generador de antes del cierre ya no vale
   const ov = document.getElementById('cierreOvl'); if (ov) ov.remove();
   renderVistaActiva();
   if (CIE.despues) try { CIE.despues(); } catch (err) {}
-  toast(`${textoCierre(S, c)} · ${pl(r.retirados, 'plaza retirada', 'plazas retiradas')}${r.avisos.length ? ` · ${pl(r.avisos.length, 'aviso', 'avisos')} en el historial` : ''}${r.rechazados.length ? ` · ${pl(r.rechazados.length, 'apoyo no se pudo poner', 'apoyos no se pudieron poner')}` : ''} · ${comoDeshacer()} para deshacer`, r.avisos.length || r.rechazados.length ? 'warn' : 'ok');
+  toast(`${textoCierre(S, c)} · ${retiradas}${repuestos ? ` · ${repuestos}` : ''}${r.avisos.length ? ` · ${pl(r.avisos.length, 'aviso', 'avisos')} en el historial` : ''}${r.rechazados.length ? ` · ${pl(r.rechazados.length, 'apoyo no se pudo poner', 'apoyos no se pudieron poner')}` : ''} · ${comoDeshacer()} para deshacer`, r.avisos.length || r.rechazados.length || r.noRepuestos.length ? 'warn' : 'ok');
 }
 function reabrirCierreUI(id, despues) {
   const c = cierresDe(S).find(x => x.id === id); if (!c) { toast('Ese cierre ya no existe', 'warn'); return; }
@@ -373,7 +448,8 @@ function reabrirCierreUI(id, despues) {
   const ov = document.getElementById('cierreOvl'); if (ov) ov.remove();
   renderVistaActiva();
   if (despues) try { despues(); } catch (err) {}
-  toast(`${nombreLocal(c.localId)} reabierto · ${pl(r.devueltos.length, 'plaza vuelve', 'plazas vuelven')}${r.noDevueltos.length ? ` · ${r.noDevueltos.length} no ${r.noDevueltos.length === 1 ? 'pudo' : 'pudieron'} volver` : ''} · ${comoDeshacer()} para deshacer`, r.noDevueltos.length ? 'warn' : 'ok');
+  const repuestos = textoRepuestos(r);
+  toast(`${nombreLocal(c.localId)} reabierto · ${pl(r.devueltos.length, 'plaza vuelve', 'plazas vuelven')}${r.noDevueltos.length ? ` · ${r.noDevueltos.length} no ${r.noDevueltos.length === 1 ? 'pudo' : 'pudieron'} volver` : ''}${repuestos ? ` · ${repuestos}` : ''} · ${comoDeshacer()} para deshacer`, r.noDevueltos.length || (r.noRepuestos || []).length ? 'warn' : 'ok');
 }
 // Reabre sin preguntar (ya se ha preguntado y apilado el deshacer) y lo apunta en el historial. Con
 // desde, solo a partir de esa fecha: lo anterior sigue cerrado (reabrirCierreDesde, del modelo).
@@ -381,7 +457,8 @@ function reabrirCierre(c, desde) {
   const ds = diasDeCierre(c), txt = textoCierre(S, c);
   const e = estadoRango(ds[0], ds[ds.length - 1], true);
   const r = desde ? reabrirCierreDesde(S, S.staff, e, c.id, desde) : quitarCierre(S, S.staff, e, c.id, { devolver: true, quitarVacaciones: true });
-  registrarCambio(`${nombreLocal(c.localId)} reabierto (${txt})${r.parcial ? ` desde el ${fmtDM(desde)}; lo anterior sigue cerrado` : ''}: ${pl(r.devueltos.length, 'plaza devuelta', 'plazas devueltas')}${r.noDevueltos.length ? `, ${r.noDevueltos.length} no (${r.noDevueltos.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${r.vacacionesQuitadas.length ? `, ${pl(r.vacacionesQuitadas.length, 'día de vacaciones o libre quitado', 'días de vacaciones o libres quitados')}` : ''}${r.apoyosQuitados.length ? `, ${pl(r.apoyosQuitados.length, 'apoyo retirado', 'apoyos retirados')}` : ''}`, 'local');
+  const repuestos = textoRepuestos(r);   // lo que vuelve de la semana tipo en las casillas que se leyeron de ella (corrección de A3)
+  registrarCambio(`${nombreLocal(c.localId)} reabierto (${txt})${r.parcial ? ` desde el ${fmtDM(desde)}; lo anterior sigue cerrado` : ''}: ${pl(r.devueltos.length, 'plaza devuelta', 'plazas devueltas')}${r.noDevueltos.length ? `, ${r.noDevueltos.length} no (${r.noDevueltos.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${r.vacacionesQuitadas.length ? `, ${pl(r.vacacionesQuitadas.length, 'día de vacaciones o libre quitado', 'días de vacaciones o libres quitados')}` : ''}${r.apoyosQuitados.length ? `, ${pl(r.apoyosQuitados.length, 'apoyo retirado', 'apoyos retirados')}` : ''}${repuestos ? ` · ${repuestos}` : ''}`, 'local');
   return r;
 }
 // «Cuándo abre»: al volver a marcar un día, los cierres que se hicieron al quitarlo (en las semanas ya

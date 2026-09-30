@@ -123,7 +123,7 @@ function htmlCierresDelDia(iso) {
     const xs = Object.entries(c.decisiones || {}).filter(([, d]) => !d.turnos || d.turnos.some(k => k.startsWith(iso + '|')));
     // quien apoya «donde haga falta» y aún no está puesto en ningún sitio lo dice (revisión F2)
     const sinSitio = new Set(apoyosSinSitio(S, S.staff, estadoDeIso(iso), iso).map(x => x.pid));
-    const grupo = t => xs.filter(([, d]) => d.tipo === t).map(([pid, d]) => { const dest = d.tipo === 'REFUERZA' && d.destinos && d.destinos[iso]; return nombrePid(pid) + (dest ? ` (${nombreLocal(partirTurno(dest).localId)})` : d.tipo === 'REFUERZA' && sinSitio.has(pid) ? ' (aún sin sitio)' : ''); });
+    const grupo = t => xs.filter(([, d]) => d.tipo === t).map(([pid, d]) => { const dest = d.tipo === 'REFUERZA' && d.destinos && d.destinos[iso]; const { tid, puesto } = destinoCierre(dest); return nombrePid(pid) + (dest ? ` (${nombreLocal(partirTurno(tid).localId)}${puesto === 'cocina' ? ', cocina' : ''})` : d.tipo === 'REFUERZA' && sinSitio.has(pid) ? ' (aún sin sitio)' : ''); });
     return `<div class="cieitem"><b>${esc(textoCierre(S, c))}</b>${DECISIONES_CIERRE.filter(d => grupo(d.id).length).map(d => `<small><em>${esc(d.largo)}:</em> ${esc(grupo(d.id).join(', '))}</small>`).join('')}<button class="glink" data-vercierre="${esc(c.id)}">Ver cierre</button></div>`;
   }).join('')}</div>`;
 }
