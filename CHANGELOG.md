@@ -2,6 +2,40 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **La Cobertura no toca lo ya trabajado, un cambio de turno no usa «cubre a» y lo que entró por alguien se va cuando
+  vuelve (01/10).** Lo que se nota:
+  - **Solo desde hoy, y desde ahora.** Si marcas días que ya han pasado (una baja que se apunta tarde), en la fila de días
+    salen rayados y con «ya pasado», la nota dice cuáles son y el botón los cuenta aparte («Buscar quién cubre (5 turnos) · + 3
+    ya pasados»). Se apuntan en su ficha y la persona sale de esos turnos, pero no entra nadie en ellos; si abría, ahora abre
+    quien le sigue y sus horas cambian. Lo mismo con lo de hoy que ya ha terminado: a las ocho de la tarde la mañana de hoy ya
+    está trabajada y nadie entra en ella; la tarde, que está en curso, sí se cubre. La vista previa enseña también esos días
+    («Iván sale también del mar 22 y mié 23 (ya pasados: no entra nadie)») y «Registrar la ausencia» avisa de que sale de sus
+    turnos. Antes la Cobertura metía a Roberto en días ya trabajados y le cambiaba las horas. Si alguien le cubrió de verdad,
+    se pone a mano.
+  - **Un cambio de turno no es una falta.** Ya no sale «Iván tiene quien le cubra», ni «ya estaba · cubre a Iván», ni el
+    partido «para cubrir a Iván»: quien ocupa su sitio entra «cambio con Iván», y la vista previa y lo aplicado hablan de
+    cambio, no de cubrir. Un cambio de un día ya pasado no toca nada: «ya pasado: no se cambia nada».
+  - **El turno a cambio, a la vista.** Se busca uno que no deje corta la otra casilla y, si no hay, se propone igual con el
+    aviso: «aviso: ese turno de Susana L. se queda sin nadie que abra y solo con apoyos». Si no hay ningún turno a cambio,
+    también se dice: «sin turno a cambio: Susana Luna se queda sin ese turno». Con cualquiera de los dos, la fila lleva «!», el
+    plan dice «cubre todo, con aviso» (y si el otro plan cubre igual sin avisos, va primero), y la vista previa, lo aplicado y
+    el historial lo repiten. El turno a cambio nunca es de un día pasado ni de un turno de hoy que ya ha empezado.
+  - **Cuando quien faltaba vuelve, se va lo que entró por él.** Si quitas las vacaciones de Iván, el aviso dice quién entró
+    por él y que sale al volver a generar la semana (o quítalo tú antes); al volver a generar, la app lo quita, también a quien
+    entró «para llegar al mínimo», en una línea por persona: «Dulce · Iván ya no falta: ya no hay que cubrir su sitio — vie 2
+    y sáb 3 tarde en Pasarela». Mientras siga faltando (en standby, o si ya no está con nosotros) no se quita nada. Lo puesto
+    a mano se queda, y la Revisión avisa de quien va «por» alguien que ya no falta o que está en el mismo turno, y dice qué
+    hacer.
+  - **«cubre a Noe» o «por Noe».** En el plan y en la planilla, quien tiene «Cubre a» Noe dice «cubre a Noe»; quien entra en
+    su lugar sin tenerlo, «por Noe»; quien entra para llegar al mínimo lo dice así, y quien entra solo para abrir, «para
+    abrir» (y al confirmar entra de verdad: antes se quedaba fuera y nadie abría).
+  - **Menos sorpresas.** Si quien cubre a Iván está en standby o de baja sin fecha de fin, la Cobertura lo dice («Iván tiene
+    quien le cubra: Dulce (en standby: ahora no cubre)»), y también su tarjeta y su ficha; una baja de media jornada ya no
+    cuenta como «de baja». Un turno cerrado ese día dice solo «cerrada ese día: nada que cubrir», también con «Reemplazar
+    siempre». Si marcas días sueltos muy separados (el 2/10 y el 31/12) se miran los dos, y si marcas más de 62 la pestaña dice
+    hasta dónde mira. «Nadie abre» ya no sale cuando quien ya estaba en el turno pasa a abrir. Y lo pequeño: «vacaciones
+    registradas», los días de la cabecera en tramos («del lun 21/9 al dom 27/9»), «3 (mínimo 2)» en vez de «3 de 2», y en el
+    móvil la «×» ya no tapa la fila de días ni la ✓ se monta sobre el nombre del día.
 - **El Generador quita lo que ya no puede estar y te dice quién y por qué (30/09 y 01/10).** Lo que se nota:
   - **Volver a generar quita lo que ya no puede estar.** Si cambias algo en Equipo (un local, una franja, un veto, el standby,
     un «nunca con», un día libre, unas vacaciones) y vuelves a generar la semana, la app quita a quien ya no puede estar en ese

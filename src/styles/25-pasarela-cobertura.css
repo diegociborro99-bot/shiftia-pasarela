@@ -1,0 +1,18 @@
+/* 01/10 (corrección de A5; revisión de cliente): la Cobertura
+   · H10: un día ya pasado de la fila de días se distingue (rayado, más apagado y con «ya pasado»), también marcado;
+   · las notas de la vista previa (los días pasados de los que sale, los avisos del turno a cambio);
+   · en el móvil, la «×» de la Cobertura abierta en una capa no se queda flotando encima de la fila de días ni le quita ancho a
+     la hoja (era la «×» pegajosa de todas las capas, 20-movil.css), y la ✓ del día marcado va en una esquina, fuera del nombre
+     del día (con el texto pequeño se montaba: «MIÉ✓»). */
+.cobdia.pasado{opacity:.55;background-image:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb, var(--ink3) 12%, transparent) 6px 7px)}
+.cobdia.pasado.on{opacity:.7;border-style:dashed}
+.cobdia .cobya{font-style:normal;font-family:var(--mono);font-size:8.5px;line-height:1.1;letter-spacing:.02em;color:var(--ink3);text-transform:uppercase}
+.pvnota{margin:6px 0 0;font-size:13px;color:var(--ink2);background:var(--surface2);border-radius:10px;padding:7px 11px}
+@media (max-width:640px), ((max-height:520px) and (pointer:coarse)){
+  #cobOvl .ovcard .ovx{position:absolute;float:none;top:10px;right:10px;margin:0;box-shadow:none}
+  #cobOvl .cobhead{padding-right:46px}
+}
+@media (max-width:640px){
+  .cobdia .cobya{font-size:7.5px}
+  .cobdia.on::after{top:-6px;right:-5px;width:15px;height:15px;border-radius:999px;background:var(--accent);color:#fff;font-size:9px;line-height:15px;text-align:center;box-shadow:0 0 0 2px var(--surface)}
+}

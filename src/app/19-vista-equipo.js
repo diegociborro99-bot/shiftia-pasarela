@@ -106,9 +106,12 @@ function chipsCondiciones(p) {
   // lo quites»; en la de quien falta, «Si falta, le cubre Mari Luz». La designación le autoriza el partido
   // para cubrirle (D1, y solo eso)
   // (revisión S0) si a quien cubre ya no está con nosotros, la designación no se aplica: se dice
-  for (const cb of p.cubreA || []) { const x = personaDeId(cb.pid), fuera = x && haSalido(x, isoHoy()); h.push(tc('cubreA', 'Cubre a', `${esc(nombrePid(cb.pid))} · ${fuera ? 'ya no está con nosotros' : `${esc(cuandoCubre(S, cb))} · hasta que lo quites`}`, 'fix cubrea' + (fuera ? ' off' : ''), fuera ? `${nombrePid(cb.pid)} ${textoSalida(x)}: ya no hay a quien cubrir (se quita en esta ficha)` : `ocupa el sitio de ${nombrePid(cb.pid)} cuando falta, hasta que se quite en esta ficha; si hace falta, puede hacer partido para cubrirle`)); }
+  // (corrección de A5; revisión de cliente H6) y si quien cubre está en standby o de baja sin fin, su chip lo dice y sale apagado,
+  // con el mismo texto que el lado de quien falta («Si falta, le cubre Dulce · está en standby»); antes parecía activo
+  for (const cb of p.cubreA || []) { const x = personaDeId(cb.pid), fuera = x && haSalido(x, isoHoy()); const ina = fuera ? null : (quienLeCubre(S, S.staff, cb.pid, isoHoy()).find(d => d.pid === p.id && d.inactiva) || {}).inactiva; h.push(tc('cubreA', 'Cubre a', `${esc(nombrePid(cb.pid))} · ${fuera ? 'ya no está con nosotros' : ina ? esc(ina) : `${esc(cuandoCubre(S, cb))} · hasta que lo quites`}`, 'fix cubrea' + (fuera || ina ? ' off' : ''), fuera ? `${nombrePid(cb.pid)} ${textoSalida(x)}: ya no hay a quien cubrir (se quita en esta ficha)` : ina ? `${p.nombre} ${ina}: mientras siga así, no cubre a ${nombrePid(cb.pid)}` : `ocupa el sitio de ${nombrePid(cb.pid)} cuando falta, hasta que se quite en esta ficha; si hace falta, puede hacer partido para cubrirle`)); }
   // 30/09 (S0): si quien le cubre ya no está con nosotros, se dice y sale tachado (la designación ya no vale)
-  for (const d of quienLeCubre(S, S.staff, p.id)) h.push(tchip('Si falta, le cubre', `${esc(d.nombre)}${d.salido ? ' · ya no está con nosotros' : d.cuando !== 'siempre que falte' ? ` <small>(${esc(d.cuando)})</small>` : ''}`, 'fix cubrea' + (d.activa && !d.salido ? '' : ' off'), d.salido ? `${d.nombre} ya no trabaja con nosotros desde el ${fmtDM(d.salido.desde)}: no le cubre nadie mientras no se cambie en Equipo` : d.activa ? `${d.nombre} ocupa su sitio cuando falta (se cambia en la ficha de ${d.nombre})` : `«Cubre a» está apagado en la ficha de ${d.nombre} o en las reglas del grupo: ahora no se aplica`));
+  // 01/10 (A5; sospecha F de la auditoría): quien está en standby o de baja sin fecha de fin no le cubre mientras siga así (se dice)
+  for (const d of quienLeCubre(S, S.staff, p.id, isoHoy())) h.push(tchip('Si falta, le cubre', `${esc(d.nombre)}${d.salido ? ' · ya no está con nosotros' : d.inactiva ? ` · ${esc(d.inactiva)}` : d.cuando !== 'siempre que falte' ? ` <small>(${esc(d.cuando)})</small>` : ''}`, 'fix cubrea' + (d.activa && !d.salido ? '' : ' off'), d.salido ? `${d.nombre} ya no trabaja con nosotros desde el ${fmtDM(d.salido.desde)}: no le cubre nadie mientras no se cambie en Equipo` : d.inactiva ? `${d.nombre} ${d.inactiva}: mientras siga así, no le cubre` : d.activa ? `${d.nombre} ocupa su sitio cuando falta (se cambia en la ficha de ${d.nombre})` : `«Cubre a» está apagado en la ficha de ${d.nombre} o en las reglas del grupo: ahora no se aplica`));
   // (fase 6, S30) con su día: el veto de Mari Luz es de los lunes, no de todos los días
   for (const v of p.vetos || []) { const ds = dowsVeto(v); h.push(tc('vetos', 'No hace', chipLocal(v.localId, `${v.franja === 'M' ? 'mañanas' : 'tardes'}${ds ? ' · ' + ds.map(d => DOW_PL[d]).join(' y ') : ''}`), 'loc warn')); }
   // (fase 6, S17 y D6) el contrato no se apaga: lo compara el contador de horas
@@ -236,11 +239,15 @@ function lineasCubrirAusencia(p, a, r) {
   const frase = s => s.charAt(0).toUpperCase() + s.slice(1) + '.';
   const donde = x => `${nombreLocal(partirTurno(x.tid).localId)} por la ${FRANJA_LBL[partirTurno(x.tid).franja].toLowerCase()}`;
   const out = { cabeza: `${p.nombre} no está ${cuandoAusencia(a)}.`, quien: [], quedan: [], pasados: '' };
-  const designadas = [...new Set(quienLeCubre(S, S.staff, p.id).map(d => d.pid))];
+  // (corrección de A5; revisión de modelo H4) el primer día que se cubre: con una ausencia apuntada desde antes de hoy, hoy
+  const hoy = isoHoy();
+  const leCubren = quienLeCubre(S, S.staff, p.id, a.desde < hoy ? hoy : a.desde);
+  const designadas = [...new Set(leCubren.map(d => d.pid))];
   for (const qid of designadas) {
-    const d = quienLeCubre(S, S.staff, p.id).filter(x => x.pid === qid);
-    // con el interruptor apagado (en su ficha o en las reglas del grupo) la designación está, pero no se aplica
-    if (!d.some(x => x.activa)) { out.quien.push({ pid: qid, txt: `${nombrePid(qid)} tiene «Cubre a» ${p.nombre}, pero está apagado: ahora no le cubre.` }); continue; }
+    const d = leCubren.filter(x => x.pid === qid);
+    // con el interruptor apagado (en su ficha o en las reglas del grupo) la designación está, pero no se aplica; (A5, sospecha F)
+    // tampoco si está en standby o de baja sin fecha de fin, y se dice eso, no que esté apagado
+    if (!d.some(x => x.activa)) { const ina = d.find(x => x.inactiva); out.quien.push({ pid: qid, txt: ina ? `${nombrePid(qid)} tiene «Cubre a» ${p.nombre}, pero ${ina.inactiva}: ahora no le cubre.` : `${nombrePid(qid)} tiene «Cubre a» ${p.nombre}, pero está apagado: ahora no le cubre.` }); continue; }
     const nuevos = r.puestos.filter(x => x.pid === qid), ya = r.relevos.filter(x => x.pid === qid);
     const frases = [];
     if (nuevos.length) frases.push(frase(`${dias(nuevos)} entra en su sitio`));
@@ -337,9 +344,27 @@ function quitarAusenciaUI(pid, idx) {
   registrarCambio(`Ausencia retirada: ${p.nombre}, ${(AUS_LBL[a.tipo] || { label: a.tipo }).label} del ${fmtDM(a.desde)}${a.hasta ? ' al ' + fmtDM(a.hasta) : ''}`, 'aus');
   saveState();
   // ¿tocaba días ya planificados? (una baja sin fin: los dos meses siguientes)
+  // (corrección de A5; revisión de cliente H12) y quién entró por su ausencia y sale al volver a generar: lo automático que la
+  // retirada quitaría ahora (motivoRetirada, que lee si sigue faltando con faltaEn); lo puesto a mano se queda
   let planificada = false, n = 0;
-  for (const iso of rangoIso(a.desde, a.hasta || addDias(a.desde, 60))) { if (++n > 62 || planificada) break; planificada = diaConPlanilla(estadoDeIso(iso), iso); }
-  return planificada ? `Ausencia retirada · ${p.nombre} vuelve a sus turnos al volver a generar la semana; si fue un error, ${comoDeshacer()} lo deshace` : 'Ausencia retirada';
+  const salen = new Map();
+  for (const iso of rangoIso(a.desde, a.hasta || addDias(a.desde, 60))) {
+    if (++n > 62) break;
+    const e = estadoDeIso(iso);
+    if (!diaConPlanilla(e, iso)) continue;
+    planificada = true;
+    for (const t of turnosDe(S)) for (const x of asignados(e, iso, t.id)) {
+      if (x.relevo || !esAutomatica(x) || (x.porAusenciaDe !== p.id && porDe(S.staff, x) !== p.id) || !motivoRetirada(S, S.staff, e, iso, t.id, x)) continue;
+      if (!salen.has(x.pid)) salen.set(x.pid, new Set());
+      salen.get(x.pid).add(iso);
+    }
+  }
+  const dia = iso => `${DIAS_L[isoDow(iso)].slice(0, 3).toLowerCase()} ${+iso.slice(8, 10)}`;
+  const quien = [...salen].map(([pid, ds]) => ({ nombre: nombrePid(pid), dias: listaY([...ds].sort().map(dia)) }));
+  const porEl = !quien.length ? '' : quien.length === 1
+    ? ` ${quien[0].nombre} entró por ${p.nombre} el ${quien[0].dias}: sale al volver a generar la semana, o quítalo ahora.`
+    : ` ${listaY(quien.map(q => `${q.nombre} (${q.dias})`))} entraron por ${p.nombre}: salen al volver a generar la semana, o quítalos ahora.`;
+  return planificada ? `Ausencia retirada · ${p.nombre} vuelve a sus turnos al volver a generar la semana.${porEl} Si fue un error, ${comoDeshacer()} lo deshace` : 'Ausencia retirada';
 }
 
 // ---------- alta y baja ----------

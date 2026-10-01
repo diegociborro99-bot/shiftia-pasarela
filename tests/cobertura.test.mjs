@@ -24,7 +24,8 @@ test('la hoja se abre desde la planilla (Semana, Hoy y Mes), marca días en una 
   assert.match(html, /data-mt="cobertura">Falta estos días…/);
   assert.match(html, /openCobertura\(\{ pid, dias: \[iso\], tipo: 'LD' \}\)/);
   assert.match(html, /openCobertura\(\{ pid, tipo: 'LD', dias: \[iso\] \}\)/);
-  assert.match(html, /function aplicarPlanCobertura\(id, root, modo\)[\s\S]*aplicarCobertura\(S, S\.staff, real, inc, plan\)/);
+  // (01/10, A5; auditoría F1) aplica «solo desde hoy», como propone; (corrección de A5, cliente H1) con la hora de Madrid
+  assert.match(html, /function aplicarPlanCobertura\(id, root, modo\)[\s\S]*aplicarCobertura\(S, S\.staff, real, inc, plan, desdeHoyCob\(\)\)/);
   assert.match(html, /pushUndo\(`cobertura de \$\{nombre\}`, \{ staff: true, otrosMeses: true \}\)/);
 });
 test('la navegación conoce la vista, el móvil la lista en «Más» y el historial tiene su tipo', () => {

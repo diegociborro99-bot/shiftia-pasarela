@@ -2041,12 +2041,23 @@ function cuandoCubre(cfg, c) { const l = lugarCubre(cfg, c); return l ? `cuando 
 // Quién cubre a esta persona (la otra cara de «cubre a»): en su ficha, «Si falta, le cubre Mari Luz»; en la
 // Cobertura, «Iván tiene quien le cubra: Mari Luz». Una fila por designación, con si está activa (la regla
 // del grupo y la característica de quien cubre: con el interruptor apagado se enseña, pero no se aplica).
-function quienLeCubre(cfg, staff, xid) {
+// 01/10 (A5; sospecha F de la auditoría): quien está en standby o de baja sin fecha de fin no cubre a nadie mientras siga así:
+// sale con activa:false y el porqué en `inactiva` («está en standby», «está de baja»). La Cobertura decía «Iván tiene quien le
+// cubra: Dulce y Laura» y dos líneas después que ninguna podía. La baja es la que tiene ese día `iso` (el primero de la
+// incidencia, o hoy en Equipo y la ficha; ausenciaEn, la lectura de siempre) y sin fecha de fin: la que tiene fin no (vuelve).
+// Sin `iso` no se mira la baja (el modelo no mira el reloj).
+// (corrección de A5; revisión de modelo H5) la baja de día entero: con una baja sin fin solo de mañana, Dulce salía «está de baja»
+// en Equipo y en su ficha mientras la Cobertura la ponía a cubrir a Iván por la tarde.
+function quienLeCubre(cfg, staff, xid, iso) {
   const out = [];
   for (const q of staff || []) for (const c of q.cubreA || []) {
     if (!c || c.pid !== xid || q.id === xid) continue;
+    const baja = iso && !haSalido(q, iso) && (q.ausencias || []).some(a => a.tipo === 'BAJ' && !a.hasta && !franjasAusencia(a) && ausenciaCubre(a, iso));
+    const inactiva = q.standby ? 'está en standby' : baja ? 'está de baja' : null;
     // (S0) `salido`: quien cubre ya no está con nosotros (la ficha y Equipo lo dicen; desde esa fecha no aplica)
-    out.push({ pid: q.id, nombre: q.nombre, dow: c.dow || null, turnoId: c.turnoId || null, cuando: cuandoCubre(cfg, c), activa: activa(cfg, q, 'cubreA'), salido: salidaDe(q) });
+    const d = { pid: q.id, nombre: q.nombre, dow: c.dow || null, turnoId: c.turnoId || null, cuando: cuandoCubre(cfg, c), activa: activa(cfg, q, 'cubreA') && !inactiva, salido: salidaDe(q) };
+    if (inactiva) d.inactiva = inactiva;
+    out.push(d);
   }
   return out;
 }
@@ -2827,6 +2838,9 @@ function asignar(est, cfg, staff, iso, tid, pid, opts) {
   // 24/09 (D13): entra SOLO porque la designación «cubre a» manda que cubra a quien falta (no es su plaza
   // fija ni la eligió el encargado): si la designación se quita, al regenerar se retira (motivoRetirada)
   if (o.por && o.porDesignacion) entry.porDesignacion = true;
+  // 01/10 (A5; auditoría F4): está ahí por la ausencia de esa persona (lo que pone la Cobertura, con «por» o para llegar al
+  // mínimo): cuando ya no falte, regenerar lo retira (motivoRetirada)
+  if (o.porAusenciaDe) entry.porAusenciaDe = o.porAusenciaDe;
   // 24/09 (fase 5, S18): la marca «a» de la semana tipo, como preferencia (primeroDe), no como «abre» a mano
   if (o.abrePatron) entry.abrePatron = true;
   const lista = ((est.asig[iso] = est.asig[iso] || {})[tid] = est.asig[iso][tid] || []);
@@ -3047,6 +3061,22 @@ function revisionMes(cfg, staff, est, opts) {
       for (const [a, b] of r.incompatibles) out.push({ iso: d.iso, turnoId: t.id, tipo: 'incompatibles', nivel: 'alta', msg: `${donde}: ${a} y ${b} no pueden coincidir` });
       // (S0, 30/09) ya no trabaja con nosotros y sigue puesta: fallo alto, con la persona
       for (const pid of r.salidos) out.push({ iso: d.iso, turnoId: t.id, pid, tipo: 'salida', nivel: 'alta', msg: `${donde}: ${nombreDe(staff, pid)} ${textoSalida(personaDe(staff, pid)).replace(/ desde el (\S+)$/, ' (desde el $1)')} y sigue en la casilla` });
+      // 01/10 (A5; auditoría F4): una entrada «por X» con X en la misma casilla, o con X que ya no falta ese día (se quitó su
+      // ausencia y aún no se ha regenerado, o lo puso alguien a mano): «Roberto va por Iván» sin que Iván falte. Regenerar
+      // retira lo automático (motivoRetirada) y al relevo le quita el «por»; lo puesto a mano se queda y aquí se ve. Quien falta
+      // es quien está ausente esa franja, libra ese día o está en standby; quien ya no está con nosotros va aparte (salida)
+      // (corrección de A5) quién falta, con la misma lectura que la retirada (faltaEn; revisión de modelo H6: aquí se miraba el día
+      // libre sin el interruptor «Libra»); la plaza fija de la semana tipo con su «por» no se mira (H7: es un dato de la plaza, D12;
+      // salía cada semana y regenerar no la quita); y la línea dice qué hacer (revisión de cliente H12)
+      for (const e of asignados(est, d.iso, t.id)) {
+        const xid = porDe(staff, e), x = xid ? personaDe(staff, xid) : null;
+        if (!x || haSalido(x, d.iso)) continue;
+        const aqui = pidsEn(est, d.iso, t.id).includes(xid);
+        if (!aqui && faltaEn(cfg, x, d.iso, t.franja)) continue;
+        if (e.origen === 'patron' && plazasDelDia(cfg, staff, d.iso).plazas.some(pl => pl.t === t.id && pl.p === e.pid && pl.por === xid)) continue;
+        const accion = !esAutomatica(e) ? 'quítalo a mano si ya no hace falta' : e.relevo ? (faltaEn(cfg, x, d.iso, t.franja) ? 'quítale el «por» a mano' : 'al volver a generar la semana se queda en su sitio, sin el «por»') : motivoRetirada(cfg, staff, est, d.iso, t.id, e) ? 'sale al volver a generar la semana' : 'quítalo a mano si ya no hace falta';
+        out.push({ iso: d.iso, turnoId: t.id, pid: e.pid, tipo: 'por-presente', nivel: 'media', msg: `${donde}: ${nombreDe(staff, e.pid)} va por ${x.nombre}, ${aqui ? 'que está en la misma casilla' : 'que ya no falta ese día'} — ${accion}` });
+      }
       if (r.forzados) out.push({ iso: d.iso, turnoId: t.id, tipo: 'forzado', nivel: 'media', msg: `${donde}: ${r.forzados} asignación(es) forzada(s) a mano — ${r.avisos.join(' · ')}` });
       else if (r.avisos.length) out.push({ iso: d.iso, turnoId: t.id, tipo: 'aviso', nivel: 'media', msg: `${donde}: ${r.avisos.join(' · ')}` });
       // D1 (fase 3): el partido para cubrir a quien falta está autorizado; se dice, en informativo. Una
@@ -3978,8 +4008,30 @@ function motivoRetiradaDe(cfg, staff, est, iso, tid, e) {
     }
     return { motivo: b.motivo, pareja: false };
   }
-  const m = motivoPorDe(cfg, staff, est, iso, tid, e, dow, franja);
+  const m = motivoPorDe(cfg, staff, est, iso, tid, e, dow, franja) || motivoAusenciaDe(cfg, staff, iso, e, franja);
   return m ? { motivo: m, pareja: false } : pareja;
+}
+// 01/10 (corrección de A5; revisión de modelo H6): ¿X falta esa franja? Una sola lectura para la retirada (motivoAusenciaDe y lo
+// que puso la Cobertura en motivoPorDe), la Revisión («por-presente») y el aviso de Equipo al quitar una ausencia: falta quien
+// está ausente esa franja, libra ese día (con «Libra» encendido, activa), está en standby o ya no está con nosotros. Antes la
+// retirada daba por vuelta a Iván en standby o fuera del grupo («Iván ya no falta el viernes 2») mientras la Revisión callaba,
+// y en la misma tanda a Roberto «Iván ya no está con nosotros». Mientras X falte, lo que entró por él no se retira: si se ha ido,
+// su sitio sigue sin cubrir.
+function faltaEn(cfg, x, iso, franja) {
+  return !!x && (haSalido(x, iso) || !!x.standby || !!ausenciaEn(x, iso, franja) || (activa(cfg, x, 'libra') && libraEn(x, iso)));
+}
+// 01/10 (A5; auditoría F4): lo que la Cobertura puso por la ausencia de X (porAusenciaDe: con «por X», elegido en el plan
+// aunque no fuera la designada, o para llegar al mínimo) sobra cuando X ya no falta esa franja: se quitó o se acortó su
+// ausencia. Antes solo se retiraba lo de la designación, y Dulce («para llegar al mínimo») y Roberto («por Iván», del plan con
+// avisos) se quedaban con Iván de vuelta en su tarde. Si X libra ese día, sigue sin trabajar: no sobra (faltaEn). El relevo (D3)
+// no lleva la marca: es su plaza y solo pierde el «por» (desmarcarRelevos).
+// (corrección de A5; revisión de cliente H13) el motivo no lleva el día: «Se retira» agrupa por persona y motivo y ponía una línea
+// por día («Dulce · Iván ya no falta el viernes 2…» y otra igual el sábado); los días ya van en la línea.
+function motivoAusenciaDe(cfg, staff, iso, e, franja) {
+  if (!e.porAusenciaDe || e.relevo) return null;
+  const x = personaDe(staff, e.porAusenciaDe);
+  if (!x || faltaEn(cfg, x, iso, franja)) return null;
+  return `${x.nombre} ya no falta: ya no hay que cubrir su sitio`;
 }
 // lo que sobra de una plaza «por X» (el relevo, la designación, la cobertura de un día libre), o null
 function motivoPorDe(cfg, staff, est, iso, tid, e, dow, franja) {
@@ -3988,25 +4040,31 @@ function motivoPorDe(cfg, staff, est, iso, tid, e, dow, franja) {
   if (e.relevo) return null;
   const x = personaDe(staff, porDe(staff, e));
   if (!x) return null;
+  // (corrección de A5; revisión de modelo H6) lo que puso la Cobertura por la ausencia de X no se retira porque X se haya ido o
+  // esté en standby: X sigue faltando (faltaEn) y su sitio, sin cubrir. Ni «ya no está con nosotros» ni «ya no falta»
+  const porSuAusencia = e.porAusenciaDe === x.id && faltaEn(cfg, x, iso, franja);
   // (S0) «por X» con X que ya no está con nosotros: X ya no falta, se fue; la plaza vuelve sin el «por» (instanciarPatron)
-  if (haSalido(x, iso)) return `${x.nombre} ya no está con nosotros`;
+  if (haSalido(x, iso) && !porSuAusencia) return `${x.nombre} ya no está con nosotros`;
   const c = cambioDeLibre(cfg, x, iso);
   // 24/09 (D13: «hasta nueva orden»): lo que puso la designación «cubre a» —y nada más la mantiene ahí—
   // sobra cuando ya no aplica en esa casilla: se quitó la designación, se apagó «Cubre a», o quien faltaba
   // ya no falta. Lo puesto a mano o forzado no (esAutomatica), ni la plaza fija de la semana tipo con su
-  // «por» (D12), ni lo que eligió el encargado en la Cobertura sin designación.
+  // «por» (D12). Lo que eligió el encargado en la Cobertura sin designación sigue mientras X falte; cuando ya
+  // no falta, lo retira motivoAusenciaDe (01/10, A5; auditoría F4).
   const deDesignacion = porDesignacionDe(cfg, staff, iso, tid, e);
   if (ausenciaEn(x, iso, franja) || (c && c.nuevos.includes(dow)))
     return deDesignacion && !sigueCubriendo(cfg, staff, est, iso, tid, e, x.id) ? `${nombreDe(staff, e.pid)} ya no cubre a ${x.nombre}` : null;
   if (c && c.pares.some(y => y[1] === dow)) return `${x.nombre} trabaja ${textoDiasEl([dow])} esta semana: ya no hay que cubrir su día libre`;
   // 24/09 (revisión: «quitar el cambio no lo devuelve todo a su sitio»): la cobertura que puso la
   // semana tipo («cubre a X» el día que X libraba o faltaba) sobra cuando X ya no libra ni falta
-  // ese día y la semana tipo no la tiene como plaza fija. Solo lo de la semana tipo: una cobertura
-  // aplicada desde la Cobertura tiene su propia vuelta atrás (quitar la ausencia).
+  // ese día y la semana tipo no la tiene como plaza fija. Solo lo de la semana tipo: lo que aplicó la
+  // Cobertura por una ausencia lleva porAusenciaDe y lo retira motivoAusenciaDe cuando X ya no falta
+  // (01/10, A5; auditoría F4: aquí se decía que quitar la ausencia lo deshacía, y no lo hacía nadie).
   if (e.origen === 'patron' && !(activa(cfg, x, 'libra') && libraEn(x, iso)) && !plazasDelDia(cfg, staff, iso).plazas.some(pl => pl.t === tid && pl.p === e.pid && pl.por === x.id))
     return `${x.nombre} trabaja ${textoDiasEl([dow])}: ya no hay que cubrir su sitio`;
-  // lo del relleno o de la designación en la Cobertura / Equipo, cuando quien faltaba ya no falta (D13)
-  if (deDesignacion && !sigueCubriendo(cfg, staff, est, iso, tid, e, x.id)) return `${x.nombre} ya no falta el ${diaYNum(iso)}: ya no hay que cubrir su sitio`;
+  // lo del relleno o de la designación en la Cobertura / Equipo, cuando quien faltaba ya no falta (D13). (Corrección de A5) sin el
+  // día en el motivo (cliente H13), y lo que puso la Cobertura por su ausencia, solo si de verdad ya no falta (modelo H6)
+  if (deDesignacion && !porSuAusencia && !sigueCubriendo(cfg, staff, est, iso, tid, e, x.id)) return `${x.nombre} ya no falta: ya no hay que cubrir su sitio`;
   return null;
 }
 // Quita una entrada de su casilla. Si llevaba la cocina o abría fijada a mano, la marca se va con ella: al
@@ -4845,13 +4903,16 @@ const MAX_DIAS_COBERTURA = 62;
 // opts.dejadas (24/09, D13): casillas que ya dejó al apuntar su ausencia en Equipo ([{ iso, tid, cocina,
 // abre }], las que cubrirAusencia no pudo cubrir): cuentan como suyas aunque ya no esté en ellas, para que
 // la Cobertura busque quién cubre lo que quedó pendiente. Antes decía «no tiene turnos ese día».
+// 01/10 (A5; auditoría F5): el tope cuenta los días MARCADOS (con o.dias) y no todos los del medio: con el 2/10 y el 15/12
+// marcados se miraban 62 días seguidos desde el 2/10 y el 15/12 se perdía sin decir nada (la ausencia sí se apuntaba e Iván
+// seguía en su tarde de vacaciones). Lo que pasa del tope lo dice planesCobertura (`truncado`).
 function turnosAfectados(cfg, staff, est, pid, desde, hasta, opts) {
   const o = opts || {};
   const out = [];
   let n = 0;
   for (const iso of rangoIso(desde, hasta || desde)) {
-    if (++n > MAX_DIAS_COBERTURA) break;
     if (o.dias && o.dias.length && !o.dias.includes(iso)) continue;
+    if (++n > MAX_DIAS_COBERTURA) break;
     for (const t of turnosDe(cfg)) {
       if (o.franjas && o.franjas.length && !o.franjas.includes(t.franja)) continue;
       if (o.turnos && o.turnos.length && !o.turnos.includes(iso + '|' + t.id)) continue;
@@ -4878,8 +4939,9 @@ function casillasDejadas(cfg, staff, est, pid, desde, hasta, opts) {
   if (!p) return out;
   let n = 0;
   for (const iso of rangoIso(desde, hasta || desde)) {
-    if (++n > MAX_DIAS_COBERTURA) break;
-    if ((o.dias && o.dias.length && !o.dias.includes(iso)) || !diaConPlanilla(est, iso)) continue;
+    if (o.dias && o.dias.length && !o.dias.includes(iso)) continue;
+    if (++n > MAX_DIAS_COBERTURA) break;   // (A5, F5) los días marcados, como turnosAfectados
+    if (!diaConPlanilla(est, iso)) continue;
     const pls = plazasDelDia(cfg, staff, iso).plazas;
     let abre = null;   // (fase 5, S18) si abría, lo dice la semana tipo con primeroDe, no la marca «a»
     for (const pl of pls) {
@@ -4990,13 +5052,28 @@ function designadaPara(cfg, staff, est, iso, tid, xid, opts) {
 }
 // un plan: sobre una copia, quita a la persona de sus turnos y va cubriendo cada uno
 // (primero los que menos candidatos tienen); estrategia = {permitirPartido, evitarDe: planBase}
+// La plantilla con la ausencia de la incidencia ya apuntada (simulada), con sus franjas si es de media jornada (D10). Sin ella si
+// es un cambio de turno (no es una ausencia) o si ya está en la ficha (opts.ausenciaApuntada: la de Equipo, D13). La usan
+// planCobertura y planesCobertura (01/10, A5: también para ver quién abre con el relevo marcado, F7).
+function staffConAusencia(staff, inc, opts) {
+  if (inc.tipo === 'CAMBIO' || (opts && opts.ausenciaApuntada)) return staff;
+  const x = { tipo: inc.tipo, desde: inc.desde, hasta: inc.sinFin ? undefined : (inc.hasta || inc.desde) };
+  if (franjasAusencia(inc)) x.franjas = franjasAusencia(inc);
+  return staff.map(p => p.id === inc.pid ? Object.assign({}, p, { ausencias: (p.ausencias || []).concat([x]) }) : p);
+}
+// opts.desdeIso (01/10, A5; auditoría F1): «solo desde hoy». Quien llama ya le pasa solo lo de desde hoy (planesCobertura, con
+// lo pasado en sus `pasados`; cubrirAusencia): aquí solo lo usa el turno a cambio, que nunca es de un turno ya empezado (con
+// opts.ahoraHM, turnoYaPasado). (Corrección de A5; revisión de modelo H9: aquí se volvía a filtrar y se sacaba a quien falta de lo
+// pasado en la simulación; en un cambio de turno, lo pasado no se toca, H2.)
+// 01/10 (A5; auditoría F3, decisión D17): un CAMBIO de turno no es una falta: no hay relevo ni designada, nadie entra «cubre a
+// X» ni «por X» ni con el partido autorizado para cubrirle (D1 es «mientras X falta»). Quien ocupa su sitio entra «cambio con
+// X»; si además falta gente, «para llegar al mínimo». Antes el plan enseñaba a Mari Luz «cubre a Iván ✓ partido para cubrir
+// a Iván» y al aplicar la autorización desaparecía: quedaba «por Iván» con su aviso de partido.
 function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
   const o = opts || {};
   const e = clonarEstado(est);
-  // la ausencia simulada, con sus franjas si es de media jornada (D10)
-  const ausSim = () => { const x = { tipo: inc.tipo, desde: inc.desde, hasta: inc.sinFin ? undefined : (inc.hasta || inc.desde) }; if (franjasAusencia(inc)) x.franjas = franjasAusencia(inc); return x; };
-  // (con opts.ausenciaApuntada la ausencia ya está en la ficha: la de Equipo, D13)
-  const staffSim = inc.tipo === 'CAMBIO' || o.ausenciaApuntada ? staff : staff.map(p => p.id === inc.pid ? Object.assign({}, p, { ausencias: (p.ausencias || []).concat([ausSim()]) }) : p);
+  const cambio = inc.tipo === 'CAMBIO';
+  const staffSim = staffConAusencia(staff, inc, o);
   // al salir quien falta, sale con ella su marca de «abre» o de cocina fijada (retirarEntrada): si no,
   // la casilla seguía «fijada» sin nadie marcado y el relevo no abría (revisión F3)
   for (const a of afectados) retirarEntrada(e, cfg, staffSim, a.iso, a.tid, inc.pid);
@@ -5008,36 +5085,47 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
   const plan = { id: null, titulo: '', estrategia: relaja ? 'con avisos: partidos no declarados y parejas «nunca con» flexibles' : 'con las reglas del grupo', relajado: relaja, asignaciones: [], huecos: [], sinCubrir: [], estado: e };
   const evitarEn = (iso, tid) => estrategia.evitarDe ? estrategia.evitarDe.asignaciones.filter(x => x.iso === iso && x.tid === tid && !x.yaEstaba).map(x => x.pid) : [];
   const sinLaPersona = pq => { const nombre = nombreDe(staff, inc.pid); for (const k of Object.keys(pq)) { pq[k] = pq[k].filter(n => n !== nombre); if (!pq[k].length) delete pq[k]; } return pq; };
-  const nCand = a => candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, { permitirPartido: relaja, faltaCocina: a.cocina, meses: o.meses }).length;
+  const nCand = a => candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, { permitirPartido: relaja, faltaCocina: a.cocina, meses: o.meses, sinCubre: cambio }).length;
   const orden = afectados.map(a => ({ a, n: nCand(a) })).sort((x, y) => x.n - y.n || (x.a.iso < y.a.iso ? -1 : x.a.iso > y.a.iso ? 1 : 0));
   const nombreX = nombreDe(staff, inc.pid);
   // D3: si la casilla ya tiene quien cubre a X (el relevo, o quien ya ha entrado «por X» en este plan),
   // quien entra además no «cubre a X»: entra para llegar al mínimo, sin «por» y sin el permiso de
-  // partido de la designación (revisión F3: antes quedaban dos o tres «por Iván» en la misma casilla)
-  const yaCubierta = a => plan.asignaciones.some(x => x.iso === a.iso && x.tid === a.tid && x.por === inc.pid);
-  const pon = (a, c, extra) => {
+  // partido de la designación (revisión F3: antes quedaban dos o tres «por Iván» en la misma casilla).
+  // (A5, D17) En un cambio de turno, igual con quien ya ha entrado «cambio con X».
+  const yaCubierta = a => plan.asignaciones.some(x => x.iso === a.iso && x.tid === a.tid && (cambio ? x.cambio : x.por === inc.pid));
+  const pon = (a, c, extra, paraAbrir) => {
     const relevo = yaCubierta(a);
     const rev0 = revisarTurno(cfg, staffSim, e, a.iso, a.tid);
-    const minimo = relevo ? `para llegar al mínimo (había ${rev0.n} de ${rev0.minimo})` : null;
-    const cub = !relevo && c.cubre ? { cubrePor: inc.pid, cubreSuCasilla: true, cubreAusente: true } : {};
-    const r = asignar(e, cfg, staffSim, a.iso, a.tid, c.pid, Object.assign({ origen: 'cobertura', razon: minimo || `cubre a ${nombreX}`, por: minimo ? undefined : inc.pid, permitirPartido: relaja, relajarNuncaCon: relaja && !!c.relajaPareja, puesto: extra && extra.cocina ? 'cocina' : 'sala' }, cub, extra || {}));
+    // (corrección de A5; revisión de modelo H1) con la casilla ya cubierta y en su mínimo, quien entra solo para que alguien abra
+    // entra «para abrir»: no «para llegar al mínimo (había 2 de 2)», sin «por» (sigue habiendo un solo «por X» en la casilla, D3)
+    const abrir = !!paraAbrir && relevo && !rev0.faltan;
+    const minimo = relevo && !abrir ? `para llegar al mínimo (había ${rev0.n} de ${rev0.minimo})` : null;
+    // (corrección de A5; revisión de cliente S1) quien entra en lugar de X con la designación «cubre a Noe»; sin ella, «por Noe»:
+    // «Cubre a» es el nombre de la designación en Equipo, y Cristian salía «cubre a Noe» debajo de «Noe tiene quien le cubra: Leo
+    // y Victoria». La designación es la que vale en esa casilla y ese puesto (c.cubre, cubreEnCasilla)
+    const razon = abrir ? 'para abrir' : minimo || (cambio ? `cambio con ${nombreX}` : c.cubre ? `cubre a ${nombreX}` : `por ${nombreX}`);
+    const por = minimo || abrir || cambio ? undefined : inc.pid;
+    const cub = !relevo && !cambio && c.cubre ? { cubrePor: inc.pid, cubreSuCasilla: true, cubreAusente: true } : {};
+    const r = asignar(e, cfg, staffSim, a.iso, a.tid, c.pid, Object.assign({ origen: 'cobertura', razon, por, permitirPartido: relaja, relajarNuncaCon: relaja && !!c.relajaPareja, puesto: extra && extra.cocina ? 'cocina' : 'sala' }, cub, extra || {}));
     if (!r.ok) return false;
-    const razones = minimo ? [minimo].concat(c.razones.filter(x => x !== `cubre a ${nombreX}`)) : c.razones;
-    plan.asignaciones.push({ iso: a.iso, tid: a.tid, localId: a.localId, franja: a.franja, pid: c.pid, nombre: c.nombre, razones, avisos: c.avisos, autorizados: r.autorizados || [], cocina: !!(extra && extra.cocina), abre: primeroDe(cfg, staffSim, e, a.iso, a.tid) === c.pid, libre: c.libre, score: c.score, por: minimo ? null : inc.pid, razon: minimo || `cubre a ${nombreX}`, cubre: !minimo && !!c.cubre });
+    // 01/10 (A5; revisión de cliente de A4, C11): la razón de la plaza va la primera, como la dirá la planilla: «cubre a Noe» o
+    // «por Noe»; «cambio con Iván» en un cambio de turno; «para llegar al mínimo» o «para abrir» si ya hay quien la cubre
+    const razones = [razon].concat(c.razones.filter(x => x !== `cubre a ${nombreX}`));
+    plan.asignaciones.push({ iso: a.iso, tid: a.tid, localId: a.localId, franja: a.franja, pid: c.pid, nombre: c.nombre, razones, avisos: c.avisos, autorizados: r.autorizados || [], cocina: !!(extra && extra.cocina), abre: primeroDe(cfg, staffSim, e, a.iso, a.tid) === c.pid, libre: c.libre, score: c.score, por: por || null, razon, cubre: !relevo && !cambio && !!c.cubre, cambio: cambio && !relevo, minimo: !!minimo, paraAbrir: abrir });
     return true;
   };
   // el primero de la lista que se pueda poner: si uno falla al asignarlo, se prueba con el siguiente en
   // vez de dejar el hueco (revisión F3)
-  const ponPrimero = (a, opcs, extra) => {
+  const ponPrimero = (a, opcs, extra, paraAbrir) => {
     const excluir = [];
-    const busca = mas => { for (const op of opcs) { const c = candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, Object.assign({ excluir, sinCubre: yaCubierta(a), soloCubre: !!o.soloCubre, meses: o.meses }, op, mas))[0]; if (c) return c; } return null; };
+    const busca = mas => { for (const op of opcs) { const c = candidatosCobertura(cfg, staffSim, e, a.iso, a.tid, inc.pid, Object.assign({ excluir, sinCubre: cambio || yaCubierta(a), soloCubre: !!o.soloCubre, meses: o.meses }, op, mas))[0]; if (c) return c; } return null; };
     for (let k = 0; k < 8; k++) {
       // (fase 6, S24) en el plan relajado, la pareja «nunca con» flexible, si no hay nadie más (buscarRelajando: la misma
       // escalera que el relleno del Generador)
       const br = buscarRelajando(busca, relaja);
       const c = br.r && br.relajaPareja ? Object.assign({}, br.r, { relajaPareja: true }) : br.r;
       if (!c) return false;
-      if (pon(a, c, extra)) return true;
+      if (pon(a, c, extra, paraAbrir)) return true;
       excluir.push(c.pid);
     }
     return false;
@@ -5045,6 +5133,9 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
   for (const { a } of orden) {
     const { localId, franja } = partirTurno(a.tid);
     const l = localDe(cfg, localId);
+    // 01/10 (A5; auditoría F6): la casilla cerrada ese día (por fechas o en «Cuándo abre») con gente dentro no se cubre, ni con
+    // «Reemplazar siempre»: se dice. Antes, «la casilla sigue completa (1 de 2)», o nada con «siempre»
+    if (!turnoAbierto(cfg, e, a.iso, a.tid)) { plan.sinCubrir.push({ iso: a.iso, tid: a.tid, localId, franja, n: asignados(e, a.iso, a.tid).length, min: minimoDe(cfg, a.iso, a.tid, e).min, cerrada: true, motivo: 'cerrada ese día: nada que cubrir' }); continue; }
     // D3, el relevo (reunión del 24/09: Mari Luz ya está de tarde con Iván los viernes y sábados):
     // quien ya está en la casilla y «cubre a» quien falta es quien la cubre. No es una plaza nueva:
     // sale en el plan como `yaEstaba` (con «por» al aplicar), abre si le toca, y no cuenta en
@@ -5053,7 +5144,8 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
     // Revisión F3: en la simulación se le pone ya el «por» (como al aplicar) antes de mirar quién abre
     // y qué falta: sin él, con el partido autorizado (D1) no podía abrir y el plan enseñaba un hueco
     // en la 1.ª posición que al aplicar no existía.
-    const rel = relevoEn(cfg, staffSim, e, a.iso, a.tid, inc.pid, { aqui: true, faltaCocina: a.cocina });
+    // (A5, D17) en un cambio de turno no hay relevo: X no falta
+    const rel = cambio ? null : relevoEn(cfg, staffSim, e, a.iso, a.tid, inc.pid, { aqui: true, faltaCocina: a.cocina });
     if (rel) {
       const q = personaDe(staffSim, rel), en = asignados(e, a.iso, a.tid).find(x => x.pid === rel);
       marcarRelevo(en, staffSim, inc.pid);
@@ -5065,13 +5157,14 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
     const necesitaCocina = rev.sinCocina && (rev.cocinaObligatoria || a.cocina || rev.faltan > 0) && l && cocinaExigida(cfg, staffSim, l, franja);
     const necesario = rev.faltan > 0 || necesitaCocina || rev.sinAbre;
     // (revisión de la fase 6, D5) con «Mínimos» apagado la casilla no está «completa»: nadie pide el mínimo
-    if (!necesario && !o.siempre) { if (!rel) plan.sinCubrir.push({ iso: a.iso, tid: a.tid, localId, franja, n: rev.n, min: rev.minimo, motivo: rev.minimosApagados && rev.n < rev.minimo ? `la regla «Mínimos» está apagada: no hace falta nadie (${rev.n} de ${rev.minimo})` : `la casilla sigue completa (${rev.n} de ${rev.minimo})` }); continue; }
+    // (corrección de A5; revisión de cliente) con más gente que el mínimo, «3 (mínimo 2)»: «3 de 2» sonaba raro
+    if (!necesario && !o.siempre) { if (!rel) plan.sinCubrir.push({ iso: a.iso, tid: a.tid, localId, franja, n: rev.n, min: rev.minimo, motivo: rev.minimosApagados && rev.n < rev.minimo ? `la regla «Mínimos» está apagada: no hace falta nadie (${rev.n} de ${rev.minimo})` : rev.n > rev.minimo ? `la casilla sigue completa: ${rev.n} (mínimo ${rev.minimo})` : `la casilla sigue completa (${rev.n} de ${rev.minimo})` }); continue; }
     const base = { permitirPartido: relaja, evitar: evitarEn(a.iso, a.tid), faltaCocina: a.cocina };
     // D2/D13 (revisión F3b): sin relevo, la persona designada entra la primera y en el puesto de X, con la
     // misma evaluación que la semana tipo (designadaPara). Si X llevaba la cocina, entra con la cocina
     // aunque otra de la casilla la haya recogido (en «siempre» solo se buscaba sala y Hojan no entraba por
-    // Jenny: «no se pudo poner»). Si lo único que falta es quien abra, solo si puede abrir.
-    if (!rel) {
+    // Jenny: «no se pudo poner»). Si lo único que falta es quien abra, solo si puede abrir. (A5, D17: en un cambio, no)
+    if (!rel && !cambio) {
       const sirve = !!o.siempre || rev.faltan > 0 || (necesitaCocina && !!a.cocina);
       const excluir = [];
       for (let k = 0; k < 8 && (sirve || rev.sinAbre); k++) {
@@ -5091,9 +5184,9 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
       if (!ponPrimero(a, rev.sinAbre ? [Object.assign({ primero: true }, base), base] : [base], null)) break;
       rev = revisarTurno(cfg, staffSim, e, a.iso, a.tid);
     }
-    if (rev.faltan > 0) plan.huecos.push({ iso: a.iso, tid: a.tid, localId, franja, tipo: 'faltan', faltan: rev.faltan, minimo: rev.minimo, supuesto: rev.supuesto, motivo: `faltan ${rev.faltan} de ${rev.minimo}`, porQueNadie: sinLaPersona(porQueNadie(cfg, staffSim, e, a.iso, a.tid, { falta: inc.pid, sinCubre: yaCubierta(a) })) });
-    if (rev.sinCocina && necesitaCocina) plan.huecos.push({ iso: a.iso, tid: a.tid, localId, franja, tipo: 'cocina', motivo: 'sin cocina', porQueNadie: sinLaPersona(porQueNadie(cfg, staffSim, e, a.iso, a.tid, { cocina: true, falta: inc.pid, sinCubre: yaCubierta(a) })) });
-    if (rev.sinAbre && !ponPrimero(a, [Object.assign({ primero: true }, base)], null)) plan.huecos.push({ iso: a.iso, tid: a.tid, localId, franja, tipo: 'primero', pos: 1, motivo: motivoSinPrimero(cfg, staffSim, e, a.iso, a.tid), porQueNadie: sinLaPersona(porQueNadiePrimero(cfg, staffSim, e, a.iso, a.tid)) });
+    if (rev.faltan > 0) plan.huecos.push({ iso: a.iso, tid: a.tid, localId, franja, tipo: 'faltan', faltan: rev.faltan, minimo: rev.minimo, supuesto: rev.supuesto, motivo: `faltan ${rev.faltan} de ${rev.minimo}`, porQueNadie: sinLaPersona(porQueNadie(cfg, staffSim, e, a.iso, a.tid, { falta: inc.pid, sinCubre: cambio || yaCubierta(a) })) });
+    if (rev.sinCocina && necesitaCocina) plan.huecos.push({ iso: a.iso, tid: a.tid, localId, franja, tipo: 'cocina', motivo: 'sin cocina', porQueNadie: sinLaPersona(porQueNadie(cfg, staffSim, e, a.iso, a.tid, { cocina: true, falta: inc.pid, sinCubre: cambio || yaCubierta(a) })) });
+    if (rev.sinAbre && !ponPrimero(a, [Object.assign({ primero: true }, base)], null, true)) plan.huecos.push({ iso: a.iso, tid: a.tid, localId, franja, tipo: 'primero', pos: 1, motivo: motivoSinPrimero(cfg, staffSim, e, a.iso, a.tid), porQueNadie: sinLaPersona(porQueNadiePrimero(cfg, staffSim, e, a.iso, a.tid)) });
   }
   // cambio de turno: quien cubre puede ceder a cambio uno de sus turnos cercanos a la persona (el
   // relevo no: no entra nuevo, ya estaba)
@@ -5101,13 +5194,18 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
     const usados = new Set();
     for (const as of plan.asignaciones) {
       if (as.yaEstaba) continue;
-      const x = intercambioPara(cfg, staff, e, inc.pid, as, afectados, usados);
+      const x = intercambioPara(cfg, staff, e, inc.pid, as, afectados, usados, { desdeIso: o.desdeIso, ahoraHM: o.ahoraHM });
       if (x) { as.intercambio = x; usados.add(x.iso + '|' + x.tid); }
+      // (corrección de A5; revisión de cliente H2) quien ocupa su sitio sin nada a cambio: X se queda sin ese turno, y se dice
+      else if (as.cambio) as.sinIntercambio = true;
     }
   }
   plan.completo = !plan.huecos.length;
   // los avisos autorizados (el partido para cubrir a quien falta, D1) no cuentan: no hunden el plan
   plan.avisos = plan.asignaciones.reduce((a, x) => a + x.avisos.length, 0);
+  // (corrección de A5; revisión de cliente H3) los avisos del intercambio, aparte: el turno a cambio que deja corta la otra casilla
+  // y el cambio sin turno a cambio. El plan ya no sale «cubre todo» a secas y, a igualdad, va detrás (planesCobertura)
+  plan.avisosCambio = plan.asignaciones.filter(x => (x.intercambio && x.intercambio.avisos.length) || x.sinIntercambio).length;
   plan.score = plan.asignaciones.reduce((a, x) => a + x.score, 0);
   // D2 también entre planes (revisión F3): cuántas plazas cubre quien «cubre a» (el relevo cuenta igual
   // en todos los planes). El plan B que evita a la designada ganaba al A por puntos.
@@ -5121,28 +5219,44 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
 }
 // turno de quien cubre que la persona podría hacer a cambio: la misma semana o la
 // siguiente, el mismo local y franja si puede ser, el más cercano; sin romper reglas
-function intercambioPara(cfg, staff, e, pid, as, afectados, usados) {
+// 01/10 (A5; auditoría F2): y sin dejar corta la casilla de quien cubre. Se mira cómo queda ese turno con el cambio hecho (sale
+// quien cubre y entra la persona, como al aplicar) y se descarta el que se queda sin nadie que abra, solo con apoyos, sin la
+// cocina que tenía o con menos gente de la que tenía para el mínimo. Si no hay otro, se propone igual con esos avisos
+// (intercambio.avisos, que la pestaña enseña). Antes el sábado de Susana Luna pasaba a Leo y Cristian: dos apoyos que no
+// abren la tarde. opts.desdeIso (A5, F1): nunca un turno de un día ya trabajado.
+function intercambioPara(cfg, staff, e, pid, as, afectados, usados, opts) {
+  const o = opts || {};
   const lunes = mondayOf(as.iso);
   const p = personaDe(staff, pid);
   const cands = [];
   for (let k = -7; k < 14; k++) {
     const iso = addDias(lunes, k);
-    if (afectados.some(a => a.iso === iso)) continue;
+    if ((o.desdeIso && iso < o.desdeIso) || afectados.some(a => a.iso === iso)) continue;
     for (const t of turnosDe(cfg)) {
       if (ausenciaEn(p, iso, t.franja)) continue;   // por franja (D10)
+      if (turnoYaPasado(cfg, iso, t.id, o, true)) continue;   // (corrección de A5; cliente H1) ni uno de hoy ya empezado
       if (!pidsEn(e, iso, t.id).includes(as.pid) || usados.has(iso + '|' + t.id)) continue;
       // 01/10 (corrección de A4; revisión de modelo H-04): con el puesto del turno que se cede (la cocina, si la llevaba), el mismo
       // con el que se pondrá al aplicar (ponerPlanCobertura): antes se preguntaba sin puesto y el plan proponía un cambio que luego
       // no entraba (quien «solo hace cocina» no puede ir de sala)
       const ced = asignados(e, iso, t.id).find(y => y.pid === as.pid);
-      const sim = clonarEstado(e); desasignar(sim, iso, t.id, as.pid);
-      const r = puedeEstar(cfg, staff, sim, iso, t.id, pid, { puesto: ced && ced.cocina ? 'cocina' : 'sala' });
+      const puesto = ced && ced.cocina ? 'cocina' : 'sala';
+      const sim = clonarEstado(e); retirarEntrada(sim, cfg, staff, iso, t.id, as.pid);
+      const r = puedeEstar(cfg, staff, sim, iso, t.id, pid, { puesto });
       if (!r.ok || r.avisos.length) continue;
+      // (A5, F2) el cambio hecho en la copia, con lo mismo que ponerPlanCobertura, y lo que pierde esa casilla
+      if (!asignar(sim, cfg, staff, iso, t.id, pid, { origen: 'cobertura', permitirPartido: true, puesto, cocina: puesto === 'cocina' ? true : undefined }).ok) continue;
+      const antes = revisarTurno(cfg, staff, e, iso, t.id), despues = revisarTurno(cfg, staff, sim, iso, t.id);
+      const avisos = [];
+      if (despues.sinAbre && !antes.sinAbre) avisos.push('sin nadie que abra');
+      if (despues.soloApoyos && !antes.soloApoyos) avisos.push('solo con apoyos');
+      if (despues.sinCocina && !antes.sinCocina) avisos.push('sin cocina');
+      if (despues.faltan > antes.faltan) avisos.push(`con ${despues.n} de ${despues.minimo}`);
       const dist = Math.abs(Math.round((fechaLocal(iso) - fechaLocal(as.iso)) / 864e5));
-      cands.push({ iso, tid: t.id, localId: t.localId, franja: t.franja, quita: as.pid, puntos: (t.localId === as.localId ? 20 : 0) + (t.franja === as.franja ? 10 : 0) - dist });
+      cands.push({ iso, tid: t.id, localId: t.localId, franja: t.franja, quita: as.pid, puntos: (t.localId === as.localId ? 20 : 0) + (t.franja === as.franja ? 10 : 0) - dist, avisos });
     }
   }
-  cands.sort((a, b) => b.puntos - a.puntos || (a.iso < b.iso ? -1 : 1));
+  cands.sort((a, b) => (!!a.avisos.length - !!b.avisos.length) || b.puntos - a.puntos || (a.iso < b.iso ? -1 : 1));
   return cands[0] || null;
 }
 // planes para una incidencia: inc = {pid, tipo, desde, hasta, sinFin?, franjas?, turnos?, detalle?};
@@ -5163,25 +5277,81 @@ function rangoNecesario(inc) {
   const r = rangoDeIncidencia(inc);
   return { desde: addDias(mondayOf(r.desde), -7), hasta: addDias(mondayOf(r.hasta), 13) };
 }
+// 01/10 (corrección de A5; revisión de modelo H3): los días que necesita, por tramos: la ventana de rangoNecesario de cada tramo
+// de días marcados seguidos (solo de los que se miran, MAX_DIAS_COBERTURA), juntas y sin repetir. Con el 2/10 y el 31/12 la
+// pestaña traía un rango seguido del 21/09 al 10/01 cortado a 100 días: el 31/12 no llegaba y se perdía sin decir nada.
+function diasNecesarios(inc) {
+  const r = rangoDeIncidencia(inc);
+  const marcados = (r.dias || [...rangoIso(r.desde, r.hasta)]).slice(0, MAX_DIAS_COBERTURA);
+  const tramos = [];
+  for (const iso of marcados) { const u = tramos[tramos.length - 1]; if (u && addDias(u.hasta, 1) === iso) u.hasta = iso; else tramos.push({ desde: iso, hasta: iso }); }
+  const out = new Set();
+  for (const t of tramos) { const v = rangoNecesario(t); for (const iso of rangoIso(v.desde, v.hasta)) out.add(iso); }
+  return [...out].sort();
+}
+// 01/10 (corrección de A5; revisión de cliente H1): «solo desde hoy» por franjas. Con desdeIso (hoy) y ahoraHM (la hora de Madrid,
+// «20:00», que pasa la pestaña: el modelo no mira el reloj), el turno de hoy cuya franja ya ha TERMINADO es pasado, como los de
+// días anteriores: a las 20:00 la mañana de hoy ya se trabajó y el plan metía a Roberto en ella. El fin es el del horario del
+// local ese día (horarioDe); un fin ≤ inicio pasa de medianoche y cuenta como el final del día. Una franja en curso no es pasada:
+// se cubre (alguien que se pone malo a media tarde). Con `empezado`, basta con que haya empezado: el turno a cambio de un cambio
+// de turno nunca es uno de hoy que ya ha empezado (a las 22:30 se proponía la tarde de hoy, casi acabada). Sin ahoraHM, el día.
+function turnoYaPasado(cfg, iso, tid, opts, empezado) {
+  const o = opts || {};
+  if (!o.desdeIso) return false;
+  if (iso !== o.desdeIso) return iso < o.desdeIso;
+  if (!o.ahoraHM) return false;
+  const { localId, franja } = partirTurno(tid);
+  const h = horarioDe(localDe(cfg, localId), isoDow(iso), franja);
+  if (!h) return false;
+  if (empezado) return hm(h.ini) <= hm(o.ahoraHM);
+  return (hm(h.fin) <= hm(h.ini) ? 1440 : hm(h.fin)) <= hm(o.ahoraHM);
+}
+// opts.desdeIso (01/10, A5; auditoría F1): «solo desde hoy», como cubrirAusencia y Equipo: los turnos de antes de ese día ya se
+// trabajaron y no se cubren: van a `pasados` ([{ iso, tid }]; al aplicar, quien falta sale de ellos y su ausencia se apunta
+// entera, pero no entra nadie). Antes la pestaña metía a Roberto en días de la semana pasada y le cambiaba las horas.
+// opts.ahoraHM (corrección de A5; cliente H1): con la hora, también el turno de hoy cuya franja ya ha terminado (turnoYaPasado).
+// `truncado` (A5, F5): si hay más días marcados que MAX_DIAS_COBERTURA, { max, marcados, hasta: el último que se mira, fuera }.
+// (corrección de A5; modelo H3) `fuera`: los días marcados (de los que se miran) que no están en la planilla que se le pasa
+// (est.days): la red de seguridad si quien llama no trae los días que pide diasNecesarios; entonces `hasta` es el último mirado.
+// `designadosInactivos` (corrección de A5; cliente H5): quien tiene «Cubre a» X pero ahora no le cubre (en standby, de baja sin
+// fin), con el porqué en `inactiva`: la cabecera lo dice («Iván tiene quien le cubra: Dulce (en standby: ahora no cubre)»).
 function planesCobertura(cfg, staff, est, inc, opts) {
   const o = opts || {};
   const p = personaDe(staff, inc.pid);
   const { desde, hasta, dias } = rangoDeIncidencia(inc);
   inc = Object.assign({}, inc, { desde, hasta });
+  const cambio = inc.tipo === 'CAMBIO';
   // las casillas que ya dejó (las que trae la incidencia desde Equipo y las de su semana tipo, revisión F3b)
-  const dejadas = !p || inc.tipo === 'CAMBIO' ? [] : (inc.dejadas || []).concat(casillasDejadas(cfg, staff, est, inc.pid, desde, hasta, { dias, franjas: inc.franjas }));
-  const afectados = p ? turnosAfectados(cfg, staff, est, inc.pid, desde, hasta, { franjas: inc.franjas, turnos: inc.turnos, dias, dejadas }) : [];
+  const dejadas = !p || cambio ? [] : (inc.dejadas || []).concat(casillasDejadas(cfg, staff, est, inc.pid, desde, hasta, { dias, franjas: inc.franjas }));
+  const todos = p ? turnosAfectados(cfg, staff, est, inc.pid, desde, hasta, { franjas: inc.franjas, turnos: inc.turnos, dias, dejadas }) : [];
+  const pasado = a => turnoYaPasado(cfg, a.iso, a.tid, o);
+  const afectados = todos.filter(a => !pasado(a));
+  const marcados = dias || [...rangoIso(desde, hasta)];
+  const enEstado = new Set((est.days || []).map(d => d.iso));
+  const mirados = marcados.slice(0, MAX_DIAS_COBERTURA), fuera = mirados.filter(iso => !enEstado.has(iso)), dentro = mirados.filter(iso => enEstado.has(iso));
+  const truncado = marcados.length > MAX_DIAS_COBERTURA || fuera.length ? { max: MAX_DIAS_COBERTURA, marcados: marcados.length, hasta: dentro.length ? dentro[dentro.length - 1] : null, fuera } : null;
   // 24/09 (D13): quién tiene la designación de cubrirla («Iván tiene quien le cubra: Mari Luz»)
   // (30/09, revisión S0) quien ya no está con nosotros el primer día de la incidencia no es designado: la cabecera decía
   // «tiene quien le cubra: Adrián» y dos líneas después que no podía; si se va a mitad, sigue y cada día dice lo suyo
-  const designados = quienLeCubre(cfg, staff, inc.pid).filter(d => d.activa && !(personaDe(staff, d.pid) && haSalido(personaDe(staff, d.pid), desde)));
-  const out = { pid: inc.pid, nombre: p ? p.nombre : inc.pid, tipo: inc.tipo, desde, hasta, dias, afectados: [], planes: [], posible: true, necesarios: 0, designados };
+  // (A5, D17) en un cambio de turno, nadie: no es una falta. (A5, sospecha F) quien está en standby o de baja sin fin, tampoco
+  // (corrección de A5; modelo H4) se mira el primer día que se cubre, no el primero marcado si ya ha pasado: Dulce, de baja sin fin
+  // desde el martes, salía como «tiene quien le cubra» con la Cobertura del lunes al domingo hecha el jueves
+  const d0 = o.desdeIso && o.desdeIso > desde ? o.desdeIso : desde;
+  const leCubren = cambio ? [] : quienLeCubre(cfg, staff, inc.pid, d0).filter(d => !(personaDe(staff, d.pid) && haSalido(personaDe(staff, d.pid), d0)));
+  const designados = leCubren.filter(d => d.activa);
+  const designadosInactivos = leCubren.filter(d => !d.activa && d.inactiva).map(d => ({ pid: d.pid, nombre: d.nombre, inactiva: d.inactiva }));
+  const out = { pid: inc.pid, nombre: p ? p.nombre : inc.pid, tipo: inc.tipo, desde, hasta, dias, afectados: [], pasados: todos.filter(pasado).map(a => ({ iso: a.iso, tid: a.tid })), truncado, planes: [], posible: true, necesarios: 0, designados, designadosInactivos };
   if (!p) return Object.assign(out, { posible: false, error: 'no existe' });
   // qué le pasa a cada casilla sin la persona
   const sin = clonarEstado(est);
-  for (const a of afectados) retirarEntrada(sin, cfg, staff, a.iso, a.tid, inc.pid);
+  const staffSim = staffConAusencia(staff, inc, o);
+  for (const a of afectados) retirarEntrada(sin, cfg, staffSim, a.iso, a.tid, inc.pid);
   for (const a of afectados) {
-    const rev = revisarTurno(cfg, staff, sin, a.iso, a.tid);
+    // 01/10 (A5; auditoría F7): con el relevo ya marcado, como el plan (D3): Mari Luz, que ya estaba con Iván y le cubre, abre
+    // (con el partido autorizado); sin marcarla, «sale» decía «nadie abre» al lado de «Mari Luz ABRE». No en un cambio (D17)
+    const rel = cambio || !turnoAbierto(cfg, sin, a.iso, a.tid) ? null : relevoEn(cfg, staffSim, sin, a.iso, a.tid, inc.pid, { aqui: true, faltaCocina: a.cocina });
+    if (rel) { marcarRelevo(asignados(sin, a.iso, a.tid).find(x => x.pid === rel), staffSim, inc.pid); normalizarCasilla(sin, cfg, staffSim, a.iso, a.tid); }
+    const rev = revisarTurno(cfg, staffSim, sin, a.iso, a.tid);
     const l = localDe(cfg, a.localId);
     const necesitaCocina = rev.sinCocina && (rev.cocinaObligatoria || a.cocina || rev.faltan > 0) && l && cocinaExigida(cfg, staff, l, a.franja);
     // la persona designada que ese día no puede cubrirla, y por qué (D13: «el domingo no puede: nunca con
@@ -5198,13 +5368,17 @@ function planesCobertura(cfg, staff, est, inc, opts) {
   }
   out.necesarios = out.afectados.filter(a => a.necesario).length;
   if (!afectados.length) return out;
+  // (los planes, con lo que queda desde hoy; con desdeIso, el turno a cambio de un cambio de turno tampoco es de un día pasado)
   const A0 = planCobertura(cfg, staff, est, inc, afectados, { permitirPartido: false }, o);
   const B0 = planCobertura(cfg, staff, est, inc, afectados, { permitirPartido: false, evitarDe: A0 }, o);
   const A1 = planCobertura(cfg, staff, est, inc, afectados, { permitirPartido: true }, o);
   const B1 = planCobertura(cfg, staff, est, inc, afectados, { permitirPartido: true, evitarDe: A1 }, o);
   const vistos = new Set(); const planes = [];
   for (const pl of [A0, B0, A1, B1]) { if (vistos.has(pl.firma)) continue; vistos.add(pl.firma); planes.push(pl); }
-  planes.sort((x, y) => x.huecos.length - y.huecos.length || x.avisos - y.avisos || y.cubren - x.cubren || y.score - x.score);
+  // (corrección de A5; cliente H3) a igualdad de huecos y de avisos, va primero el plan sin avisos del turno a cambio (el que deja
+  // corta la otra casilla o el que se queda sin turno a cambio): el plan A recomendaba a Susana Luna con el sábado de la
+  // Zapatillera sin nadie que abra y Roberto, que no dejaba nada corto, iba de alternativa
+  planes.sort((x, y) => x.huecos.length - y.huecos.length || x.avisos - y.avisos || x.avisosCambio - y.avisosCambio || y.cubren - x.cubren || y.score - x.score);
   out.planes = planes.slice(0, 2).map((pl, i) => Object.assign(pl, { id: i ? 'B' : 'A', titulo: i ? 'Plan B · alternativa' : 'Plan A · recomendado' }));
   if (out.planes[1]) out.planes[1].distinto = out.planes[1].asignaciones.filter(x => !out.planes[0].asignaciones.some(y => y.iso === x.iso && y.tid === x.tid && y.pid === x.pid)).length;
   out.posible = out.planes.some(pl => pl.completo);
@@ -5212,7 +5386,8 @@ function planesCobertura(cfg, staff, est, inc, opts) {
 }
 // aplica un plan sobre el estado real: ausencia en la ficha (salvo cambio de turno),
 // la persona sale de sus turnos, entran quienes cubren (con «por») y los intercambios
-function aplicarCobertura(cfg, staff, est, inc, plan) {
+// opts.desdeIso (01/10, A5; auditoría F1): «solo desde hoy» (ver ponerPlanCobertura); res.pasados, los turnos de antes
+function aplicarCobertura(cfg, staff, est, inc, plan, opts) {
   const p = personaDe(staff, inc.pid);
   const res = { ausencia: null, quitados: 0, asignados: [], rechazados: [], intercambios: [] };
   if (!p) return res;
@@ -5234,7 +5409,7 @@ function aplicarCobertura(cfg, staff, est, inc, plan) {
       res.ausencia = anadirAusencia(p, a).ausencia;
     }
   }
-  return ponerPlanCobertura(cfg, staff, est, inc, plan, res);
+  return ponerPlanCobertura(cfg, staff, est, inc, plan, res, opts);
 }
 // La parte de aplicar un plan que toca la planilla, no la ficha: quien falta sale de sus turnos y entra
 // quien cubre (con «por»), los relevos se marcan y se hacen los intercambios. La usan aplicarCobertura
@@ -5251,11 +5426,26 @@ function volverAFoto(est, f) {
     if (o) { for (const z of Object.keys(o)) delete o[z]; Object.assign(o, v); } else if (Object.keys(v).length) est[k][iso] = v;
   });
 }
-function ponerPlanCobertura(cfg, staff, est, inc, plan, res0) {
+// opts.desdeIso (01/10, A5; auditoría F1): «solo desde hoy». Quien falta sale también de los turnos de antes (estaba ausente:
+// no los trabajó; van a res.pasados), pero en ellos no entra nadie: un plan que traiga plazas de días ya trabajados (uno
+// calculado sin desdeIso) no las pone (rechazados, «ese día ya ha pasado»).
+// (corrección de A5) opts.ahoraHM (cliente H1): con la hora, también los turnos de hoy cuya franja ya ha terminado («ese turno ya ha
+// pasado»), y el turno a cambio de un cambio de turno no puede ser uno que ya ha empezado («ese turno ya ha empezado»). En un
+// CAMBIO lo pasado no se toca (modelo H2, cliente H8): quien lo pide trabajó ese turno; antes salía de él y perdía esas horas
+// sin ninguna ausencia apuntada. Van a res.pasados igual, como «ya pasado: no se cambia nada».
+// 01/10 (A5; auditoría F4): lo que entra por una ausencia de X (con «por X» o para llegar al mínimo) lleva porAusenciaDe: X;
+// cuando X ya no falte, regenerar lo retira (motivoRetirada). En un cambio de turno no: X no falta (D17).
+// 01/10 (A5; auditoría F9): quien entraba para llegar al mínimo no entra si la casilla ya está completa (el plan se calculó
+// antes de que el encargado la completara: «la casilla ya está completa»); en la app lo frena además la huella del plan.
+function ponerPlanCobertura(cfg, staff, est, inc, plan, res0, opts) {
+  const o = opts || {};
   const p = personaDe(staff, inc.pid);
   const res = res0 || { ausencia: null, quitados: 0, asignados: [], rechazados: [], intercambios: [] };
+  res.pasados = res.pasados || [];
   if (!p) return res;
   const { desde, hasta, dias } = rangoDeIncidencia(inc);
+  const pasado = (iso, tid) => turnoYaPasado(cfg, iso, tid, o);
+  const yaPaso = iso => iso < o.desdeIso ? 'ese día ya ha pasado' : 'ese turno ya ha pasado';
   // (corrección de A4, H-04) un cambio de turno es un trato entre dos: si una parte no se puede hacer al aplicarlo (algo ha
   // cambiado desde que se propuso), no se hace nada, ni la mitad. Antes quien pedía el cambio perdía su turno y no recibía el otro
   const cambio = inc.tipo === 'CAMBIO' && ((plan && plan.asignaciones) || []).some(as => as.intercambio);
@@ -5263,8 +5453,13 @@ function ponerPlanCobertura(cfg, staff, est, inc, plan, res0) {
   // quien falta sale con su marca de «abre» o de cocina fijada (retirarEntrada, revisión F3): Mari
   // Luz, de relevo, abría en el plan pero en la planilla seguía la marca de Iván (la «a» de su plaza de
   // la semana tipo) y su tramo y su perfil decían 21:00–00:00
-  for (const a of turnosAfectados(cfg, staff, est, inc.pid, desde, hasta, { franjas: inc.franjas, turnos: inc.turnos, dias })) if (retirarEntrada(est, cfg, staff, a.iso, a.tid, inc.pid)) res.quitados++;
+  for (const a of turnosAfectados(cfg, staff, est, inc.pid, desde, hasta, { franjas: inc.franjas, turnos: inc.turnos, dias })) {
+    const ya = pasado(a.iso, a.tid);
+    if (ya && inc.tipo === 'CAMBIO') { res.pasados.push({ iso: a.iso, tid: a.tid }); continue; }
+    if (retirarEntrada(est, cfg, staff, a.iso, a.tid, inc.pid)) { res.quitados++; if (ya) res.pasados.push({ iso: a.iso, tid: a.tid }); }
+  }
   for (const as of (plan && plan.asignaciones) || []) {
+    if (pasado(as.iso, as.tid)) { res.rechazados.push({ iso: as.iso, tid: as.tid, pid: as.pid, motivo: yaPaso(as.iso) }); continue; }
     // D3: el relevo ya está en la casilla: no se asigna, se marca «por» quien falta. Si entre proponer
     // y confirmar ha salido de la casilla, no se crea una plaza nueva: va a rechazados.
     if (as.yaEstaba) {
@@ -5273,16 +5468,25 @@ function ponerPlanCobertura(cfg, staff, est, inc, plan, res0) {
       else res.rechazados.push({ iso: as.iso, tid: as.tid, pid: as.pid, motivo: 'ya no está en la casilla' });
       continue;
     }
-    const por = as.por === undefined ? inc.pid : as.por;   // quien entra «para llegar al mínimo» no lleva «por»
+    // quien entra «para llegar al mínimo» no lleva «por», ni quien entra en un cambio de turno (A5, D17)
+    const por = inc.tipo === 'CAMBIO' ? null : as.por === undefined ? inc.pid : as.por;
     const cub = por ? { cubrePor: por, cubreSuCasilla: true, cubreAusente: true } : {};
+    // (corrección de A5; revisión de modelo H1) salvo quien entra a abrir una casilla que sigue sin quien abra (como la cocina): F9
+    // la rechazaba y la casilla se quedaba sin abrir con el plan diciendo «cubre todo». (H9: sin mirar la razón; todos los planes
+    // que se aplican llevan la marca)
+    if (as.minimo || as.paraAbrir) {
+      const rv = revisarTurno(cfg, staff, est, as.iso, as.tid);
+      if (!rv.faltan && !(as.cocina && rv.sinCocina) && !(as.abre && rv.sinAbre)) { res.rechazados.push({ iso: as.iso, tid: as.tid, pid: as.pid, motivo: 'la casilla ya está completa' }); continue; }
+    }
     // la persona designada entra por la designación (D13: si se quita, al regenerar se retira); en un
     // cambio de turno no, que es un trato entre los dos
     // (revisión de la fase 6) con lo que relajó el plan (RELAJABLE): la pareja flexible del plan relajado también
     // (A4, H6) y con su puesto (el plan ya se decidió así: quien «solo hace cocina» no entra de sala)
-    const r = asignar(est, cfg, staff, as.iso, as.tid, as.pid, Object.assign({ origen: 'cobertura', razon: as.razon || `cubre a ${p.nombre}`, por: por || undefined, porDesignacion: !!por && !!as.cubre && inc.tipo !== 'CAMBIO', cocina: as.cocina ? true : undefined, puesto: as.cocina ? 'cocina' : 'sala' }, RELAJABLE, cub));
+    const r = asignar(est, cfg, staff, as.iso, as.tid, as.pid, Object.assign({ origen: 'cobertura', razon: as.razon || `cubre a ${p.nombre}`, por: por || undefined, porDesignacion: !!por && !!as.cubre && inc.tipo !== 'CAMBIO', porAusenciaDe: inc.tipo !== 'CAMBIO' ? inc.pid : undefined, cocina: as.cocina ? true : undefined, puesto: as.cocina ? 'cocina' : 'sala' }, RELAJABLE, cub));
     if (r.ok) res.asignados.push({ iso: as.iso, tid: as.tid, pid: as.pid, avisos: r.avisos }); else { res.rechazados.push({ iso: as.iso, tid: as.tid, pid: as.pid, motivo: r.motivo }); continue; }
     if (as.intercambio && inc.tipo === 'CAMBIO') {
       const x = as.intercambio;
+      if (turnoYaPasado(cfg, x.iso, x.tid, o, true)) { res.rechazados.push({ iso: x.iso, tid: x.tid, pid: inc.pid, motivo: x.iso < o.desdeIso ? 'ese día ya ha pasado' : 'ese turno ya ha empezado' }); continue; }
       // 30/09 (A1; auditoría C1/H7): quien cede su turno sale con retirarEntrada, que se lleva su «sale primero» o su cocina
       // a mano (con desasignar la casilla quedaba «fijada a mano» sin nadie que abriera: Hoy decía que abría uno y el Mes,
       // el Excel, Horas y la app del empleado que nadie). Si el cambio no puede hacerse, vuelve con SU entrada de antes (su
@@ -5311,7 +5515,7 @@ function ponerPlanCobertura(cfg, staff, est, inc, plan, res0) {
   }
   if (foto && res.rechazados.length) {
     volverAFoto(est, foto);
-    res.quitados = 0; res.asignados = []; res.intercambios = [];
+    res.quitados = 0; res.asignados = []; res.intercambios = []; res.pasados = [];
   }
   return res;
 }
@@ -6450,7 +6654,7 @@ if (typeof module !== 'undefined') {
     cerradaEseDia, aperturaDelDia, diaConPlanilla, apoyosSinSitio, mitadesCerradas, cierresDelHorario, reabrirCierreDesde, dentroDeCierre, repartoDelDia, semanaTipoAlEditar, ponerApoyoCierre, destinoCierre, franjasSemanaTipo, noRefuerzaSala,
     TIPOS_INCIDENCIA, turnosAfectados, turnosSemanaDe, turnosMesDe, candidatosCobertura, planesCobertura, aplicarCobertura, vaciarPlanilla,
     cubrirAusencia, ponerPlanCobertura, quienLeCubre, cuandoCubre, lugarCubre, porQueNoCubre, porDesignacionDe, designadaPara, motivoNoRelevo, casillasDejadas,
-    cubreEnCasilla, rangoNecesario, revisarEntrada, relevoEn, marcarRelevo, desmarcarRelevos, volcarPrevia, porDeSuCasilla, MOTIVO_SOLO_APOYOS, etiquetaAusencia, quedariaSoloApoyos, puntosPuesto, cocinaDelDia, franjasAusencia, textoFranjasAusencia,
+    cubreEnCasilla, rangoNecesario, diasNecesarios, turnoYaPasado, faltaEn, revisarEntrada, relevoEn, marcarRelevo, desmarcarRelevos, volcarPrevia, porDeSuCasilla, MOTIVO_SOLO_APOYOS, etiquetaAusencia, quedariaSoloApoyos, puntosPuesto, cocinaDelDia, franjasAusencia, textoFranjasAusencia,
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,
     crearContexto, evaluarPlaza, primerBloqueo, incompatibles, evita, abreFijo, PESOS, puntuar, candidatos, VARIABLES, SOLO_TEXTO, gruposSelector, destrapa, fraseBloqueo,
     plazaOcupa, salaDelDia, salaFirmeDelDia, siSeFuerza, cocinasTitular,

@@ -121,8 +121,11 @@ try {
     ok('el día marcado es el martes 6', await pg.evaluate(() => JSON.stringify(COB.dias) === '["2026-10-06"]'), await pg.evaluate(() => JSON.stringify(COB.dias)));
     await clic(pg, '#cobRoot #cobProponer');
     ok('sale la propuesta', await llega(pg, () => !!document.querySelector('#cobRes .cobplan.reco'), null, 8000) >= 0);
-    ok('el plan A propone el turno a cambio (⇄ el sábado 10 en Zapatillera)', await pg.evaluate(() => { const P = document.querySelector('#cobRes .cobplan.reco'); return !!P && /a cambio/.test(P.textContent); }));
-    await clic(pg, '#cobRes .cobplan.reco [data-aplicar="A"]');
+    // 01/10 (A5, D17): un cambio de turno no es una falta y «cubre a» no da prioridad: Roberto («Cubre a» Susana Luna) ya no va
+    // por fuerza en el plan A; se confirma el plan que propone el turno a cambio
+    const idCambio = await pg.evaluate(() => { const P = [...document.querySelectorAll('#cobRes .cobplan')].find(x => /a cambio/.test(x.textContent) && /S[aá]b 10/i.test(x.textContent)); const b = P && P.querySelector('[data-aplicar]'); return b ? b.dataset.aplicar : null; });
+    ok('un plan propone el turno a cambio (⇄ el sábado 10 en Zapatillera)', !!idCambio, await pg.evaluate(() => [...document.querySelectorAll('#cobRes .cobplan')].map(x => x.textContent.replace(/\s+/g, ' ').slice(0, 200)).join(' | ')));
+    await clic(pg, `#cobRes [data-aplicar="${idCambio}"]`);
     await llega(pg, () => !!document.querySelector('#previaCobOvl #pvOk'), null, 4000);
     await clic(pg, '#previaCobOvl #pvOk');
     await llega(pg, () => !!document.querySelector('#cobRes .cobok'), null, 5000);

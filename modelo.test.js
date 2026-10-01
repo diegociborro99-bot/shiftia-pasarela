@@ -2887,8 +2887,9 @@ ok('F3 · D3 el relevo: «reemplazar siempre» no mete a otra más, el cambio de
   const cfg2 = f3Escenario();
   const cambio = { pid: 'ivan', tipo: 'CAMBIO', dias: [F3_VIE], desde: F3_VIE, hasta: F3_VIE };
   const A = M.planesCobertura(cfg2, cfg2.staff, f3Entero(cfg2, cambio), cambio, { intercambio: true }).planes[0];
-  const ml = f3De(A, F3_VIE, 'mariluz')[0];
-  assert.ok(ml && ml.yaEstaba && !ml.intercambio, JSON.stringify(A.asignaciones));
+  // 01/10 (A5, D17): en un cambio de turno no hay relevo (Iván no falta): Mari Luz, que ya está en la tarde, no pasa a ir
+  // «por Iván» ni sale en el plan, así que tampoco se usa para intercambiar (antes: ya estaba, sin intercambio)
+  assert.ok(!f3De(A, F3_VIE, 'mariluz').length && !A.asignaciones.some(a => a.yaEstaba || a.por), JSON.stringify(A.asignaciones));
 });
 
 ok('F3 · S8 rangoNecesario: la Cobertura trabaja con semanas enteras (de −7 a +13 días), así cuenta bien los turnos de la semana y encuentra el turno a cambio', () => {
@@ -8205,6 +8206,565 @@ ok('A4 · corrección (sospecha de la revisión de modelo: puesto en quitarCierr
   const r = M.quitarCierre(cfg, st, e, 'c1', { devolver: true });
   assert.deepStrictEqual(r.devueltos.map(x => x.pid), ['b']);
   assert.deepStrictEqual(r.noDevueltos.map(x => [x.pid, x.motivo]), [['a', 'solo hace cocina']]);
+});
+
+// ---------- A5 (01/10): auditoría del modelo · cobertura (F1, F2, F3/D17, F4, F5, F6, F7, F9, sospecha F de quienLeCubre, C11) ----------
+// Los scripts de la lente F (scratchpad/auditoria-modelo/F-cobertura/{02-aplicar, 06-turnos-afectados, 07-intercambio-cambio,
+// 08-designadas-reglas, 09-varios}.js) como pruebas del repo: en rojo antes, en verde después. f3Escenario es su base.js (la
+// planilla de ?demo=1 el jueves 24/09, Dulce ya en activo y Mari Luz «Cubre a» Iván); la Cobertura trabaja como la pestaña, con
+// las semanas enteras de rangoNecesario.
+const A5_INC = () => ({ pid: 'ivan', tipo: 'VAC', dias: [F3_VIE, F3_SAB, F3_DOM], desde: F3_VIE, hasta: F3_DOM, franjas: ['T'] });
+const a5Planes = (cfg, inc, o) => M.planesCobertura(cfg, cfg.staff, f3Entero(cfg, inc), inc, Object.assign({ meses: cfg.meses }, o || {}));
+const a5Aplicar = (cfg, inc, plan, o) => { const rg = M.rangoNecesario(inc); return M.aplicarCobertura(cfg, cfg.staff, cieRango(cfg, rg.desde, rg.hasta), inc, plan, o); };
+const a5Turnos = (cfg, pid, desde, hasta) => [...M.rangoIso(desde, hasta)].reduce((xs, iso) => xs.concat(M.turnosDe(cfg).filter(t => M.pidsEn(f3Mes(cfg, iso), iso, t.id).includes(pid)).map(t => iso + '|' + t.id)), []);
+
+ok('A5 · F1 (06-turnos-afectados B): la Cobertura con «solo desde hoy» (opts.desdeIso, como cubrirAusencia): los turnos de antes de hoy van a `pasados` —quien falta sale de ellos y su ausencia se apunta entera, pero no entra nadie ni cuentan como hueco—; un plan de antes aplicado con desdeIso tampoco toca lo ya trabajado, y el turno a cambio de un cambio de turno nunca es de un día pasado', () => {
+  const HOY = '2026-09-24', FIN = '2026-09-25';   // (el jueves 24 libra: el viernes 25 es el primer turno que queda)
+  const inc = { pid: 'sluna', tipo: 'BAJ', desde: '2026-09-14', hasta: FIN, dias: [...M.rangoIso('2026-09-14', FIN)] };
+  const cfg = f3Escenario();
+  const suyos = a5Turnos(cfg, 'sluna', '2026-09-14', FIN);
+  assert.ok(suyos.some(k => k < HOY) && suyos.some(k => k >= HOY), 'preparado: Susana Luna trabaja días pasados y hoy: ' + JSON.stringify(suyos));
+  const res = a5Planes(cfg, inc, { desdeIso: HOY });
+  assert.deepStrictEqual((res.pasados || []).map(x => x.iso + '|' + x.tid).sort(), suyos.filter(k => k < HOY).sort(), 'lo de antes de hoy, a pasados');
+  assert.deepStrictEqual(res.afectados.map(a => a.iso + '|' + a.tid), suyos.filter(k => k >= HOY), 'solo se cubre desde hoy');
+  for (const P of res.planes) {
+    assert.deepStrictEqual(P.asignaciones.filter(a => a.iso < HOY).map(a => a.iso + ' ' + a.pid), [], P.titulo + ': nadie en días ya trabajados');
+    assert.ok(P.huecos.concat(P.sinCubrir).every(h => h.iso >= HOY), P.titulo + ': lo pasado no es un hueco');
+  }
+  // al aplicar: la baja entera en la ficha, Susana Luna sale también de los días pasados y nadie entra en ellos
+  const rob0 = a5Turnos(cfg, 'roberto', '2026-09-01', '2026-09-23'), cri0 = a5Turnos(cfg, 'cristian', '2026-09-01', '2026-09-23');
+  const r = a5Aplicar(cfg, inc, res.planes[0], { desdeIso: HOY });
+  assert.deepStrictEqual(a5Turnos(cfg, 'roberto', '2026-09-01', '2026-09-23'), rob0, 'Roberto, igual en los días ya trabajados');
+  assert.deepStrictEqual(a5Turnos(cfg, 'cristian', '2026-09-01', '2026-09-23'), cri0, 'Cristian, igual');
+  assert.deepStrictEqual(a5Turnos(cfg, 'sluna', '2026-09-14', FIN), [], 'Susana Luna sale de todos (estaba de baja)');
+  assert.deepStrictEqual((r.pasados || []).map(x => x.iso + '|' + x.tid).sort(), suyos.filter(k => k < HOY).sort());
+  assert.ok(M.ausenciaEn(M.personaDe(cfg.staff, 'sluna'), '2026-09-15', 'T') && M.ausenciaEn(M.personaDe(cfg.staff, 'sluna'), FIN, 'T'), 'la baja, entera');
+  // el plan de antes (sin desdeIso sí ponía gente en días pasados) aplicado con desdeIso: nada en lo ya trabajado
+  const cfg2 = f3Escenario();
+  const P2 = a5Planes(cfg2, inc).planes[0];
+  assert.ok(P2.asignaciones.some(a => a.iso < HOY), 'preparado: sin «solo desde hoy» el plan ponía gente en días pasados');
+  const rob2 = a5Turnos(cfg2, 'roberto', '2026-09-01', '2026-09-23'), cri2 = a5Turnos(cfg2, 'cristian', '2026-09-01', '2026-09-23');
+  const r2 = a5Aplicar(cfg2, inc, P2, { desdeIso: HOY });
+  assert.deepStrictEqual([a5Turnos(cfg2, 'roberto', '2026-09-01', '2026-09-23'), a5Turnos(cfg2, 'cristian', '2026-09-01', '2026-09-23')], [rob2, cri2]);
+  assert.ok(r2.asignados.every(x => x.iso >= HOY), JSON.stringify(r2.asignados));
+  // cambio de turno de Susana Luna el miércoles 7/10 con «hoy» ese miércoles: Roberto tiene el martes 6 (más cerca, ya
+  // trabajado) y el sábado 10
+  const cfg3 = cfgBase(), st3 = cfg3.staff, e3 = estadoOct();
+  for (const [d, id, c] of [['2026-10-07', 'sluna'], ['2026-10-06', 'roberto'], ['2026-10-06', 'adrian', 1], ['2026-10-10', 'roberto'], ['2026-10-10', 'adrian', 1]]) assert.ok(M.asignar(e3, cfg3, st3, d, 'ZAPA_T', id, { cocina: !!c }).ok, id + ' ' + d);
+  const cambio = { pid: 'sluna', tipo: 'CAMBIO', desde: '2026-10-07', hasta: '2026-10-07', dias: ['2026-10-07'] };
+  const sinHoy = M.planesCobertura(cfg3, st3, e3, cambio, { intercambio: true }).planes.map(P => P.asignaciones.find(a => a.pid === 'roberto' && a.intercambio)).filter(Boolean)[0];
+  assert.ok(sinHoy && sinHoy.intercambio.iso === '2026-10-06', 'preparado: sin «solo desde hoy» el turno a cambio es el martes 6: ' + JSON.stringify(sinHoy && sinHoy.intercambio));
+  const conHoy = M.planesCobertura(cfg3, st3, e3, cambio, { intercambio: true, desdeIso: '2026-10-07' }).planes.map(P => P.asignaciones.find(a => a.pid === 'roberto' && a.intercambio)).filter(Boolean)[0];
+  assert.ok(conHoy && conHoy.intercambio.iso === '2026-10-10', 'con «solo desde hoy», el sábado 10: ' + JSON.stringify(conHoy && conHoy.intercambio));
+});
+
+ok('A5 · F2 (09-varios B): el turno a cambio de un cambio de turno no deja corta la casilla de quien cubre: se descarta el que la deja sin quien abra, solo con apoyos, sin la cocina que tenía o con menos gente; si no hay otro, se propone con esos avisos (as.intercambio.avisos)', () => {
+  // martes 6/10 Zapatillera tarde: Cristian y Adrián (cocina); sábado 10: Susana Luna y Leo. Cristian cambia el martes: Susana Luna
+  // le cubre y, a cambio, Cristian haría el sábado de Susana Luna (quedarían Leo y Cristian: dos apoyos que no abren la tarde)
+  const monta = otro => {
+    const cfg = cfgBase(), st = cfg.staff, e = estadoOct();
+    const ps = [['2026-10-06', 'cristian'], ['2026-10-06', 'adrian', 1], ['2026-10-10', 'sluna'], ['2026-10-10', 'leo']].concat(otro ? [['2026-10-13', 'roberto'], ['2026-10-13', 'sluna']] : []);
+    for (const [d, id, c] of ps) assert.ok(M.asignar(e, cfg, st, d, 'ZAPA_T', id, { cocina: !!c }).ok, id + ' ' + d);
+    return { cfg, st, e };
+  };
+  const cambio = { pid: 'cristian', tipo: 'CAMBIO', desde: '2026-10-06', hasta: '2026-10-06', dias: ['2026-10-06'] };
+  const deSluna = (cfg, st, e) => M.planesCobertura(cfg, st, e, cambio, { intercambio: true, siempre: true }).planes.map(P => P.asignaciones.find(a => a.pid === 'sluna' && a.intercambio)).filter(Boolean)[0];
+  { // sin otro turno de Susana Luna esa quincena: el del sábado, con los avisos
+    const { cfg, st, e } = monta(false);
+    const as = deSluna(cfg, st, e);
+    assert.ok(as && as.intercambio.iso === '2026-10-10' && as.intercambio.tid === 'ZAPA_T', JSON.stringify(as && as.intercambio));
+    assert.deepStrictEqual(as.intercambio.avisos, ['sin nadie que abra', 'solo con apoyos'], 'el sábado tenía quien abriera y alguien de sala; la cocina ya faltaba antes: no es un aviso nuevo');
+  }
+  { // con otro turno suyo, el martes 13 con Roberto (que abre), se elige ese aunque esté más lejos, y sin avisos
+    const { cfg, st, e } = monta(true);
+    const as = deSluna(cfg, st, e);
+    assert.ok(as && as.intercambio.iso === '2026-10-13', JSON.stringify(as && as.intercambio));
+    assert.deepStrictEqual(as.intercambio.avisos, []);
+  }
+  { // el intercambio de siempre (el sábado de Roberto, con Adrián en la cocina) sigue sin avisos
+    const cfg = cfgBase(), st = cfg.staff, e = estadoOct();
+    for (const [d, id, c] of [['2026-10-06', 'sluna'], ['2026-10-06', 'adrian', 1], ['2026-10-10', 'roberto'], ['2026-10-10', 'adrian', 1]]) assert.ok(M.asignar(e, cfg, st, d, 'ZAPA_T', id, { cocina: !!c }).ok);
+    const x = M.planesCobertura(cfg, st, e, { pid: 'sluna', tipo: 'CAMBIO', desde: '2026-10-06', hasta: '2026-10-06' }, { intercambio: true }).planes[0].asignaciones[0].intercambio;
+    assert.ok(x && x.iso === '2026-10-10' && Array.isArray(x.avisos) && !x.avisos.length, JSON.stringify(x));
+  }
+});
+
+ok('A5 · F3/D17 (07-intercambio-cambio C): un cambio de turno no es una falta: ni designadas, ni relevo, ni «cubre a», ni «por X», ni el partido autorizado para cubrirle; quien entra lo hace «cambio con Iván», y lo que enseña el plan es lo que queda al aplicar', () => {
+  const sinParejas = (cfg, st) => { for (const id of ['mariluz', 'lavinia']) { M.personaDe(st, id).nuncaCon = []; M.personaDe(st, id).nuncaConFlex = []; } };
+  const cfg = f3Escenario(sinParejas);
+  const cambio = { pid: 'ivan', tipo: 'CAMBIO', desde: F3_DOM, hasta: F3_DOM, dias: [F3_DOM] };
+  const res = a5Planes(cfg, cambio, { intercambio: true });
+  assert.deepStrictEqual(res.designados, [], 'nadie «tiene quien le cubra» en un cambio');
+  assert.ok(res.afectados.every(a => !(a.noCubren || []).length), JSON.stringify(res.afectados.map(a => a.noCubren)));
+  assert.ok(res.planes.length && res.planes[0].asignaciones.length, 'preparado: el plan pone a alguien en la tarde del domingo');
+  for (const P of res.planes) for (const a of P.asignaciones) {
+    const quien = `${P.id} ${a.iso} ${a.pid}: ${JSON.stringify(a)}`;
+    assert.ok(!a.yaEstaba && !a.cubre && !a.por, quien);
+    assert.ok(!a.razones.some(x => /^cubre a /.test(x)), quien);
+    assert.ok(!(a.autorizados || []).some(x => /para cubrir/.test(x.texto)), quien);
+    if (!/^para llegar al mínimo/.test(a.razones[0])) assert.strictEqual(a.razones[0], 'cambio con Iván', quien);
+  }
+  // al aplicar: sin «por», sin designación, «cambio con Iván»; lo autorizado y los avisos, los mismos que enseñó el plan
+  const P = res.planes[0];
+  const r = a5Aplicar(cfg, cambio, P);
+  const oct = f3Mes(cfg, F3_DOM);
+  assert.ok(r.asignados.length, JSON.stringify(r));
+  for (const x of r.asignados) {
+    const en = M.asignados(oct, x.iso, x.tid).find(y => y.pid === x.pid), as = P.asignaciones.find(y => y.iso === x.iso && y.tid === x.tid && y.pid === x.pid);
+    assert.ok(en && !en.por && !en.porDesignacion && !en.porAusenciaDe && /^(cambio con Iván|para llegar al mínimo)/.test(en.razon), JSON.stringify(en));
+    assert.strictEqual(!!M.avisosVigentes(cfg, cfg.staff, oct, x.iso, x.tid, x.pid).length, !!as.avisos.length, 'los avisos que enseñó el plan son los que quedan: ' + JSON.stringify(as.avisos));
+    assert.deepStrictEqual(M.revisarEntrada(cfg, cfg.staff, oct, x.iso, x.tid, x.pid).autorizados.filter(a => !a.continuo), []);
+  }
+  // regenerar no lo retira (Iván no está ausente: nada que «ya no falte»)
+  const g = M.generarPlanilla(cfg, cfg.staff, oct, '2026-10-01', '2026-10-31', { meses: cfg.meses });
+  assert.deepStrictEqual(g.retirados.filter(x => r.asignados.some(y => y.iso === x.iso && y.pid === x.pid)), []);
+  // el relevo tampoco: Iván cambia el viernes y Mari Luz, que ya está en la tarde, no pasa a ir «por Iván»
+  const cfg2 = f3Escenario();
+  const c2 = { pid: 'ivan', tipo: 'CAMBIO', desde: F3_VIE, hasta: F3_VIE, dias: [F3_VIE] };
+  for (const P2 of a5Planes(cfg2, c2, { intercambio: true }).planes) assert.ok(!P2.asignaciones.some(a => a.yaEstaba || a.por), JSON.stringify(P2.asignaciones));
+});
+
+ok('A5 · F4 (02-aplicar D, 09-varios D): lo que pone la Cobertura por la ausencia de X lleva porAusenciaDe (también quien entra «para llegar al mínimo»); cuando X ya no falta, la Revisión lo dice («por-presente») y regenerar lo retira («Iván ya no falta…»); el relevo solo pierde el «por», y lo puesto a mano no se retira', () => {
+  const cfg = f3Escenario(), inc = A5_INC();
+  const A = a5Planes(cfg, inc).planes[0];
+  a5Aplicar(cfg, inc, A);
+  const oct = f3Mes(cfg, F3_VIE);
+  const en = (iso, pid, tid) => M.asignados(oct, iso, tid || 'PASARELA_T').find(x => x.pid === pid);
+  assert.ok(en(F3_VIE, 'dulce') && en(F3_DOM, 'roberto') && en(F3_VIE, 'mariluz'), 'preparado: ' + [F3_VIE, F3_SAB, F3_DOM].map(i => M.pidsEn(oct, i, 'PASARELA_T').join(',')).join(' | '));
+  assert.strictEqual(en(F3_VIE, 'dulce').porAusenciaDe, 'ivan', 'la que entra para llegar al mínimo también: ' + JSON.stringify(en(F3_VIE, 'dulce')));
+  assert.ok(!en(F3_VIE, 'dulce').por);
+  assert.strictEqual(en(F3_DOM, 'roberto').porAusenciaDe, 'ivan');
+  assert.ok(!en(F3_VIE, 'mariluz').porAusenciaDe && en(F3_VIE, 'mariluz').relevo, 'el relevo está en su plaza: no');
+  // a mano, «por Iván», el domingo por la mañana (lo puso el encargado)
+  assert.ok(M.asignar(oct, cfg, cfg.staff, F3_DOM, 'PASARELA_M', 'dulce', { origen: 'manual', por: 'ivan', razon: 'cubre a Iván', forzar: true }).ok);
+  // Iván vuelve (se quitan sus vacaciones en la ficha): la Revisión lo dice antes de regenerar
+  M.personaDe(cfg.staff, 'ivan').ausencias = [];
+  const pp = () => M.revisionMes(cfg, cfg.staff, oct, { desde: F3_VIE, hasta: F3_DOM }).filter(x => x.tipo === 'por-presente');
+  const rv = pp();
+  assert.ok(rv.some(x => x.iso === F3_DOM && x.pid === 'roberto' && x.nivel === 'media' && /Roberto va por Iván, que ya no falta ese día/.test(x.msg)), JSON.stringify(rv));
+  assert.ok(rv.some(x => x.iso === F3_VIE && x.pid === 'mariluz'), 'el relevo también va «por» quien ya no falta: ' + JSON.stringify(rv));
+  assert.ok(!rv.some(x => x.pid === 'dulce' && x.turnoId === 'PASARELA_T'), 'quien entró para llegar al mínimo no va «por» nadie');
+  // regenerar retira lo que entró por él, también lo de «para llegar al mínimo»; el relevo pierde el «por»; lo manual se queda
+  const g = M.generarPlanilla(cfg, cfg.staff, oct, '2026-10-01', '2026-10-04', { meses: cfg.meses });
+  const ret = g.retirados.filter(x => x.turnoId === 'PASARELA_T').map(x => [x.iso, x.pid, x.motivo]).sort();
+  // (corrección de A5, cliente H13) el motivo sin el día: «Se retira» lo agrupa por persona y los días van en la línea
+  assert.deepStrictEqual(ret, [
+    [F3_VIE, 'dulce', 'Iván ya no falta: ya no hay que cubrir su sitio'],
+    [F3_SAB, 'dulce', 'Iván ya no falta: ya no hay que cubrir su sitio'],
+    [F3_DOM, 'roberto', 'Iván ya no falta: ya no hay que cubrir su sitio'],
+  ]);
+  assert.ok(M.pidsEn(oct, F3_VIE, 'PASARELA_T').includes('ivan') && !en(F3_VIE, 'mariluz').por, 'Iván vuelve a su tarde y Mari Luz sigue en la suya sin «por»');
+  assert.ok(en(F3_DOM, 'dulce', 'PASARELA_M'), 'lo puesto a mano no se retira');
+  assert.deepStrictEqual(pp().map(x => [x.iso, x.turnoId, x.pid]), [[F3_DOM, 'PASARELA_M', 'dulce']], 'tras regenerar, la Revisión solo señala lo puesto a mano');
+  assert.deepStrictEqual(M.generarPlanilla(cfg, cfg.staff, oct, '2026-10-01', '2026-10-04', { meses: cfg.meses }).retirados, [], 'regenerar otra vez no retira nada');
+  // «por X» con X en la misma casilla (Iván vuelve y el encargado le pone a mano en su tarde antes de regenerar): también
+  const cfg2 = f3Escenario();
+  a5Aplicar(cfg2, inc, a5Planes(cfg2, inc).planes[0]);
+  const oct2 = f3Mes(cfg2, F3_DOM);
+  M.personaDe(cfg2.staff, 'ivan').ausencias = [];
+  assert.ok(M.asignar(oct2, cfg2, cfg2.staff, F3_DOM, 'PASARELA_T', 'ivan', { origen: 'manual', forzar: true }).ok);
+  const rv2 = M.revisionMes(cfg2, cfg2.staff, oct2, { desde: F3_DOM, hasta: F3_DOM }).filter(x => x.tipo === 'por-presente');
+  assert.ok(rv2.some(x => x.pid === 'roberto' && /Roberto va por Iván, que está en la misma casilla/.test(x.msg)), JSON.stringify(rv2));
+  // lo que pone un cambio de turno no lleva porAusenciaDe (Iván no falta)
+  const cfg3 = f3Escenario();
+  const c3 = { pid: 'ivan', tipo: 'CAMBIO', desde: F3_SAB, hasta: F3_SAB, dias: [F3_SAB] };
+  const r3 = a5Aplicar(cfg3, c3, a5Planes(cfg3, c3).planes[0]);
+  assert.ok(r3.asignados.length && r3.asignados.every(x => !M.asignados(f3Mes(cfg3, x.iso), x.iso, x.tid).find(y => y.pid === x.pid).porAusenciaDe), JSON.stringify(r3.asignados));
+});
+
+ok('A5 · F5 (06-turnos-afectados A): MAX_DIAS_COBERTURA cuenta los días MARCADOS, no los del medio: el 2/10 y el 15/12 son dos días y salen los dos (y aplicar saca a Iván de los dos); con más días marcados que el tope, `truncado` dice hasta dónde se ha mirado', () => {
+  const cfg = f3Escenario();
+  const dic = M.estadoDesde(cfg.meses, [], 2026, 12);
+  M.generarPlanilla(cfg, cfg.staff, dic, '2026-12-14', '2026-12-20', {});
+  cfg.meses['2026-12'] = { asig: dic.asig, apertura: dic.apertura, manual: dic.manual };
+  assert.ok(M.pidsEn(dic, '2026-12-15', 'PASARELA_T').includes('ivan'), 'preparado: Iván trabaja la tarde del 15/12');
+  const inc = { pid: 'ivan', tipo: 'VAC', dias: ['2026-10-02', '2026-12-15'], desde: '2026-10-02', hasta: '2026-12-15', franjas: ['T'] };
+  const res = a5Planes(cfg, inc);
+  assert.deepStrictEqual(res.afectados.map(a => a.iso + ' ' + a.tid), ['2026-10-02 PASARELA_T', '2026-12-15 PASARELA_T']);
+  assert.strictEqual(res.truncado, null);
+  const r = a5Aplicar(cfg, inc, res.planes[0]);
+  assert.strictEqual(r.quitados, 2);
+  assert.ok(!M.pidsEn(M.estadoDesde(cfg.meses, [], 2026, 12), '2026-12-15', 'PASARELA_T').includes('ivan'), 'Iván ya no está en la tarde del 15/12, de vacaciones');
+  // 70 días marcados: se miran los primeros 62 y se dice (corrección de A5, modelo H3: con la planilla de esos días, la que trae la
+  // pestaña; `fuera`, los marcados que no están en ella, ninguno)
+  const dias = [...M.rangoIso('2026-10-01', M.addDias('2026-10-01', 69))];
+  const inc70 = { pid: 'laura', tipo: 'BAJ', dias, desde: dias[0], hasta: dias[69] };
+  const r2 = M.planesCobertura(cfg, cfg.staff, M.clonarEstado(a5rDias(cfg, M.diasNecesarios(inc70))), inc70, {});
+  assert.deepStrictEqual(r2.truncado, { max: 62, marcados: 70, hasta: dias[61], fuera: [] });
+});
+
+ok('A5 · F6 (06 C y D, 09 C): una casilla cerrada ese día (por fechas o en «Cuándo abre») con gente dentro: «cerrada ese día: nada que cubrir», también con «Reemplazar siempre» (antes «sigue completa (1 de 2)» o nada)', () => {
+  const cierre = { id: 'c1', localId: 'MONACO', dias: { '2026-09-27': ['T'], '2026-09-28': ['M', 'T'], '2026-09-29': ['M', 'T'] }, motivo: 'reforma', decisiones: {}, retirados: [] };
+  const cfg = f3Escenario(null, c => { c.cierresPuntuales = [cierre]; });
+  const inc = { pid: 'cristian', tipo: 'LD', desde: '2026-09-28', hasta: '2026-09-29', dias: ['2026-09-28', '2026-09-29'] };
+  for (const siempre of [false, true]) {
+    const res = a5Planes(cfg, inc, { siempre });
+    assert.deepStrictEqual(res.afectados.map(a => a.iso + ' ' + a.tid), ['2026-09-28 MONACO_M', '2026-09-29 MONACO_T'], 'preparado');
+    for (const P of res.planes.length ? res.planes : [null]) {
+      assert.ok(P, 'hay plan (con «siempre» = ' + siempre + ')');
+      assert.deepStrictEqual([P.asignaciones, P.huecos], [[], []]);
+      assert.deepStrictEqual(P.sinCubrir.map(s => [s.iso, s.tid, s.motivo]), [['2026-09-28', 'MONACO_M', 'cerrada ese día: nada que cubrir'], ['2026-09-29', 'MONACO_T', 'cerrada ese día: nada que cubrir']], 'siempre = ' + siempre);
+    }
+  }
+  // «Cuándo abre» a mano (apertura false) con Cristian aún dentro
+  const cfg2 = f3Escenario();
+  f3Mes(cfg2, '2026-09-29').apertura['2026-09-29'] = { MONACO_T: false };
+  const inc2 = { pid: 'cristian', tipo: 'LD', desde: '2026-09-29', hasta: '2026-09-29', dias: ['2026-09-29'] };
+  for (const siempre of [false, true]) {
+    const P = a5Planes(cfg2, inc2, { siempre }).planes[0];
+    assert.ok(P, 'hay plan');
+    assert.deepStrictEqual(P.sinCubrir.map(s => [s.tid, s.motivo]).concat(P.asignaciones.map(a => [a.tid, a.pid])), [['MONACO_T', 'cerrada ese día: nada que cubrir']], 'siempre = ' + siempre);
+  }
+});
+
+ok('A5 · F7 (06-turnos-afectados E): «sale · … nadie abre» se calcula con el relevo ya marcado, como el plan: Mari Luz (sin partido declarado el viernes) ya estaba con Iván y, al cubrirle, abre', () => {
+  const cfg = f3Escenario(null, (c, st) => { M.personaDe(st, 'mariluz').partido.dias = [2, 4]; });
+  const inc = { pid: 'ivan', tipo: 'VAC', dias: [F3_VIE], desde: F3_VIE, hasta: F3_VIE, franjas: ['T'] };
+  assert.ok(M.pidsEn(f3Mes(cfg, F3_VIE), F3_VIE, 'PASARELA_T').includes('mariluz') && M.pidsEn(f3Mes(cfg, F3_VIE), F3_VIE, 'PASARELA_M').includes('mariluz'), 'preparado: Mari Luz de mañana y de tarde el viernes');
+  const res = a5Planes(cfg, inc);
+  const rel = res.planes[0].asignaciones.find(a => a.pid === 'mariluz');
+  assert.ok(rel && rel.yaEstaba && rel.abre, 'el plan: Mari Luz ya estaba y abre: ' + JSON.stringify(rel));
+  assert.strictEqual(res.afectados[0].sinAbre, false, 'y «sale» no dice que nadie abre');
+  // con el mínimo de la tarde en 2, sin Iván quedan 2 de 2: no hay nada que cubrir (antes, «nadie abre» la hacía necesaria)
+  const cfg2 = f3Escenario(null, (c, st) => { M.personaDe(st, 'mariluz').partido.dias = [2, 4]; M.localDe(c, 'PASARELA').minimos.T[5] = 2; });
+  const res2 = a5Planes(cfg2, inc);
+  assert.deepStrictEqual([res2.afectados[0].faltan, res2.afectados[0].sinAbre, res2.afectados[0].necesario, res2.necesarios], [0, false, false, 0]);
+});
+
+ok('A5 · F9 (09-varios A): al aplicar un plan, quien entraba «para llegar al mínimo» no entra si la casilla ya está completa («la casilla ya está completa»); quien cubre a X sí', () => {
+  const cfg = f3Escenario(), inc = A5_INC();
+  const A = a5Planes(cfg, inc).planes[0];
+  assert.ok(A.asignaciones.some(a => a.iso === F3_VIE && a.pid === 'dulce' && /^para llegar al mínimo/.test(a.razon)), 'preparado: ' + JSON.stringify(A.asignaciones.map(a => a.iso + ' ' + a.pid + ' ' + a.razon)));
+  // entre proponer y confirmar, el encargado quita a Iván del viernes y fuerza a Yilian: la casilla queda completa (3 de 3)
+  const oct = f3Mes(cfg, F3_VIE);
+  M.desasignar(oct, F3_VIE, 'PASARELA_T', 'ivan');
+  assert.ok(M.asignar(oct, cfg, cfg.staff, F3_VIE, 'PASARELA_T', 'yilian', { forzar: true }).ok);
+  const r = a5Aplicar(cfg, inc, A);
+  assert.ok(r.rechazados.some(x => x.iso === F3_VIE && x.pid === 'dulce' && x.motivo === 'la casilla ya está completa'), JSON.stringify(r.rechazados));
+  assert.ok(!M.pidsEn(oct, F3_VIE, 'PASARELA_T').includes('dulce'));
+  assert.strictEqual(M.revisarTurno(cfg, cfg.staff, oct, F3_VIE, 'PASARELA_T').n, 3);
+  assert.ok(M.pidsEn(oct, F3_SAB, 'PASARELA_T').includes('dulce'), 'el sábado sigue faltando gente: entra');
+  assert.ok(r.asignados.some(x => x.iso === F3_VIE && x.pid === 'mariluz' && x.yaEstaba), 'el relevo, sí');
+});
+
+ok('A5 · sospecha F (08-designadas-reglas A): quienLeCubre marca activa:false (con el porqué en `inactiva`) a la designada de baja sin fecha de fin o en standby, y la Cobertura no la anuncia en «tiene quien le cubra»', () => {
+  const cfg = f3Escenario(null, (c, st) => { M.personaDe(st, 'mariluz').cubreA = []; M.personaDe(st, 'laura').cubreA = [{ pid: 'ivan' }]; M.personaDe(st, 'dulce').standby = true; M.personaDe(st, 'dulce').cubreA = [{ pid: 'ivan' }]; });
+  const q = M.quienLeCubre(cfg, cfg.staff, 'ivan', '2026-09-29');
+  assert.deepStrictEqual(q.map(d => [d.pid, d.activa, d.inactiva || null]), [['dulce', false, 'está en standby'], ['laura', false, 'está de baja']]);
+  const inc = { pid: 'ivan', tipo: 'PERM', desde: '2026-09-29', hasta: '2026-09-29', dias: ['2026-09-29'], franjas: ['T'] };
+  assert.deepStrictEqual(a5Planes(cfg, inc).designados, []);
+  // la baja con fecha de fin no (vuelve), ni la baja sin fin que aún no ha empezado ese día; con «Cubre a» apagado, activa:false sin `inactiva`
+  M.personaDe(cfg.staff, 'laura').ausencias = [{ tipo: 'BAJ', desde: '2026-09-01', hasta: '2026-10-15' }];
+  delete M.personaDe(cfg.staff, 'dulce').standby;
+  assert.deepStrictEqual(M.quienLeCubre(cfg, cfg.staff, 'ivan', '2026-09-29').map(d => [d.pid, d.activa]), [['dulce', true], ['laura', true]]);
+  M.personaDe(cfg.staff, 'laura').ausencias = [{ tipo: 'BAJ', desde: '2026-10-15' }];
+  assert.deepStrictEqual(M.quienLeCubre(cfg, cfg.staff, 'ivan', '2026-09-29').map(d => [d.pid, d.activa]), [['dulce', true], ['laura', true]]);
+  assert.deepStrictEqual(M.quienLeCubre(cfg, cfg.staff, 'ivan', '2026-10-20').map(d => [d.pid, d.activa, d.inactiva || null]), [['dulce', true, null], ['laura', false, 'está de baja']]);
+  M.personaDe(cfg.staff, 'dulce').inactivas = ['cubreA'];
+  assert.deepStrictEqual(M.quienLeCubre(cfg, cfg.staff, 'ivan', '2026-09-29').filter(d => d.pid === 'dulce').map(d => [d.activa, d.inactiva || null]), [[false, null]]);
+});
+
+ok('A5 · C11 (revisión de cliente de A4): en el plan de la Cobertura quien entra «por Noe» lo dice (lo primero: «por Noe», o «cubre a Noe» si tiene la designación, corrección C-S1), como luego lo dice la planilla; quien entra para llegar al mínimo, no', () => {
+  const cfg = Object.assign(cfgBase(), { meses: {} });
+  M.personaDe(cfg.staff, 'leo').cubreA = [{ pid: 'noe' }];
+  M.personaDe(cfg.staff, 'victoria').cubreA = [{ pid: 'noe' }];
+  M.sembrarDemo(cfg, '2026-09-24');
+  cfg.eventos = (cfg.eventos || []).concat([{ id: 'ev_fiesta', iso: '2026-10-06', nombre: 'Fiesta del barrio', franja: 'T', refuerzo: { EL33: 1 } }]);
+  const M6 = '2026-10-06';
+  const inc = { pid: 'noe', tipo: 'PERM', desde: M6, hasta: M6, dias: [M6] };
+  const res = a5Planes(cfg, inc);
+  const A = res.planes[0];
+  const v = A.asignaciones.find(a => a.tid === 'EL33_T' && a.pid === 'victoria'), l = A.asignaciones.find(a => a.tid === 'EL33_T' && a.pid === 'leo');
+  assert.ok(v && l, 'preparado: ' + JSON.stringify(A.asignaciones.map(a => a.tid + ' ' + a.pid)));
+  assert.strictEqual(v.por, 'noe');
+  // (corrección de A5, cliente S1) Victoria tiene «Cubre a» Noe, pero Noe llevaba la cocina y ella entra de sala: su designación no
+  // es para ese puesto (cubreEnCasilla), así que entra «por Noe», no «cubre a Noe»
+  assert.strictEqual(v.razones[0], 'por Noe', JSON.stringify(v.razones));
+  assert.ok(/^para llegar al mínimo \(había 1 de 2\)$/.test(l.razones[0]) && !l.razones.some(x => x === 'cubre a Noe' || x === 'por Noe'), JSON.stringify(l.razones));
+  for (const P of res.planes) for (const a of P.asignaciones) if (a.por && !a.yaEstaba) assert.strictEqual(a.razones.filter(x => x === 'cubre a Noe' || x === 'por Noe').length, 1, JSON.stringify(a));
+  // y al aplicar, la planilla dice lo mismo
+  a5Aplicar(cfg, inc, A);
+  assert.strictEqual(M.asignados(f3Mes(cfg, M6), M6, 'EL33_T').find(x => x.pid === 'victoria').razon, 'por Noe');
+});
+
+// ---------- A5 · corrección tras la revisión (01/10): las dos revisiones de la fase (modelo M-Hx y cliente C-Hx / C-Sx) ----------
+// Los scripts de los revisores (scratchpad/fases/A5rev/modelo/rNN-*.js, cliente/*.mjs) como pruebas del repo. HOY es el jueves
+// 24/09 de ?demo=1; la hora de Madrid la pasa la pestaña (opts.ahoraHM), el modelo no mira el reloj.
+const A5R_HOY = '2026-09-24';
+// el estado virtual de unos días sueltos (como la pestaña con diasNecesarios): cada día apunta a los objetos de su mes
+function a5rDias(cfg, isos) {
+  const e = { y: +isos[0].slice(0, 4), m: +isos[0].slice(5, 7), days: [], asig: {}, apertura: {}, manual: {}, festivos: [], virtual: true };
+  for (const iso of isos) {
+    const k = iso.slice(0, 7);
+    cfg.meses[k] = cfg.meses[k] || { asig: {}, apertura: {}, manual: {} };
+    const me = M.estadoDesde(cfg.meses, [], +iso.slice(0, 4), +iso.slice(5, 7));
+    e.days.push(me.days.find(d => d.iso === iso));
+    me.asig[iso] = me.asig[iso] || {}; me.apertura[iso] = me.apertura[iso] || {}; me.manual[iso] = me.manual[iso] || {};
+    e.asig[iso] = me.asig[iso]; e.apertura[iso] = me.apertura[iso]; e.manual[iso] = me.manual[iso];
+  }
+  return e;
+}
+const a5rTxt = P => JSON.stringify(P.asignaciones.map(a => `${a.iso.slice(5)} ${a.tid} ${a.pid}${a.abre ? ' ABRE' : ''} «${a.razones[0]}»${a.intercambio ? ' ⇄ ' + a.intercambio.iso + ' ' + a.intercambio.tid : ''}`));
+
+ok('A5 · corrección M-H1 (r01c): quien entra solo para que la casilla tenga quien abra lleva «para abrir» (sin «por» ni «para llegar al mínimo») y al aplicar entra: la casilla abre; si al confirmar ya hay quien abra, no entra', () => {
+  const D = '2026-10-18', T = 'PASARELA_T';
+  const monta = () => f3Escenario((c, st) => { M.personaDe(st, 'lavinia').cubreA = [{ pid: 'ivan' }]; M.personaDe(st, 'mariluz').cubreA = []; },
+    (c, st) => { M.localDe(c, 'PASARELA').minimos.T[0] = 1; M.personaDe(st, 'lavinia').noPrimero = ['T']; });
+  const inc = { pid: 'ivan', tipo: 'VAC', dias: [D], desde: D, hasta: D, franjas: ['T'] };
+  const cfg = monta();
+  const A = a5Planes(cfg, inc, { desdeIso: '2026-10-01' }).planes[0];
+  const ab = A.asignaciones.find(a => a.abre && !a.yaEstaba);
+  assert.ok(ab && A.completo, 'preparado: alguien entra a abrir: ' + a5rTxt(A));
+  assert.strictEqual(ab.razones[0], 'para abrir', a5rTxt(A));
+  assert.ok(!ab.minimo && !ab.por && !ab.cubre && !ab.razones.some(r => /para llegar al mínimo|^cubre a|^por /.test(r)), JSON.stringify(ab));
+  const r = a5Aplicar(cfg, inc, A, { desdeIso: '2026-10-01' });
+  assert.deepStrictEqual(r.rechazados, [], 'lo que enseña el plan es lo que queda');
+  const oct = f3Mes(cfg, D), en = M.asignados(oct, D, T).find(x => x.pid === ab.pid);
+  assert.ok(en && en.razon === 'para abrir' && !en.por && en.porAusenciaDe === 'ivan', JSON.stringify(M.asignados(oct, D, T)));
+  assert.strictEqual(M.revisarTurno(cfg, cfg.staff, oct, D, T).sinAbre, false, 'la casilla tiene quien abra');
+  // (F9, red de seguridad) si al confirmar la casilla ya está completa y alguien abre, no entra
+  const cfg2 = monta(), A2 = a5Planes(cfg2, inc, { desdeIso: '2026-10-01' }).planes[0], oct2 = f3Mes(cfg2, D);
+  M.desasignar(oct2, D, T, 'ivan');
+  for (const pid of ['leo', 'yilian']) assert.ok(M.asignar(oct2, cfg2, cfg2.staff, D, T, pid, { forzar: true, abre: pid === 'leo' }).ok, pid);
+  const r2 = a5Aplicar(cfg2, inc, A2, { desdeIso: '2026-10-01' });
+  assert.ok(r2.rechazados.some(x => x.pid === ab.pid && x.motivo === 'la casilla ya está completa'), JSON.stringify(r2.rechazados));
+});
+
+ok('A5 · corrección M-H2 y C-H8 (r02): en un cambio de turno lo ya pasado no se toca —ni un día de antes de hoy ni, con la hora, el turno de hoy ya terminado—: va a `pasados`, quien lo pide sigue en él y no se apunta nada', () => {
+  const cfg = f3Escenario(), sep = f3Mes(cfg, '2026-09-15');
+  const dia = [...M.rangoIso('2026-09-15', '2026-09-23')].find(iso => M.pidsEn(sep, iso, 'PASARELA_T').includes('ivan'));
+  assert.ok(dia, 'preparado: Iván trabajó una tarde de la semana pasada');
+  const inc = { pid: 'ivan', tipo: 'CAMBIO', desde: dia, hasta: dia, dias: [dia] };
+  const res = a5Planes(cfg, inc, { desdeIso: A5R_HOY, intercambio: true });
+  assert.deepStrictEqual([res.planes.length, res.afectados.length, res.pasados], [0, 0, [{ iso: dia, tid: 'PASARELA_T' }]]);
+  const r = a5Aplicar(cfg, inc, null, { desdeIso: A5R_HOY });
+  assert.deepStrictEqual([r.quitados, r.pasados], [0, [{ iso: dia, tid: 'PASARELA_T' }]]);
+  assert.ok(M.pidsEn(sep, dia, 'PASARELA_T').includes('ivan'), 'Iván sigue en el turno que trabajó');
+  assert.deepStrictEqual(M.personaDe(cfg.staff, 'ivan').ausencias || [], [], 'un cambio no apunta ausencia');
+  // hoy a las 20:00, el cambio de turno de la mañana de Lola (07:00–16:00, ya trabajada): lo mismo
+  const cfg2 = cfgDemo(), c2 = { pid: 'lola', tipo: 'CAMBIO', desde: A5R_HOY, hasta: A5R_HOY, dias: [A5R_HOY] };
+  const res2 = a5Planes(cfg2, c2, { desdeIso: A5R_HOY, ahoraHM: '20:00', intercambio: true });
+  assert.deepStrictEqual([res2.planes.length, res2.afectados.length, res2.pasados], [0, 0, [{ iso: A5R_HOY, tid: 'PASARELA_M' }]]);
+  const r2 = a5Aplicar(cfg2, c2, null, { desdeIso: A5R_HOY, ahoraHM: '20:00' });
+  assert.strictEqual(r2.quitados, 0);
+  assert.ok(M.pidsEn(f3Mes(cfg2, A5R_HOY), A5R_HOY, 'PASARELA_M').includes('lola'), 'Lola sigue en su mañana');
+  // a las 10:00 esa mañana está en curso: sí se cambia
+  assert.deepStrictEqual(a5Planes(cfgDemo(), c2, { desdeIso: A5R_HOY, ahoraHM: '10:00', intercambio: true }).afectados.map(a => a.tid), ['PASARELA_M']);
+});
+
+ok('A5 · corrección C-H1 (cliente 07-reloj2 y 03-cambio a las 22:30): con la hora de Madrid (opts.ahoraHM) el turno de hoy cuya franja ya ha terminado es pasado (nadie entra; quien falta sale), la franja en curso se cubre, y el turno a cambio nunca es de hoy si su franja ya ha empezado (tampoco al confirmar un plan de antes)', () => {
+  const baja = { pid: 'lola', tipo: 'BAJ', dias: ['2026-09-22', '2026-09-23', A5R_HOY, '2026-09-25'], desde: '2026-09-22', hasta: '2026-09-25' };
+  const cfg = cfgDemo();
+  const P10 = a5Planes(cfg, baja, { desdeIso: A5R_HOY, ahoraHM: '10:00' });
+  const A10 = P10.planes[0];
+  assert.ok(A10 && A10.asignaciones.some(a => a.iso === A5R_HOY && a.tid === 'PASARELA_M'), 'preparado: a las 10:00 alguien entra en la mañana de hoy: ' + (A10 && a5rTxt(A10)));
+  const P20 = a5Planes(cfg, baja, { desdeIso: A5R_HOY, ahoraHM: '20:00' });
+  assert.deepStrictEqual(P20.pasados.map(x => x.iso + '|' + x.tid), ['2026-09-22|PASARELA_M', '2026-09-23|PASARELA_M', A5R_HOY + '|PASARELA_M']);
+  assert.deepStrictEqual(P20.afectados.map(a => a.iso), ['2026-09-25']);
+  for (const P of P20.planes) assert.ok(P.asignaciones.every(a => a.iso > A5R_HOY), a5rTxt(P));
+  // el plan de las 10:00 confirmado a las 20:00: quien entraba en la mañana de hoy no entra; Lola sale de ella igual (estaba de baja)
+  const r = a5Aplicar(cfg, baja, A10, { desdeIso: A5R_HOY, ahoraHM: '20:00' });
+  const hoyM = M.pidsEn(f3Mes(cfg, A5R_HOY), A5R_HOY, 'PASARELA_M');
+  assert.ok(r.rechazados.some(x => x.iso === A5R_HOY && x.motivo === 'ese turno ya ha pasado'), JSON.stringify(r.rechazados));
+  assert.ok(!hoyM.includes('lola') && A10.asignaciones.filter(a => a.iso === A5R_HOY).every(a => !hoyM.includes(a.pid)), hoyM.join(','));
+  assert.ok(r.pasados.some(x => x.iso === A5R_HOY && x.tid === 'PASARELA_M'), JSON.stringify(r.pasados));
+  // la tarde de hoy de Iván a las 20:00 (16:00–00:00) está en curso: se cubre
+  const tarde = { pid: 'ivan', tipo: 'PERM', dias: [A5R_HOY], desde: A5R_HOY, hasta: A5R_HOY, franjas: ['T'] };
+  const PT = a5Planes(cfgDemo(), tarde, { desdeIso: A5R_HOY, ahoraHM: '20:00' });
+  assert.deepStrictEqual([PT.afectados.map(a => a.iso + '|' + a.tid), PT.pasados], [[A5R_HOY + '|PASARELA_T'], []]);
+  // el cambio de turno de Victoria el sábado 26: a las 10:00 el turno a cambio puede ser la tarde de hoy de Noe; a las 22:30 no
+  const cambio = { pid: 'victoria', tipo: 'CAMBIO', dias: ['2026-09-26'], desde: '2026-09-26', hasta: '2026-09-26' };
+  const cfg3 = cfgDemo();
+  const aCambio = res => res.planes.flatMap(P => P.asignaciones.filter(a => a.intercambio).map(a => a.intercambio.iso + '|' + a.intercambio.tid));
+  const a10 = a5Planes(cfg3, cambio, { desdeIso: A5R_HOY, ahoraHM: '10:00', intercambio: true });
+  assert.ok(aCambio(a10).includes(A5R_HOY + '|EL33_T'), 'preparado: ' + JSON.stringify(aCambio(a10)));
+  const a2230 = a5Planes(cfg3, cambio, { desdeIso: A5R_HOY, ahoraHM: '22:30', intercambio: true });
+  assert.deepStrictEqual(aCambio(a2230).filter(k => k.slice(0, 10) <= A5R_HOY), [], JSON.stringify(aCambio(a2230)));
+  // el plan de las 10:00 confirmado a las 22:30: no se hace nada (un cambio es un trato entre dos: entero o nada)
+  const P = a10.planes.find(x => x.asignaciones.some(a => a.intercambio && a.intercambio.iso === A5R_HOY));
+  const foto = () => JSON.stringify([M.asignados(f3Mes(cfg3, A5R_HOY), A5R_HOY, 'EL33_T'), M.asignados(f3Mes(cfg3, '2026-09-26'), '2026-09-26', 'EL33_M')]);
+  const antes = foto();
+  const r3 = a5Aplicar(cfg3, cambio, P, { desdeIso: A5R_HOY, ahoraHM: '22:30' });
+  assert.ok(r3.rechazados.some(x => x.iso === A5R_HOY && x.motivo === 'ese turno ya ha empezado'), JSON.stringify(r3.rechazados));
+  assert.strictEqual(foto(), antes, 'nada cambia');
+});
+
+ok('A5 · corrección M-H3 (r05): la Cobertura pide los días que necesita por tramos (diasNecesarios: la ventana de rangoNecesario de cada tramo de días marcados) y `truncado` dice también los días marcados que no están en la planilla que se le pasa', () => {
+  const cfg = f3Escenario(), D31 = '2026-12-31';
+  const dic = M.estadoDesde(cfg.meses, [], 2026, 12);
+  M.generarPlanilla(cfg, cfg.staff, dic, '2026-12-28', D31, {});
+  cfg.meses['2026-12'] = { asig: dic.asig, apertura: dic.apertura, manual: dic.manual };
+  assert.ok(M.pidsEn(dic, D31, 'PASARELA_T').includes('ivan'), 'preparado: Iván trabaja la tarde del 31/12');
+  const inc = { pid: 'ivan', tipo: 'VAC', dias: ['2026-10-02', D31], desde: '2026-10-02', hasta: D31, franjas: ['T'] };
+  const v1 = M.rangoNecesario({ desde: '2026-10-02', hasta: '2026-10-02' }), v2 = M.rangoNecesario({ desde: D31, hasta: D31 });
+  assert.deepStrictEqual(M.diasNecesarios(inc), [...M.rangoIso(v1.desde, v1.hasta), ...M.rangoIso(v2.desde, v2.hasta)]);
+  assert.deepStrictEqual(M.diasNecesarios({ pid: 'ivan', tipo: 'BAJ', desde: '2026-10-02', hasta: '2026-10-08' }), [...M.rangoIso(M.rangoNecesario({ desde: '2026-10-02', hasta: '2026-10-08' }).desde, M.rangoNecesario({ desde: '2026-10-02', hasta: '2026-10-08' }).hasta)], 'un tramo: la ventana de siempre');
+  // con el estado que hacía la pestaña (un rango seguido, cortado a 100 días) el 31/12 no está: se dice
+  const rg = M.rangoNecesario(inc);
+  const corto = M.clonarEstado(cieRango(cfg, rg.desde, M.addDias(rg.desde, 99)));
+  const res0 = M.planesCobertura(cfg, cfg.staff, corto, inc, { meses: cfg.meses, desdeIso: A5R_HOY });
+  assert.deepStrictEqual(res0.truncado, { max: 62, marcados: 2, hasta: '2026-10-02', fuera: [D31] });
+  // con los días que pide: los dos, sin truncar, y al aplicar Iván sale también del 31/12
+  const res = M.planesCobertura(cfg, cfg.staff, M.clonarEstado(a5rDias(cfg, M.diasNecesarios(inc))), inc, { meses: cfg.meses, desdeIso: A5R_HOY });
+  assert.deepStrictEqual([res.afectados.map(a => a.iso + ' ' + a.tid), res.truncado], [['2026-10-02 PASARELA_T', D31 + ' PASARELA_T'], null]);
+  const r = M.aplicarCobertura(cfg, cfg.staff, a5rDias(cfg, M.diasNecesarios(inc)), inc, res.planes[0], { desdeIso: A5R_HOY });
+  assert.strictEqual(r.quitados, 2);
+  assert.ok(!M.pidsEn(M.estadoDesde(cfg.meses, [], 2026, 12), D31, 'PASARELA_T').includes('ivan'));
+});
+
+ok('A5 · corrección M-H4 y C-H5 (r09, cliente 18-standby-cobertura): con «solo desde hoy», quién le cubre se mira el primer día que se cubre (no el primero marcado, ya pasado); la designada que ahora no cubre (standby, baja sin fin) sale aparte con el porqué (designadosInactivos) y no en cada casilla', () => {
+  const cfg = f3Escenario((c, st) => { M.personaDe(st, 'mariluz').cubreA = []; M.personaDe(st, 'dulce').cubreA = [{ pid: 'ivan' }]; });
+  M.anadirAusencia(M.personaDe(cfg.staff, 'dulce'), { tipo: 'BAJ', desde: '2026-09-22' });
+  const inc = { pid: 'ivan', tipo: 'VAC', desde: '2026-09-21', hasta: '2026-10-04', dias: [...M.rangoIso('2026-09-21', '2026-10-04')], franjas: ['T'] };
+  const res = a5Planes(cfg, inc, { desdeIso: A5R_HOY });
+  assert.ok(res.pasados.length && res.afectados.length, 'preparado');
+  assert.deepStrictEqual(res.designados, [], JSON.stringify(res.designados));
+  assert.deepStrictEqual((res.designadosInactivos || []).map(d => [d.pid, d.nombre, d.inactiva]), [['dulce', 'Dulce', 'está de baja']]);
+  assert.deepStrictEqual(res.afectados.flatMap(a => a.noCubren.map(x => x.nombre)), [], 'no se repite «Dulce: de baja» en cada casilla');
+  // sin «solo desde hoy», el primer día marcado (21/09) Dulce aún no estaba de baja: es designada
+  assert.deepStrictEqual(a5Planes(cfg, inc).designados.map(d => d.pid), ['dulce']);
+  // en standby, igual
+  const cfg2 = f3Escenario((c, st) => { M.personaDe(st, 'mariluz').cubreA = []; M.personaDe(st, 'dulce').cubreA = [{ pid: 'ivan' }]; }, (c, st) => { M.personaDe(st, 'dulce').standby = true; });
+  const res2 = a5Planes(cfg2, A5_INC(), { desdeIso: A5R_HOY });
+  assert.deepStrictEqual([res2.designados, (res2.designadosInactivos || []).map(d => [d.pid, d.inactiva])], [[], [['dulce', 'está en standby']]]);
+});
+
+ok('A5 · corrección M-H5 (r10): una baja sin fin de media jornada no deja inactiva la designación («está de baja» es la de día entero): Dulce, de baja solo por la mañana, cubre a Iván por la tarde y la cabecera lo dice', () => {
+  const V = F3_VIE;
+  const cfg = f3Escenario((c, st) => { M.personaDe(st, 'mariluz').cubreA = []; M.personaDe(st, 'dulce').cubreA = [{ pid: 'ivan' }]; });
+  M.anadirAusencia(M.personaDe(cfg.staff, 'dulce'), { tipo: 'BAJ', desde: '2026-09-28', franjas: ['M'] });
+  assert.deepStrictEqual(M.quienLeCubre(cfg, cfg.staff, 'ivan', V).map(d => [d.pid, d.activa, d.inactiva || null]), [['dulce', true, null]]);
+  const res = a5Planes(cfg, { pid: 'ivan', tipo: 'VAC', dias: [V], desde: V, hasta: V, franjas: ['T'] }, { desdeIso: A5R_HOY });
+  assert.deepStrictEqual(res.designados.map(d => d.pid), ['dulce']);
+  // la de día entero, sí
+  M.personaDe(cfg.staff, 'dulce').ausencias = [{ tipo: 'BAJ', desde: '2026-09-28' }];
+  assert.deepStrictEqual(M.quienLeCubre(cfg, cfg.staff, 'ivan', V).map(d => [d.pid, d.activa, d.inactiva || null]), [['dulce', false, 'está de baja']]);
+});
+
+ok('A5 · corrección M-H6 (r04, casos 4 a 6) y M-H8 (mutantes m4 y m5): «¿X falta esa franja?» se lee en un sitio (faltaEn: ausente, libra, en standby o ya no está con nosotros) que usan la retirada y la Revisión: mientras X falte, lo que entró por su ausencia no se retira ni se señala; cuando vuelve de verdad, sí', () => {
+  const monta = () => { const cfg = f3Escenario(), inc = A5_INC(); a5Aplicar(cfg, inc, a5Planes(cfg, inc, { desdeIso: A5R_HOY }).planes[0], { desdeIso: A5R_HOY }); return cfg; };
+  const regen = cfg => M.generarPlanilla(cfg, cfg.staff, f3Mes(cfg, F3_VIE), '2026-09-28', F3_DOM, { meses: cfg.meses }).retirados.filter(x => x.pid !== 'ivan').map(x => [x.iso, x.pid, x.motivo]);
+  const pp = cfg => M.revisionMes(cfg, cfg.staff, f3Mes(cfg, F3_VIE), { desde: F3_VIE, hasta: F3_DOM }).filter(x => x.tipo === 'por-presente').map(x => x.msg);
+  const porAus = cfg => [F3_VIE, F3_SAB, F3_DOM].flatMap(iso => M.asignados(f3Mes(cfg, iso), iso, 'PASARELA_T').filter(x => x.porAusenciaDe === 'ivan').map(x => iso + ' ' + x.pid));
+  { // 4) se quita la ausencia y pasa a standby: sigue faltando
+    const cfg = monta(), ya = porAus(cfg), iv = M.personaDe(cfg.staff, 'ivan');
+    assert.ok(ya.length >= 3, 'preparado: ' + JSON.stringify(ya));
+    iv.ausencias = []; iv.standby = true;
+    assert.strictEqual(M.faltaEn(cfg, iv, F3_VIE, 'T'), true);
+    assert.deepStrictEqual(pp(cfg), [], 'la Revisión no dice que «ya no falta»');
+    assert.deepStrictEqual(regen(cfg).filter(x => ['dulce', 'roberto'].includes(x[1])), [], 'regenerar no lo retira');
+    assert.deepStrictEqual(porAus(cfg), ya);
+  }
+  { // 5) ya no está con nosotros desde el 1/10: su sitio sigue sin cubrir; lo que entró por él se queda
+    const cfg = monta(), ya = porAus(cfg), iv = M.personaDe(cfg.staff, 'ivan');
+    iv.salida = { desde: '2026-10-01' };
+    assert.strictEqual(M.faltaEn(cfg, iv, F3_VIE, 'T'), true);
+    assert.deepStrictEqual(pp(cfg), []);
+    assert.deepStrictEqual(regen(cfg).filter(x => ['dulce', 'roberto'].includes(x[1])), []);
+    assert.deepStrictEqual(porAus(cfg), ya);
+  }
+  { // 6) se quita la ausencia pero libra el domingo (un día libre de esa semana): el domingo sigue sin trabajar y no sobra nadie
+    const cfg = monta(), iv = M.personaDe(cfg.staff, 'ivan');
+    iv.ausencias = []; iv.libraPuntual = [{ semana: M.mondayOf(F3_DOM), dias: [M.isoDow(F3_DOM)] }];
+    assert.deepStrictEqual([M.faltaEn(cfg, iv, F3_VIE, 'T'), M.faltaEn(cfg, iv, F3_DOM, 'T')], [false, true]);
+    assert.ok(!pp(cfg).some(m => /domingo/.test(m)), JSON.stringify(pp(cfg)));
+    const ret = regen(cfg);
+    assert.ok(!ret.some(x => x[0] === F3_DOM), 'el domingo no se retira nada: ' + JSON.stringify(ret));
+    assert.ok(ret.some(x => x[0] === F3_VIE && x[1] === 'dulce'), 'el viernes, Iván ya no falta: ' + JSON.stringify(ret));
+  }
+  { // y cuando vuelve de verdad (sin ausencia, sin standby, sin salida), la Revisión y la retirada dicen lo mismo
+    const cfg = monta(), iv = M.personaDe(cfg.staff, 'ivan');
+    iv.ausencias = [];
+    assert.strictEqual(M.faltaEn(cfg, iv, F3_VIE, 'T'), false);
+    assert.ok(pp(cfg).some(m => /Roberto va por Iván, que ya no falta ese día/.test(m)), JSON.stringify(pp(cfg)));
+    assert.deepStrictEqual(regen(cfg).filter(x => ['dulce', 'roberto'].includes(x[1])).map(x => x[1]).sort(), ['dulce', 'dulce', 'roberto']);
+  }
+});
+
+ok('A5 · corrección M-H7 (fuzz IA5-porPresente-auto): la Revisión no señala «por-presente» en la plaza fija de la semana tipo con su «por» (D12: es un dato de la plaza): Noe «por Victoria» los miércoles sigue sin aviso aunque Victoria ya no libre ese día', () => {
+  const cfg = cfgDemo(), X = '2026-09-30';
+  assert.ok(M.asignados(sepDe(cfg), X, 'EL33_M').some(e => e.pid === 'noe' && e.por === 'victoria' && e.origen === 'patron'), 'preparado: la plaza fija del miércoles');
+  M.personaDe(cfg.staff, 'victoria').libra = [4];
+  const pp = () => M.revisionMes(cfg, cfg.staff, sepDe(cfg), { desde: X, hasta: X }).filter(x => x.tipo === 'por-presente');
+  assert.deepStrictEqual(pp().map(x => x.msg), []);
+  // lo que no es plaza fija sí se señala: Leo, a mano, «por Victoria» esa tarde en Pasarela
+  assert.ok(M.asignar(sepDe(cfg), cfg, cfg.staff, X, 'PASARELA_T', 'leo', { origen: 'manual', por: 'victoria', forzar: true }).ok);
+  assert.deepStrictEqual(pp().map(x => [x.turnoId, x.pid]), [['PASARELA_T', 'leo']]);
+});
+
+ok('A5 · corrección C-S1: quien entra en lugar de X sin tener la designación lleva «por Iván»; quien la tiene, «cubre a Iván»; lo mismo en el plan y en la planilla', () => {
+  const cfg = f3Escenario((c, st) => { M.personaDe(st, 'mariluz').cubreA = []; M.personaDe(st, 'dulce').cubreA = [{ pid: 'ivan' }]; });
+  const inc = A5_INC();
+  const A = a5Planes(cfg, inc, { desdeIso: A5R_HOY }).planes[0];
+  const de = (iso, pid) => A.asignaciones.find(a => a.iso === iso && a.pid === pid);
+  assert.ok(de(F3_VIE, 'dulce') && de(F3_DOM, 'roberto'), 'preparado: ' + a5rTxt(A));
+  assert.deepStrictEqual([de(F3_VIE, 'dulce').razones[0], de(F3_VIE, 'dulce').cubre, de(F3_VIE, 'dulce').por], ['cubre a Iván', true, 'ivan']);
+  assert.deepStrictEqual([de(F3_DOM, 'roberto').razones[0], de(F3_DOM, 'roberto').cubre, de(F3_DOM, 'roberto').por], ['por Iván', false, 'ivan']);
+  assert.ok(!de(F3_DOM, 'roberto').razones.includes('cubre a Iván'), JSON.stringify(de(F3_DOM, 'roberto').razones));
+  a5Aplicar(cfg, inc, A, { desdeIso: A5R_HOY });
+  const en = (iso, pid) => M.asignados(f3Mes(cfg, iso), iso, 'PASARELA_T').find(x => x.pid === pid);
+  assert.deepStrictEqual([en(F3_VIE, 'dulce').razon, en(F3_DOM, 'roberto').razon, en(F3_DOM, 'roberto').por], ['cubre a Iván', 'por Iván', 'ivan']);
+  assert.strictEqual(M.porDe(cfg.staff, en(F3_DOM, 'roberto')), 'ivan');
+});
+
+ok('A5 · corrección C-H2 y C-H3: en un cambio de turno con intercambio pedido, quien entra sin turno a cambio lo dice (sinIntercambio) y el plan cuenta los avisos del intercambio (avisosCambio: con aviso o sin turno a cambio); a igualdad, va primero el plan sin ellos', () => {
+  const monta = robertoTambien => {
+    const cfg = cfgDemo();
+    for (const iso of M.rangoIso('2026-09-28', '2026-10-18')) { const e = f3Mes(cfg, iso); for (const tid of Object.keys(e.asig[iso] || {})) delete e.asig[iso][tid]; if (e.manual) delete e.manual[iso]; }
+    for (const [d, id, c] of [['2026-10-06', 'cristian'], ['2026-10-06', 'adrian', 1], ['2026-10-10', 'sluna'], ['2026-10-10', 'leo']].concat(robertoTambien ? [['2026-10-13', 'roberto'], ['2026-10-13', 'adrian', 1]] : [])) assert.ok(M.asignar(f3Mes(cfg, d), cfg, cfg.staff, d, 'ZAPA_T', id, { cocina: !!c }).ok, id + ' ' + d);
+    return cfg;
+  };
+  const inc = { pid: 'cristian', tipo: 'CAMBIO', dias: ['2026-10-06'], desde: '2026-10-06', hasta: '2026-10-06' };
+  const lee = P => P.asignaciones.map(a => [a.pid, a.intercambio ? a.intercambio.avisos.length : null, !!a.sinIntercambio]);
+  { // Susana Luna con su sábado (que se queda sin nadie que abra) o Roberto sin nada a cambio: un aviso cada uno
+    const res = a5Planes(monta(false), inc, { desdeIso: A5R_HOY, intercambio: true, siempre: true });
+    assert.deepStrictEqual(res.planes.map(lee), [[['sluna', 2, false]], [['roberto', null, true]]]);
+    assert.deepStrictEqual(res.planes.map(P => P.avisosCambio), [1, 1]);
+    assert.deepStrictEqual(res.planes.map(P => [P.completo, P.avisos]), [[true, 0], [true, 0]], 'los avisos de la puerta, aparte');
+  }
+  { // si Roberto tiene un turno que Cristian puede hacer sin dejar nada corto, ese plan va primero aunque puntúe menos
+    const res = a5Planes(monta(true), inc, { desdeIso: A5R_HOY, intercambio: true, siempre: true });
+    assert.deepStrictEqual(res.planes.map(lee), [[['roberto', 0, false]], [['sluna', 2, false]]]);
+    assert.deepStrictEqual(res.planes.map(P => P.avisosCambio), [0, 1]);
+    assert.ok(res.planes[0].score < res.planes[1].score, 'preparado: por puntos iba primero Susana Luna');
+  }
+  { // sin intercambio pedido no hay nada que avisar
+    const res = a5Planes(monta(false), inc, { desdeIso: A5R_HOY, intercambio: false, siempre: true });
+    assert.ok(res.planes.every(P => !P.avisosCambio && P.asignaciones.every(a => !a.sinIntercambio)), JSON.stringify(res.planes.map(lee)));
+  }
+});
+
+ok('A5 · corrección (cliente, «no es de A5»): la casilla que sigue con más gente que el mínimo dice «3 (mínimo 2)», no «3 de 2»; con el mínimo justo, «2 de 2»', () => {
+  const cfg = cfgDemo(), V25 = '2026-09-25';
+  const res = a5Planes(cfg, { pid: 'juani', tipo: 'BAJ', dias: [V25], desde: V25, hasta: V25 }, { desdeIso: A5R_HOY });
+  assert.deepStrictEqual(res.planes[0].sinCubrir.map(s => s.motivo), ['la casilla sigue completa: 3 (mínimo 2)']);
+  const res2 = a5Planes(cfgDemo(), { pid: 'juani', tipo: 'BAJ', dias: ['2026-09-27'], desde: '2026-09-27', hasta: '2026-09-27' }, { desdeIso: A5R_HOY });
+  assert.deepStrictEqual(res2.planes[0].sinCubrir.map(s => s.motivo), ['la casilla sigue completa (2 de 2)']);
+});
+
+ok('A5 · corrección M-H8 (mutantes m1 y m3): al aplicar, quien entra «para llegar al mínimo» llevando la cocina que falta entra aunque la casilla tenga su mínimo; y el turno a cambio de un día ya pasado no se hace (ni el resto del cambio)', () => {
+  // m1: Adrián (la cocina de Zapatillera) falta el martes 6 por la tarde; quedan Susana Luna y Cristian, 2 de 2, sin cocina. Roberto
+  // entra «para llegar al mínimo» con la cocina (lo que hace el plan cuando el relevo ya cubre a quien falta)
+  const cfg = cfgBase(), oct = estadoOct(), D = '2026-10-06', T = 'ZAPA_T';
+  for (const [id, c] of [['adrian', 1], ['sluna'], ['cristian']]) assert.ok(M.asignar(oct, cfg, cfg.staff, D, T, id, { cocina: !!c }).ok, id);
+  const rv0 = (() => { const e = M.clonarEstado(oct); M.retirarEntrada(e, cfg, cfg.staff, D, T, 'adrian'); return M.revisarTurno(cfg, cfg.staff, e, D, T); })();
+  assert.ok(!rv0.faltan && rv0.sinCocina, 'preparado: sin Adrián la casilla tiene su mínimo y no tiene cocina: ' + JSON.stringify([rv0.n, rv0.minimo, rv0.sinCocina]));
+  const plan = { asignaciones: [{ iso: D, tid: T, pid: 'roberto', cocina: true, minimo: true, razon: 'para llegar al mínimo (había 2 de 2)', por: null, avisos: [] }] };
+  const r = M.aplicarCobertura(cfg, cfg.staff, oct, { pid: 'adrian', tipo: 'PERM', desde: D, hasta: D, dias: [D], franjas: ['T'] }, plan, { desdeIso: A5R_HOY });
+  assert.deepStrictEqual([r.rechazados, M.pidsEn(oct, D, T).includes('roberto'), M.revisarTurno(cfg, cfg.staff, oct, D, T).sinCocina], [[], true, false]);
+  // m3: el cambio de turno de Susana Luna del miércoles 7/10 calculado sin la fecha (a cambio, el martes 6 de Roberto) y aplicado
+  // con «hoy» el miércoles 7: el martes ya pasó; no se hace nada
+  const cfg3 = Object.assign(cfgBase(), { meses: {} });
+  const rg = M.rangoNecesario({ desde: '2026-10-07', hasta: '2026-10-07' });
+  const e3 = cieRango(cfg3, rg.desde, rg.hasta);
+  for (const [d, id, c] of [['2026-10-07', 'sluna'], ['2026-10-06', 'roberto'], ['2026-10-06', 'adrian', 1], ['2026-10-10', 'roberto'], ['2026-10-10', 'adrian', 1]]) assert.ok(M.asignar(e3, cfg3, cfg3.staff, d, 'ZAPA_T', id, { cocina: !!c }).ok, id + ' ' + d);
+  const cambio = { pid: 'sluna', tipo: 'CAMBIO', desde: '2026-10-07', hasta: '2026-10-07', dias: ['2026-10-07'] };
+  const P = M.planesCobertura(cfg3, cfg3.staff, M.clonarEstado(e3), cambio, { intercambio: true }).planes.find(x => x.asignaciones.some(a => a.pid === 'roberto' && a.intercambio && a.intercambio.iso === '2026-10-06'));
+  assert.ok(P, 'preparado: un plan con el turno a cambio del martes 6');
+  const antes = JSON.stringify(['2026-10-06', '2026-10-07'].map(d => M.asignados(e3, d, 'ZAPA_T')));
+  const r3 = M.aplicarCobertura(cfg3, cfg3.staff, e3, cambio, P, { desdeIso: '2026-10-07' });
+  assert.ok(r3.rechazados.some(x => x.iso === '2026-10-06' && x.motivo === 'ese día ya ha pasado'), JSON.stringify(r3.rechazados));
+  assert.strictEqual(JSON.stringify(['2026-10-06', '2026-10-07'].map(d => M.asignados(e3, d, 'ZAPA_T'))), antes, 'ni la mitad del cambio');
 });
 
 console.log(`\n${n} tests OK`);

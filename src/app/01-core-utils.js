@@ -51,6 +51,21 @@ function esc(s) { return String(s === undefined || s === null ? '' : s).replace(
 function initials(n) { const p = String(n || '').trim().split(/\s+/); return ((p[0] && p[0][0] || '') + (p[1] ? p[1][0] : '')).toUpperCase(); }
 function pl(n, sing, plur) { return `${n} ${n === 1 ? sing : plur}`; }
 function isoHoy() { return fechaMadrid(); }
+// 01/10 (corrección de A5; revisión de cliente H1): la hora de Madrid («20:00»). La Cobertura se la pasa al modelo con isoHoy()
+// (opts.ahoraHM) para que lo de hoy ya trabajado tampoco se toque: el modelo no mira el reloj
+function horaMadrid() {
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const g = t => p.find(x => x.type === t).value;
+  return `${g('hour')}:${g('minute')}`;
+}
+// 01/10 (corrección de A5): unos días en tramos seguidos, «del 22/9 al 24/9 y el 27/9» (fmt, cómo se escribe cada día; por
+// defecto «22/9»). La cabecera de la Cobertura decía los 70 días uno a uno
+function textoTramos(isos, fmt) {
+  const f = fmt || fmtDM, tr = [];
+  for (const iso of [...new Set(isos)].sort()) { const u = tr[tr.length - 1]; if (u && addDias(u[1], 1) === iso) u[1] = iso; else tr.push([iso, iso]); }
+  const xs = tr.map(([a, b]) => a === b ? `el ${f(a)}` : `del ${f(a)} al ${f(b)}`);
+  return xs.length > 1 ? xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1] : (xs[0] || '');
+}
 function fmtDM(iso) { return `${+iso.slice(8, 10)}/${+iso.slice(5, 7)}`; }
 function fmtDDMM(iso) { return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`; }   // «28/09», como lo escribe el grupo
 // cómo se deshace en este dispositivo: con teclado, Ctrl+Z; en el móvil no hay teclado y la barra

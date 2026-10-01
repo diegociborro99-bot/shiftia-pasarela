@@ -540,8 +540,13 @@ try {
   // 6b) Gestor de cobertura desde la planilla: en Semana, «Falta estos días…» sobre una persona abre la hoja
   //     con ese día marcado; plan A / plan B como «quién sale → quién entra»; confirmar aplica y vuelve a la semana
   await vista(pg, 'semana');
-  const cob = await pg.evaluate(ex => {   // una persona con turno esta semana (distinta de la puesta en Hoy) y su primer día
-    for (let k = 0; k < 7; k++) { const iso = addDias(S.semLunes, k); const e = estadoDeIso(iso); for (const t of turnosDe(S)) for (const pid of pidsEn(e, iso, t.id)) if (pid !== ex) return { pid, iso, tid: t.id }; }
+  // 01/10 (A5; auditoría F1): desde hoy (la hora de Madrid, isoHoy de la app): la Cobertura ya no cubre días ya trabajados, y con
+  // el reloj de verdad el lunes de la semana suele haber pasado (los turnos de antes de hoy van a «pasados», sin plan). La semana
+  // en pantalla es la de hoy (la de antes era la del apoyo de 2b, que puede ser ya pasada)
+  await pg.evaluate(() => { S.semLunes = mondayOf(isoHoy()); renderSemana(); });
+  const cob = await pg.evaluate(ex => {   // una persona con turno esta semana desde hoy (distinta de la puesta en Hoy) y su primer día
+    // (corrección de A5, cliente H1) y con la hora de Madrid: un turno de hoy ya terminado tampoco se cubre (por la tarde, la mañana)
+    for (let k = 0; k < 7; k++) { const iso = addDias(S.semLunes, k); if (iso < isoHoy()) continue; const e = estadoDeIso(iso); for (const t of turnosDe(S)) for (const pid of pidsEn(e, iso, t.id)) if (pid !== ex && !turnoYaPasado(S, iso, t.id, { desdeIso: isoHoy(), ahoraHM: horaMadrid() })) return { pid, iso, tid: t.id }; }
     return null;
   }, asig ? asig.pid : '');
   ok(`hay alguien con turno esta semana para la prueba (${cob && cob.pid} el ${cob && cob.iso})`, !!cob, JSON.stringify(cob));
