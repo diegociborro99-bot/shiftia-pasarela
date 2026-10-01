@@ -706,7 +706,16 @@ const server = http.createServer(async (req, res) => {
         // (revisión S0) la misma comprobación que darSalida: con «2026-13-01» toISOString lanzaba y el PUT daba 500 en vez de 400
         const fechaIso = s => M.fechaIsoValida(s);
         const salidaBien = x => x === undefined || x === null || (!!x && typeof x === 'object' && !Array.isArray(x) && fechaIso(x.desde) && (x.motivo === undefined || typeof x.motivo === 'string'));
-        const fichaBien = p => ['nuncaCon', 'nuncaConFlex', 'nuncaConOff'].every(k => ids(p[k])) && (p.localHabitual === undefined || p.localHabitual === null || typeof p.localHabitual === 'string') && salidaBien(p.salida);
+        // 01/10 (A7; revisión de modelo de A6, S3) y las listas de la ficha que recorre la app (Equipo, el Mes, la Semana, Horas):
+        // ausente, null o una lista sin nulls; las ausencias, además, objetos. «ausencias: "ups"» o «locales: "ups"» entraban y la
+        // app no pintaba Equipo ni el Mes. libraPuntual no se mira aquí: la de antes de D9 es un objeto y sigue valiendo
+        const listaSinNull = v => v === undefined || v === null || (Array.isArray(v) && v.every(x => x !== null && x !== undefined));
+        // (01/10, corrección de A7; revisión de modelo S-1) y, un nivel más abajo, solo lo que tumbaba una vista: cada ausencia con su
+        // «desde» (una fecha: Equipo la parte con slice) y el nombre de la ficha, un texto (Horas ordena por él). Las 310 versiones
+        // guardadas en las bases y los 54 PUT de estados válidos de la revisión siguen entrando
+        const listasFicha = p => ['locales', 'franjas', 'libra', 'vetos', 'cubreA', 'noAbre', 'noPrimero', 'inactivas', 'ausencias'].every(k => listaSinNull(p[k]))
+          && (!Array.isArray(p.ausencias) || p.ausencias.every(a => !!a && typeof a === 'object' && !Array.isArray(a) && fechaIso(a.desde)));
+        const fichaBien = p => typeof p.nombre === 'string' && ['nuncaCon', 'nuncaConFlex', 'nuncaConOff'].every(k => ids(p[k])) && (p.localHabitual === undefined || p.localHabitual === null || typeof p.localHabitual === 'string') && salidaBien(p.salida) && listasFicha(p);
         // 01/10 (A6; auditoría G8): cada clave de la planilla, con su forma (lista u objeto), de la lista del modelo
         // (CLAVES_PLANILLA, la misma que la huella de la app; ahora también la semana tipo, los equipos, los meses cerrados y las
         // reglas del grupo: un `reglas: "ups"` dejaba a la app sin poder leer ninguna); aquí, lo que no es la planilla
@@ -765,7 +774,9 @@ const server = http.createServer(async (req, res) => {
         json(res, 200, { version: f.version, actualizado: f.actualizado, usuario: f.usuario, estado: estadoV });
         return;
       }
-      json(res, 200, { versiones: db.prepare('SELECT version,actualizado,usuario,length(json) AS bytes FROM estado_hist ORDER BY version DESC').all() });
+      // (01/10, corrección de A7; revisión de cliente B10) y cuántas guarda como mucho (HIST_MAX): Cuenta decía «guarda las últimas 4» (las
+      // que había) encima de «las últimas 60»
+      json(res, 200, { versiones: db.prepare('SELECT version,actualizado,usuario,length(json) AS bytes FROM estado_hist ORDER BY version DESC').all(), max: HIST_MAX });
       return;
     }
     // 30/09 (S0; Diego: «restaura en la aplicación el trabajador eliminado»): las personas borradas del todo. Se recorren

@@ -1,7 +1,62 @@
 # Changelog — Shiftia · Grupo Pasarela
 
-## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
+## v0.6.0 · 17/09 – 01/10/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **Lo que ya no puede estar en su sitio se ve, lo ya trabajado no se toca y la Revisión aparta lo pasado (01/10).** Lo que se
+  nota:
+  - **Volver a generar «Solo desde hoy» mira la hora**, como la Cobertura y Equipo. A las cinco y media de la tarde, la mañana de
+    hoy ya está trabajada: el Generador ni quita ni pone a nadie en ella, y sus horas se quedan. Antes, si a media tarde le
+    ponías a Tere «solo Bar Mónaco» y volvías a generar la semana, salía también de la mañana que ya había hecho y perdía esas
+    ocho horas en Horas. Lo mismo con la vista previa que vuelcas un rato después y con el Núcleo. La opción lo dice: «Solo desde
+    hoy · no toca lo ya trabajado: ni los días pasados ni el turno de hoy que ya ha terminado».
+  - **Hoy, la Semana y el Mes marcan a quien ya no puede estar donde está**, con la misma marca roja que lo forzado. Si pusiste a
+    Leo a mano en Pasarela por la tarde y luego le apuntas «no hace tardes en Pasarela», su ficha lleva el «!» y dice qué hacer:
+    «Puesta a mano: ya no puede estar aquí (no hace tardes en Pasarela). No se quita sola: quítala tú». Si la puso la semana
+    tipo o el Generador: «Ya no puede estar aquí (solo Bar Mónaco): sale al volver a generar la semana». Con un «nunca con» entre
+    dos que puso la app (la semana tipo o el Generador), la marca solo la lleva la que sale al volver a generar (la otra se queda: en el Mónaco, la de la
+    cocina). Lo ya trabajado no lleva marca: nada lo va a cambiar. En el móvil, al tocar la ficha, el menú dice la frase entera.
+  - **El «!» de lo forzado dice qué se saltó**: «Puesta a la fuerza: se salta «libra los miércoles» y «nunca con Lavinia…»». Si
+    después le apuntas unas vacaciones esos días, eso no se forzó: sale en rojo y dice que la quites.
+  - **La Revisión pone en rojo lo que ya no puede estar** («Hay que resolver»), con qué hacer: «Tere: solo Bar Mónaco — sale al
+    volver a generar la semana». Lo mismo en varios días de un turno va en una línea, con los días: «Pasarela · mañanas del jue
+    15 al vie 16, del lun 19 al vie 23 y del lun 26 al vie 30: Tere: solo Bar Mónaco — sale al volver a generar la semana». Una pareja que no puede coincidir sale siempre en el mismo
+    orden y dice quién sale al volver a generar (o, si las dos están puestas a mano, que quites a una).
+  - **Lo ya trabajado va aparte, al final y en gris** («Ya pasado · para que lo sepas»), también lo de hoy que ya ha terminado:
+    un «nunca con» que pones hoy ya no llena «Hay que resolver» de días de hace dos semanas, y un hueco de esta mañana, a las
+    ocho de la tarde, ya no sale en rojo. El título cuenta aparte lo pasado («8 cosas que mirar (y 5 ya pasadas)») y el punto
+    rojo de arriba solo cuenta lo de hoy en adelante. En el móvil la explicación de los colores va plegada y la «×» va en su
+    barra, arriba, sin taparte los botones de fecha; en el modo oscuro lo pasado se ve apagado de verdad.
+  - **Quitar la cocina a mano es tuyo.** Si le quitas la marca de cocina a alguien, la app te dice lo que significa («sin cocina,
+    porque la has quitado tú. Nada de lo automático la vuelve a poner; Hojan, que solo hace cocina, se queda de sala») y lo
+    cumple: ni volver a generar la semana, ni la Cobertura, ni el apoyo de un cierre, ni el Núcleo ponen a nadie «para la
+    cocina» en ese turno, y en Hoy la ★ y el selector ya no te recomiendan a Hojan «para la cocina» ahí (el selector dice
+    «Cocina · quitada a mano»). En el Mónaco, donde la cocina es obligatoria, la Revisión lo pone en ámbar, «sin cocina (quitada a
+    mano)», y el Generador no lo cuenta como hueco. Y si esa semana alguien libra otro día, su otro turno ya no se queda vacío
+    por eso.
+  - **Hojan de sala** («solo hace cocina») lleva en Hoy un aviso en ámbar (⚠), como en la Revisión. Si generas sin semana tipo y
+    luego con ella, y la semana tipo le quita la cocina a quien solo hace cocina, esa persona sale de ese turno (lo dice «Se
+    retira») y el turno se completa con otra; antes se quedaba de sala y la tarde se quedaba sin cocina.
+  - **Equipo y el Mes con la hora.** Si a las ocho de la tarde apuntas que Adrián se ha puesto malo hoy, nadie entra en su
+    mañana, que ya se trabajó («Hoy, la mañana ya ha terminado: Adrián sale de ese turno, pero no se pone a nadie en su sitio»), y
+    te pregunta: «¿Trabajó la mañana de hoy? Apunta hoy la ausencia solo por la tarde». Al quitar un día de una ausencia desde el
+    Mes, dice quién entró por ella («Roberto entró por Susana Luna el dom 18: sale al volver a generar la semana, o quítalo
+    ahora»); y si ese día ya pasó, lo que hay que hacer a mano: «Ya ha pasado el dom 18: si trabajó Susana Luna, ponle su turno a
+    mano y quita a Roberto». Igual desde Equipo.
+  - **Un cierre de domingos sueltos** dice en Hoy hasta cuándo cierra ese domingo («Cerrado · inventario (hasta dom 18)»), no el
+    último domingo del cierre («hasta dom 01»). Con dos cierres el mismo día (El 33 por la mañana y el Mónaco por la tarde), el
+    Mes dice los dos; y quien ese día tiene vacaciones por la mañana y por la tarde sale «VAC», no «VAC+VAC» (con dos cosas
+    distintas, cada una con su franja: «PERM·M+VAC·T»).
+  - **El servidor no guarda una planilla rota** que dejaría la app sin poder abrir el Mes, Equipo u Horas (un bar en blanco, un
+    turno roto, una ausencia sin fecha, una persona sin nombre…). Todo lo que guarda la app, también lo de antes, sigue entrando
+    igual.
+  - **Lo pequeño.** En Entrevistas, una fecha que no existe (30 de febrero) ya no ordena donde no toca, «5 de mayo 2026» se lee
+    con su año y «5 de mayo 1730» (la hora pegada) con el de la última vez; «1/1/99» ya no es 2099. En el móvil, la casilla de
+    marcar de las opciones del Generador y de la Cobertura va a la altura de la primera línea del texto. Los avisos largos se
+    quedan más tiempo en pantalla (sin tapar los botones de debajo). Plurales de verdad («5 avisos importantes», «1 plaza retirada»). En
+    Cuenta, cuántas versiones guarda el servidor (las últimas 60) y las personas borradas sin «borrada» ni «recuperada» («se
+    borró el 1/10», «Se ha recuperado a Adrián»); en la Revisión, «Mari Luz, a la fuerza». En la planilla de prueba (la que trae la
+    app al estrenarla; la vuestra no cambia), Zapatillera tiene a Adrián y Susi de titulares de cocina y a Roberto y Hojan de
+    reserva, y el Mónaco a Maydeth, como dicen sus fichas. La app pasa a la versión 0.6.0.
 - **El turno continuo con horas a mano cuenta bien, el Núcleo no deja dos apoyos solos, al móvil del empleado solo le llega lo
   suyo y «forzar» dice todas las reglas (01/10).** Lo que se nota:
   - **Horas del turno continuo** (abre la mañana y la tarde del mismo bar, de corrido). Si apuntas a mano en una de las dos
@@ -116,9 +171,8 @@
     turno lo dice en vez de volver sin más.
   - **Dos apoyos no se quedan solos, tampoco en la cocina.**
   - **Quien está en standby** solo tiene en el Generador la condición «aún no entra en la planilla».
-  (Auditoría del modelo del 25/09, fase A4, y su corrección del 01/10.)
 - **Los cierres por fechas y la semana tipo: editar un cierre, guardar la semana tipo con el Mónaco cerrado y los textos del
-  visor (30/09; auditoría del modelo del 25/09, fase A3).** Lo que se nota:
+  visor (30/09).** Lo que se nota:
   - **Editar un cierre** hecho antes de generar la semana (cambiarle el detalle, acortarlo, volver a marcar el día en «Cuándo
     abre») ya no pierde lo decidido: Susana sigue de vacaciones, Cristian sin trabajo y Yilian de apoyo. Antes, con la semana
     ya generada, el visor no encontraba a nadie en la casilla cerrada y se quitaban las vacaciones sin reponerlas.
@@ -128,8 +182,9 @@
     semana tipo vacía de jueves a domingo sin decirlo) y de los «Sale primero» a mano que no van a mandar (Mari Luz frente a
     Lola, que es «Quién abre» de Pasarela); el historial lo apunta.
   - **El visor del cierre** dice lo que pasa de verdad con las vacaciones o el día libre de quien ese día tiene otro turno:
-    «lun 28: ese día también trabaja en El 33 por la mañana, así que las vacaciones son solo de la tarde» (antes decía que no
-    se le ponían y que la parte cerrada contaba como sin trabajo, y no era así). «Ver cierre» enseña la media jornada
+    «El lunes 28 también hace El 33 por la mañana (hacía partido: se queda con su mañana en El 33 de 11:00 a 16:00), así
+    que las vacaciones son solo de la tarde» (antes decía que no se le ponían y que la parte cerrada contaba como sin
+    trabajo, y no era así). «Ver cierre» enseña la media jornada
     («lun 28 (solo la tarde)») y «no se pudo poner» solo cuando ese día ya estaba ausente.
   - Quien esa semana libra otro día ya no sale «sin trabajo por el cierre» en Horas ni en la Semana sin que el visor haya
     preguntado por él; al editar, quien no pudo volver a su casilla (se le forzó en otra) tiene destino de apoyo («ya está
@@ -138,7 +193,7 @@
     guarda (se decía en cada generación); el visor rechaza fechas que no existen (30/02) y franjas repetidas; «los domingos
     del 27/09 al 18/10» solo cuando los cuatro son iguales (si uno es entero, se enumeran); al reabrir, las vacaciones propias
     con las que se fundieron las del cierre se quedan con su detalle (sin el «cierre de Bar Mónaco · reforma» pegado).
-  - **Tras la revisión de A3 (30/09):** al **acortar o reabrir** un cierre hecho antes de generar, la casilla que vuelve a
+  - **Y después de repasarlo (30/09):** al **acortar o reabrir** un cierre hecho antes de generar, la casilla que vuelve a
     abrir recupera a los suyos de la semana tipo (Susana Capón y Cristian el martes 3) y el resumen, el toast y el historial lo
     dicen (antes se quedaba vacía sin avisar); al editar **añadiendo una franja** (la mañana) se lee la planilla de esa mañana
     (quien estaba sale; quien no, no recibe «sin trabajo»); quien pasa a tener plaza en la casilla cerrada después de cerrar
@@ -153,7 +208,7 @@
     retiradas»; con dos cierres del Mónaco por reforma, reabrir uno no borra el «cierre de Bar Mónaco · reforma» del otro; y
     «Guardar como semana tipo» con el local cerrado no repone a quien ya no está con nosotros ni a quien está en standby.
 - **Las ausencias: un día suelto de una baja sin fecha de fin, las bajas que se pisan y las medias jornadas
-  (30/09; auditoría del modelo del 25/09, fase A2).** Lo que se nota:
+  (30/09).** Lo que se nota:
   - **«Quitar la ausencia de este día»** en el Mes sobre una baja sin fecha de fin (Laura, Maydeth, Susi) quita solo ese
     día y la baja sigue antes y después; la app lo dice antes («Laura está de baja desde el 1/9 sin fecha de fin: se quita
     solo el 15/10…») y así queda en el historial. Antes, en un día posterior no cambiaba nada (y el historial decía que sí)
@@ -189,7 +244,7 @@
     en vez de colgar la pestaña; un cambio de día libre que llega con la semana en un día que no es lunes, con los días
     como texto o repetidos se arregla al cargar; y un veto guardado con el día como texto se reconoce igual.
 - **La casilla decide sola quién abre y quién lleva la cocina, y lo vuelve a decidir cuando cambia algo del día
-  (30/09; auditoría del modelo del 25/09, fase A1).** Lo que se nota:
+  (30/09).** Lo que se nota:
   - Lo que dice Hoy de quién abre es lo mismo que dicen el Mes, el Excel, Horas y la app del empleado, también
     después de generar sin semana tipo, de una Cobertura, de apuntar una ausencia en Equipo o de cambiar un día
     libre: poner o quitar a alguien en una mañana vuelve a mirar su tarde (si viene de la mañana ya no abre la tarde,
@@ -255,11 +310,10 @@
     retomar su planilla»): en Cuenta, «Personas borradas» lista a quien está en alguna versión anterior del servidor y
     no en la de ahora; «Recuperar» vuelve a poner su ficha (como «ya no está con nosotros» desde el día en que se
     borró) y sus turnos de antes de ese día, sin tocar nada más, y todos los dispositivos lo ven.
-  - Dos arreglos de la auditoría del 25/09 que hacían falta para esto: quitar la única plaza de un día ya no
-    «desengancha» ese día de la planilla guardada (una Cobertura sobre el único turno del día llegaba a la pantalla y
-    no al servidor, B2/H1), y el tramo del partido del sábado con horario propio solo para la mañana ya no cuenta la
-    tarde con las ocho horas de apertura (G1).
-  - **Revisión de S0 (30/09), lo que se nota tras las dos revisiones (modelo y cliente):** en el móvil, «Ya no está
+  - Dos arreglos que hacían falta para esto: quitar la única plaza de un día ya no «desengancha» ese día de la planilla
+    guardada (una Cobertura sobre el único turno del día llegaba a la pantalla y no al servidor), y el tramo del partido
+    del sábado con horario propio solo para la mañana ya no cuenta la tarde con las ocho horas de apertura.
+  - **Y después de repasarlo (30/09):** en el móvil, «Ya no está
     con nosotros…» y «Confirmar» responden al primer toque (el sitio para el teclado sale ahora de lo que el teclado
     tapa de verdad, no del foco de un campo: al tocar un botón la tarjeta encogía y el botón se movía bajo el dedo);
     el pie de la ficha (con ese botón y «Listo») va pegado abajo y se ve sin bajar 3.000 px. Las ausencias apuntadas
@@ -280,7 +334,7 @@
     a mano de entonces en sus casillas; Cuenta dice que el servidor guarda las últimas 60 versiones. Con servidor, el
     empleado que ya no está no puede tampoco cambiar la contraseña, pedir la clave push ni abrir el canal de eventos
     con la sesión abierta (solo salir y ver la versión), y una fecha de salida imposible (mes 13) da 400, no un error
-    interno. `darSalida` exige la fecha en AAAA-MM-DD.
+    interno. Una fecha de salida mal escrita no se guarda.
 - **Revisión final de todo lo del 24/09 (25/09).** Tres revisiones con el caso completo (el Mónaco cerrado del
   domingo 27 por la tarde al martes 29, Mari Luz libra el martes 29, «cubre a Iván» y sus vacaciones del 2 al 4 por
   la tarde), con la base de datos de producción abierta con la versión nueva y con el servidor. Lo que se arregla:

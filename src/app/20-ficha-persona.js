@@ -153,7 +153,7 @@ function openFicha(pid, opts) {
        <span class="addrow addrow3">${selPersonas('fCubreP')}${selDia('id="fCubreD"')}${selTurno('id="fCubreT"')}<button type="button" class="btn-mini" data-addcubre>Añadir</button></span>`));
     // 24/09 (fase 6, S30): el veto con su día («no hace mañanas los lunes») y el alta con el día; repetido es el mismo
     // local, franja y día (vetoRepetido), o uno de todos los días que ya lo cubre
-    h += sec('vetos', 'Vetos', subOff('vetos', p.vetos.length ? `${p.vetos.length} franja(s) que no hace` : 'ninguno'),
+    h += sec('vetos', 'Vetos', subOff('vetos', p.vetos.length ? pl(p.vetos.length, 'franja que no hace', 'franjas que no hace') : 'ninguno'),
       car('vetos', '', '', (p.vetos.map((v, i) => fila(`<i class="ldot" style="--lc:${esc(colorLocal(v.localId))}"></i>${esc(nombreLocal(v.localId))}`, esc(textoVeto(v)), '', `data-rmveto="${i}"`)).join('') || '<div class="festvacio">Sin vetos: puede ir a cualquier franja de sus locales.</div>') +
       `<span class="addrow"><select class="logininp" id="fVetoL" data-libre>${S.locales.map(l => `<option value="${esc(l.id)}">${esc(l.nombre)}</option>`).join('')}</select><select class="logininp" id="fVetoF" data-libre>${FRANJAS.map(f => `<option value="${f}">${FRANJA_LBL[f]}s</option>`).join('')}</select>${selDia('id="fVetoD" aria-label="Qué día"')}<button type="button" class="btn-mini" data-addveto>Añadir veto</button></span>`));
     // 24/09 (fase 6, S17 y D6): sin interruptor. Lo compara el contador de horas; el Generador no reparte según él
@@ -163,7 +163,7 @@ function openFicha(pid, opts) {
     h += sec('prefs', 'Preferencias', subOff('prefs', 'no bloquean: el generador las respeta al priorizar'),
       car('prefs', '', '', `<div class="pinlbl">Prefiere no trabajar los…</div><div class="dowset">${dowSet(p.prefs.evitaDows || [], 'tevita')}</div>
        <label class="pinlbl">Criterio personal<input type="text" class="logininp" data-txt="prefsNota" data-libre value="${esc(p.prefs.nota || '')}" placeholder="p. ej. concilia los lunes"></label>`));
-    h += sec('aus', 'Ausencias', p.ausencias.length ? `${p.ausencias.length} registrada(s)` : 'ninguna',
+    h += sec('aus', 'Ausencias', p.ausencias.length ? pl(p.ausencias.length, 'registrada', 'registradas') : 'ninguna',
       // (revisión de A2, cliente 6) «Permiso el 8/10 por la mañana» para un día; «del 1/10 al 20/10»; «del 28/9 sin fecha de fin»
       (p.ausencias.map((a, i) => fila(`<span class="abschip a-${esc(a.tipo)}">${esc((AUS_LBL[a.tipo] || { label: a.tipo }).label)}</span> ${a.hasta === a.desde ? 'el ' + fmtDM(a.desde) : 'del ' + fmtDM(a.desde) + (a.hasta ? ' al ' + fmtDM(a.hasta) : ' sin fecha de fin')}${esc(textoFranjasAusencia(a))}`, esc(a.detalle || ''), '', `data-rmaus="${i}"`)).join('') || '<div class="festvacio">Sin ausencias registradas.</div>') +
       `<div class="absform ausalta" style="display:grid">
@@ -173,7 +173,7 @@ function openFicha(pid, opts) {
         <span><label>Hasta <small>(en blanco: un día; una baja, sin fin)</small></label><input type="date" id="fAusD2" data-libre value="${isoHoy()}"></span></div>
         <div class="row2"><span><label>Cuándo</label>${selFranjaAusencia('id="fAusFr"', p)}</span><span></span></div>
         <div class="bar"><button type="button" class="btn-mini" data-addaus>Guardar ausencia</button></div></div>`);
-    h += sec('notas', 'Notas y supuestos', p.supuestos.length ? `${p.supuestos.length} supuesto(s) por confirmar` : 'sin supuestos',
+    h += sec('notas', 'Notas y supuestos', p.supuestos.length ? pl(p.supuestos.length, 'supuesto por confirmar', 'supuestos por confirmar') : 'sin supuestos',
       `<label class="pinlbl">Nota <small>(lo que hay que saber de esta persona, con sus palabras)</small><textarea class="logininp" rows="3" data-txt="nota" data-libre>${esc(p.nota || '')}</textarea></label>
        <div class="pinlbl">Supuestos <small>(decisiones de Highkey pendientes de confirmar con el grupo)</small></div>
        ${p.supuestos.map((s, i) => fila(`<span class="ficb warn">SUPUESTO</span> ${esc(s)}`, '', '', `data-rmsup="${i}"`)).join('') || '<div class="festvacio">Nada por confirmar.</div>'}
@@ -441,7 +441,7 @@ function cambiarDiaLibreUI(pid, lunes, dias) {
   const r = volcar ? moverDiaLibre(S, S.staff, real, pid, l0, dias, { desdeIso, meses: S.meses }) : null;
   if (!volcar) ponerLibraPuntual(p, l0, dias);
   const nRech = r ? r.rechazados.length : 0;
-  registrarCambio(`Ficha de ${p.nombre}: ${dias.length ? `la semana del ${fmtDDMM(l0)} ${textoCambioLibre(p, { semana: l0, dias })}` : `la semana del ${fmtDDMM(l0)} vuelve a su día libre de siempre`}${r ? ` · planilla: ${r.quitados.length} plaza(s) fuera, ${r.puestos.length} dentro${r.huecos.length ? `, ${r.huecos.length} hueco(s) por cubrir` : ''}${nRech ? `, ${nRech} que no se ${nRech === 1 ? 'pudo' : 'pudieron'} poner (${r.rechazados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${r.avisos.length ? ` · ${r.avisos.map(a => a.texto).join(' · ')}` : ''}` : ''}`, 'equipo');
+  registrarCambio(`Ficha de ${p.nombre}: ${dias.length ? `la semana del ${fmtDDMM(l0)} ${textoCambioLibre(p, { semana: l0, dias })}` : `la semana del ${fmtDDMM(l0)} vuelve a su día libre de siempre`}${r ? ` · planilla: ${pl(r.quitados.length, 'plaza fuera', 'plazas fuera')}, ${r.puestos.length} dentro${r.huecos.length ? `, ${pl(r.huecos.length, 'hueco por cubrir', 'huecos por cubrir')}` : ''}${nRech ? `, ${nRech} que no se ${nRech === 1 ? 'pudo' : 'pudieron'} poner (${r.rechazados.map(x => `${nombrePid(x.pid)} el ${fmtDM(x.iso)}: ${x.motivo}`).join('; ')})` : ''}${r.avisos.length ? ` · ${r.avisos.map(a => a.texto).join(' · ')}` : ''}` : ''}`, 'equipo');
   saveState();
   if (typeof GEN !== 'undefined' && GEN.previa && GEN.previa.semana && GEN.lunes === l0) GEN.previa = null;   // la vista previa de esa semana ya no vale
   if (r) toast(`${p.nombre}: la semana del ${fmtDDMM(l0)} ya está cambiada en la planilla${r.huecos.length ? ` · ${pl(r.huecos.length, 'hueco', 'huecos')} por cubrir` : ''}${nRech ? ` · ${nRech === 1 ? 'una plaza no se pudo poner' : `${nRech} plazas no se pudieron poner`}` : ''} · ${comoDeshacer()} para deshacer`, r.huecos.length || nRech ? 'warn' : 'ok');

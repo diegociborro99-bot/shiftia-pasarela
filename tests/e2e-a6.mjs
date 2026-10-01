@@ -237,8 +237,8 @@ try {
       const zapa = ls.find(l => /^Zapatillera · mañana/.test(l)) || '', pas = ls.filter(l => /^Pasarela · tarde/.test(l));
       // (corrección de A6; revisión de cliente H2 y H4) «1 asignación forzada a mano — Mari Luz, puesto a la fuerza ("su motivo"): …», y el
       // partido de ese día una sola vez (en la primera casilla de las dos, con sus franjas y sus locales)
-      ok('la Revisión nombra el partido del día que libra en la mañana de Zapatillera, una vez y con las dos franjas, y el motivo escrito al forzar', /: 1 asignación forzada a mano — Mari Luz, puesto a la fuerza \(“prueba A6”\): solo Pasarela, libra los miércoles, no hace partido los miércoles \(mañana en Zapatillera y tarde en Pasarela\)/.test(zapa), zapa);
-      ok('y en la tarde de Pasarela la pareja «nunca con» flexible sale una vez, con lo forzado de Mari Luz (no también en Lavinia), sin repetir el partido', pas.length === 1 && (pas[0].match(/nunca con/g) || []).length === 1 && /: 1 asignación forzada a mano — Mari Luz, puesto a la fuerza \(“prueba A6”\): libra los miércoles, nunca con Lavinia \(pareja flexible/.test(pas[0]) && !/no hace partido/.test(pas[0]), j(pas));
+      ok('la Revisión nombra el partido del día que libra en la mañana de Zapatillera, una vez y con las dos franjas, y el motivo escrito al forzar', /: 1 asignación forzada a mano — Mari Luz, a la fuerza \(“prueba A6”\): solo Pasarela, libra los miércoles, no hace partido los miércoles \(mañana en Zapatillera y tarde en Pasarela\)/.test(zapa), zapa);
+      ok('y en la tarde de Pasarela la pareja «nunca con» flexible sale una vez, con lo forzado de Mari Luz (no también en Lavinia), sin repetir el partido', pas.length === 1 && (pas[0].match(/nunca con/g) || []).length === 1 && /: 1 asignación forzada a mano — Mari Luz, a la fuerza \(“prueba A6”\): libra los miércoles, nunca con Lavinia \(pareja flexible/.test(pas[0]) && !/no hace partido/.test(pas[0]), j(pas));
     });
     await pg.context().close();
   }

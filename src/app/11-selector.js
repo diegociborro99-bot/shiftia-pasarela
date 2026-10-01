@@ -47,7 +47,8 @@ function openPicker(iso, tid, anchor) {
     const vNo = noPueden.filter(x => pasa(x.nombre));
     if (n && !vCoc.length && !vOk.length && !vAviso.length && !vNo.length) return `<div class="pgroup">No hay nadie con ese nombre</div>`;
     const recCoc = !n && vCoc.length > 0;
-    return `${vCoc.length ? `<div class="pgroup">COCINA · ${vCoc.length} <small>la casilla no tiene cocina</small></div>${vCoc.map((c, i) => fila(c, `coc${recCoc && i === 0 ? ' rec' : ''}`, c.razones.join(' · '), ' data-cocina="1"')).join('')}` : ''}
+    // (corrección de A7; revisión de cliente H5) la cocina que quitó el encargado a mano: no se recomienda a nadie para ella; se dice
+    return `${g.cocinaQuitada && !n ? '<div class="pgroup">COCINA · quitada a mano <small>nadie la lleva aquí: lo has decidido tú</small></div>' : ''}${vCoc.length ? `<div class="pgroup">COCINA · ${vCoc.length} <small>la casilla no tiene cocina</small></div>${vCoc.map((c, i) => fila(c, `coc${recCoc && i === 0 ? ' rec' : ''}`, c.razones.join(' · '), ' data-cocina="1"')).join('')}` : ''}
       ${vOk.length ? `<div class="pgroup">PUEDEN · ${vOk.length}</div>${vOk.map((c, i) => fila(c, !n && !recCoc && i === 0 ? 'rec' : '', c.razones.join(' · '))).join('')}` : (n || vCoc.length ? '' : '<div class="pgroup">NADIE PUEDE SIN ROMPER NADA</div>')}
       ${vAviso.length ? `<div class="pgroup">CON AVISO · ${vAviso.length}</div>${vAviso.map(c => fila(c, c.cocina ? 'aviso coc' : 'aviso', c.razones.join(' · '), c.cocina ? ' data-aviso="1" data-cocina="1"' : ' data-aviso="1"')).join('')}` : ''}
       ${vNo.length ? `<div class="pgroup">NO PUEDEN · ${vNo.length}</div>${vNo.map(filaNo).join('')}` : ''}`;
@@ -89,7 +90,7 @@ function openPicker(iso, tid, anchor) {
       pushUndo(`forzar a ${nombrePid(pid)}`);
       const puesto = rr.cocina ? { puesto: 'cocina', cocina: true } : { puesto: 'sala' };
       const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', forzar: true, permitirPartido: true, razon: motivo.trim() || RAZON_FORZADO }, puesto));
-      if (res.ok) { closePicker(); renderVistaActiva(); toast(`${nombrePid(pid)} puesto a la fuerza · incumple ${conSuRegla(res.avisos, inc)}`, 'warn'); }
+      if (res.ok) { closePicker(); renderVistaActiva(); toast(`Se ha puesto a ${nombrePid(pid)} a la fuerza · incumple ${conSuRegla(res.avisos, inc)}`, 'warn'); }   // (corrección de A7; B5) sin género
       else { undoStack.pop(); actualizarUndoBtn(); toast(`${nombreRegla(res.regla)} — ${res.motivo}`, 'bad'); }
       return;
     }
@@ -123,10 +124,23 @@ function ponerRecomendadoUI(iso, tid, pid, c, conAviso) {
   // Cobertura, volcar el Generador o aceptar su propuesta «con aviso»
   const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', razon: c ? c.razones.join(' · ') : 'recomendado' }, conAviso ? RELAJABLE : {}, puesto, cub));
   if (!res.ok) { undoStack.pop(); actualizarUndoBtn(); toast(res.motivo, 'bad'); return res; }
-  toast(res.avisos.length ? `${nombrePid(pid)} añadido con aviso: ${res.avisos.join(', ')}` : `${nombrePid(pid)} añadido`, res.avisos.length ? 'warn' : 'ok');
+  // (corrección de A7; revisión de cliente B5) sin género, que no se sabe: «Lavinia añadido»
+  toast(res.avisos.length ? `Se ha añadido a ${nombrePid(pid)}, con aviso: ${res.avisos.join(', ')}` : `Se ha añadido a ${nombrePid(pid)}`, res.avisos.length ? 'warn' : 'ok');
   return res;
 }
 // menú de una persona ya sentada en la casilla: ficha, orden, abre, cocina, quitar
+// 01/10 (corrección de A7; revisión de cliente H3): en el móvil, tocar la ficha con «!» abre este menú, no el título del «!»: el menú
+// lleva la frase entera de la marca (textoIncumple: qué incumple y qué hacer), en rojo si ya no puede estar ahí (una regla dura) y
+// en ámbar si se forzó; lo demás que incumple (lo blando: un partido no declarado, la cocina…), en «Incumple …» como siempre. Antes
+// solo decía «Incumple no hace tardes en Pasarela», sin qué hacer
+function htmlIncumpleMenu(s, avisosAhora, iso, tid) {
+  const marca = s && s.pid ? textoIncumple(s, iso, tid) : '';
+  const dichos = marca ? (s.forzado ? s.avisos || [] : s.duras || []) : [];
+  const resto = avisosAhora.filter(a => !dichos.includes(a));
+  // en rojo lo que ya no puede estar (también lo duro que no se forzó de una forzada: revisión de modelo B-4); lo forzado, en ámbar
+  const rojo = marca && (!s.forzado || ((s.duras || []).length > 0 && !turnoTrabajado(iso, tid)));
+  return (marca ? `<br><small data-incumple style="color:var(--${rojo ? 'bad' : 'warn'})">${esc(marca)}</small>` : '') + (resto.length ? `<br><small style="color:var(--warn)">Incumple ${esc(resto.join(' · '))}</small>` : '');
+}
 function openMenuTurno(iso, tid, pid, anchor) {
   cerrarPops();
   const e = estadoDeIso(iso);
@@ -153,7 +167,7 @@ function openMenuTurno(iso, tid, pid, anchor) {
   const pop = document.createElement('div');
   pop.className = 'pop'; pop.id = 'menuTurnoPop'; pop.setAttribute('role', 'dialog');
   pop.innerHTML = `<div class="ph">${esc(p.nombre)}</div>
-    <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${posDe.pos} de ${posiciones.length}${seFue ? `<br><small style="color:var(--bad)">${esc(textoSalida(p))}</small>` : ''}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${avisosAhora.length ? `<br><small style="color:var(--warn)">Incumple ${esc(avisosAhora.join(' · '))}</small>` : ''}</div>
+    <div class="pd">${esc(l.nombre)} · ${FRANJA_LBL[franja].toLowerCase()} · posición ${posDe.pos} de ${posiciones.length}${seFue ? `<br><small style="color:var(--bad)">${esc(textoSalida(p))}</small>` : ''}${entry.razon ? `<br><small>${esc(entry.razon)}</small>` : ''}${htmlIncumpleMenu(posDe, avisosAhora, iso, tid)}</div>
     ${esApoyo(p) ? btnTramo : ''}
     <button class="popb full" data-mt="ficha">Ver y editar su ficha</button>
     ${yaFuera ? '' : '<button class="popb full rec" data-mt="cobertura">Falta estos días… buscar quién cubre</button>'}
@@ -246,7 +260,7 @@ function openMenuTurno(iso, tid, pid, anchor) {
         if (motivo === null) return;
       }
       pushUndo('quién abre'); const eco = marcarAbre(ew, iso, tid, pid, S, S.staff);
-      registrarCambio(`${p.nombre} abre ${lf} del ${fmtDM(iso)}${pr.ok ? '' : ` · puesto a la fuerza (incumple ${pr.regla ? nombreRegla(pr.regla) + ': ' : ''}${pr.motivo})${motivo.trim() ? ' · ' + motivo.trim() : ''}`}`, 'asig');
+      registrarCambio(`${p.nombre} abre ${lf} del ${fmtDM(iso)}${pr.ok ? '' : ` · a la fuerza (incumple ${pr.regla ? nombreRegla(pr.regla) + ': ' : ''}${pr.motivo})${motivo.trim() ? ' · ' + motivo.trim() : ''}`}`, 'asig');
       if (!pr.ok) toast(`${p.nombre} sale primero a la fuerza · incumple ${pr.regla ? nombreRegla(pr.regla) + ': ' : ''}${pr.motivo}`, 'warn');
       anunciarEco(eco, `el «sale primero» de ${p.nombre}`);
     }
@@ -256,7 +270,12 @@ function openMenuTurno(iso, tid, pid, anchor) {
     // (A1) «Quitar la marca de cocina»: nadie la lleva a propósito (quitarCocinaAMano deja la marca sinCocina, que es lo que la
     // distingue de una marca huérfana). La línea del historial lleva la franja (30/09, revisión de A1, modelo 4: la de antes, sin
     // franja, valía para la otra franja del día; la migración sinCocina3009 la sigue entendiendo, para las dos)
-    else if (a === 'nococina') { pushUndo('cocina'); const eco = quitarCocinaAMano(ew, S, S.staff, iso, tid); registrarCambio(`${p.nombre} deja la cocina de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); anunciarEco(eco, `quitar la cocina de ${p.nombre}`); }
+    else if (a === 'nococina') { pushUndo('cocina'); const eco = quitarCocinaAMano(ew, S, S.staff, iso, tid); registrarCambio(`${p.nombre} deja la cocina de ${l.nombre} ${FRANJA_LBL[franja].toLowerCase()} del ${fmtDM(iso)}`, 'asig'); anunciarEco(eco, `quitar la cocina de ${p.nombre}`);
+      // (01/10, corrección de A7; revisión de cliente H5) lo que significa: es una decisión del encargado y nada de lo automático la
+      // deshace; quien solo hace cocina (o ya lleva otra ese día) se queda de sala en esa casilla
+      const noSala = noRefuerzaSala(S, S.staff, ew, iso, tid, pid);
+      toast(`${l.nombre}, ${FRANJA_LBL[franja].toLowerCase()} del ${DIAS_L[isoDow(iso)].slice(0, 3).toLowerCase()} ${+iso.slice(8, 10)}: sin cocina, porque la has quitado tú. Nada de lo automático la vuelve a poner${noSala ? `; ${p.nombre}, que ${noSala}, se queda de sala` : ''}. Para devolverla, «Lleva la cocina» en el menú de quien la vaya a llevar.`, 'warn');
+    }
     else if (a === 'quitar') { pushUndo(`quitar a ${p.nombre}`); desasignarUI(iso, tid, pid); }
     saveState(); renderVistaActiva();
   });

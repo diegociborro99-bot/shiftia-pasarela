@@ -64,9 +64,11 @@ const enlazaBorrados = ov => {
   api('GET', '/api/estado/borrados').then(r => {
     if (!r.ok || !Array.isArray(r.datos)) { bs.innerHTML = ''; return; }
     const lista = r.datos.filter(x => !S.staff.some(p => p.id === x.pid));
-    if (!lista.length) { bs.innerHTML = cab + '<p class="revsub">Nadie borrado del todo en las versiones que guarda el servidor (las últimas 60).</p>'; return; }
-    bs.innerHTML = cab + '<p class="revsub">Quien se borró del todo y aún está en alguna de las últimas 60 versiones que guarda el servidor. «Recuperar» vuelve a poner su ficha (como «ya no está con nosotros» desde el día en que se borró, o desde su salida si ya la tenía) y sus turnos de antes de ese día; lo demás no se toca.</p>' +
-      lista.map(x => `<div class="festrow" style="border-left-color:var(--bad)"><span class="festinfo"><b>${esc(x.nombre)}</b><small>borrada el ${esc(fmtDM(x.borradoEn))}${x.usuario ? ' por ' + esc(x.usuario) : ''} · última versión con ella: ${+x.version}</small></span><button class="btn btn-ghost" data-recuperar="${esc(x.pid)}" data-version="${+x.version}" data-borradoen="${esc(x.borradoEn)}" data-nombre="${esc(x.nombre)}">Recuperar</button></div>`).join('');
+    // (01/10, corrección de A7; revisión de cliente B10 y B5) cuántas versiones guarda el servidor lo dice el bloque de versiones, con el
+    // número del servidor (aquí decía que eran sesenta y arriba, las que hubiera en ese momento: cuatro); y sin género, que no se sabe («borrada el», «con ella»)
+    if (!lista.length) { bs.innerHTML = cab + '<p class="revsub">Nadie borrado del todo en las versiones que guarda el servidor.</p>'; return; }
+    bs.innerHTML = cab + '<p class="revsub">Quien se borró del todo y aún está en alguna de las versiones que guarda el servidor. «Recuperar» vuelve a poner su ficha (como «ya no está con nosotros» desde el día en que se borró, o desde su salida si ya la tenía) y sus turnos de antes de ese día; lo demás no se toca.</p>' +
+      lista.map(x => `<div class="festrow" style="border-left-color:var(--bad)"><span class="festinfo"><b>${esc(x.nombre)}</b><small>se borró el ${esc(fmtDM(x.borradoEn))}${x.usuario ? ' (' + esc(x.usuario) + ')' : ''} · la última versión en la que está: ${+x.version}</small></span><button class="btn btn-ghost" data-recuperar="${esc(x.pid)}" data-version="${+x.version}" data-borradoen="${esc(x.borradoEn)}" data-nombre="${esc(x.nombre)}">Recuperar</button></div>`).join('');
     bs.querySelectorAll('[data-recuperar]').forEach(b => b.addEventListener('click', async () => {
       const pid = b.dataset.recuperar, version = +b.dataset.version, desde = b.dataset.borradoen, nombre = b.dataset.nombre;
       b.disabled = true;
@@ -76,11 +78,11 @@ const enlazaBorrados = ov => {
       const r = recuperarPersona(S, rv.datos.estado, pid, desde);
       if (!r.ficha && !r.turnos) { undoStack.pop(); actualizarUndoBtn(); toast('No había nada que recuperar', 'warn'); b.disabled = false; return; }
       cargarMes();   // los meses que han vuelto se enlazan con la pantalla
-      registrarCambio(`Recuperada ${nombre} de la versión ${version}: ficha y ${r.turnos} turnos`, 'equipo');
+      registrarCambio(`Se ha recuperado a ${nombre} de la versión ${version}: ficha y ${r.turnos} turnos`, 'equipo');
       saveState();
       ov.remove();
       repintarTrasEquipo();
-      toast(`${nombre} recuperada: su ficha (ya no está con nosotros desde el ${fmtDM(desde)}) y ${pl(r.turnos, 'turno', 'turnos')} de antes · ${comoDeshacer()} para deshacer`, 'ok');
+      toast(`Se ha recuperado a ${nombre}: su ficha (ya no está con nosotros desde el ${fmtDM(desde)}) y ${pl(r.turnos, 'turno', 'turnos')} de antes · ${comoDeshacer()} para deshacer`, 'ok');
     }));
   });
 };
@@ -93,7 +95,7 @@ const enlazaCopia = ov => {
     const lista = (r.datos.versiones || []).filter(v => v.version !== SRV.version).slice(0, 8);
     if (!lista.length) { vs.innerHTML = '<p class="revsub">Aún no hay versiones anteriores en el servidor.</p>'; return; }
     const f = t => { const d = new Date(t); return `${d.getDate()}/${d.getMonth() + 1} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
-    vs.innerHTML = `<p class="revsub" style="margin-bottom:6px">El servidor guarda las últimas ${r.datos.versiones.length} versiones de la planilla. Restaurar una crea una versión nueva (no se pierde nada).</p>` +
+    vs.innerHTML = `<p class="revsub" style="margin-bottom:6px">${r.datos.max ? `El servidor guarda las últimas ${r.datos.max} versiones de la planilla (ahora tiene ${r.datos.versiones.length})` : `El servidor guarda ${r.datos.versiones.length} versiones de la planilla`}. Restaurar una crea una versión nueva (no se pierde nada).</p>` +
       lista.map(v => `<div class="festrow f-manual" style="border-left-color:var(--border)"><span class="festinfo"><b>Versión ${v.version}</b><small>${f(v.actualizado)}${v.usuario ? ' · ' + esc(v.usuario) : ''} · ${Math.round(v.bytes / 1024)} KB</small></span><button class="btn btn-ghost" data-restaurav="${v.version}">Restaurar</button></div>`).join('');
     vs.querySelectorAll('[data-restaurav]').forEach(b => b.addEventListener('click', async () => {
       if (!confirm(`Restaurar la versión ${b.dataset.restaurav} SUSTITUYE la planilla actual en todos los dispositivos. ¿Continuar?`)) return;

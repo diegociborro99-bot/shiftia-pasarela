@@ -222,7 +222,6 @@ function selFranjaAusencia(attr, p) {
 }
 // «el viernes 2», «del viernes 2 al domingo 4», «desde el viernes 2 (sin fecha de fin)»
 const diaLargoAus = iso => `${DIAS_L[isoDow(iso)].toLowerCase()} ${+iso.slice(8, 10)}`;
-const listaY = xs => xs.length > 1 ? xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1] : (xs[0] || '');
 function cuandoAusencia(a) {
   const fr = a.franjas && a.franjas.length === 1 ? ` por la ${FRANJA_LBL[a.franjas[0]].toLowerCase()}` : '';
   if (!a.hasta) return `desde el ${diaLargoAus(a.desde)} (sin fecha de fin)${fr}`;
@@ -261,8 +260,16 @@ function lineasCubrirAusencia(p, a, r) {
   if (!designadas.length) out.quien.push({ pid: null, txt: `Nadie tiene «Cubre a» ${p.nombre}: sus turnos de esos días quedan por cubrir.` });
   for (const h of r.huecos) out.quedan.push(`${diaLargoAus(h.iso)} en ${donde(h)} (${h.tipo === 'faltan' ? `${h.faltan === 1 ? 'falta' : 'faltan'} ${h.faltan} de ${h.minimo}` : h.tipo === 'primero' ? 'nadie abre' : 'sin cocina'})`);
   // los días ya pasados: sale de la planilla (no los trabajó), pero no se pone a nadie en su sitio
-  const pas = r.pasados || [];
-  if (pas.length) out.pasados = frase(`${dias(pas)} ${new Set(pas.map(x => x.iso)).size > 1 ? 'ya han pasado' : 'ya ha pasado'}: ${p.nombre} sale de la planilla esos días, pero no se pone a nadie en su sitio; si alguien le cubrió, ponlo a mano`);
+  // (01/10, A7) y lo de hoy que ya ha terminado (con la hora, como la Cobertura): «Hoy, la mañana ya ha terminado…», no «el jueves 8
+  // ya ha pasado»
+  const pas = (r.pasados || []).filter(x => x.iso < hoy), pasHoy = (r.pasados || []).filter(x => x.iso >= hoy);
+  const fr = [];
+  if (pas.length) fr.push(frase(`${dias(pas)} ${new Set(pas.map(x => x.iso)).size > 1 ? 'ya han pasado' : 'ya ha pasado'}: ${p.nombre} sale de la planilla esos días, pero no se pone a nadie en su sitio; si alguien le cubrió, ponlo a mano`));
+  if (pasHoy.length) fr.push(frase(`Hoy, ${listaY(FRANJAS.filter(f => pasHoy.some(x => partirTurno(x.tid).franja === f)).map(f => 'la ' + FRANJA_LBL[f].toLowerCase()))} ya ha terminado: ${p.nombre} sale de ese turno, pero no se pone a nadie en su sitio; si alguien le cubrió, ponlo a mano`));
+  // (01/10, corrección de A7; revisión de cliente S1) una ausencia del día entero apuntada por la tarde le quita también la mañana que
+  // ya trabajó (y sus horas): lo normal es que sí la trabajara. Se le sugiere apuntarla solo por la tarde
+  if (pasHoy.some(x => partirTurno(x.tid).franja === 'M') && !(a.franjas && a.franjas.length === 1)) fr.push('¿Trabajó la mañana de hoy? Apunta hoy la ausencia solo por la tarde.');
+  out.pasados = fr.join(' ');
   return out;
 }
 // Alta de una ausencia con deshacer. En días ya planificados, la persona sale de sus casillas y entra quien
@@ -294,12 +301,12 @@ function altaAusenciaUI(pid, aus, hecho) {
   // del historial ni Ctrl+Z (antes, dos altas iguales dejaban dos líneas)
   const yaEstaba = JSON.stringify(personaDe(prueba, pid).ausencias) === JSON.stringify(p.ausencias);
   // (revisión F5) con S.meses, la carga «M este mes» de quien cubre cuenta el mes entero, como en la Cobertura
-  const sim = cubrirAusencia(S, prueba, clonarEstado(estadoRango(rg.desde, rg.hasta, false)), pid, a.desde, hasta, a.franjas, { desdeIso: hoy, meses: S.meses });
+  const sim = cubrirAusencia(S, prueba, clonarEstado(estadoRango(rg.desde, rg.hasta, false)), pid, a.desde, hasta, a.franjas, { desdeIso: hoy, ahoraHM: horaMadrid(), meses: S.meses });   // (01/10, A7) con la hora, como la Cobertura
   if (yaEstaba && !sim.quitados.length && !sim.puestos.length && !sim.relevos.length) { toast(`${p.nombre} ya tenía apuntada esa ausencia: no hay nada que cambiar`, 'ok'); return null; }
   const guardar = conCobertura => {
     pushUndo(`ausencia de ${p.nombre}`, { staff: true, otrosMeses: true });
     const r0 = anadirAusencia(p, a);
-    const r = cubrirAusencia(S, S.staff, estadoRango(rg.desde, rg.hasta, true), pid, a.desde, hasta, a.franjas, { desdeIso: hoy, meses: S.meses });
+    const r = cubrirAusencia(S, S.staff, estadoRango(rg.desde, rg.hasta, true), pid, a.desde, hasta, a.franjas, { desdeIso: hoy, ahoraHM: horaMadrid(), meses: S.meses });
     const quien = r.puestos.concat(r.relevos);
     // las fechas en orden (revisión F3b: salían en el orden en que se cubrían: «20/9, 15/9, 22/9…»)
     const cubren = [...new Set(quien.map(x => x.pid))].map(q => `${nombrePid(q)} le cubre ${listaY([...new Set(quien.filter(x => x.pid === q).map(x => x.iso))].sort().map(fmtDM))}`);
@@ -344,19 +351,34 @@ function quitarAusenciaUI(pid, idx) {
   registrarCambio(`Ausencia retirada: ${p.nombre}, ${(AUS_LBL[a.tipo] || { label: a.tipo }).label} del ${fmtDM(a.desde)}${a.hasta ? ' al ' + fmtDM(a.hasta) : ''}`, 'aus');
   saveState();
   // ¿tocaba días ya planificados? (una baja sin fin: los dos meses siguientes)
-  // (corrección de A5; revisión de cliente H12) y quién entró por su ausencia y sale al volver a generar: lo automático que la
-  // retirada quitaría ahora (motivoRetirada, que lee si sigue faltando con faltaEn); lo puesto a mano se queda
-  let planificada = false, n = 0;
-  const salen = new Map();
-  for (const iso of rangoIso(a.desde, a.hasta || addDias(a.desde, 60))) {
-    if (++n > 62) break;
+  return avisoQuitarAusencia(p, [...rangoIso(a.desde, a.hasta || addDias(a.desde, 60))].slice(0, 62));
+}
+// Lo que se dice al quitar una ausencia (o un día de ella) que tocaba días ya planificados: que la persona vuelve a sus turnos al
+// volver a generar y quién entró por su ausencia y sale entonces. (corrección de A5; revisión de cliente H12) quién: lo automático que
+// la retirada quitaría ahora (motivoRetirada, que lee si sigue faltando con faltaEn); lo puesto a mano se queda. (01/10, A7) una sola
+// lectura para Equipo, la ficha y el Mes («Quitar la ausencia de este día» no lo decía).
+// (01/10, corrección de A7; revisión de cliente H4) lo ya trabajado (turnoTrabajado: los días de antes de hoy y el turno de hoy que ya
+// ha terminado) no lo toca regenerar «Solo desde hoy»: ni la persona vuelve sola a su turno ni sale quien entró por ella. Se dice qué
+// hacer a mano: «El dom 18 ya ha pasado: si trabajó Susana Luna, ponle su turno a mano y quita a Roberto». Antes el aviso decía que
+// volvía al volver a generar, y no volvía (Horas le pagaba el domingo a Roberto y no a Susana)
+function avisoQuitarAusencia(p, isos) {
+  let planificada = false;
+  const salen = new Map(), pasDias = new Set(), pasHoy = new Set(), entraron = new Set();
+  for (const iso of isos) {
     const e = estadoDeIso(iso);
     if (!diaConPlanilla(e, iso)) continue;
-    planificada = true;
-    for (const t of turnosDe(S)) for (const x of asignados(e, iso, t.id)) {
-      if (x.relevo || !esAutomatica(x) || (x.porAusenciaDe !== p.id && porDe(S.staff, x) !== p.id) || !motivoRetirada(S, S.staff, e, iso, t.id, x)) continue;
-      if (!salen.has(x.pid)) salen.set(x.pid, new Set());
-      salen.get(x.pid).add(iso);
+    for (const t of turnosDe(S)) {
+      if (turnoTrabajado(iso, t.id)) {
+        if (iso < isoHoy()) pasDias.add(iso); else pasHoy.add(t.franja);
+        for (const x of asignados(e, iso, t.id)) if (!x.relevo && (x.porAusenciaDe === p.id || porDe(S.staff, x) === p.id)) entraron.add(x.pid);
+        continue;
+      }
+      planificada = true;
+      for (const x of asignados(e, iso, t.id)) {
+        if (x.relevo || !esAutomatica(x) || (x.porAusenciaDe !== p.id && porDe(S.staff, x) !== p.id) || !motivoRetirada(S, S.staff, e, iso, t.id, x)) continue;
+        if (!salen.has(x.pid)) salen.set(x.pid, new Set());
+        salen.get(x.pid).add(iso);
+      }
     }
   }
   const dia = iso => `${DIAS_L[isoDow(iso)].slice(0, 3).toLowerCase()} ${+iso.slice(8, 10)}`;
@@ -364,7 +386,10 @@ function quitarAusenciaUI(pid, idx) {
   const porEl = !quien.length ? '' : quien.length === 1
     ? ` ${quien[0].nombre} entró por ${p.nombre} el ${quien[0].dias}: sale al volver a generar la semana, o quítalo ahora.`
     : ` ${listaY(quien.map(q => `${q.nombre} (${q.dias})`))} entraron por ${p.nombre}: salen al volver a generar la semana, o quítalos ahora.`;
-  return planificada ? `Ausencia retirada · ${p.nombre} vuelve a sus turnos al volver a generar la semana.${porEl} Si fue un error, ${comoDeshacer()} lo deshace` : 'Ausencia retirada';
+  const partes = (pasDias.size ? [textoTramos([...pasDias], dia)] : []).concat(pasHoy.size ? [`hoy por la ${listaY(FRANJAS.filter(f => pasHoy.has(f)).map(f => FRANJA_LBL[f].toLowerCase()))}`] : []);
+  const yaPaso = partes.length ? ` Ya ${pasDias.size + (pasHoy.size ? 1 : 0) > 1 ? 'han' : 'ha'} pasado ${listaY(partes)}: si trabajó ${p.nombre}, ponle su turno a mano${entraron.size ? ` y quita a ${listaY([...entraron].map(nombrePid))}` : ''}.` : '';
+  if (!planificada && !yaPaso) return 'Ausencia retirada';
+  return `Ausencia retirada ·${planificada ? ` ${p.nombre} vuelve a sus turnos al volver a generar la semana.${porEl}` : ''}${yaPaso} Si fue un error, ${comoDeshacer()} lo deshace`;
 }
 
 // ---------- alta y baja ----------
@@ -517,7 +542,7 @@ function borrarDelTodo(pid) {
   pushUndo(`borrar del todo a ${p.nombre}`, { staff: true, otrosMeses: true });
   const turnos = quitarPidDeTodo(pid);
   S.staff = S.staff.filter(x => x.id !== pid);
-  registrarCambio(`Borrada del todo: ${p.nombre}${turnos ? ` · ${turnos} turno(s) retirados de la planilla` : ''}`, 'cambio');
+  registrarCambio(`Borrada del todo: ${p.nombre}${turnos ? ` · ${pl(turnos, 'turno retirado', 'turnos retirados')} de la planilla` : ''}`, 'cambio');
   saveState();
   repintarTrasEquipo();
   toast(`${p.nombre} se ha borrado del todo`, 'warn');

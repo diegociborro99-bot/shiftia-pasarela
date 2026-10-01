@@ -7,15 +7,18 @@ modelo de dominio del grupo: dos franjas por local y día, casillas ordenadas
 (quien abre va el primero, la cocina en su posición), partidos, dobles,
 «nunca con», «cubre a», mínimos por día y refuerzos cuando hay fútbol.
 
-Todo el conocimiento del PDF del grupo (20 personas en activo, 2 de baja,
-29 condiciones personales, mínimos por local y día, quién abre y quién lleva
-la cocina) viene precargado **como datos editables** desde la propia app.
+Todo el conocimiento del PDF del grupo (29 condiciones personales, mínimos por
+local y día, quién abre y quién lleva la cocina) viene precargado **como datos
+editables** desde la propia app. La planilla de partida trae 24 personas: 20 en
+activo, 3 de baja (Laura, Maydeth y Susi) y Dulce en standby.
 Lo que el grupo no ha confirmado se marca «supuesto».
 
 ## Qué hace
 
 - **Hoy**: las cuatro casillas de la mañana y las cuatro de la tarde del día,
-  ordenadas, con quién abre, cocina, refuerzo, forzados y turnos cortos.
+  ordenadas, con quién abre, cocina, refuerzo, forzados (y quien ya no puede
+  estar donde está, con el mismo «!» y qué hacer; lo ya trabajado, sin marca;
+  lo que solo es un aviso, en ámbar) y turnos cortos.
   Asignar con el selector (puede / con aviso / no puede, con «forzar» y motivo),
   reordenar, marcar cocina o quién abre, horario distinto en una casilla.
 - **Semana**: el cuadrante que el grupo conoce (ocho filas local × franja por
@@ -42,7 +45,8 @@ Lo que el grupo no ha confirmado se marca «supuesto».
 - **Contador de horas**: horas del mes por persona a partir de la planilla y de
   los ajustes del encargado (horas extra, horario distinto), con los horarios del
   grupo (mañana 07:00–16:00, fines de semana desde las 08:00; tarde 16:00 hasta el
-  cierre) y el turno partido contado por tramos, con nocturnas,
+  cierre) y el turno partido contado por tramos (el continuo, una vez: con horas
+  a mano en una sola mitad, esas son las de todo el turno), con nocturnas,
   domingos y festivos, saldo frente a contrato, desglose por local, Excel,
   impresión y **cierre de mes** para la nómina.
 - **Generador semanal**: la planilla de la semana con las condiciones del cliente
@@ -58,14 +62,23 @@ Lo que el grupo no ha confirmado se marca «supuesto».
   cambio de turno), y la app propone el **plan A** y el **plan B** día a día:
   quién sale → quién entra (o el hueco y por qué nadie puede); confirmar registra
   la ausencia, retira a la persona y pone a quien cubre con «por X», con deshacer.
-  En un cambio de turno propone también el intercambio.
+  Solo desde hoy y desde ahora: en lo ya trabajado no entra nadie. Un cambio de
+  turno no es una falta (no usa «cubre a») y propone también el intercambio.
+- **Revisión del mes**: en rojo lo que hay que resolver (también quien ya no puede
+  estar en su sitio, con qué hacer), en ámbar lo que conviene revisar (lo forzado,
+  los avisos, la cocina que se quitó a mano), y lo ya trabajado (los días pasados
+  y lo de hoy que ya ha terminado) aparte, en gris. Lo mismo en varios días de un
+  turno va en una sola línea, con los días.
 - **Cerrar un local unos días** (Equipo → Ajustes de los locales → Cierres por
   fechas, o desde Hoy): del día y la franja de inicio al de fin, con motivo, y un
   visor para decidir qué hace cada persona (apoyo en otros locales, sin trabajo,
   vacaciones o día libre); al pasar las fechas el local vuelve solo a su horario.
 - **El Generador retira lo automático que ya no vale** (nunca lo puesto a mano):
-  al cambiar el día libre de una semana, una ausencia, un cierre o una ficha, lo
-  dice en «Qué ha cambiado» y se deshace con Ctrl+Z.
+  al cambiar el día libre de una semana, una ausencia, un cierre o una ficha (un
+  local, una franja, un veto, el standby, un «nunca con» estricto), lo dice en
+  «Qué ha cambiado» con quién y por qué, y se deshace con Ctrl+Z. «Solo desde
+  hoy» no toca lo ya trabajado: ni los días pasados ni el turno de hoy que ya ha
+  terminado.
 - **Visible para el equipo**: cada mes se hace visible a los trabajadores cuando
   la planilla está lista (el mes en curso siempre lo ven).
 - **Vaciar la semana o el mes** (en Semana y Mes) respetando bajas, vacaciones y

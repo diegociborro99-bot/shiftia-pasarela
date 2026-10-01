@@ -119,3 +119,11 @@
    botones contra el borde */
 @media (min-width:641px) and (max-width:1200px){ .dbig{font-size:32px} }
 @media (min-width:1201px){ .dstats{margin-left:auto} }
+
+/* 01/10 (A7; revisión de cliente de A4, S7): la casilla de marcar de las opciones del Generador (y de la Cobertura) se quedaba
+   debajo de la primera línea del texto en el móvil: 20-movil.css da 46px de alto a todo input y el navegador dibuja la casilla
+   centrada en ese alto. Aquí la casilla mide lo suyo y va a la altura de la primera línea; el dedo tiene toda la etiqueta */
+@media (pointer:coarse), (max-width:1024px){
+  .genopt{min-height:40px}
+  .genopt input[type="checkbox"]{min-height:0;width:20px;height:20px;margin:1px 0 0}
+}

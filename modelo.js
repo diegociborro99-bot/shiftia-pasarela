@@ -258,16 +258,27 @@ function fechaCandidato(c, hoy) {
   if (!s) return null;
   let y = 0, m = 0, d = 0, r;
   if ((r = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) { y = +r[1]; m = +r[2]; d = +r[3]; }
-  else if ((r = s.match(/(\d{1,2})\s*\/\D{0,2}(\d{1,2})\s*\/\D{0,2}(\d{2,4})/))) { d = +r[1]; m = +r[2]; y = +r[3]; if (y < 100) y += 2000; }
-  else if ((r = s.match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)(?:\s+(?:de|del)\s+(\d{4}))?/))) {
+  // (01/10, corrección de A7; revisión de modelo S-2) un año de dos cifras es 20xx solo si no pasa del año que viene: «1/1/99» daba
+  // 2099-01-01, una fecha futura que ordenaba la primera; ahora, sin fecha
+  else if ((r = s.match(/(\d{1,2})\s*\/\D{0,2}(\d{1,2})\s*\/\D{0,2}(\d{2,4})/))) { d = +r[1]; m = +r[2]; y = +r[3]; if (y < 100) { y += 2000; if (y > +hoy.slice(0, 4) + 1) return null; } }
+  // (01/10, A7; auditoría A9) el año también sin «de» delante: «5 de mayo 2026» perdía el 2026 y se tomaba la última vez.
+  // (corrección de A7; revisión de modelo B-1) sin «de», solo un año de este siglo (20xx): «5 de mayo 1730» o «12 de junio 1800h» (la
+  // hora, pegada) tomaban la hora por el año y daban null; con «de» delante, cualquier número de cuatro cifras es el año (y antes de 2000
+  // no vale, A9)
+  else if ((r = s.match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)(?:\s+(?:(?:de|del)\s+(\d{4})|(20\d{2})(?!\d)))?/))) {
     const pref = r[2].normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 3);
-    d = +r[1]; m = MES_PREF.indexOf(pref === 'set' ? 'sep' : pref) + 1; y = r[3] ? +r[3] : 0;
+    d = +r[1]; m = MES_PREF.indexOf(pref === 'set' ? 'sep' : pref) + 1; y = r[3] || r[4] ? +(r[3] || r[4]) : 0;
   } else return null;
   if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+  // (01/10, A7; auditoría A9) la fecha tiene que existir (ni 30/2 ni 31 de abril) y el año ser de 2000 en adelante: antes
+  // salían «2026-02-30» o «202-02-01», que ordenaban donde no tocaba. Sin año, la última vez que cayó ese día (el 29 de
+  // febrero, el último año bisiesto)
   if (!y) {
     y = +hoy.slice(0, 4);
     if (isoDe(y, m, d) > hoy) y--;
+    for (let k = 0; k < 8 && !fechaIsoValida(isoDe(y, m, d)); k++) y--;
   }
+  if (y < 2000 || !fechaIsoValida(isoDe(y, m, d))) return null;
   return isoDe(y, m, d);
 }
 // 21/09 (José, por WhatsApp): «Intenta que las entrevistas los que pongo BIEN o descarte me
@@ -465,8 +476,16 @@ function cierreEn(cfg, iso, tid) {
 function motivoCierreTxt(c) { const m = MOTIVOS_CIERRE.find(x => x.id === (c && c.motivo)); return (m && m.txt) || String((c && c.detalle) || '').trim(); }
 // «Reforma», «Vacaciones del local»… lo que se enseña en la casilla cerrada
 function etiquetaCierre(c) { const m = MOTIVOS_CIERRE.find(x => x.id === (c && c.motivo)); return m && m.id !== 'otro' ? m.label : (String((c && c.detalle) || '').trim() || 'Cierre'); }
-// «mar 29/09»: el último día cerrado
-function hastaCierre(c) { const ds = diasDeCierre(c); return ds.length ? fechaCortaCierre(ds[ds.length - 1]) : ''; }
+// «mar 29/09»: el último día cerrado. (01/10, A7; auditoría B12) con el día (iso), el último del tramo de días seguidos
+// cerrados que lo contiene: en un cierre de domingos sueltos, el domingo 4 está cerrado «hasta el dom 04/10» (el lunes
+// abre), no «hasta el dom 18/10», que se leía como dos semanas sin abrir
+function hastaCierre(c, iso) {
+  const ds = diasDeCierre(c);
+  if (!ds.length) return '';
+  let fin = ds[ds.length - 1];
+  if (iso && ds.includes(iso)) { fin = iso; while (ds.includes(addDias(fin, 1))) fin = addDias(fin, 1); }
+  return fechaCortaCierre(fin);
+}
 // «Bar Mónaco cerrado por reforma (dom 27/09 tarde – mar 29/09)»: el texto de la regla, de los avisos
 // y del historial. Dice las fechas para que nadie lo lea como un cierre de todas las semanas (la
 // regla «cerrado» decía «no abre la tarde el lunes», que suena a horario fijo).
@@ -506,7 +525,8 @@ function textoCierre(cfg, c) {
   return `${cab} (${rango})`;
 }
 // lo que se le dice a quien no trabaja esos días (regla, forzar y retirada automática)
-function motivoSinTrabajo(cfg, c) { const l = localDe(cfg, c.localId); return `sin trabajo: ${l ? l.nombre : c.localId} cerrado hasta el ${hastaCierre(c)}`; }
+// (01/10, A7; B12) con el día, «hasta» el final de su tramo (hastaCierre)
+function motivoSinTrabajo(cfg, c, iso) { const l = localDe(cfg, c.localId); return `sin trabajo: ${l ? l.nombre : c.localId} cerrado hasta el ${hastaCierre(c, iso)}`; }
 const MAX_DIAS_CIERRE = 62;   // como la tira de la Cobertura: dos meses
 function validarCierre(cfg, c) {
   const errores = [];
@@ -708,7 +728,8 @@ function sugerenciasRefuerzo(cfg, staff, est, c, pid, opts) {
   // ¿la cocina de esa casilla está libre? Nadie la lleva en la planilla y, si el día aún no tiene planilla, la semana tipo tampoco
   // trae a nadie con ella ese día (si no, al generar entraría el cocinero de siempre y el apoyo se quedaría de sala: S34)
   const cocinaLibre = (iso, t) => {
-    if (asignados(sim, iso, t.id).some(x => x.cocina)) return false;
+    // 01/10 (A7; como el Generador tras la semilla 9286) la que el encargado quitó a mano no está libre: es de nadie, a propósito
+    if (asignados(sim, iso, t.id).some(x => x.cocina) || cocinaQuitadaEn(sim, iso, t.id)) return false;
     if (diaConPlanilla(sim, iso)) return true;
     return !plazasDelDia(cfg2, staff, iso).plazas.some(pl => pl.t === t.id && pl.c && (q => q && !q.standby && !haSalido(q, iso) && !ausenciaEn(q, iso, t.franja))(personaDe(staff, pl.p)));
   };
@@ -763,6 +784,12 @@ function ponerApoyoCierre(cfg, staff, est, c, pid, iso, destino) {
       // tipo al generar), su plaza automática sale y se dice; de sala no puede estar (S34)
       if (mio && esAutomatica(mio)) retirarEntrada(est, cfg, staff, iso, tid, pid);
       return { ok: false, motivo: `la cocina de ${(localDe(cfg, localId) || { nombre: localId }).nombre} esa ${FRANJA_LBL[franja].toLowerCase()} ya la lleva ${nombreDe(staff, coc.pid)}`, regla: 'cocina' };
+    }
+    // 01/10 (A7; como el Generador tras la semilla 9286) la cocina que el encargado quitó a mano no es de nadie: la casilla no se la
+    // daría y el apoyo de cocina se quedaría de sala (Hojan, solo cocina). Sale, como cuando la cocina la lleva otro, y se dice
+    if (cocinaQuitadaEn(est, iso, tid)) {
+      if (mio && esAutomatica(mio)) retirarEntrada(est, cfg, staff, iso, tid, pid);
+      return { ok: false, motivo: `en ${(localDe(cfg, localId) || { nombre: localId }).nombre} esa ${FRANJA_LBL[franja].toLowerCase()} nadie lleva la cocina: se quitó a mano`, regla: 'cocina' };
     }
     if (mio) return { ok: true, ya: true };   // está y nadie lleva la cocina: la casilla se la dará
     return asignar(est, cfg, staff, iso, tid, pid, { origen: 'cierre', puesto: 'cocina', cocina: true, razon });
@@ -1060,6 +1087,7 @@ function instanciarCierres(cfg, staff, est, desde, hasta, opts) {
     for (const [iso, t] of Object.entries(d.destinos)) {
       if (iso < desde || iso > hasta || (o.desdeIso && iso < o.desdeIso)) continue;
       for (const x of [].concat(t).filter(Boolean)) {
+        if (turnoYaPasado(cfg, iso, destinoCierre(x).tid, o)) continue;   // (corrección de A7) el turno de hoy ya terminado no se toca
         const a = ponerApoyoCierre(cfg, staff, est, c, pid, iso, x), tid = destinoCierre(x).tid;
         if (a.ok && !a.ya) r.aplicados.push({ iso, turnoId: tid, pid, origen: 'cierre', razon: a.entry.razon });
         else if (!a.ok) r.rechazados.push({ iso, turnoId: tid, pid, motivo: a.motivo });
@@ -1104,12 +1132,16 @@ function mitadesCerradas(cfg, pid, iso) {
 function cierresDelHorario(cfg, localId, franja, dow) {
   return cierresDe(cfg).filter(c => c.localId === localId && c.origen && c.origen.abre && c.origen.abre.franja === franja && +c.origen.abre.dow === +dow);
 }
-function turnosAbiertosSemana(cfg) {
+// (01/10, A7; auditoría B11) cuántas casillas (local × franja × día) abre el horario de los locales en una semana, sin
+// cierres ni aperturas a mano (las 54 de la portada del PDF); y cuántas abren de verdad en un mes (turnoAbierto: con los
+// cierres por fechas y lo abierto o cerrado a mano). Se llamaban turnosAbiertosSemana/Mes y no decían que una mira el horario
+// y la otra el mes, ni que cuentan casillas, no turnos de nadie
+function casillasHorarioSemana(cfg) {
   let n = 0;
   for (const l of cfg.locales) for (const f of FRANJAS) n += ((l.abre && l.abre[f]) || []).length;
   return n;
 }
-function turnosAbiertosMes(cfg, est) {
+function casillasAbiertasMes(cfg, est) {
   let n = 0;
   for (const d of est.days) for (const t of turnosDe(cfg)) if (turnoAbierto(cfg, est, d.iso, t.id)) n++;
   return n;
@@ -1175,6 +1207,10 @@ function casillasDe(est, iso, pid) {
   return out;
 }
 function manualDe(est, iso, tid) { return (est.manual && est.manual[iso] && est.manual[iso][tid]) || {}; }
+// ¿El encargado quitó a propósito la cocina de esa casilla («Quitar la marca de cocina»: la marca sinCocina)? (01/10, corrección de A7;
+// decisiones.md, principio 1) una sola lectura para todos los caminos: el relleno del Generador, la Cobertura, el apoyo de un cierre,
+// el problema y el volcado del núcleo, la puerta, el selector y su ★, la Revisión, los huecos y las condiciones del Generador
+function cocinaQuitadaEn(est, iso, tid) { return !!manualDe(est, iso, tid).sinCocina; }
 function marcarManual(est, iso, tid, k) { est.manual = est.manual || {}; ((est.manual[iso] = est.manual[iso] || {})[tid] = est.manual[iso][tid] || {})[k] = true; }
 function primerDiaPlanificable(est, hoy) {
   // (30/09, auditoría A5/G15) la fecha es obligatoria: sin ella se miraba el reloj
@@ -1598,9 +1634,12 @@ function migrarCocinaLocales(estado) {
     for (const p of estado.staff) {
       const papel = cocinaDe(estado, p, l.id);
       if (!papel || enListaCocina(l, p.id) || !conCocina.length) continue;
-      if (papel === 'titular') for (const f of ((p.franjas || []).length ? p.franjas : FRANJAS)) { if (conCocina.includes(f)) c.titulares[f].push(p.id); }
-      else c.reservas.push(p.id);
-      r.listas++;
+      // (01/10, A7; auditoría C11) solo cuenta si de verdad entra en alguna lista: titular de El 33 en su ficha y solo de
+      // tardes, con El 33 sin cocina por la tarde, no entra en ninguna y antes se contaba igual
+      let puesto = false;
+      if (papel === 'titular') for (const f of ((p.franjas || []).length ? p.franjas : FRANJAS)) { if (conCocina.includes(f)) { c.titulares[f].push(p.id); puesto = true; } }
+      else { c.reservas.push(p.id); puesto = true; }
+      if (puesto) r.listas++;
     }
   }
   estado.migraciones.cocinaLocales2409 = 1;
@@ -1835,16 +1874,27 @@ function estadoDia(cfg, p, iso, franja) {
   const libra = on && libraEn(p, iso);
   const hab = (p && p.libra) || [];
   // 24/09 (D11): qué hace ese día por el cierre de su local (sin trabajo, apoyo…), con sus franjas
-  let cierre = null;
-  if (p) for (const f of FRANJAS) { const dc = decisionCierre(cfg, p.id, iso, f); if (dc) { cierre = cierre || { tipo: dc.tipo, cierre: dc.cierre, franjas: [], explicita: dc.explicita }; cierre.franjas.push(f); } }
+  // (01/10, A7; auditoría B12) cada cierre con SUS franjas (cierres): con dos cierres el mismo día (El 33 por la mañana y el
+  // Mónaco por la tarde) la tarde se apuntaba al primero; `cierre` sigue siendo el primero, para quien solo mira uno
+  const cierres = [];
+  if (p) for (const f of FRANJAS) {
+    const dc = decisionCierre(cfg, p.id, iso, f);
+    if (!dc) continue;
+    let x = cierres.find(y => y.cierre === dc.cierre && y.tipo === dc.tipo);
+    if (!x) cierres.push(x = { tipo: dc.tipo, cierre: dc.cierre, franjas: [], explicita: dc.explicita });
+    x.franjas.push(f);
+  }
+  const cierre = cierres[0] || null;
   let texto = '';
-  if (ausencia) texto = motivoAusencia(ausencia);
+  // (01/10, A7) sin franja, todas las ausencias del día (la misma lectura que Hoy y el Mes, etiquetaAusenciasDia): con
+  // vacaciones de la mañana y de la tarde decía solo la de la mañana
+  if (ausencia) texto = (!franja && etiquetaAusenciasDia(p, iso, motivoAusencia)) || motivoAusencia(ausencia);
   else if (standby) texto = 'en standby';
   else if (libra && puntual) texto = textoLibraDia(p, puntual, dow, true);   // (30/09, A3) con el «en vez de» solo de lo que libera
   else if (libra) texto = `libra ${DOW_PL[dow]}`;
-  else if (cierre && cierre.tipo !== 'REFUERZA') texto = motivoSinTrabajo(cfg, cierre.cierre);
+  else if (cierre && cierres.some(x => x.tipo !== 'REFUERZA')) texto = [...new Set(cierres.filter(x => x.tipo !== 'REFUERZA').map(x => motivoSinTrabajo(cfg, x.cierre, iso)))].join(' · ');
   else if (puntual && hab.includes(dow)) texto = `esta semana trabaja (libra ${textoDiasEl(puntual.dias)})`;
-  return { libra, puntual, ausencia, standby, cierre, texto };
+  return { libra, puntual, ausencia, standby, cierre, cierres, texto };
 }
 // 24/09 (fase 4; reunión: «que lea todas las variables»): tres lecturas más de la ficha que antes estaban
 // copiadas en la puerta, en el relleno, en la Cobertura, en la hoja impresa y en las condiciones del
@@ -2158,10 +2208,22 @@ function noRefuerzaSala(cfg, staff, est, iso, tid, pid) {
   if (!p || !activa(cfg, p, 'cocina')) return null;
   if (p.soloCocina) return 'solo hace cocina';
   const tc = cocinaDelDia(cfg, est, iso, pid);
-  return tc && tc !== tid ? `ya lleva la cocina de ${localDe(cfg, partirTurno(tc).localId).nombre} ese día` : null;
+  return tc && tc !== tid ? textoLlevaCocina(cfg, tc, tid) : null;
 }
-function salaDelDia(cfg, est, iso, pid, excepto) {
-  for (const t of turnosDe(cfg)) if (t.id !== excepto && asignados(est, iso, t.id).some(x => x.pid === pid && !x.cocina) && plazaOcupa(cfg, est, iso, t.id)) return t.id;
+// «ya lleva la cocina de El 33 ese día»; (01/10, corrección de A7; revisión de cliente S3) si es la del mismo local (la cocina de la otra
+// franja), con la franja: «ya lleva la cocina de Zapatillera por la mañana» (decía «… de Zapatillera ese día» a quien está en Zapatillera)
+function textoLlevaCocina(cfg, tc, tid) {
+  const c = partirTurno(tc), l = localDe(cfg, c.localId), nombre = l ? l.nombre : tc;
+  return tid && partirTurno(tid).localId === c.localId ? `ya lleva la cocina de ${nombre} por la ${FRANJA_LBL[c.franja].toLowerCase()}` : `ya lleva la cocina de ${nombre} ese día`;
+}
+// (01/10, corrección de A7; revisión de modelo B-2) con `firme` (la puerta): la casilla cuya cocina decidió el encargado a mano (la
+// quitó o se la puso a otra persona: marca manual `cocina`) no cuenta como «de sala», igual que en salaFirmeDelDia (principio 4: lo
+// decidido a mano no provoca cambios en otras casillas; la Revisión y la condición «cocinaSala» avisan del cruce en ámbar y decide el
+// encargado). Con la cocina de El 33 mañana quitada a mano, el cambio de día libre de Jenny la dejaba de sala allí y la puerta le
+// rechazaba la cocina de la tarde: El 33 tarde se quedaba vacía. (Fuzz de la corrección, semilla 9265: con Adrián puesto a mano con la
+// cocina de El 33 por la mañana, Jenny, de sala allí, puede llevar la del Mónaco por la tarde, con el aviso del cruce.)
+function salaDelDia(cfg, est, iso, pid, excepto, firme) {
+  for (const t of turnosDe(cfg)) if (t.id !== excepto && asignados(est, iso, t.id).some(x => x.pid === pid && !x.cocina) && plazaOcupa(cfg, est, iso, t.id) && !(firme && manualDe(est, iso, t.id).cocina)) return t.id;
   return null;
 }
 // S34 para la cocina que se marca sola (Aroa, 17/09: quien lleva la cocina ese día no refuerza la sala; revisión
@@ -2270,7 +2332,7 @@ function evaluarPlaza(ctx, iso, tid, pid, opts) {
   // otra casilla de esa franja salvo que el encargado lo fuerce; quien apoya puede ir a cualquier local.
   const dc = decisionCierre(cfg, pid, iso, franja);
   const apoyaCierre = !!dc && dc.tipo === 'REFUERZA';
-  if (dc && !apoyaCierre) bloquea('cierre', motivoSinTrabajo(cfg, dc.cierre), { forzable: true });
+  if (dc && !apoyaCierre) bloquea('cierre', motivoSinTrabajo(cfg, dc.cierre, iso), { forzable: true });
   if (corte) return res;
   if (!apoyaCierre && act('locales') && Array.isArray(p.locales) && p.locales.length && !p.locales.includes(localId)) bloquea('locales', `solo ${lblLocales(cfg, p.locales)}`, { forzable: true });
   if (corte) return res;
@@ -2290,7 +2352,7 @@ function evaluarPlaza(ctx, iso, tid, pid, opts) {
     const m = noRefuerzaSala(cfg, staff, est, iso, tid, pid);   // una sola lectura, con las sugerencias de apoyo del cierre
     if (m) bloquea('cocina', m, { forzable: true });
   } else if (o.puesto === 'cocina' && !o.yaDentro && act('cocina')) {
-    const ts = salaDelDia(cfg, est, iso, pid, tid);
+    const ts = salaDelDia(cfg, est, iso, pid, tid, true);
     if (ts) bloquea('cocina', `ya está de sala en ${localDe(cfg, partirTurno(ts).localId).nombre} ese día`, { forzable: true });
   }
   if (corte) return res;
@@ -2706,11 +2768,18 @@ function posicionesDe(cfg, staff, est, iso, tid) {
     const continuo = ocupa && e.pid === primero && esContinuo(cfg, staff, est, iso, localId, e.pid);
     const fijo = abreFijo(cfg, l, p, franja);   // la misma lectura que la puntuación (fase 4)
     const por = porDe(staff, e);
-    const { avisos, autorizados, abreNoApto } = revisarEntrada(cfg, staff, est, iso, tid, e.pid);
+    const { avisos, autorizados, abreNoApto, detalle } = revisarEntrada(cfg, staff, est, iso, tid, e.pid);
     // (fase 5, S18) abreNoApto: el porqué, si sale primero porque se marcó a mano y no puede abrir
     // (S0, 30/09) `salido`: la salida de quien tiene una, también en días anteriores a la fecha (es el sombreado rojo
     // de «ya no trabaja con nosotros» en Hoy, la Semana, el Mes, la hoja impresa y la imagen de compartir)
-    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && fijo, abreNoApto: abreNoApto ? abreNoApto.motivo : null, cocina: !!e.cocina, partido: ocupa && enOtraFranja(cfg, est, iso, tid, e.pid) && !continuo, continuo, comodin: esComodin(p), por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, autorizados, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null, salido: salidaDe(p) };
+    return { pos: i + 1, pid: e.pid, nombre: p.nombre, abre: e.pid === primero, abreFijo: e.pid === primero && fijo, abreNoApto: abreNoApto ? abreNoApto.motivo : null, cocina: !!e.cocina, partido: ocupa && enOtraFranja(cfg, est, iso, tid, e.pid) && !continuo, continuo, comodin: esComodin(p), por: por || null, nota: e.nota || null, supuesto: !!e.supuesto, avisos, autorizados, forzado: !!e.forzado && avisos.length > 0, origen: e.origen || 'manual', tramo: e.ini && e.fin ? { ini: e.ini, fin: e.fin } : null, salido: salidaDe(p),
+      // (01/10, A7) las reglas duras que rompe ahora (un veto nuevo, un local que ya no hace…): Hoy y la Semana la marcan como lo
+      // forzado y su título lo dice; no se retira (lo puesto a mano no lo quita nadie: principio 4). (corrección de A7; revisión de
+      // modelo M-1) en lo automático, solo si regenerar la retira de verdad (durasDeEntrada)
+      duras: durasDeEntrada(cfg, staff, est, iso, tid, e, detalle),
+      // (corrección de A7; revisión de cliente S2) y lo blando (solo un aviso: «solo hace cocina», un partido no declarado, la pareja
+      // flexible): Hoy lo marca en ámbar, como la Revisión. Sin el porqué del 1.º (abreNoApto), que va en su «ABRE ⚠»
+      blandos: detalle.filter(d => d && !esDuraDetalle(d) && !(abreNoApto && d.motivo === abreNoApto.motivo)).map(d => d.motivo) };
   });
 }
 // ¿El encargado quitó la cocina de esa casilla a propósito («Quitar la marca de cocina» del menú) en los datos de ANTES de la
@@ -2862,11 +2931,13 @@ function ecoCasilla(est, cfg, staff, iso, tid, pids) {
 // 30/09 (revisión de A1, modelo 1): cada día se repasa hasta que ninguna casilla cambie (con tope, VUELTAS_ECO): una sola pasada
 // dependía del orden de las casillas (Jenny de cocina en El 33 tarde y de sala en Pasarela mañana, donde Tere acababa de pasar a
 // titular, hasta la siguiente pasada que nadie hacía). Refrescar dos veces es lo mismo que una
-function refrescarCasillas(cfg, staff, est, desde, hasta) {
+// (01/10, corrección de A7; revisión de cliente H1) opts { desdeIso, ahoraHM }: el turno de hoy ya terminado (turnoYaPasado) no se
+// vuelve a decidir: se trabajó con quien abría y con quien llevaba la cocina
+function refrescarCasillas(cfg, staff, est, desde, hasta, opts) {
   const out = [];
   const dias = Object.keys((est && est.asig) || {}).filter(iso => (!desde || iso >= desde) && (!hasta || iso <= hasta)).sort();
   for (const iso of dias) {
-    const tids = Object.keys(est.asig[iso] || {}).filter(tid => asignados(est, iso, tid).length);
+    const tids = Object.keys(est.asig[iso] || {}).filter(tid => asignados(est, iso, tid).length && !turnoYaPasado(cfg, iso, tid, opts));
     const quien = (tid, k) => { const e = asignados(est, iso, tid).find(x => x[k]); return e ? e.pid : null; };
     const antes = Object.fromEntries(tids.map(tid => [tid, { a: quien(tid, 'abre'), c: quien(tid, 'cocina') }]));
     for (let vuelta = 0; vuelta < VUELTAS_ECO; vuelta++) {
@@ -3117,7 +3188,8 @@ function revisarTurno(cfg, staff, est, iso, tid) {
       const d = r.detalle[i];
       const q = d && d.k === 'nuncaCon' && d.otro ? parDe(pid, d.otro) : null;
       if (q && q.en !== pid) continue;
-      v.push({ k: d ? d.k || null : null, texto: q && !q.flexible ? `no puede coincidir con ${nombreDe(staff, d.otro)}` : r.avisos[i] });
+      // (01/10, A7) `dura`: una regla dura (esDuraDetalle); la pareja estricta va aparte (incompatibles o la línea de lo forzado)
+      v.push({ k: d ? d.k || null : null, texto: q && !q.flexible ? `no puede coincidir con ${nombreDe(staff, d.otro)}` : r.avisos[i], dura: esDuraDetalle(d) && d.k !== 'nuncaCon' });
     }
     vig.set(pid, v);
     return v;
@@ -3137,6 +3209,9 @@ function revisarTurno(cfg, staff, est, iso, tid) {
     // (revisión de la fase 6) para que la cabecera n/mín de Hoy y la Cobertura digan por qué no falta nadie
     minimosApagados: !regla(cfg, 'minimos'),
     sinCocina: !!(abierto && tieneCocina && !coc),
+    // (01/10, corrección de A7; decisión 4c del coordinador) sin cocina porque el encargado la quitó a mano: una decisión suya, como lo
+    // forzado (la Revisión la pone en ámbar, el Generador no la da como hueco ni la busca)
+    cocinaQuitada: !!(abierto && tieneCocina && !coc && cocinaQuitadaEn(est, iso, tid)),
     cocinaObligatoria: cocinaObligatoriaEn(cfg, l, franja),
     // (01/10, A6; auditoría C12) también la cocina de un local que no la tiene (esa franja)
     cocinaNoApta: !!(coc && regla(cfg, 'cocina') && (!tieneCocina || !puedeCocina(cfg, personaDe(staff, coc.pid), localId, iso))),
@@ -3156,12 +3231,14 @@ function revisarTurno(cfg, staff, est, iso, tid) {
     autorizados: lista.filter(e => autDe(e.pid).length).map(e => `${nombreDe(staff, e.pid)}: ${autDe(e.pid).map(a => a.texto).join(', ')}`),
     autorizadosPor: lista.filter(e => autDe(e.pid).length).map(e => ({ pid: e.pid, textos: autDe(e.pid).map(a => a.texto) })),
     incompatibles: [],
+    // (corrección de A7; revisión de cliente B3) las mismas parejas, con quién es quién (pids): la Revisión dice qué hacer
+    incompatiblesPor: [],
     // 24/09 (S26): gente puesta en una casilla que ya no abre ese día (plazas fantasma)
     enCerrado: abierto ? 0 : n,
   };
   // La pareja flexible (S24) no es «no pueden coincidir» de nivel alta: si se relajó porque no había nadie más, o se puso a mano,
   // queda su aviso (media), una vez
-  for (const q of pares) if (q.alta) out.incompatibles.push([nombreDe(staff, q.a.pid), nombreDe(staff, q.b.pid)]);
+  for (const q of pares) if (q.alta) { out.incompatibles.push([nombreDe(staff, q.a.pid), nombreDe(staff, q.b.pid)]); out.incompatiblesPor.push({ a: q.a.pid, b: q.b.pid }); }
   // (S0, 30/09) quien ya no está con nosotros desde ese día y sigue en la casilla (una plaza de antes de apuntar la
   // salida, o puesta desde otro dispositivo): la Revisión lo dice
   out.salidos = lista.map(e => personaDe(staff, e.pid)).filter(q => q && haSalido(q, iso)).map(q => q.id);
@@ -3178,6 +3255,15 @@ function revisionMes(cfg, staff, est, opts) {
     // que sale y con sus franjas («no hace partido los martes (mañana y tarde)»): antes salía una vez en la mañana y otra en la
     // tarde. Por eso las casillas del día se revisan antes de escribir sus líneas
     const rDia = new Map(), partidoDia = new Map();
+    // (01/10, A7; revisión de cliente de A4, S3, y de A5, S2) lo de un día ya trabajado (opts.hoy) no va ni en rojo ni en ámbar:
+    // aparte, como «pasado» (la Revisión lo enseña en gris, para que se sepa), y sin «qué hacer» (generar desde hoy no lo toca).
+    // Antes un «nunca con» recién puesto llenaba «Hay que resolver» de días de septiembre, y los huecos de días ya trabajados
+    // salían en rojo sin que se pudieran resolver
+    // (01/10, corrección de A7; revisión de modelo B-3 y de cliente H1) con opts.ahoraHM (la hora de Madrid que pasa la app), también lo
+    // de un turno de hoy que ya ha terminado (turnoYaPasado, la misma lectura que la Cobertura, Equipo y «Solo desde hoy» del
+    // Generador): a las 20:00 el hueco de esta mañana salía en rojo y no se podía resolver. Por casilla (tids: las de la línea)
+    const yaPaso = tid => !!(opts && opts.hoy) && (d.iso < opts.hoy || (!!tid && turnoYaPasado(cfg, d.iso, tid, { desdeIso: opts.hoy, ahoraHM: opts.ahoraHM })));
+    const pon = (x, accion, tids) => out.push((tids || [x.turnoId]).every(yaPaso) ? Object.assign(x, { nivel: 'pasado', pasado: true }) : accion ? Object.assign(x, { msg: `${x.msg} — ${accion}` }) : x);
     for (const t of ts) if (turnoAbierto(cfg, est, d.iso, t.id)) rDia.set(t.id, revisarTurno(cfg, staff, est, d.iso, t.id));
     for (const [tid, r] of rDia) for (const x of r.avisosPor) for (const it of x.items) if (it.k === 'partido') { const k = x.pid + '|' + it.texto; if (!partidoDia.has(k)) partidoDia.set(k, []); partidoDia.get(k).push(tid); }
     const itemsDe = (x, tid) => x.items.flatMap(it => {
@@ -3198,29 +3284,37 @@ function revisionMes(cfg, staff, est, opts) {
         // los días ya pasados que solo cierra «Cuándo abre» no se avisan: se trabajaron con el horario
         // de entonces y cuentan en las horas (revisión F2)
         const dentro = pidsEn(est, d.iso, t.id);
-        if (dentro.length && opts && opts.hoy && d.iso < opts.hoy && plazaOcupa(cfg, est, d.iso, t.id)) continue;
-        if (dentro.length) { const c = cierreEn(cfg, d.iso, t.id); out.push({ iso: d.iso, turnoId: t.id, tipo: 'plaza-en-cerrado', nivel: 'alta', n: dentro.length, msg: `${donde}: ${c ? `cerrado (${motivoCierreTxt(c) || etiquetaCierre(c).toLowerCase()})` : 'el local no abre'} y ${dentro.length > 1 ? 'siguen puestas' : 'sigue puesta'} ${dentro.map(pid => nombreDe(staff, pid)).join(', ')}` }); }
+        if (dentro.length && yaPaso(t.id) && plazaOcupa(cfg, est, d.iso, t.id)) continue;
+        if (dentro.length) { const c = cierreEn(cfg, d.iso, t.id); pon({ iso: d.iso, turnoId: t.id, tipo: 'plaza-en-cerrado', nivel: 'alta', n: dentro.length, msg: `${donde}: ${c ? `cerrado (${motivoCierreTxt(c) || etiquetaCierre(c).toLowerCase()})` : 'el local no abre'} y ${dentro.length > 1 ? 'siguen puestas' : 'sigue puesta'} ${dentro.map(pid => nombreDe(staff, pid)).join(', ')}` }); }
         continue;
       }
       const r = rDia.get(t.id);
       // abierta a mano con mínimo 0 y sin nadie (S28): el mínimo no avisa, pero una casilla abierta vacía sí
-      if (!r.n && !r.minimo) out.push({ iso: d.iso, turnoId: t.id, tipo: 'abierta-vacia', nivel: 'media', msg: `${donde}: abierta y sin nadie (mínimo 0)` });
-      if (r.faltan) out.push({ iso: d.iso, turnoId: t.id, tipo: 'falta', nivel: r.supuesto ? 'media' : 'alta', n: r.faltan, msg: `${donde}: falta${r.faltan > 1 ? 'n' : ''} ${r.faltan} (hay ${r.n} de ${r.minimo}${r.supuesto ? ', mínimo supuesto' : ''}${r.refuerzo ? ', con refuerzo' : ''})` });
-      if (r.sinCocina) out.push({ iso: d.iso, turnoId: t.id, tipo: 'sin-cocina', nivel: r.cocinaObligatoria ? 'alta' : 'media', msg: `${donde}: sin cocina${r.cocinaObligatoria ? ' (obligatoria)' : ''}` });
+      if (!r.n && !r.minimo) pon({ iso: d.iso, turnoId: t.id, tipo: 'abierta-vacia', nivel: 'media', msg: `${donde}: abierta y sin nadie (mínimo 0)` });
+      if (r.faltan) pon({ iso: d.iso, turnoId: t.id, tipo: 'falta', nivel: r.supuesto ? 'media' : 'alta', n: r.faltan, msg: `${donde}: falta${r.faltan > 1 ? 'n' : ''} ${r.faltan} (hay ${r.n} de ${r.minimo}${r.supuesto ? ', mínimo supuesto' : ''}${r.refuerzo ? ', con refuerzo' : ''})` });
+      // (01/10, corrección de A7; decisión 4c del coordinador) la que quitó el encargado a mano, en ámbar y dicho: es una decisión suya
+      if (r.sinCocina) pon({ iso: d.iso, turnoId: t.id, tipo: 'sin-cocina', nivel: r.cocinaObligatoria && !r.cocinaQuitada ? 'alta' : 'media', msg: `${donde}: sin cocina${r.cocinaQuitada ? ' (quitada a mano)' : r.cocinaObligatoria ? ' (obligatoria)' : ''}` });
       if (r.cocinaNoApta) {
         const coc = asignados(est, d.iso, t.id).find(e => e.cocina);
         const sinLocal = !localTieneCocina(t.local, t.franja, cfg, staff);   // (A6, C12) el local no tiene cocina esa franja
-        out.push({ iso: d.iso, turnoId: t.id, tipo: 'cocina-no-apta', nivel: 'media', msg: `${donde}: ${sinLocal ? `${textoSinCocinaLocal(cfg, staff, t.local, t.franja)} y ${nombreDe(staff, coc.pid)} lleva la cocina` : 'la cocina la lleva alguien que no es cocina de ese local'}` });
+        pon({ iso: d.iso, turnoId: t.id, tipo: 'cocina-no-apta', nivel: 'media', msg: `${donde}: ${sinLocal ? `${textoSinCocinaLocal(cfg, staff, t.local, t.franja)} y ${nombreDe(staff, coc.pid)} lleva la cocina` : 'la cocina la lleva alguien que no es cocina de ese local'}` });
       }
-      if (r.sinAbre) out.push({ iso: d.iso, turnoId: t.id, tipo: 'sin-abre', nivel: 'alta', msg: `${donde}: hueco disponible en la 1.ª posición — ${r.motivoAbre}` });
+      if (r.sinAbre) pon({ iso: d.iso, turnoId: t.id, tipo: 'sin-abre', nivel: 'alta', msg: `${donde}: hueco disponible en la 1.ª posición — ${r.motivoAbre}` });
       // 24/09 (fase 5, S18): «Sale primero» a mano sobre quien no puede abrir
-      if (r.abreNoApto) out.push({ iso: d.iso, turnoId: t.id, pid: r.abreNoApto.pid, tipo: 'abre-no-apto', nivel: 'media', msg: `${donde}: sale primero ${nombreDe(staff, r.abreNoApto.pid)}, marcado a mano, y no puede abrir — ${r.abreNoApto.motivo}` });
+      if (r.abreNoApto) pon({ iso: d.iso, turnoId: t.id, pid: r.abreNoApto.pid, tipo: 'abre-no-apto', nivel: 'media', msg: `${donde}: sale primero ${nombreDe(staff, r.abreNoApto.pid)}, marcado a mano, y no puede abrir — ${r.abreNoApto.motivo}` });
       // 24/09 (S33; José, 17/09: «dos apoyos no se quedan solos, hace falta un veterano»): hasta ahora
       // solo lo pintaba Hoy; también con un solo apoyo
-      if (r.soloApoyos) out.push({ iso: d.iso, turnoId: t.id, tipo: 'solo-apoyos', nivel: 'alta', msg: `${donde}: solo apoyos (${pidsEn(est, d.iso, t.id).map(pid => nombreDe(staff, pid)).join(', ')}): hace falta alguien de sala o de cocina` });
-      for (const [a, b] of r.incompatibles) out.push({ iso: d.iso, turnoId: t.id, tipo: 'incompatibles', nivel: 'alta', msg: `${donde}: ${a} y ${b} no pueden coincidir` });
+      if (r.soloApoyos) pon({ iso: d.iso, turnoId: t.id, tipo: 'solo-apoyos', nivel: 'alta', msg: `${donde}: solo apoyos (${pidsEn(est, d.iso, t.id).map(pid => nombreDe(staff, pid)).join(', ')}): hace falta alguien de sala o de cocina` });
+      // (01/10, corrección de A7; revisión de cliente B3) la pareja siempre en el mismo orden (por el nombre: salía «Victoria y Jenny» por
+      // la mañana y «Jenny y Victoria» por la tarde) y con qué hacer, como las demás líneas rojas: quién sale al volver a generar (lo que
+      // hace regenerar: saleAlRegenerar) o, si las dos están puestas a mano, que se quite una
+      for (const q of r.incompatiblesPor) {
+        const [a, b] = [q.a, q.b].sort((x, y) => nombreDe(staff, x).localeCompare(nombreDe(staff, y), 'es'));
+        const sale = [a, b].map(pid => asignados(est, d.iso, t.id).find(e => e.pid === pid)).find(e => e && saleAlRegenerar(cfg, staff, est, d.iso, t.id, e));
+        pon({ iso: d.iso, turnoId: t.id, tipo: 'incompatibles', nivel: 'alta', pids: [a, b], msg: `${donde}: ${nombreDe(staff, a)} y ${nombreDe(staff, b)} no pueden coincidir` }, sale ? `sale ${nombreDe(staff, sale.pid)} al volver a generar la semana` : 'las dos están puestas a mano: quita a una');
+      }
       // (S0, 30/09) ya no trabaja con nosotros y sigue puesta: fallo alto, con la persona
-      for (const pid of r.salidos) out.push({ iso: d.iso, turnoId: t.id, pid, tipo: 'salida', nivel: 'alta', msg: `${donde}: ${nombreDe(staff, pid)} ${textoSalida(personaDe(staff, pid)).replace(/ desde el (\S+)$/, ' (desde el $1)')} y sigue en la casilla` });
+      for (const pid of r.salidos) pon({ iso: d.iso, turnoId: t.id, pid, tipo: 'salida', nivel: 'alta', msg: `${donde}: ${nombreDe(staff, pid)} ${textoSalida(personaDe(staff, pid)).replace(/ desde el (\S+)$/, ' (desde el $1)')} y sigue en la casilla` });
       // 01/10 (A5; auditoría F4): una entrada «por X» con X en la misma casilla, o con X que ya no falta ese día (se quitó su
       // ausencia y aún no se ha regenerado, o lo puso alguien a mano): «Roberto va por Iván» sin que Iván falte. Regenerar
       // retira lo automático (motivoRetirada) y al relevo le quita el «por»; lo puesto a mano se queda y aquí se ve. Quien falta
@@ -3235,33 +3329,54 @@ function revisionMes(cfg, staff, est, opts) {
         if (!aqui && faltaEn(cfg, x, d.iso, t.franja)) continue;
         if (e.origen === 'patron' && plazasDelDia(cfg, staff, d.iso).plazas.some(pl => pl.t === t.id && pl.p === e.pid && pl.por === xid)) continue;
         const accion = !esAutomatica(e) ? 'quítalo a mano si ya no hace falta' : e.relevo ? (faltaEn(cfg, x, d.iso, t.franja) ? 'quítale el «por» a mano' : 'al volver a generar la semana se queda en su sitio, sin el «por»') : motivoRetirada(cfg, staff, est, d.iso, t.id, e) ? 'sale al volver a generar la semana' : 'quítalo a mano si ya no hace falta';
-        out.push({ iso: d.iso, turnoId: t.id, pid: e.pid, tipo: 'por-presente', nivel: 'media', msg: `${donde}: ${nombreDe(staff, e.pid)} va por ${x.nombre}, ${aqui ? 'que está en la misma casilla' : 'que ya no falta ese día'} — ${accion}` });
+        pon({ iso: d.iso, turnoId: t.id, pid: e.pid, tipo: 'por-presente', nivel: 'media', msg: `${donde}: ${nombreDe(staff, e.pid)} va por ${x.nombre}, ${aqui ? 'que está en la misma casilla' : 'que ya no falta ese día'}` }, accion);
       }
       // (01/10, A6; auditoría C9) la línea de lo forzado lleva solo lo de las entradas forzadas; lo demás, en su línea de aviso.
       // (corrección de A6; revisión de cliente H2) cada forzada con el motivo que escribió el encargado («Leo, puesto a la fuerza
       // ("No hay nadie más"): no puede coincidir con Susana Capón») y la cuenta en singular o en plural de verdad
-      const avF = r.avisosPor.filter(x => x.forzado).map(x => { const its = itemsDe(x, t.id); return `${nombreDe(staff, x.pid)}, puesto a la fuerza${x.motivo ? ` (“${x.motivo}”)` : ''}${its.length ? ': ' + its.join(', ') : ''}`; });
-      const avR = r.avisosPor.filter(x => !x.forzado).map(x => { const its = itemsDe(x, t.id); return its.length ? `${nombreDe(staff, x.pid)}: ${its.join(', ')}` : ''; }).filter(Boolean);
-      if (r.forzados) out.push({ iso: d.iso, turnoId: t.id, tipo: 'forzado', nivel: 'media', msg: `${donde}: ${r.forzados === 1 ? '1 asignación forzada' : `${r.forzados} asignaciones forzadas`} a mano — ${avF.join(' · ')}` });
-      if (avR.length) out.push({ iso: d.iso, turnoId: t.id, tipo: 'aviso', nivel: 'media', msg: `${donde}: ${avR.join(' · ')}` });
+      // (corrección de A7; revisión de modelo B-4) de una forzada, lo duro que NO se forzó (no está en los avisos que se guardaron al
+      // forzar: unas vacaciones apuntadas después por otro camino) no es «a la fuerza»: va en rojo, en la línea de abajo. (B5) «Mari Luz, a
+      // la fuerza»: sin el género, que no se sabe (decía «Mari Luz, puesto a la fuerza»)
+      const enListaF = asignados(est, d.iso, t.id);
+      const noForzado = x => { const en = enListaF.find(y => y.pid === x.pid) || {}; return it => it.dura && it.k !== 'salida' && Array.isArray(en.avisos) && !en.avisos.includes(it.texto); };
+      const avF = r.avisosPor.filter(x => x.forzado).map(x => { const nf = noForzado(x); const its = itemsDe(Object.assign({}, x, { items: x.items.filter(it => !nf(it)) }), t.id); return `${nombreDe(staff, x.pid)}, a la fuerza${x.motivo ? ` (“${x.motivo}”)` : ''}${its.length ? ': ' + its.join(', ') : ''}`; });
+      // (01/10, A7; revisión de cliente de A4, S2) lo que no se forzó y rompe una regla dura (un local o una franja que ya no hace, un
+      // veto, el día libre, una ausencia, el standby, el cierre de su local…) va en rojo, con qué hacer: lo automático lo retira el
+      // Generador al volver a generar (D15) y lo puesto a mano no lo quita nadie (principio 4). Salía en ámbar («Conviene
+      // revisar») y era justo lo que regenerar retiraba. Lo blando (el partido no declarado, la pareja flexible), en «aviso». La
+      // salida («ya no trabaja con nosotros») tiene su línea (arriba): no se repite
+      const enLista = asignados(est, d.iso, t.id);
+      for (const x of r.avisosPor) {
+        const its = x.items.filter(x.forzado ? noForzado(x) : it => it.dura && it.k !== 'salida');
+        if (!its.length) continue;
+        const en = enLista.find(y => y.pid === x.pid);
+        // (corrección de A7; revisión de modelo M-1) de lo automático, solo lo que regenerar retira de verdad (saleAlRegenerar): la
+        // misma persona en dos casillas de esa franja va en la línea de la que sale
+        if (en && esAutomatica(en) && !saleAlRegenerar(cfg, staff, est, d.iso, t.id, en)) continue;
+        pon({ iso: d.iso, turnoId: t.id, pid: x.pid, tipo: 'regla-dura', nivel: 'alta', msg: `${donde}: ${nombreDe(staff, x.pid)}: ${its.map(it => it.texto).join(', ')}` }, en && esAutomatica(en) ? 'sale al volver a generar la semana' : 'puesta a mano, no se quita sola: quítala tú');   // (corrección de A7; B1) sin repetirse
+      }
+      const blando = x => Object.assign({}, x, { items: x.items.filter(it => !it.dura && it.k !== 'salida') });
+      const avR = r.avisosPor.filter(x => !x.forzado).map(blando).map(x => { const its = itemsDe(x, t.id); return its.length ? `${nombreDe(staff, x.pid)}: ${its.join(', ')}` : ''; }).filter(Boolean);
+      if (r.forzados) pon({ iso: d.iso, turnoId: t.id, tipo: 'forzado', nivel: 'media', msg: `${donde}: ${r.forzados === 1 ? '1 asignación forzada' : `${r.forzados} asignaciones forzadas`} a mano — ${avF.join(' · ')}` });
+      if (avR.length) pon({ iso: d.iso, turnoId: t.id, tipo: 'aviso', nivel: 'media', msg: `${donde}: ${avR.join(' · ')}` });
       // D1 (fase 3): el partido para cubrir a quien falta está autorizado; se dice, en informativo. Una
       // línea por persona y día (revisión F3: salía una por la mañana y otra por la tarde)
       for (const x of r.autorizadosPor) for (const texto of x.textos) {
         const k = x.pid + '|' + texto, ya = autDia.get(k);
-        if (ya) { if (!ya.franjas.includes(t.franja)) ya.franjas.push(t.franja); if (!ya.locales.includes(t.local.nombre)) ya.locales.push(t.local.nombre); continue; }
-        autDia.set(k, { pid: x.pid, texto, turnoId: t.id, franjas: [t.franja], locales: [t.local.nombre] });
+        if (ya) { if (!ya.franjas.includes(t.franja)) ya.franjas.push(t.franja); if (!ya.locales.includes(t.local.nombre)) ya.locales.push(t.local.nombre); ya.tids.push(t.id); continue; }
+        autDia.set(k, { pid: x.pid, texto, turnoId: t.id, franjas: [t.franja], locales: [t.local.nombre], tids: [t.id] });
       }
     }
     for (const x of autDia.values()) {
       const fr = FRANJAS.filter(f => x.franjas.includes(f)).map(f => FRANJA_LBL[f].toLowerCase()).join(' y ');
-      out.push({ iso: d.iso, turnoId: x.turnoId, pid: x.pid, tipo: 'autorizado', nivel: 'info', msg: `${nombreDe(staff, x.pid)}: ${x.texto} · ${x.locales.join(' y ')}, ${fr} del ${DOW_LBL[d.dow]} ${d.d}` });
+      pon({ iso: d.iso, turnoId: x.turnoId, pid: x.pid, tipo: 'autorizado', nivel: 'info', msg: `${nombreDe(staff, x.pid)}: ${x.texto} · ${x.locales.join(' y ')}, ${fr} del ${DOW_LBL[d.dow]} ${d.d}` }, null, x.tids);
     }
     autDia.clear();
     // quien apoya por un cierre «donde haga falta» y nadie ha colocado ese día (revisión F2): sin este
     // aviso, en la planilla parecía que libraba. Va con la casilla cerrada de la que viene.
     for (const x of apoyosSinSitio(cfg, staff, est, d.iso)) {
       const lc = localDe(cfg, x.cierre.localId);
-      out.push({ iso: d.iso, turnoId: turnoId(x.cierre.localId, x.franja), pid: x.pid, tipo: 'apoyo-sin-sitio', nivel: 'media', msg: `${nombreDe(staff, x.pid)}: de apoyo por el cierre de ${lc ? lc.nombre : x.cierre.localId}, la ${FRANJA_LBL[x.franja].toLowerCase()} del ${DOW_LBL[d.dow]} ${d.d} aún sin sitio` });
+      pon({ iso: d.iso, turnoId: turnoId(x.cierre.localId, x.franja), pid: x.pid, tipo: 'apoyo-sin-sitio', nivel: 'media', msg: `${nombreDe(staff, x.pid)}: de apoyo por el cierre de ${lc ? lc.nombre : x.cierre.localId}, la ${FRANJA_LBL[x.franja].toLowerCase()} del ${DOW_LBL[d.dow]} ${d.d} aún sin sitio` });
     }
   }
   return out;
@@ -3308,7 +3423,7 @@ const diaYNum = iso => `${DOW_LBL[isoDow(iso)]} ${+iso.slice(8, 10)}`;
 // opts.soloTurnos: solo las plazas de esas casillas (30/09, corrección de A3: quitarCierre repone la casilla que reabre)
 function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
   const o = opts || {};
-  const r = { aplicados: [], rechazados: [], coberturas: [], ausentes: [], avisos: [] };
+  const r = { aplicados: [], rechazados: [], coberturas: [], ausentes: [], avisos: [], retirados: [] };
   const toca = pl => (!o.soloPid || pl.p === o.soloPid || pl.por === o.soloPid) && (!o.soloTurnos || o.soloTurnos.includes(pl.t));
   // 30/09 (A4; auditoría E2): con soloPid (moverDiaLibre) se vuelve a pasar también por las ausencias de quien esa persona cubre
   // («cubre a»): al quitar el cambio de día libre, el relevo y la cobertura por designación vuelven; antes solo regenerar lo
@@ -3367,15 +3482,17 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
       }
     }
     // quien esta semana libra este día: su plaza se cubre como la de un ausente (si sigue con nosotros, S0)
+    // (01/10, corrección de A7; revisión de cliente H1) con opts.ahoraHM, nada en el turno de hoy que ya ha terminado: se trabajó así
+    const yaPaso = tid => turnoYaPasado(cfg, iso, tid, o);
     for (const pl of libres) {
-      if (!tocaAusente(pl) || (o.sinSupuestos && pl.s)) continue;
+      if (!tocaAusente(pl) || (o.sinSupuestos && pl.s) || yaPaso(pl.t)) continue;
       const p = personaDe(staff, pl.p);
       if (p && haSalido(p, iso)) continue;
       ausentes.push({ pl, p });
       r.ausentes.push({ iso, turnoId: pl.t, pid: pl.p, tipo: 'libraPuntual' });
     }
     for (const pl of plazas) {
-      if (!tocaAusente(pl) || (o.sinSupuestos && pl.s)) continue;
+      if (!tocaAusente(pl) || (o.sinSupuestos && pl.s) || yaPaso(pl.t)) continue;
       const p = personaDe(staff, pl.p);
       if (!p) { if (toca(pl)) r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: 'no existe' }); continue; }
       // (S0, 30/09) quien ya no está con nosotros: su plaza se salta, con el motivo, y no hay que cubrirla
@@ -3407,7 +3524,7 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
         // cocina; Hojan, solo cocina, quedaba de sala en dos casillas). Se rechaza con el motivo y el aviso lo dice; el Generador rellena
         // la casilla con otra persona
         const tc = cocinaDelDia(cfg, est, iso, p.id);
-        const fuera = p.soloCocina && activa(cfg, p, 'cocina') ? 'solo hace cocina' : tc ? `ya lleva la cocina de ${(localDe(cfg, partirTurno(tc).localId) || {}).nombre || tc} ese día` : null;
+        const fuera = p.soloCocina && activa(cfg, p, 'cocina') ? 'solo hace cocina' : tc ? textoLlevaCocina(cfg, tc, pl.t) : null;
         r.avisos.push({ pid: pl.p, semana: lunesDe(iso), tipo: 'dosCocinas', texto: `${p.nombre} y ${nombreDe(staff, otraC.pid)} traen la cocina de ${l ? l.nombre : pl.t} el ${diaYNum(iso)} por la ${FRANJA_LBL[f].toLowerCase()}${pl.traslado ? ` (${p.nombre} cambia su día libre esta semana)` : ''}: la lleva ${nombreDe(staff, otraC.pid)}${fuera ? `; ${p.nombre} se queda fuera de ese turno` : ''}` });
         if (fuera) { r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: `${fuera}, y ${laLleva}` }); continue; }
       }
@@ -3424,9 +3541,23 @@ function instanciarPatron(cfg, staff, est, desde, hasta, opts) {
       // sin cocina esa franja, la «c» también entra de sala (antes la puerta la frenaba como cocina y la plaza se tiraba entera)
       const { localId: plLocal, franja: plFranja } = partirTurno(pl.t);
       const puesto = cocina && regla(cfg, 'cocina') && puedeCocinaCasilla(cfg, staff, p, plLocal, plFranja, iso) ? 'cocina' : 'sala';
+      // 01/10 (corrección de A7; decisión 1 del coordinador, ampliada por la revisión de modelo a toda plaza automática): la «c» de la
+      // semana tipo le quita la cocina a una plaza automática de otra vuelta (el Generador, el núcleo, la Cobertura, un cierre: la última
+      // cocina automática que se pone manda, S38) y esa persona no puede hacer sala (noRefuerzaSala, la lectura de la puerta: solo hace
+      // cocina o ya lleva otra cocina ese día): esa plaza SALE, con su motivo en «Se retira» (D15), y el relleno completa la casilla.
+      // Antes se quedaba de sala con su aviso (Hojan, el sábado 3 en el Mónaco al generar octubre sin la semana tipo y luego con ella)
+      // y, por estar de sala por la mañana, perdía también la cocina de la tarde, obligatoria. Lo puesto a mano o forzado, nunca
+      const antesCoc = puesto === 'cocina' ? asignados(est, iso, pl.t).find(x => x.cocina && x.pid !== pl.p && esAutomatica(x)) : null;
+      const noSala = antesCoc ? noRefuerzaSala(cfg, staff, est, iso, pl.t, antesCoc.pid) : null;
       const a = asignar(est, cfg, staff, iso, pl.t, pl.p, { origen: 'patron', razon, supuesto: !!pl.s, cocina, puesto, abrePatron: !!pl.a, por, nota: pl.n });
       if (a.ok) { r.aplicados.push({ iso, turnoId: pl.t, pid: pl.p, origen: 'patron', razon: a.entry.razon, supuesto: !!pl.s }); enSuSitio(iso, pl, pl.p, plazas); }
       else r.rechazados.push({ iso, turnoId: pl.t, pid: pl.p, motivo: a.motivo });
+      const pierde = noSala && asignados(est, iso, pl.t).find(x => x.pid === antesCoc.pid && !x.cocina && esAutomatica(x));
+      if (pierde && asignados(est, iso, pl.t).some(x => x.pid === pl.p && x.cocina)) {
+        const l = localDe(cfg, partirTurno(pl.t).localId);
+        r.retirados.push({ iso, turnoId: pl.t, pid: pierde.pid, origen: pierde.origen, por: porDe(staff, pierde), motivo: `${noSala}, y la cocina de ${l ? l.nombre : pl.t} es de ${p.nombre} (semana tipo)` });
+        retirarEntrada(est, cfg, staff, iso, pl.t, pierde.pid);
+      }
     }
     // quien «cubre a» la persona ausente ocupa su sitio (si puede). La semana de un cambio de
     // día libre, el «cubre a X los miércoles» vale para el martes que ahora libra X (24/09).
@@ -4036,7 +4167,11 @@ function gruposSelector(cfg, staff, est, iso, tid, opts) {
   const { localId, franja } = partirTurno(tid);
   const l = localDe(cfg, localId);
   const dentro = new Set(pidsEn(est, iso, tid));
-  const sinCocina = !!l && cocinaExigida(cfg, staff, l, franja) && turnoAbierto(cfg, est, iso, tid) && !asignados(est, iso, tid).some(e => e.cocina);
+  // (01/10, corrección de A7; revisión de cliente H5) no donde el encargado quitó la cocina a mano (cocinaQuitadaEn, la misma lectura que
+  // el Generador): la ★ ofrecía a Hojan «cocina titular» en esa casilla y el selector «COCINA · la casilla no tiene cocina», y tocarla
+  // devolvía la cocina a mano
+  const quitada = cocinaQuitadaEn(est, iso, tid);
+  const sinCocina = !quitada && !!l && cocinaExigida(cfg, staff, l, franja) && turnoAbierto(cfg, est, iso, tid) && !asignados(est, iso, tid).some(e => e.cocina);
   const deCocina = c => Object.assign(c, { cocina: true });
   const cocina = sinCocina ? candidatos(ctx, iso, tid, { modo: 'relleno', cocina: true }).map(deCocina) : [];
   const ya = new Set(cocina.map(c => c.pid));
@@ -4060,7 +4195,7 @@ function gruposSelector(cfg, staff, est, iso, tid, opts) {
   }
   // la ★: la primera de la cocina si la casilla no la tiene; si no, la primera de «pueden» (la usan el
   // selector y la ★ de un toque de Hoy, que ponen igual: ponerRecomendadoUI)
-  return { cocina, pueden, conAviso, noPueden, recomendado: cocina[0] || pueden[0] || null };
+  return { cocina, pueden, conAviso, noPueden, recomendado: cocina[0] || pueden[0] || null, cocinaQuitada: quitada };
 }
 // Cómo se dice un bloqueo en la hoja impresa, detrás de «Nombre, que …»
 function fraseBloqueo(b, p) {
@@ -4115,6 +4250,11 @@ function esAutomatica(e) { return !!e && ORIGENES_AUTO.includes(e.origen) && !e.
 const REGLAS_DURAS = ['cerrado', 'cierre', 'libra', 'ausencia', 'standby', 'locales', 'franjas', 'vetos', 'nuncaCon', 'salida', 'otraFranja'];
 // ¿Este bloqueo de la puerta es una regla dura (D15)? El «nunca con» solo si es estricto (la pareja flexible se relaja)
 function esReglaDura(b) { return !!b && REGLAS_DURAS.includes(b.k) && !(b.k === 'nuncaCon' && b.relajable); }
+// 01/10 (A7; revisión de cliente de A4, S1 y S2): ¿lo que incumple ahora una entrada ya puesta (el detalle de revisarEntrada) es una
+// regla dura? Lo que se fuerza con aviso y no es duro (el partido no declarado, la cocina, la pareja flexible relajada, que llega
+// como aviso) no. Una sola lectura para la casilla (posicionesDe.duras: Hoy y la Semana la marcan como lo forzado) y la Revisión
+// (en rojo): lo mismo que regenerar retiraría si fuera automática
+function esDuraDetalle(d) { return !!d && !d.aviso && REGLAS_DURAS.includes(d.k); }
 // ¿Esta entrada «por X» está ahí SOLO por la designación «cubre a»? (24/09, D13) Lo nuevo lleva la marca
 // `porDesignacion` (la semana tipo, el relleno, la Cobertura y la ausencia apuntada en Equipo la ponen
 // cuando quien entra es la persona designada). Lo guardado antes no la lleva, pero se sabe: el relleno
@@ -4177,10 +4317,41 @@ function motivoRetiradaDe(cfg, staff, est, iso, tid, e) {
       if (s.sale === e && !pareja) pareja = { motivo: `${b.motivo} (se queda ${nombreDe(staff, otro.pid)}, ${s.porque})`, pareja: true };
       continue;
     }
-    return { motivo: b.motivo, pareja: false };
+    return { motivo: b.motivo, pareja: false, k: b.k };
   }
   const m = motivoPorDe(cfg, staff, est, iso, tid, e, dow, franja) || motivoAusenciaDe(cfg, staff, iso, e, franja);
   return m ? { motivo: m, pareja: false } : pareja;
+}
+// 01/10 (corrección de A7; revisión de modelo M-1): ¿regenerar retiraría de verdad esta plaza automática? La marca «!» de Hoy, la
+// Semana y el Mes y la línea roja de la Revisión dicen «sale al volver a generar la semana»: tiene que ser lo que hace
+// retirarQueIncumplen. Con un motivo que no depende de nadie más (un local, una franja, un veto, el día libre…), sí. Cuando depende de
+// otra plaza (la pareja «nunca con» de dos automáticas: sale una, quienSobra; la misma persona en dos casillas de esa franja: sale la
+// primera que se mira), se mira qué retira ese día en una copia del día. Antes las dos de la pareja decían que salían, y la que se
+// queda era a veces la cocina obligatoria del Mónaco
+function saleAlRegenerar(cfg, staff, est, iso, tid, e) {
+  if (!esAutomatica(e)) return false;
+  const m = motivoRetiradaDe(cfg, staff, est, iso, tid, e);
+  if (!m) return false;
+  if (!m.pareja && m.k !== 'otraFranja') return true;
+  const copia = x => JSON.parse(JSON.stringify(x || {}));
+  const dia = Object.assign({}, est, { asig: Object.assign({}, est.asig, { [iso]: copia(est.asig && est.asig[iso]) }), manual: Object.assign({}, est.manual, { [iso]: copia(est.manual && est.manual[iso]) }), apertura: Object.assign({}, est.apertura, { [iso]: copia(est.apertura && est.apertura[iso]) }) });
+  return retirarQueIncumplen(cfg, staff, dia, iso, iso, {}).some(x => x.turnoId === tid && x.pid === e.pid);
+}
+// Las reglas duras que rompe ahora una entrada ya puesta (el detalle de revisarEntrada), tal como las marca la casilla (posicionesDe.duras;
+// el Mes): todas si es a mano (no se quita sola: principio 4); si es automática, solo si regenerar la retira (saleAlRegenerar)
+// (corrección de A7; revisión de modelo B-4) de lo forzado, solo lo duro que NO se forzó (no está entre los avisos que se guardaron al
+// forzar: unas vacaciones apuntadas después); lo que se forzó lo dice su «Puesta a la fuerza»
+function durasDeEntrada(cfg, staff, est, iso, tid, e, detalle) {
+  const duras = (detalle || []).filter(esDuraDetalle).map(d => d.motivo);
+  // (sin avisos guardados —datos de antes, o el estado del móvil de un empleado— no se sabe qué se forzó: nada)
+  if (e.forzado) return Array.isArray(e.avisos) ? duras.filter(m => !e.avisos.includes(m)) : [];
+  if (!duras.length || !esAutomatica(e)) return duras;
+  return saleAlRegenerar(cfg, staff, est, iso, tid, e) ? duras : [];
+}
+// lo mismo para la plaza de una persona (el Mes la pinta sin pasar por posicionesDe)
+function durasDe(cfg, staff, est, iso, tid, pid) {
+  const e = asignados(est, iso, tid).find(x => x.pid === pid);
+  return e ? durasDeEntrada(cfg, staff, est, iso, tid, e, revisarEntrada(cfg, staff, est, iso, tid, pid).detalle) : [];
 }
 // 01/10 (corrección de A5; revisión de modelo H6): ¿X falta esa franja? Una sola lectura para la retirada (motivoAusenciaDe y lo
 // que puso la Cobertura en motivoPorDe), la Revisión («por-presente») y el aviso de Equipo al quitar una ausencia: falta quien
@@ -4280,10 +4451,14 @@ function desmarcarRelevos(cfg, staff, est, iso, tid) {
 // casilla se recalcula (así abre quien debe).
 // estDe(iso): el estado escribible de ese día. opts: { desde, hasta, desdeIso, previaDe(iso): el estado
 // de la vista previa de ese día }. Devuelve { aplicadas, fallos, retiradas, relevos }.
+// (01/10, corrección de A7; revisión de cliente H1) opts.ahoraHM: la hora del volcado, que puede ser otra que la de la vista previa (hecha
+// a las 15:55, volcada a las 16:05): lo de un turno de hoy que ya ha terminado no se vuelca, ni se retira, ni se le cambian las marcas
 function volcarPrevia(cfg, staff, estDe, previa, opts) {
   const o = opts || {};
   const r = { aplicadas: 0, fallos: 0, retiradas: 0, relevos: 0, marcas: [] };
+  const yaPaso = (iso, tid) => turnoYaPasado(cfg, iso, tid, o);
   for (const x of previa.retirados || []) {
+    if (yaPaso(x.iso, x.turnoId)) continue;
     const e = estDe(x.iso);
     const en = asignados(e, x.iso, x.turnoId).find(y => y.pid === x.pid);
     if (!en || !esAutomatica(en)) continue;
@@ -4292,9 +4467,10 @@ function volcarPrevia(cfg, staff, estDe, previa, opts) {
   if (o.desde && o.hasta) for (const iso of rangoIso(o.desde, o.hasta)) {
     if (o.desdeIso && iso < o.desdeIso) continue;
     const e = estDe(iso);
-    for (const t of turnosDe(cfg)) desmarcarRelevos(cfg, staff, e, iso, t.id);
+    for (const t of turnosDe(cfg)) if (!yaPaso(iso, t.id)) desmarcarRelevos(cfg, staff, e, iso, t.id);
   }
   for (const a of previa.aplicados || []) {
+    if (yaPaso(a.iso, a.turnoId)) continue;
     const e = estDe(a.iso);
     if (pidsEn(e, a.iso, a.turnoId).includes(a.pid)) continue;
     const pv = o.previaDe ? o.previaDe(a.iso) : null;
@@ -4309,7 +4485,7 @@ function volcarPrevia(cfg, staff, estDe, previa, opts) {
     if (res.ok) r.aplicadas++; else r.fallos++;
   }
   for (const c of previa.coberturas || []) {
-    if (!c.yaEstaba) continue;
+    if (!c.yaEstaba || yaPaso(c.iso, c.turnoId)) continue;
     const e = estDe(c.iso);
     const en = asignados(e, c.iso, c.turnoId).find(y => y.pid === c.pid);
     if (!en) continue;
@@ -4321,7 +4497,7 @@ function volcarPrevia(cfg, staff, estDe, previa, opts) {
   // vista previa recalculó de lo que ya estaba (previa.marcas) llega a la planilla real, y nada queda desfasado
   if (o.desde && o.hasta) for (const iso of rangoIso(o.desde, o.hasta)) {
     if (o.desdeIso && iso < o.desdeIso) continue;
-    r.marcas.push(...refrescarCasillas(cfg, staff, estDe(iso), iso, iso));
+    r.marcas.push(...refrescarCasillas(cfg, staff, estDe(iso), iso, iso, o));
   }
   return r;
 }
@@ -4363,7 +4539,10 @@ function quitarSalida(staff, pid) {
   delete p.salida;
   return true;
 }
-// opts: { desdeIso, soloPid, soloDias: [iso] } → [{ iso, turnoId, pid, origen, por, motivo }]
+// opts: { desdeIso, ahoraHM, soloPid, soloDias: [iso] } → [{ iso, turnoId, pid, origen, por, motivo }]
+// (01/10, corrección de A7; revisión de cliente H1) con opts.ahoraHM (la hora de Madrid que pasa el Generador), el turno de hoy cuya
+// franja ya ha terminado tampoco se toca (turnoYaPasado, la misma lectura que la Cobertura y Equipo): a las 17:30 «Solo desde hoy»
+// retiraba a Tere de la mañana de hoy, ya trabajada, y le quitaba esas 8 horas de la nómina
 function retirarQueIncumplen(cfg, staff, est, desde, hasta, opts) {
   const o = opts || {};
   const out = [];
@@ -4371,6 +4550,7 @@ function retirarQueIncumplen(cfg, staff, est, desde, hasta, opts) {
     if (o.desdeIso && iso < o.desdeIso) continue;
     if (o.soloDias && !o.soloDias.includes(iso)) continue;
     for (const t of turnosDe(cfg)) {
+      if (turnoYaPasado(cfg, iso, t.id, o)) continue;
       desmarcarRelevos(cfg, staff, est, iso, t.id);
       // 01/10 (corrección de A4; revisión de modelo H-09): de una en una, en el orden de la casilla, y lo que solo es un «nunca
       // con» con otra plaza automática, lo último; tras cada retirada se vuelve a mirar la casilla (solo donde se ha retirado
@@ -4416,16 +4596,19 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
     if (hasta > d1) hasta = d1;
     if (desde > hasta) return r;
   }
-  if (!o.sinRetirar) r.retirados = retirarQueIncumplen(cfg, staff, target, desde, hasta, { desdeIso: o.desdeIso });
+  // (01/10, corrección de A7; revisión de cliente H1) «Solo desde hoy» con la hora (opts.ahoraHM, como la Cobertura): el turno de hoy
+  // que ya ha terminado es lo ya trabajado, como los días de antes: ni se retira, ni se rellena, ni se le cambian las marcas
+  const hoyYa = { desdeIso: o.desdeIso, ahoraHM: o.ahoraHM };
+  if (!o.sinRetirar) r.retirados = retirarQueIncumplen(cfg, staff, target, desde, hasta, hoyYa);
   // (revisión de la fase 5) quién abre y la cocina de lo que ya estaba, con la configuración de ahora
-  r.marcas = refrescarCasillas(cfg, staff, target, desdeEfectivo(desde, o.desdeIso), hasta);
+  r.marcas = refrescarCasillas(cfg, staff, target, desdeEfectivo(desde, o.desdeIso), hasta, hoyYa);
   // paso 1: lo fijo (la semana tipo y quien apoya por un cierre en su destino), el mismo que el del núcleo
-  const fijo = instanciarFijo(cfg, staff, target, desde, hasta, { sinPatron: !!o.sinPatron, desdeIso: o.desdeIso, meses: o.meses });
-  r.aplicados.push(...fijo.aplicados); r.coberturas.push(...fijo.coberturas); r.rechazados.push(...fijo.rechazados); r.avisos.push(...fijo.avisos);
+  const fijo = instanciarFijo(cfg, staff, target, desde, hasta, { sinPatron: !!o.sinPatron, desdeIso: o.desdeIso, ahoraHM: o.ahoraHM, meses: o.meses });
+  r.aplicados.push(...fijo.aplicados); r.coberturas.push(...fijo.coberturas); r.rechazados.push(...fijo.rechazados); r.avisos.push(...fijo.avisos); r.retirados.push(...fijo.retirados);
   for (const iso of rangoIso(desde, hasta)) {
     if (o.desdeIso && iso < o.desdeIso) continue;
-    // primero las casillas con menos candidatos (difícil primero)
-    const abiertos = turnosDe(cfg).filter(t => turnoAbierto(cfg, target, iso, t.id));
+    // primero las casillas con menos candidatos (difícil primero). (corrección de A7) sin el turno de hoy ya terminado
+    const abiertos = turnosDe(cfg).filter(t => turnoAbierto(cfg, target, iso, t.id) && !turnoYaPasado(cfg, iso, t.id, hoyYa));
     const pendientes = abiertos.map(t => ({ t, rev: revisarTurno(cfg, staff, target, iso, t.id) })).filter(x => x.rev.faltan || x.rev.sinCocina);
     pendientes.sort((a, b) => candidatosPara(cfg, staff, target, iso, a.t.id, ms).length - candidatosPara(cfg, staff, target, iso, b.t.id, ms).length);
     // 24/09 (revisión de la fase 5): una cocina que no es obligatoria no se lleva a quien hace falta para una
@@ -4437,13 +4620,15 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
       for (const t2 of abiertos) {
         if (t2.id === tid) continue;
         const r2 = revisarTurno(cfg, staff, target, iso, t2.id);
-        if (r2.sinCocina && r2.cocinaObligatoria) for (const c2 of candidatosPara(cfg, staff, target, iso, t2.id, Object.assign({ cocina: true, permitirPartido: !!o.permitirPartido }, ms))) out.add(c2.pid);
+        if (r2.sinCocina && r2.cocinaObligatoria && !r2.cocinaQuitada) for (const c2 of candidatosPara(cfg, staff, target, iso, t2.id, Object.assign({ cocina: true, permitirPartido: !!o.permitirPartido }, ms))) out.add(c2.pid);
       }
       return out;
     };
     for (const { t } of pendientes) {
       let rev = revisarTurno(cfg, staff, target, iso, t.id);
-      if (rev.sinCocina && (rev.cocinaObligatoria || rev.faltan)) {
+      // 01/10 (A7; fuzz, semilla 9286) no donde el encargado quitó la cocina a mano (sinCocina, principio 4): la casilla no se la
+      // daba (normalizarCasilla la respeta) y quien entraba «para la cocina» se quedaba de sala aunque solo hiciera cocina (Hojan)
+      if (rev.sinCocina && (rev.cocinaObligatoria || rev.faltan) && !rev.cocinaQuitada) {
         // (fase 6, S24; revisión) si nadie más puede, y solo con «Permitir partidos no declarados» (el modo relajado), la
         // pareja «nunca con» flexible se relaja (José, 17/09), con su aviso: la misma escalera que la Cobertura
         const { r: cs, relajaPareja: relajar } = buscarRelajando(x => candidatosPara(cfg, staff, target, iso, t.id, Object.assign({ cocina: true, permitirPartido: !!o.permitirPartido }, ms, x)), !!o.permitirPartido);
@@ -4502,7 +4687,7 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
   }
   // 30/09 (A1; auditoría H2): pasada final por lo generado. El eco de normalizarCasilla no encadena; lo que haya quedado
   // desfasado (e.abre, la cocina, el orden) frente a lo que dice la casilla se recoge aquí, y va en r.marcas
-  r.marcas.push(...refrescarCasillas(cfg, staff, target, desdeEfectivo(desde, o.desdeIso), hasta));
+  r.marcas.push(...refrescarCasillas(cfg, staff, target, desdeEfectivo(desde, o.desdeIso), hasta, hoyYa));
   return r;
 }
 // Paso 1 de todo generador: lo fijo del periodo, por la puerta (asignar): la semana tipo (instanciarPatron, con sus
@@ -4511,15 +4696,15 @@ function generarPlanilla(cfg, staff, est, desde, hasta, opts) {
 // usan el generador local (generarPlanilla), el problema del núcleo (toProblem: lo que pone es lo fijo del
 // problema) y el volcado de su solución (desdeSolucion). Antes el núcleo leía la semana tipo por su cuenta
 // (plazasDelDia, sin la puerta): fijaba plazas que la puerta no dejaba poner y no sabía de «cubre a».
-// opts: { sinPatron, sinSupuestos, desdeIso, meses }
+// opts: { sinPatron, sinSupuestos, desdeIso, ahoraHM (corrección de A7: el turno de hoy ya terminado no se toca), meses }
 function instanciarFijo(cfg, staff, est, desde, hasta, opts) {
   const o = opts || {};
-  const r = { aplicados: [], coberturas: [], rechazados: [], avisos: [] };
+  const r = { aplicados: [], coberturas: [], rechazados: [], avisos: [], retirados: [] };
   if (!o.sinPatron) {
-    const p = instanciarPatron(cfg, staff, est, desde, hasta, { desdeIso: o.desdeIso, meses: o.meses, sinSupuestos: !!o.sinSupuestos });
-    r.aplicados.push(...p.aplicados); r.coberturas.push(...p.coberturas); r.rechazados.push(...p.rechazados); r.avisos.push(...p.avisos);
+    const p = instanciarPatron(cfg, staff, est, desde, hasta, { desdeIso: o.desdeIso, ahoraHM: o.ahoraHM, meses: o.meses, sinSupuestos: !!o.sinSupuestos });
+    r.aplicados.push(...p.aplicados); r.coberturas.push(...p.coberturas); r.rechazados.push(...p.rechazados); r.avisos.push(...p.avisos); r.retirados.push(...p.retirados);
   }
-  const ci = instanciarCierres(cfg, staff, est, desde, hasta, { desdeIso: o.desdeIso });
+  const ci = instanciarCierres(cfg, staff, est, desde, hasta, { desdeIso: o.desdeIso, ahoraHM: o.ahoraHM });
   r.aplicados.push(...ci.aplicados); r.rechazados.push(...ci.rechazados);
   return r;
 }
@@ -4538,7 +4723,8 @@ function huecosDeCasilla(cfg, staff, est, iso, tid) {
   const out = [];
   if (rev.faltan > 0) out.push(Object.assign(huecoFaltan(cfg, staff, est, iso, tid, rev), rev.soloApoyos ? { motivo: MOTIVO_HUECO_APOYOS } : {}));
   else if (rev.soloApoyos) out.push({ iso, turnoId: tid, tipo: 'apoyos', faltan: 0, minimo: rev.minimo, supuesto: rev.supuesto, motivo: MOTIVO_HUECO_APOYOS, porQueNadie: porQueNadie(cfg, staff, est, iso, tid) });
-  if (rev.sinCocina && rev.cocinaObligatoria) out.push(huecoCocina(cfg, staff, est, iso, tid, rev));
+  // (corrección de A7; decisión 4c) la cocina que quitó el encargado a mano no es un hueco que haya que llenar (la Revisión la dice en ámbar)
+  if (rev.sinCocina && rev.cocinaObligatoria && !rev.cocinaQuitada) out.push(huecoCocina(cfg, staff, est, iso, tid, rev));
   if (rev.sinAbre) out.push(huecoPrimero(cfg, staff, est, iso, tid));
   return out;
 }
@@ -4787,7 +4973,8 @@ const VARIABLES = [
         const tid = turnoId(c.localId, f), l = localDe(ctx.cfg, c.localId);
         if (!turnoAbierto(ctx.cfg, ctx.est, iso, tid) || !localTieneCocina(l, f, ctx.cfg, ctx.staff)) continue;
         const r = revisarTurno(ctx.cfg, ctx.staff, ctx.est, iso, tid);
-        if (r.sinCocina) { if (r.cocinaObligatoria || r.n) v.push(`${diaV(iso)} ${FRANJA_LBL[f].toLowerCase()}: sin cocina`); continue; }
+        // (corrección de A7; decisión 4c) la quitada a mano lo dice, como la Revisión
+        if (r.sinCocina) { if (r.cocinaQuitada || r.cocinaObligatoria || r.n) v.push(`${diaV(iso)} ${FRANJA_LBL[f].toLowerCase()}: sin cocina${r.cocinaQuitada ? ' (quitada a mano)' : ''}`); continue; }
         if (r.cocinaNoApta) v.push(`${diaV(iso)} ${FRANJA_LBL[f].toLowerCase()}: la cocina no es de este local`);
         const sl = ctx.slots(iso, tid); const coc = sl.find(x => x.cocina);
         // (A1, C5/E3) la misma cuenta que la casilla: posicionCocina, con las personas (el hueco de la 1.ª no lo es)
@@ -4902,7 +5089,7 @@ function generarSemana(cfg, staff, est, lunes, opts) {
   // «cubre a» —Mari Luz pasa a ir «por Iván» sin moverse— no era un cambio y no se podía volcar)
   const foto = e => { const m = {}; for (const iso of dias) for (const t of turnosDe(cfg)) m[iso + '|' + t.id] = asignados(e, iso, t.id).map(x => ({ pid: x.pid, por: porDe(staff, x) || null })); return m; };
   const antes = foto(target);
-  const g = generarPlanilla(cfg, staff, target, lunes, dias[6], { desdeIso: o.desdeIso, permitirPartido: !!o.permitirPartido, sinPatron: !!o.sinPatron, sinRetirar: !!o.sinRetirar, meses: o.meses });
+  const g = generarPlanilla(cfg, staff, target, lunes, dias[6], { desdeIso: o.desdeIso, ahoraHM: o.ahoraHM, permitirPartido: !!o.permitirPartido, sinPatron: !!o.sinPatron, sinRetirar: !!o.sinRetirar, meses: o.meses });
   const despues = foto(target);
   const cambios = [];
   let relevos = 0, desmarcados = 0;
@@ -4921,7 +5108,7 @@ function generarSemana(cfg, staff, est, lunes, opts) {
     id: l.id, nombre: l.nombre, corto: l.corto, color: l.color, cocina: descripcionCocina(cfg, l),
     franjas: FRANJAS.map(f => ({ franja: f, dias: dias.map(iso => {
       const tid = turnoId(l.id, f);
-      if (!turnoAbierto(cfg, target, iso, tid)) { const c = cierreEn(cfg, iso, tid); return { iso, tid, abierto: false, cierre: c ? { id: c.id, localId: c.localId, motivo: c.motivo, detalle: c.detalle || '', etiqueta: etiquetaCierre(c), texto: textoCierre(cfg, c), hasta: hastaCierre(c) } : null }; }
+      if (!turnoAbierto(cfg, target, iso, tid)) { const c = cierreEn(cfg, iso, tid); return { iso, tid, abierto: false, cierre: c ? { id: c.id, localId: c.localId, motivo: c.motivo, detalle: c.detalle || '', etiqueta: etiquetaCierre(c), texto: textoCierre(cfg, c), hasta: hastaCierre(c, iso) } : null }; }
       const r = revisarTurno(cfg, staff, target, iso, tid);
       return { iso, tid, abierto: true, n: r.n, min: r.minimo, supuesto: r.supuesto, refuerzo: r.refuerzo, faltan: r.faltan, cambiado: cambiado.has(iso + '|' + tid), slots: posicionesDe(cfg, staff, target, iso, tid) };
     }) })),
@@ -5050,7 +5237,8 @@ function moverDiaLibre(cfg, staff, est, pid, lunes, dias, opts) {
   const trabaja = () => enEst.filter(iso => casillasDe(est, iso, pid).length).length;
   const nAntes = trabaja();
   const quitados = tocables.length ? retirarQueIncumplen(cfg, staff, est, desde, hasta, { soloPid: pid, soloDias: tocables }) : [];
-  const ip = tocables.length ? instanciarPatron(cfg, staff, est, desde, hasta, { soloPid: pid, soloDias: tocables, meses: o.meses }) : { aplicados: [], rechazados: [], avisos: [] };
+  const ip = tocables.length ? instanciarPatron(cfg, staff, est, desde, hasta, { soloPid: pid, soloDias: tocables, meses: o.meses }) : { aplicados: [], rechazados: [], avisos: [], retirados: [] };
+  quitados.push(...ip.retirados);   // (corrección de A7; decisión 1) la plaza automática que pierde la cocina frente a la suya y no puede hacer sala
   const quedan = [];
   for (const iso of tocables) {
     if (!(activa(cfg, p, 'libra') && libraEn(p, iso))) continue;
@@ -5340,7 +5528,9 @@ function planCobertura(cfg, staff, est, inc, afectados, estrategia, opts) {
       plan.asignaciones.push({ iso: a.iso, tid: a.tid, localId: a.localId, franja: a.franja, pid: rel, nombre: q.nombre, yaEstaba: true, razones: [`cubre a ${nombreX}`, 'ya estaba en este turno'], avisos: [], autorizados: aut, cocina: !!en.cocina, abre: primeroDe(cfg, staffSim, e, a.iso, a.tid) === rel, libre: false, score: 0, por: inc.pid, razon: `cubre a ${nombreX}` });
     }
     let rev = revisarTurno(cfg, staffSim, e, a.iso, a.tid);
-    const necesitaCocina = rev.sinCocina && (rev.cocinaObligatoria || a.cocina || rev.faltan > 0) && l && cocinaExigida(cfg, staffSim, l, franja);
+    // 01/10 (A7; como el Generador tras la semilla 9286) no donde el encargado quitó la cocina a mano (sinCocina, principio 4): el plan
+    // ponía a Hojan «para la cocina» por Cris en la mañana del Mónaco, la casilla no se la daba y se quedaba de sala (solo hace cocina)
+    const necesitaCocina = rev.sinCocina && (rev.cocinaObligatoria || a.cocina || rev.faltan > 0) && l && cocinaExigida(cfg, staffSim, l, franja) && !rev.cocinaQuitada;
     const necesario = rev.faltan > 0 || necesitaCocina || rev.sinAbre;
     // (revisión de la fase 6, D5) con «Mínimos» apagado la casilla no está «completa»: nadie pide el mínimo
     // (corrección de A5; revisión de cliente) con más gente que el mínimo, «3 (mínimo 2)»: «3 de 2» sonaba raro
@@ -5436,6 +5626,11 @@ function intercambioPara(cfg, staff, e, pid, as, afectados, usados, opts) {
       const avisos = [];
       if (despues.sinAbre && !antes.sinAbre) avisos.push('sin nadie que abra');
       if (despues.soloApoyos && !antes.soloApoyos) avisos.push('solo con apoyos');
+      // (01/10, A7; decisión del coordinador sobre los mutantes m9 y m10 de la corrección de A5) estas dos no se dan hoy: el cambio
+      // quita a uno y pone a otro (n no cambia, y el mínimo no depende de quién esté: `faltan` no puede subir), y quien recibe un
+      // turno con la cocina tiene que poder llevarla (la puerta con `puesto: 'cocina'` lo frena antes), así que la cocina no se
+      // pierde. Se quedan como defensa por si cambia cualquiera de esas dos cosas (un mínimo por persona, un cambio sin la
+      // cocina): ninguna prueba puede llegar a ellas mientras tanto
       if (despues.sinCocina && !antes.sinCocina) avisos.push('sin cocina');
       if (despues.faltan > antes.faltan) avisos.push(`con ${despues.n} de ${despues.minimo}`);
       const dist = Math.abs(Math.round((fechaLocal(iso) - fechaLocal(as.iso)) / 864e5));
@@ -5539,7 +5734,7 @@ function planesCobertura(cfg, staff, est, inc, opts) {
     if (rel) { marcarRelevo(asignados(sin, a.iso, a.tid).find(x => x.pid === rel), staffSim, inc.pid); normalizarCasilla(sin, cfg, staffSim, a.iso, a.tid); }
     const rev = revisarTurno(cfg, staffSim, sin, a.iso, a.tid);
     const l = localDe(cfg, a.localId);
-    const necesitaCocina = rev.sinCocina && (rev.cocinaObligatoria || a.cocina || rev.faltan > 0) && l && cocinaExigida(cfg, staff, l, a.franja);
+    const necesitaCocina = rev.sinCocina && (rev.cocinaObligatoria || a.cocina || rev.faltan > 0) && l && cocinaExigida(cfg, staff, l, a.franja) && !rev.cocinaQuitada;
     // la persona designada que ese día no puede cubrirla, y por qué (D13: «el domingo no puede: nunca con
     // Lavinia»); si ya va «por» ella en esa casilla (lo dejó Equipo), no hay nada que explicar
     const noCubren = [];
@@ -5736,7 +5931,10 @@ function cubrirAusencia(cfg, staff, est, pid, desde, hasta, franjas, opts) {
   const todos = turnosAfectados(cfg, staff, est, pid, desde, hasta || desde, { franjas: fs || undefined }).filter(a => ausenciaEn(p, a.iso, a.franja));
   if (!todos.length) return out;
   out.quitados = todos.map(a => ({ iso: a.iso, tid: a.tid, cocina: a.cocina, abre: a.abre }));
-  const pasado = a => !!o.desdeIso && a.iso < o.desdeIso;
+  // (01/10, A7; corrección de A5, lo que quedó sin tocar) con opts.ahoraHM (la hora de Madrid que pasa Equipo), también el turno de
+  // hoy cuya franja ya ha terminado, con la misma lectura que la Cobertura (turnoYaPasado): Aroa apunta a las 20:00 que Adrián se puso
+  // malo y Roberto no entra en la mañana ya trabajada; la tarde, en curso, sí se cubre. Sin la hora, solo los días de antes de hoy
+  const pasado = a => turnoYaPasado(cfg, a.iso, a.tid, o);
   out.pasados = todos.filter(pasado).map(a => ({ iso: a.iso, tid: a.tid }));
   for (const a of todos.filter(pasado)) retirarEntrada(est, cfg, staff, a.iso, a.tid, pid);
   const afectados = todos.filter(a => !pasado(a));
@@ -6166,7 +6364,8 @@ function horasLocalMes(cfg, staff, meses, y, m) {
 // opts: { conPatron (por defecto sí), permitirPartido (el modo relajado), meses (la planilla de todos los meses,
 // { 'aaaa-mm': { asig, apertura, manual } }: el periodo puede cruzar de mes; sin ella, est para todo el periodo; el
 // mes del propio est se lee siempre de est, que es la copia del Generador, como en turnosSemanaDe), desdeIso («Solo
-// desde hoy»: el problema empieza ese día; null si todo el periodo ya ha pasado) }.
+// desde hoy»: el problema empieza ese día; null si todo el periodo ya ha pasado), ahoraHM (corrección de A7: con desdeIso, el turno de
+// hoy ya terminado se queda como está: sin mínimo ni cocina que pedir y nadie más puede entrar en él) }.
 // También toProblem(ctx, desde, hasta, opts), con el contexto de crearContexto (sus meses, si no se pasan otros).
 // 25/09 (revisión de la fase 7, con el núcleo de verdad: shiftia-core y su CP-SAT):
 //  · «ningún local ese medio día» va como la lista ['*'] (el esquema del servicio: unavailable: dict[str, list[str]]);
@@ -6240,11 +6439,21 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
   const porId = new Map(workers.map(w => [w.id, w]));
   // lo fijo: lo ya puesto y el paso 1 (la semana tipo sin sus plazas supuestas, que las decide el núcleo), sobre la
   // planilla del periodo; solo en casillas abiertas (una cerrada tiene cobertura 0/0 y fijar ahí lo haría imposible)
-  instanciarFijo(cfg, staff, periodo, desde, hasta, { sinPatron: o.conPatron === false, sinSupuestos: true, meses: o.meses });
+  // (01/10, corrección de A7; revisión de cliente H1) el turno de hoy que ya ha terminado (turnoYaPasado con la hora) se trabajó como
+  // está: lo de dentro va fijo, nadie más puede entrar (unavailable) y no pide mínimo ni cocina (abajo)
+  const yaPaso = (iso, tid) => turnoYaPasado(cfg, iso, tid, o);
+  instanciarFijo(cfg, staff, periodo, desde, hasta, { sinPatron: o.conPatron === false, sinSupuestos: true, meses: o.meses, desdeIso: o.desdeIso, ahoraHM: o.ahoraHM });
   indices.forEach((x, i) => {
     for (const t of turnosDe(cfg)) {
       if (t.franja !== x.franja || !turnoAbierto(cfg, periodo, x.iso, t.id)) continue;
       for (const pid of pidsEn(periodo, x.iso, t.id)) { const w = porId.get(pid); if (w) { w.fixed[i] = t.local.id; delete w.unavailable[i]; } }
+    }
+    const pasados = cfg.locales.filter(l => yaPaso(x.iso, turnoId(l.id, x.franja))).map(l => l.id);
+    if (pasados.length) for (const w of workers) {
+      const u = w.unavailable[i] || [];
+      if (w.fixed[i] || u.includes('*')) continue;
+      const nu = [...new Set(u.concat(pasados.filter(id => w.allowed_shifts.includes(id))))];
+      if (nu.length) w.unavailable[i] = w.allowed_shifts.every(id => nu.includes(id)) ? ['*'] : nu;
     }
   });
   // (revisión de la fase 7) el partido de ESE día con lo que ya va fijo, por la puerta: quien tiene fija una mitad del
@@ -6271,6 +6480,7 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
     for (const l of cfg.locales) {
       const tid = turnoId(l.id, x.franja);
       if (!turnoAbierto(cfg, periodo, x.iso, tid)) { (cerradas[i] = cerradas[i] || {})[l.id] = { min: 0, max: 0 }; continue; }
+      if (yaPaso(x.iso, tid)) continue;   // (corrección de A7) ya trabajado
       const min = regla(cfg, 'minimos') ? minimoDe(cfg, x.iso, tid, periodo).min : 0;
       if (min > 0) (minimos[i] = minimos[i] || {})[l.id] = { min };
     }
@@ -6285,7 +6495,8 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
     if (!cocinaExigida(cfg, staff, l, f)) continue;
     const dura = cocinaObligatoriaEn(cfg, l, f);
     indices.forEach(x => {
-      if (x.franja !== f || !turnoAbierto(cfg, periodo, x.iso, turnoId(l.id, f))) return;
+      // (corrección de A7; decisión 3 del coordinador) ni la que el encargado quitó a mano (cocinaQuitadaEn, la lectura de la puerta y del volcado)
+      if (x.franja !== f || !turnoAbierto(cfg, periodo, x.iso, turnoId(l.id, f)) || yaPaso(x.iso, turnoId(l.id, f)) || cocinaQuitadaEn(periodo, x.iso, turnoId(l.id, f))) return;
       rules.push({ type: 'skill_coverage', mode: dura ? 'hard' : 'soft', weight: 5, tier: dura ? 3 : 1, id: `cocina ${l.nombre} ${FRANJA_LBL[f].toLowerCase()} del ${DOW_LBL[x.dow]} ${+x.iso.slice(8, 10)}/${+x.iso.slice(5, 7)}`, params: { requirements: [{ shift: l.id, skill: skillCocina(l.id, x.iso), min: 1 }] }, scope: { day_tags: [x.iso + '_' + f] } });
     });
   }
@@ -6328,19 +6539,22 @@ function toProblem(cfg, staff, est, desde, hasta, opts) {
 // rechaza (con su regla) y, si la casilla se queda corta, es un hueco con su porqué y lo que el núcleo proponía.
 // opts: { permitirPartido (el modo relajado del Generador), meses, razon, desdeIso («Solo desde hoy»: nada antes),
 // vetadas (lo que la puerta rechazó en la primera vuelta y se vetó en la segunda: si su casilla sigue corta, el hueco
-// lo dice) }. Devuelve { aplicados, rechazados, coberturas, avisos, huecos }.
+// lo dice), ahoraHM (corrección de A7: con desdeIso, el turno de hoy ya terminado tampoco) }. Devuelve { aplicados, rechazados,
+// coberturas, avisos, huecos }.
 function desdeSolucion(cfg, staff, est, problema, sol, opts) {
   const o = opts || {};
   const meta = problema.meta || {};
   const indices = meta.indices || [];
-  const r = { aplicados: [], rechazados: [], coberturas: [], avisos: [], huecos: [] };
+  const r = { aplicados: [], rechazados: [], coberturas: [], avisos: [], huecos: [], retirados: [] };
   // los días del periodo que están en este estado (el Periodo se vuelca mes a mes)
   const ds = (est.days || []).map(d => d.iso);
   const d1 = [meta.desde || (indices[0] || {}).iso, ds[0], o.desdeIso].filter(Boolean).sort().pop();
   const d2 = [meta.hasta || (indices[indices.length - 1] || {}).iso, ds[ds.length - 1]].filter(Boolean).sort()[0];
   if (!d1 || !d2 || d1 > d2) return r;
-  const f = instanciarFijo(cfg, staff, est, d1, d2, { sinPatron: meta.conPatron === false, sinSupuestos: true, meses: o.meses });
-  r.aplicados.push(...f.aplicados); r.coberturas.push(...f.coberturas); r.rechazados.push(...f.rechazados); r.avisos.push(...f.avisos);
+  const f = instanciarFijo(cfg, staff, est, d1, d2, { sinPatron: meta.conPatron === false, sinSupuestos: true, meses: o.meses, desdeIso: o.desdeIso, ahoraHM: o.ahoraHM });
+  // (01/10, corrección de A7; revisión de cliente H1) el turno de hoy que ya ha terminado no se toca (el problema ya no pide nada en él)
+  const yaPaso = (iso, tid) => turnoYaPasado(cfg, iso, tid, o);
+  r.aplicados.push(...f.aplicados); r.coberturas.push(...f.coberturas); r.rechazados.push(...f.rechazados); r.avisos.push(...f.avisos); r.retirados.push(...f.retirados);
   const modo = o.permitirPartido ? RELAJABLE : {};
   // la plaza de la semana tipo que el núcleo ha elegido por su cuenta (una supuesta) lleva su «por» y su nota
   const fijas = {};
@@ -6361,7 +6575,9 @@ function desdeSolucion(cfg, staff, est, problema, sol, opts) {
     const pl = plazaDe(iso, tid, pid);
     const base = Object.assign({ origen: 'nucleo', razon: o.razon || 'propuesto por el núcleo Shiftia (CP-SAT)', por: pl ? pl.por : undefined, nota: pl ? pl.n : undefined, supuesto: pl && pl.s ? true : undefined, apoyos: true }, modo);
     let a = asignar(est, cfg, staff, iso, tid, pid, Object.assign({ puesto: 'sala' }, base));
-    if (!a.ok && a.regla === 'cocina') a = asignar(est, cfg, staff, iso, tid, pid, Object.assign({ puesto: 'cocina', cocina: true }, base));
+    // (01/10, A7; como el Generador tras la semilla 9286) de cocina no donde el encargado la quitó a mano: la casilla no se la daría y
+    // se quedaría de sala; se rechaza con el porqué de la sala («solo hace cocina»)
+    if (!a.ok && a.regla === 'cocina' && !cocinaQuitadaEn(est, iso, tid)) a = asignar(est, cfg, staff, iso, tid, pid, Object.assign({ puesto: 'cocina', cocina: true }, base));
     if (a.ok) r.aplicados.push({ iso, turnoId: tid, pid, origen: 'nucleo', razon: a.entry.razon, avisos: a.avisos });
     return a;
   };
@@ -6369,7 +6585,7 @@ function desdeSolucion(cfg, staff, est, problema, sol, opts) {
     if (!code || code === (problema.rest_code || 'OFF')) continue;
     const x = indices[+i]; if (!x || x.iso < d1 || x.iso > d2) continue;
     const tid = turnoId(code, x.franja);
-    if (pidsEn(est, x.iso, tid).includes(pid)) continue;
+    if (pidsEn(est, x.iso, tid).includes(pid) || yaPaso(x.iso, tid)) continue;
     const a = poner(x.iso, tid, pid);
     if (a.ok) continue;
     const rech = { iso: x.iso, turnoId: tid, pid, motivo: a.motivo, regla: a.regla || null, nucleo: true };
@@ -6394,7 +6610,7 @@ function desdeSolucion(cfg, staff, est, problema, sol, opts) {
     if (!l.some(y => y.pid === v.pid)) l.push({ pid: v.pid, motivo, regla });
   }
   for (const iso of rangoIso(d1, d2)) for (const t of turnosDe(cfg)) {
-    if (!turnoAbierto(cfg, est, iso, t.id)) continue;
+    if (!turnoAbierto(cfg, est, iso, t.id) || yaPaso(iso, t.id)) continue;
     const hs = huecosDeCasilla(cfg, staff, est, iso, t.id);
     if (hs.length && propuso[iso + '|' + t.id]) hs[0].nucleo = propuso[iso + '|' + t.id];
     r.huecos.push(...hs);
@@ -6452,15 +6668,17 @@ const VUELTAS_NUCLEO = 3;
 //     corta sale en su hueco («El núcleo proponía a …») y entre lo que no se pudo poner.
 // Devuelve lo mismo que el generador local (aplicados, huecos, coberturas, rechazados, retirados, avisos) más
 // `nucleo` (estado, relajaciones, vueltas, vetadas), o { error } con la respuesta que no sirvió.
-// opts: { permitirPartido, conPatron, desdeIso, meses (los de fuera del periodo: S.meses) }
+// opts: { permitirPartido, conPatron, desdeIso, ahoraHM (corrección de A7), meses (los de fuera del periodo: S.meses) }
 function* flujoNucleo(cfg, staff, meses, desde, hasta, opts) {
   const o = opts || {};
   const modo = { permitirPartido: !!o.permitirPartido, meses: Object.assign({}, o.meses || {}, meses) };
   const total = { aplicados: [], huecos: [], coberturas: [], rechazados: [], retirados: [], avisos: [], marcas: [], permitirPartido: modo.permitirPartido, nucleo: null };
   const lista = Object.values(meses);
   const tramo = e => [desde > e.days[0].iso ? desde : e.days[0].iso, hasta < e.days[e.days.length - 1].iso ? hasta : e.days[e.days.length - 1].iso];
-  for (const e of lista) { const [d1, d2] = tramo(e); if (d1 <= d2) total.retirados.push(...retirarQueIncumplen(cfg, staff, e, d1, d2, { desdeIso: o.desdeIso })); }
-  let problema = lista.length ? toProblem(cfg, staff, lista[0], desde, hasta, { conPatron: o.conPatron !== false, permitirPartido: modo.permitirPartido, meses: modo.meses, desdeIso: o.desdeIso }) : null;
+  // (01/10, corrección de A7; revisión de cliente H1) con opts.ahoraHM, como el generador local: el turno de hoy ya terminado no se toca
+  const hoyYa = { desdeIso: o.desdeIso, ahoraHM: o.ahoraHM };
+  for (const e of lista) { const [d1, d2] = tramo(e); if (d1 <= d2) total.retirados.push(...retirarQueIncumplen(cfg, staff, e, d1, d2, hoyYa)); }
+  let problema = lista.length ? toProblem(cfg, staff, lista[0], desde, hasta, { conPatron: o.conPatron !== false, permitirPartido: modo.permitirPartido, meses: modo.meses, desdeIso: o.desdeIso, ahoraHM: o.ahoraHM }) : null;
   if (!problema) return total;
   const sirve = r => !!(r && r.ok && r.datos && r.datos.schedule && r.datos.feasible !== false);
   const r1 = yield { problem: problema, config: Object.assign({}, CONFIG_NUCLEO) };
@@ -6468,7 +6686,7 @@ function* flujoNucleo(cfg, staff, meses, desde, hasta, opts) {
   let sol = r1.datos, vueltas = 1;
   const vetadas = [];
   while (vueltas < VUELTAS_NUCLEO) {
-    const rech = rechazosDelNucleo(cfg, staff, meses, problema, sol, Object.assign({ desdeIso: o.desdeIso }, modo));
+    const rech = rechazosDelNucleo(cfg, staff, meses, problema, sol, Object.assign({}, hoyYa, modo));
     if (!rech.length) break;
     const p2 = vetarRechazos(problema, rech);
     const r2 = yield { problem: p2, config: Object.assign({}, CONFIG_NUCLEO) };
@@ -6476,14 +6694,14 @@ function* flujoNucleo(cfg, staff, meses, desde, hasta, opts) {
     problema = p2; sol = r2.datos; vetadas.push(...rech); vueltas++;
   }
   for (const e of lista) {
-    const x = desdeSolucion(cfg, staff, e, problema, sol, Object.assign({ vetadas, desdeIso: o.desdeIso }, modo));
-    total.aplicados.push(...x.aplicados); total.rechazados.push(...x.rechazados); total.coberturas.push(...x.coberturas); total.huecos.push(...x.huecos);
+    const x = desdeSolucion(cfg, staff, e, problema, sol, Object.assign({ vetadas }, hoyYa, modo));
+    total.aplicados.push(...x.aplicados); total.rechazados.push(...x.rechazados); total.coberturas.push(...x.coberturas); total.huecos.push(...x.huecos); total.retirados.push(...x.retirados);
     for (const a of x.avisos) if (!total.avisos.some(y => y.pid === a.pid && y.semana === a.semana)) total.avisos.push(a);
   }
   // 01/10 (A6; auditoría G16): como generarPlanilla, una pasada final por el periodo: quién abre, la cocina y el orden de lo que ya
   // estaba (y no tocó el volcado) se vuelven a decidir con la configuración de ahora (lo puesto a mano no se toca), y va en
   // `marcas`. Antes, con «Quién abre» cambiado después de generar, el Núcleo dejaba el «abre» viejo en las casillas que no tocaba
-  for (const e of lista) { const [d1, d2] = tramo(e); if (d1 <= d2) total.marcas.push(...refrescarCasillas(cfg, staff, e, desdeEfectivo(d1, o.desdeIso), d2)); }
+  for (const e of lista) { const [d1, d2] = tramo(e); if (d1 <= d2) total.marcas.push(...refrescarCasillas(cfg, staff, e, desdeEfectivo(d1, o.desdeIso), d2, hoyYa)); }
   // lo vetado que deja su casilla corta va también con lo que no se pudo poner («el núcleo volvió a resolver sin ellas y la casilla
   // sigue corta»). (corrección de A6; revisión de modelo S2) corta es que falta gente (faltan > 0): la que solo tiene apoyos pero su
   // mínimo no lo está; y lo vetado que al final entró (H1) no se cuenta. El porqué, el de su hueco (el de la casilla como queda)
@@ -6510,12 +6728,25 @@ const CLAVES_PLANILLA = ['meses', 'staff', 'locales', 'patron', 'eventos', 'equi
 // o, las demás, una lista
 const OBJETOS_PLANILLA = ['meses', 'patron', 'cierres', 'reglas'];
 // ¿Cada clave de la planilla que viene tiene su forma? Ausente o null vale: lo guardado antes no las traía todas
+// 01/10 (A7; revisión de modelo de A6, S3) y un nivel más, solo lo que tumbaría la app (comprobado en el navegador con el servidor
+// real): ningún null dentro de las listas; los locales, los equipos, los eventos, los extras y los cierres por fechas, objetos; cada
+// mes, un objeto con `asig` objeto, cada día un objeto y cada casilla una lista de entradas con su `pid`; la semana tipo, por día, una
+// lista de plazas (objetos). Lo que no rompe nada (un mes o un día de la semana tipo null, un número en los meses visibles) sigue
+// entrando: ningún estado que la app escriba puede recibir un 400
+const LISTAS_DE_OBJETOS = ['staff', 'locales', 'eventos', 'equipos', 'extras', 'cierresPuntuales'];
+const esObjeto = x => !!x && typeof x === 'object' && !Array.isArray(x);
 function formaPlanillaBien(estado) {
   if (!estado || typeof estado !== 'object') return false;
   return CLAVES_PLANILLA.every(k => {
     const v = estado[k];
     if (v === undefined || v === null) return true;
-    return OBJETOS_PLANILLA.includes(k) ? typeof v === 'object' && !Array.isArray(v) : Array.isArray(v);
+    if (!(OBJETOS_PLANILLA.includes(k) ? esObjeto(v) : Array.isArray(v))) return false;
+    // (corrección de A7; revisión de modelo S-1) la cocina de un local, un objeto (o nada): «ups» tumbaba la carga
+    if (Array.isArray(v)) return v.every(x => x !== null && x !== undefined && (!LISTAS_DE_OBJETOS.includes(k) || esObjeto(x)) && (k !== 'locales' || x.cocina === undefined || x.cocina === null || esObjeto(x.cocina)));
+    if (k === 'meses') return Object.values(v).every(mes => mes === null || (esObjeto(mes) && (mes.asig === undefined || mes.asig === null || (esObjeto(mes.asig)
+      && Object.values(mes.asig).every(dia => !!dia && typeof dia === 'object' && Object.values(dia).every(l => Array.isArray(l) && l.every(e => esObjeto(e) && typeof e.pid === 'string')))))));
+    if (k === 'patron') return Object.values(v).every(pls => pls === null || (Array.isArray(pls) && pls.every(esObjeto)));
+    return true;
   });
 }
 // Una clave que falta vale lo mismo que vacía ([] o {}): el primer 409 tras desplegar una clave nueva
@@ -6585,7 +6816,7 @@ function recuperarPersona(actual, viejo, pid, salidaDesde, opts) {
   const corte = sv && sv.desde < salidaDesde ? sv.desde : salidaDesde;
   if (!personaDe(actual.staff, pid)) {
     const p = clon(pv);
-    p.salida = sv && sv.desde < salidaDesde ? sv : { desde: salidaDesde, motivo: (opts && opts.motivo) || 'recuperada de una versión anterior' };
+    p.salida = sv && sv.desde < salidaDesde ? sv : { desde: salidaDesde, motivo: (opts && opts.motivo) || 'se recuperó de una versión anterior' };   // (corrección de A7; B5) sin género
     // sin parejas «nunca con» ni «cubre a»: ya no aplican, y la otra ficha ya no las tiene (la Revisión sacaba «no
     // pueden coincidir» con una pareja de un solo lado; revisión S0)
     p.nuncaCon = []; p.nuncaConFlex = []; p.nuncaConOff = []; p.cubreA = [];
@@ -6707,13 +6938,15 @@ function semillaPasarela() {
       abre: { M: dows.slice(), T: dows.slice() },
       minimos: { M: min([2, 2, 2, 2, 2, 2, 2]), T: min([2, 2, 2, 2, 4, 4, 2]) },
       supuestos: { M: sup([1, 1, 1, 1, 1, 1, 1]), T: sup([0, 0, 0, 0, 0, 0, 1]) },
-      cocina: { obligatoria: { M: false, T: false }, titulares: { M: ['adrian', 'roberto', 'hojan'], T: ['adrian', 'roberto', 'hojan'] }, reservas: ['roberto', 'hojan'], posicion: { M: 3, T: 2 }, posicionSiDesde: { M: 3 } },
+      // (01/10, A7; auditoría G12) la lista del local como las fichas (contexto-previo: «Zapatillera: Adrián; Roberto y Hojan de
+      // reserva»): Susi titular (de baja), Roberto y Hojan solo de reserva; y Maydeth en el Mónaco. migrarCocinaLocales ya no la cambia
+      cocina: { obligatoria: { M: false, T: false }, titulares: { M: ['adrian', 'susi'], T: ['adrian', 'susi'] }, reservas: ['roberto', 'hojan'], posicion: { M: 3, T: 2 }, posicionSiDesde: { M: 3 } },
       primero: { M: null, T: null }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, duracion: duracion(), duracionSupuesta: true, descansoMin: 0 },
     { id: 'MONACO', nombre: 'Bar Mónaco', corto: 'MON', color: '#2f6db5',
       abre: { M: dows.slice(), T: dows.slice() },
       minimos: { M: min([3, 3, 3, 3, 3, 3, 3]), T: min([2, 2, 2, 2, 3, 3, 2]) },
       supuestos: { M: sup([0, 0, 0, 0, 0, 0, 0]), T: sup([0, 0, 0, 0, 0, 0, 1]) },
-      cocina: { obligatoria: { M: true, T: true }, titulares: { M: ['esmeralda', 'jenny', 'hojan'], T: ['hojan', 'jenny', 'scapon'] }, reservas: ['hojan'], posicion: { M: 2, T: 2 }, posicionSiDesde: {} },
+      cocina: { obligatoria: { M: true, T: true }, titulares: { M: ['esmeralda', 'jenny', 'hojan', 'maydeth'], T: ['hojan', 'jenny', 'scapon', 'maydeth'] }, reservas: ['hojan'], posicion: { M: 2, T: 2 }, posicionSiDesde: {} },
       primero: { M: null, T: 'scapon' }, horario: horario(), horarioSupuesto: false, cierreAprox: true, horarioPartido: horarioPartido(), horarioPartidoSupuesto: true, duracion: duracion(), duracionSupuesta: true, descansoMin: 0 },
     { id: 'PASARELA', nombre: 'Pasarela', corto: 'PAS', color: '#1f9a6e',
       abre: { M: dows.slice(), T: dows.slice() },
@@ -6903,7 +7136,7 @@ if (typeof module !== 'undefined') {
     fechaLocal, isoDow, addDias, diasDelMes, isoDe, claveMes, mondayOf, semanaDe, fechaMadrid, rangoIso,
     FRANJAS, FRANJA_LBL, DOW_LBL, DOW_PL, TODOS, TIPOS_AUSENCIA, AUS_LBL, PUESTOS,
     turnoId, partirTurno, turnosDe, localDe, personaDe, nombreDe,
-    turnoAbierto, toggleApertura, abrirCasilla, motivoCerrado, turnosAbiertosSemana, turnosAbiertosMes, turnosConSupuesto, eventosDe, minimoDe,
+    turnoAbierto, toggleApertura, abrirCasilla, motivoCerrado, casillasHorarioSemana, casillasAbiertasMes, turnosConSupuesto, eventosDe, minimoDe,
     nuevoEstado, estadoDesde, clonarEstado, asignados, pidsEn, casillasDe, manualDe, marcarManual, quitarMarcaManual, primerDiaPlanificable,
     ausenciaEn, quitarDiaDeAusencia, anadirAusencia, deBaja,
     salidaDe, haSalido, enPlantilla, textoSalida, staffEnPlantilla, fechaIsoValida, darSalida, quitarSalida, recuperarPersona, mesesSinCerrar, personasDelMes,
@@ -6928,7 +7161,7 @@ if (typeof module !== 'undefined') {
     cerradaEseDia, aperturaDelDia, diaConPlanilla, apoyosSinSitio, mitadesCerradas, cierresDelHorario, reabrirCierreDesde, dentroDeCierre, repartoDelDia, semanaTipoAlEditar, ponerApoyoCierre, destinoCierre, franjasSemanaTipo, noRefuerzaSala,
     TIPOS_INCIDENCIA, turnosAfectados, turnosSemanaDe, turnosMesDe, candidatosCobertura, planesCobertura, aplicarCobertura, vaciarPlanilla,
     cubrirAusencia, ponerPlanCobertura, quienLeCubre, cuandoCubre, lugarCubre, porQueNoCubre, porDesignacionDe, designadaPara, motivoNoRelevo, casillasDejadas,
-    cubreEnCasilla, rangoNecesario, diasNecesarios, turnoYaPasado, faltaEn, revisarEntrada, relevoEn, marcarRelevo, desmarcarRelevos, volcarPrevia, porDeSuCasilla, MOTIVO_SOLO_APOYOS, etiquetaAusencia, quedariaSoloApoyos, puntosPuesto, cocinaDelDia, franjasAusencia, textoFranjasAusencia,
+    cubreEnCasilla, rangoNecesario, diasNecesarios, turnoYaPasado, saleAlRegenerar, durasDe, cocinaQuitadaEn, faltaEn, revisarEntrada, relevoEn, marcarRelevo, desmarcarRelevos, volcarPrevia, porDeSuCasilla, MOTIVO_SOLO_APOYOS, etiquetaAusencia, quedariaSoloApoyos, puntosPuesto, cocinaDelDia, franjasAusencia, textoFranjasAusencia,
     sugerirUsuario, PALETA_PERSONAS, asignarColores, semillaPasarela,
     crearContexto, evaluarPlaza, primerBloqueo, incompatibles, evita, abreFijo, PESOS, puntuar, candidatos, VARIABLES, SOLO_TEXTO, gruposSelector, destrapa, fraseBloqueo,
     plazaOcupa, salaDelDia, salaFirmeDelDia, siSeFuerza, cocinasTitular,

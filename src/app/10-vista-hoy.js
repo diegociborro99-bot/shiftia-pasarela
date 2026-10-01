@@ -10,6 +10,26 @@ const textoAbreNoApto = motivo => `«Sale primero» marcado a mano, pero no pued
 // 30/09 (S0): el aviso de la plaza de quien ya no está con nosotros, igual en Hoy, la Semana, el Mes, el perfil y la
 // hoja impresa (s.salido = salidaDe de posicionesDe)
 const textoSalido = s => `ya no trabaja con nosotros (desde el ${fmtDM(s.desde)})`;
+// Lo que dice la marca «!» de una plaza en Hoy y en la Semana (01/10, A7; revisión de cliente de A4, S1, y de A6): la forzada, todo lo
+// que incumple (antes «Asignación forzada: rompe una regla», sin decir cuál; en la Semana, solo el borde); la que no se forzó y
+// ahora rompe una regla dura (un veto nuevo, un local que ya no hace…), cuál y qué hacer: lo automático sale al volver a generar
+// (D15) y lo puesto a mano no se quita solo (principio 4). '' si no rompe nada.
+// (corrección de A7; revisión de cliente H2 y de modelo M-2) con el día y la casilla: lo ya trabajado (turnoTrabajado: un día de antes de
+// hoy o el turno de hoy que ya ha terminado) no lleva la marca de lo que ya no puede estar: decía «sale al volver a generar la semana» y
+// regenerar «Solo desde hoy» no lo toca nunca (la Revisión ya lo pone en gris). Lo forzado sigue diciendo lo que se saltó. (Revisión de
+// modelo M-1: s.duras de lo automático ya es solo lo que regenerar retira de verdad.) (B1) los textos, en castellano de bar: el de lo
+// puesto a mano se repetía («ya no puede estar… si ya no puede estar») y el de lo forzado decía «incumple libra los miércoles»
+// (revisión de modelo B-4) de lo forzado, s.duras es lo duro que NO se forzó (unas vacaciones apuntadas después): eso no se salta a la
+// fuerza, se dice aparte y qué hacer (como la línea roja de la Revisión)
+function textoIncumple(s, iso, tid) {
+  const pasado = !!(iso && tid && turnoTrabajado(iso, tid)), duras = s.duras || [];
+  if (s.forzado) {
+    const saltadas = (s.avisos || []).filter(a => !duras.includes(a));
+    return `Puesta a la fuerza${saltadas.length ? `: se salta ${listaY(saltadas.map(a => `«${a}»`))}` : ''}${duras.length && !pasado ? `. Y ahora ya no puede estar aquí (${duras.join(', ')}), y eso no se forzó: quítala tú` : ''}`;
+  }
+  if (!duras.length || pasado) return '';
+  return esAutomatica({ origen: s.origen }) ? `Ya no puede estar aquí (${s.duras.join(', ')}): sale al volver a generar la semana` : `Puesta a mano: ya no puede estar aquí (${s.duras.join(', ')}). No se quita sola: quítala tú`;
+}
 function chipPersona(iso, tid, s, opts) {
   const p = personaDeId(s.pid); if (!p) return '';
   const est = estadoDeIso(iso);
@@ -18,10 +38,14 @@ function chipPersona(iso, tid, s, opts) {
   // el tramo del partido de esa persona ese día: quien abre una franja entra a abrir
   const hTramo = s.partido && !s.continuo ? horarioDe(localDe(S, lid), isoDow(iso), fr, true, turnoDelDia(S, est, iso, s.pid).abre) : null;
   // 30/09 (S0): la plaza de quien ya no está con nosotros lleva el sombreado rojo (clase salido) y lo dice (textoSalido)
-  const razon = [s.salido ? textoSalido(s.salido) : '', e.razon, e.avisos && e.avisos.length ? 'aviso: ' + e.avisos.join(', ') : '', s.abreNoApto ? textoAbreNoApto(s.abreNoApto) : '', s.supuesto ? 'plaza supuesta (pendiente de confirmar con el grupo)' : '', s.continuo ? 'turno continuo: abre la mañana y la tarde del mismo local' : s.partido ? `partido: mañana y tarde${hTramo ? ` · este tramo, ${hTramo.ini}–${hTramo.fin}` : ''}` : '', s.comodin ? 'sin local fijo: puede ir a cualquier bar' : '', `origen: ${ORIGEN_LBL[s.origen] || s.origen || 'a mano'}`].filter(Boolean).join('\n');
-  return `<span class="pchip${s.forzado ? ' forzado' : ''}${s.abre ? ' primero' : ''}${s.salido ? ' salido' : ''}" data-pid="${s.pid}" data-turno="${iso}|${tid}" style="--pc:${avColor(s.pid)}" data-tipstr="${esc(razon)}" role="button" tabindex="0">
+  const incumple = textoIncumple(s, iso, tid), rompe = !s.forzado && !!incumple;   // (A7) la misma marca que lo forzado
+  // (corrección de A7; revisión de cliente S2) lo que solo es un aviso (Hojan de sala: «solo hace cocina»), en ámbar, como en la Revisión;
+  // no en lo ya trabajado ni en lo forzado (su «!» ya lo dice)
+  const aviso = !s.forzado && !rompe && (s.blandos || []).length && !turnoTrabajado(iso, tid) ? `Aviso: ${s.blandos.join(', ')}` : '';
+  const razon = [s.salido ? textoSalido(s.salido) : '', e.razon, e.avisos && e.avisos.length ? 'aviso: ' + e.avisos.join(', ') : '', rompe ? incumple : '', s.abreNoApto ? textoAbreNoApto(s.abreNoApto) : '', s.supuesto ? 'plaza supuesta (pendiente de confirmar con el grupo)' : '', s.continuo ? 'turno continuo: abre la mañana y la tarde del mismo local' : s.partido ? `partido: mañana y tarde${hTramo ? ` · este tramo, ${hTramo.ini}–${hTramo.fin}` : ''}` : '', s.comodin ? 'sin local fijo: puede ir a cualquier bar' : '', `origen: ${ORIGEN_LBL[s.origen] || s.origen || 'a mano'}`].filter(Boolean).join('\n');
+  return `<span class="pchip${s.forzado ? ' forzado' : ''}${rompe ? ' rompe' : ''}${s.abre ? ' primero' : ''}${s.salido ? ' salido' : ''}" data-pid="${s.pid}" data-turno="${iso}|${tid}" style="--pc:${avColor(s.pid)}" data-tipstr="${esc(razon)}" role="button" tabindex="0">
     <span class="pos">${s.pos}</span><span class="avq">${esc(initials(p.nombre))}</span><span class="pnom">${s.abreFijo ? '<i class="mk fijo" title="sale el primero (fijo)">▸</i>' : ''}${esc(p.nombre)}${s.tramo ? `<small class="por tramo">${esc(s.tramo.ini)}–${esc(s.tramo.fin)}</small>` : ''}${s.por ? `<small class="por">por ${esc(nombreCorto(nombrePid(s.por)))}</small>` : s.nota ? `<small class="por">${esc(s.nota)}</small>` : ''}</span>
-    ${s.abre ? (s.abreNoApto ? `<span class="bdg abre warn" title="${esc(textoAbreNoApto(s.abreNoApto))}">ABRE ⚠</span>` : '<span class="bdg abre">ABRE</span>') : ''}${s.cocina ? `<span class="bdg cocina">${SVG_COCINA} COCINA</span>` : ''}${s.continuo ? '<span class="bdg cont" title="turno continuo: abre mañana y tarde">C</span>' : s.partido ? '<span class="bdg part" title="partido: mañana y tarde">P</span>' : ''}${s.comodin ? '<span class="bdg com" title="sin local fijo: puede ir a cualquier bar">□</span>' : ''}${s.forzado ? '<span class="bdg forz" title="Asignación forzada: rompe una regla">!</span>' : ''}${s.supuesto ? '<span class="bdg sup" title="Supuesto: pendiente de confirmar">?</span>' : ''}${s.origen === 'refuerzo' ? '<span class="bdg ref">REFUERZO</span>' : ''}
+    ${s.abre ? (s.abreNoApto ? `<span class="bdg abre warn" title="${esc(textoAbreNoApto(s.abreNoApto))}">ABRE ⚠</span>` : '<span class="bdg abre">ABRE</span>') : ''}${s.cocina ? `<span class="bdg cocina">${SVG_COCINA} COCINA</span>` : ''}${s.continuo ? '<span class="bdg cont" title="turno continuo: abre mañana y tarde">C</span>' : s.partido ? '<span class="bdg part" title="partido: mañana y tarde">P</span>' : ''}${s.comodin ? '<span class="bdg com" title="sin local fijo: puede ir a cualquier bar">□</span>' : ''}${incumple ? `<span class="bdg forz" title="${esc(incumple)}">!</span>` : ''}${aviso ? `<span class="bdg avi" title="${esc(aviso)}">⚠</span>` : ''}${s.supuesto ? '<span class="bdg sup" title="Supuesto: pendiente de confirmar">?</span>' : ''}${s.origen === 'refuerzo' ? '<span class="bdg ref">REFUERZO</span>' : ''}
     ${opts && opts.soloLectura ? '' : `<button class="rmx" data-un="${iso}|${tid}|${s.pid}" aria-label="Quitar a ${esc(p.nombre)}">×</button>`}
   </span>`;
 }
@@ -59,7 +83,7 @@ function htmlCasilla(iso, tid, opts) {
     // 24/09 (D11): cerrado por fechas dice el motivo y hasta cuándo, y en vez de «abrir hoy» (que no
     // lo abriría: el cierre manda) lleva a ver el cierre, donde se edita o se reabre
     const c = cierreEn(S, iso, tid);
-    if (c) return `<div class="casilla cerrada cierre" data-cas="${iso}|${tid}">${cab}<div class="cascerr" data-tipstr="${esc(textoCierre(S, c))}">Cerrado · ${esc(etiquetaCierre(c))} (hasta ${esc(hastaCortoCierre(c))}) ${opts && opts.soloLectura ? '' : `<button data-vercierre="${esc(c.id)}">Ver cierre</button>`}</div></div>`;
+    if (c) return `<div class="casilla cerrada cierre" data-cas="${iso}|${tid}">${cab}<div class="cascerr" data-tipstr="${esc(textoCierre(S, c))}">Cerrado · ${esc(etiquetaCierre(c))} (hasta ${esc(hastaCortoCierre(c, iso))}) ${opts && opts.soloLectura ? '' : `<button data-vercierre="${esc(c.id)}">Ver cierre</button>`}</div></div>`;
     return `<div class="casilla cerrada" data-cas="${iso}|${tid}">${cab}<div class="cascerr">Cerrado ${DOW_PL[isoDow(iso)].replace('los ', 'el ')} ${opts && opts.soloLectura ? '' : `<button data-abrir="${iso}|${tid}">abrir hoy</button>`}</div></div>`;
   }
   let cuerpo = posicionesDe(S, S.staff, e, iso, tid).map(x => x.hueco ? chipHueco(iso, tid, x, opts) : chipPersona(iso, tid, x, opts)).join('');
@@ -101,7 +125,7 @@ function renderDia() {
   $('#dStats').innerHTML = `<span class="dstat"><b>${abiertos}</b> casillas</span><span class="dstat ${cortos ? 'warn' : 'ok'}"><b>${cortos}</b> cortas</span><span class="dstat ${sinCocina ? 'warn' : 'ok'}"><b>${sinCocina}</b> sin cocina</span><span class="dstat"><b>${personas.size}</b> personas</span>${forzados ? `<span class="dstat sal"><b>${forzados}</b> forzadas</span>` : ''}`;
   // eventos del día y avisos
   const evs = eventosDe(S, iso);
-  const rev = revisionMes(S, S.staff, est, { desde: iso, hasta: iso, hoy: isoHoy() }).filter(x => x.nivel === 'alta');
+  const rev = revisionMes(S, S.staff, est, { desde: iso, hasta: iso, hoy: isoHoy(), ahoraHM: horaMadrid() }).filter(x => x.nivel === 'alta');
   $('#diaWarn').innerHTML = (evs.length ? `<div class="evrow">${evs.map(chipEvento).join('')}</div>` : '') +
     (rev.length ? `<div class="warnbanner"><b>${pl(rev.length, 'aviso importante', 'avisos importantes')} hoy</b>${rev.slice(0, 4).map(x => esc(x.msg)).join(' · ')}${rev.length > 4 ? ` · y ${rev.length - 4} más` : ''}</div>` : '');
   $('#diaLocales').innerHTML = S.locales.map(l => htmlLocal(iso, l)).join('');

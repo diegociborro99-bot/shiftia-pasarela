@@ -425,14 +425,14 @@ function vaciarRangoUI(desde, hasta, titulo, que) {
   const previo = (() => { let n = 0; for (const iso of rangoIso(desde, hasta)) for (const lista of Object.values(estadoDeIso(iso).asig[iso] || {})) n += lista.length; return n; })();
   if (!previo) { toast(`No hay nada que vaciar en ${que}`, 'warn'); return; }
   const ausentes = S.staff.filter(p => [...rangoIso(desde, hasta)].some(iso => ausenciaEn(p, iso))).length;
-  if (!confirm(`Se quitan las ${previo} plazas de ${titulo} (también las puestas a mano). ${ausentes ? `Las ${ausentes} persona(s) con baja, vacaciones u otra ausencia siguen igual en sus fichas. ` : 'Las ausencias siguen en las fichas. '}Los eventos, cierres y aperturas se quedan. ¿Vaciar ${que}? (Ctrl+Z lo deshace)`)) return;
+  if (!confirm(`Se quitan las ${previo} plazas de ${titulo} (también las puestas a mano). ${ausentes ? `${ausentes === 1 ? 'La persona' : `Las ${ausentes} personas`} con baja, vacaciones u otra ausencia ${ausentes === 1 ? 'sigue igual en su ficha' : 'siguen igual en sus fichas'}. ` : 'Las ausencias siguen en las fichas. '}Los eventos, cierres y aperturas se quedan. ¿Vaciar ${que}? (Ctrl+Z lo deshace)`)) return;
   pushUndo(`vaciar ${que}`, { otrosMeses: true });
   let plazas = 0;
   for (const iso of rangoIso(desde, hasta)) plazas += vaciarPlanilla(estadoDeIso(iso, true), iso, iso).plazas;
-  registrarCambio(`Vaciada ${titulo}: ${plazas} plaza(s) retiradas (ausencias respetadas)`, 'cambio');
+  registrarCambio(`Vaciada ${titulo}: ${pl(plazas, 'plaza retirada', 'plazas retiradas')} (ausencias respetadas)`, 'cambio');   // (corrección de A7; B2) plurales de verdad
   if (mesCerrado(desde)) registrarCambio(`Cambio en un mes cerrado (${desde.slice(0, 7)})`, 'aviso');
   saveState(); renderVistaActiva();
-  toast(`${plazas} plaza(s) retiradas de ${que} · Ctrl+Z para deshacer`, 'warn');
+  toast(`${pl(plazas, 'plaza retirada', 'plazas retiradas')} de ${que} · Ctrl+Z para deshacer`, 'warn');
 }
 
 // ---------- visible para el equipo (publicar meses) ----------

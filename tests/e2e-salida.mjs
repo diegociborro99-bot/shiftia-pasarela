@@ -361,10 +361,10 @@ try {
       const tB = await llega(A, () => !!document.querySelector('#ctaOvl #borradosSrv [data-recuperar]'), null, 8000);
       ok(`Cuenta enseña «Personas borradas» con Adrián (${tB} ms)`, tB >= 0 && /Adrián/.test(await A.$eval('#ctaOvl #borradosSrv', x => x.textContent)), await A.$eval('#ctaOvl', x => (x.querySelector('#borradosSrv') || { textContent: 'sin bloque' }).textContent.slice(0, 200)).catch(() => 'sin Cuenta'));
       await A.click('#ctaOvl #borradosSrv [data-recuperar]');
-      ok('Recuperar: la ficha vuelve, marcada «ya no está» desde el día en que se borró', await llega(A, () => S.staff.some(p => p.id === 'adrian'), null, 8000) >= 0 && await A.evaluate(iso => { const s = salidaDe(personaDeId('adrian')); return !!s && s.desde === iso && /recuperada/.test(s.motivo || ''); }, ISO_HOY), await A.evaluate(() => JSON.stringify(salidaDe(personaDeId('adrian')))));
+      ok('Recuperar: la ficha vuelve, marcada «ya no está» desde el día en que se borró', await llega(A, () => S.staff.some(p => p.id === 'adrian'), null, 8000) >= 0 && await A.evaluate(iso => { const s = salidaDe(personaDeId('adrian')); return !!s && s.desde === iso && /se recuperó/.test(s.motivo || ''); }, ISO_HOY), await A.evaluate(() => JSON.stringify(salidaDe(personaDeId('adrian')))));
       const nTras = await A.evaluate(() => { let n = 0; for (const k of Object.keys(S.meses)) for (const porT of Object.values(S.meses[k].asig || {})) for (const l of Object.values(porT)) if (l.some(x => x.pid === 'adrian')) n++; return n; });
       ok(`y sus turnos de antes de hoy vuelven (${nTras})`, nTras === nAntes, `${nTras} vs ${nAntes}`);
-      ok('el historial lo apunta («Recuperada Adrián de la versión N: ficha y N turnos»)', /Recuperada Adrián de la versión \d+: ficha y \d+ turnos/.test(await A.evaluate(() => (S.historial[0] || {}).txt || '')), await A.evaluate(() => (S.historial[0] || {}).txt));
+      ok('el historial lo apunta («Se ha recuperado a Adrián de la versión N: ficha y N turnos»)', /Se ha recuperado a Adrián de la versión \d+: ficha y \d+ turnos/.test(await A.evaluate(() => (S.historial[0] || {}).txt || '')), await A.evaluate(() => (S.historial[0] || {}).txt));
       await A.click('#ctaOvl [data-ovx]').catch(() => {});
       await A.click('.tab[data-v="equipo"]');
       ok('Equipo le lista en «Ya no están con nosotros»', await llega(A, () => !!document.querySelector('#eqSalidos [data-scard="adrian"]'), null, 5000) >= 0);

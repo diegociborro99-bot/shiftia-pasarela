@@ -164,7 +164,7 @@ async function resolverConflicto(marca) {
     S.peticiones = fusion.estado.peticiones; S.avisos = fusion.estado.avisos;
     SRV.version = srv.datos.version; SRV.baseTxt = JSON.stringify(srv.datos.estado);
     if (typeof pintaPetDot === 'function') pintaPetDot();
-    if (fusion.nuevasPeticiones) toast(`${fusion.nuevasPeticiones} petición(es) nueva(s) del equipo mientras editabas: fundidas con tu cambio`, 'ok');
+    if (fusion.nuevasPeticiones) toast(`${pl(fusion.nuevasPeticiones, 'petición nueva', 'peticiones nuevas')} del equipo mientras editabas: ${fusion.nuevasPeticiones === 1 ? 'fundida' : 'fundidas'} con tu cambio`, 'ok');   // (corrección de A7; B2) plurales de verdad
     return 'ahora';
   }
   conflictosSeguidos = 0;

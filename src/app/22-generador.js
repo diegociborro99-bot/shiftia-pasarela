@@ -3,6 +3,10 @@
 // + relleno de mínimos con razones, determinista, funciona sin conexión) y el
 // núcleo Shiftia (CP-SAT, vía el servidor, cuando está configurado). Siempre con
 // vista previa: nada se aplica sin verlo; todo se deshace con Ctrl+Z.
+// 01/10 (corrección de A7; revisión de cliente H1) «Solo desde hoy» con la hora, como la Cobertura: lo ya trabajado son los días de
+// antes de hoy y el turno de hoy cuya franja ya ha terminado (ahoraHM: la hora de Madrid; el modelo no mira el reloj). A las 17:30,
+// regenerar le quitaba a Tere la mañana de hoy, ya trabajada, y sus 8 horas de la nómina
+const desdeHoyGen = () => GEN.opts.desdeHoy ? { desdeIso: isoHoy(), ahoraHM: horaMadrid() } : {};
 const GEN = { modo: 'semana', lunes: null, desde: null, hasta: null, titulo: '', motor: 'local', previa: null, opts: { desdeHoy: true, permitirPartido: false, sinPatron: false }, nucleo: null, ocupado: false };
 
 function irAGenerador(o) {
@@ -37,7 +41,7 @@ function renderGenerador() {
         <label class="pinlbl" style="margin:0">Hasta<input type="date" id="genD2" class="logininp" value="${GEN.hasta}" data-libre></label>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-mini ghost" data-rango="semana">Esta semana</button><button class="btn-mini ghost" data-rango="mes">Este mes</button><button class="btn-mini ghost" data-rango="resto">Resto del mes</button></div>
-      <label class="genopt"><input type="checkbox" id="genDesdeHoy" ${GEN.opts.desdeHoy ? 'checked' : ''} data-libre> <span><b>Solo desde hoy</b> · no toca los días ya pasados</span></label>
+      <label class="genopt"><input type="checkbox" id="genDesdeHoy" ${GEN.opts.desdeHoy ? 'checked' : ''} data-libre> <span><b>Solo desde hoy</b> · no toca lo ya trabajado: ni los días pasados ni el turno de hoy que ya ha terminado</span></label>
       <label class="genopt"><input type="checkbox" id="genPatron" ${GEN.opts.sinPatron ? '' : 'checked'} data-libre> <span><b>Partir de la semana tipo</b> · las plazas fijas del grupo primero; luego se rellena lo que falte</span></label>
       <label class="genopt"><input type="checkbox" id="genPartido" ${GEN.opts.permitirPartido ? 'checked' : ''} data-libre> <span><b>Permitir partidos no declarados</b> · si falta gente, propone partidos a quien no los tiene declarados y, si aun así no hay nadie más, junta parejas «nunca con» flexibles; lo avisa</span></label>
       <div class="pinlbl" style="margin-top:4px">Motor</div>
@@ -121,7 +125,7 @@ function generarSobre(meses, desde, hasta, simular) {
   for (const [k, e] of Object.entries(meses)) {
     const d1 = desde > e.days[0].iso ? desde : e.days[0].iso, d2 = hasta < e.days[e.days.length - 1].iso ? hasta : e.days[e.days.length - 1].iso;
     if (d1 > d2) continue;
-    const r = generarPlanilla(S, S.staff, e, d1, d2, { simular: false, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron, meses: todos });
+    const r = generarPlanilla(S, S.staff, e, d1, d2, Object.assign({ simular: false, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron, meses: todos }, desdeHoyGen()));
     total.aplicados.push(...r.aplicados); total.huecos.push(...r.huecos); total.coberturas.push(...r.coberturas); total.rechazados.push(...r.rechazados);
     // (30/09, revisión de A1, S3) un aviso por persona, semana, tipo y texto: por persona y semana tapaba el segundo «dos cocinas» de Hojan
     total.retirados.push(...r.retirados); for (const a of r.avisos) if (!total.avisos.some(x => x.pid === a.pid && x.semana === a.semana && x.tipo === a.tipo && x.texto === a.texto)) total.avisos.push(a);
@@ -140,7 +144,7 @@ async function generarPrevia() {
     r.meses = meses; r.motor = GEN.motor; r.ts = Date.now();
     // avisos sobre la previa: casillas que siguen cortas, sin cocina…
     r.revision = [];
-    for (const e of Object.values(meses)) r.revision.push(...revisionMes(S, S.staff, e, { desde: GEN.desde, hasta: GEN.hasta, hoy: isoHoy() }));
+    for (const e of Object.values(meses)) r.revision.push(...revisionMes(S, S.staff, e, { desde: GEN.desde, hasta: GEN.hasta, hoy: isoHoy(), ahoraHM: horaMadrid() }));
     GEN.previa = r;
   } catch (e) { toast('No se pudo generar: ' + (e && e.message ? e.message : e), 'bad'); }
   finally { GEN.ocupado = false; renderGenerador(); }
@@ -152,7 +156,7 @@ async function generarConNucleo(meses) {
   // «Solo desde hoy» (antes el núcleo no lo sabía y proponía y contaba huecos en días pasados); si lo que propone el
   // núcleo choca con la puerta, otra vuelta con eso vetado; y el volcado, mes a mes, por la puerta
   toast('Enviando al núcleo Shiftia…', 'ok');
-  const it = flujoNucleo(S, S.staff, meses, GEN.desde, GEN.hasta, { permitirPartido: !!GEN.opts.permitirPartido, conPatron: !GEN.opts.sinPatron, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, meses: S.meses });
+  const it = flujoNucleo(S, S.staff, meses, GEN.desde, GEN.hasta, Object.assign({ permitirPartido: !!GEN.opts.permitirPartido, conPatron: !GEN.opts.sinPatron, meses: S.meses }, desdeHoyGen()));
   let paso = it.next();
   while (!paso.done) paso = it.next(await api('POST', '/api/nucleo/solve', paso.value));
   if (paso.value.error) { toast(mensajeErrorNucleo(paso.value.error), 'bad'); return null; }
@@ -307,7 +311,7 @@ function aplicarPrevia() {
   // (cada una con su «por» y su nota) y, al final, los relevos «cubre a» con su marca. Antes los relevos se
   // marcaban antes de volcar las plazas y Mari Luz entraba «por Iván» sin la marca: al volver Iván, el
   // generador le retiraba su propia plaza
-  const r = volcarPrevia(S, S.staff, iso => estadoDeIso(iso, true), p, { desde: GEN.desde, hasta: GEN.hasta, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, previaDe: iso => p.meses[iso.slice(0, 7)] });
+  const r = volcarPrevia(S, S.staff, iso => estadoDeIso(iso, true), p, Object.assign({ desde: GEN.desde, hasta: GEN.hasta, previaDe: iso => p.meses[iso.slice(0, 7)] }, desdeHoyGen()));
   const n = r.aplicadas, fallos = r.fallos, nRet = r.retiradas;
   registrarCambio(`Generador (${p.motor === 'nucleo' ? 'núcleo Shiftia' : 'local'}): ${pl(n, 'plaza aplicada', 'plazas aplicadas')} del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}${nRet ? ` · ${pl(nRet, 'retirada que ya no valía', 'retiradas que ya no valían')} (${lineasRetirados(p.retirados, true).join('; ')})` : ''}${r.relevos ? ` · ${pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : ''}${p.huecos.length ? ` · por cubrir: ${textoHuecos(p.huecos)}` : ''}${fallos ? ` · ${fallos} no se pudieron poner` : ''}`, 'ia');
   saveState();
@@ -358,7 +362,7 @@ function estadoSemana(lunes, escribible) {
   return e;
 }
 // 24/09 (fase 5): con S.meses, «M este mes» de la carga cuenta el mes entero y no solo los días de la semana
-function opcionesSemana() { return { simular: false, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron, meses: S.meses }; }
+function opcionesSemana() { return Object.assign({ simular: false, permitirPartido: GEN.opts.permitirPartido, sinPatron: GEN.opts.sinPatron, meses: S.meses }, desdeHoyGen()); }
 function tituloSemana(lunes) { const fin = addDias(lunes, 6); const m1 = +lunes.slice(5, 7), m2 = +fin.slice(5, 7); return `${+lunes.slice(8, 10)}${m1 !== m2 ? ' ' + MES3[m1 - 1] : ''} – ${+fin.slice(8, 10)} de ${MESES[m2 - 1].toLowerCase()} ${fin.slice(0, 4)}`; }
 function renderGeneradorSemana() {
   if (!GEN.lunes) GEN.lunes = mondayOf(isoDia());
@@ -369,7 +373,7 @@ function renderGeneradorSemana() {
       ${htmlModoGen()}
       <span class="micro">PLANILLA SEMANAL</span>
       <div class="dnav gsnav"><div class="arrows"><button class="mbtn" id="gsPrev" aria-label="Semana anterior">‹</button><button class="mbtn" id="gsHoy" title="Semana de hoy">Hoy</button><button class="mbtn" id="gsNext" aria-label="Semana siguiente">›</button></div><div><span class="dkick">Semana del</span><div class="dbig gsbig"><b>${esc(tituloSemana(lunes))}</b></div></div></div>
-      <label class="genopt"><input type="checkbox" id="genDesdeHoy" ${GEN.opts.desdeHoy ? 'checked' : ''} data-libre> <span><b>Solo desde hoy</b> · no toca los días ya pasados</span></label>
+      <label class="genopt"><input type="checkbox" id="genDesdeHoy" ${GEN.opts.desdeHoy ? 'checked' : ''} data-libre> <span><b>Solo desde hoy</b> · no toca lo ya trabajado: ni los días pasados ni el turno de hoy que ya ha terminado</span></label>
       <label class="genopt"><input type="checkbox" id="genPatron" ${GEN.opts.sinPatron ? '' : 'checked'} data-libre> <span><b>Partir de la semana tipo</b> · las plazas fijas del grupo primero</span></label>
       <label class="genopt"><input type="checkbox" id="genPartido" ${GEN.opts.permitirPartido ? 'checked' : ''} data-libre> <span><b>Permitir partidos no declarados</b> · y, si no hay nadie más, juntar parejas «nunca con» flexibles; con aviso</span></label>
       <p class="revsub" style="margin:0">Usa las fichas y los ajustes de cada local: mínimos, cocina en su posición, quién abre (turno completo), «nunca con», partidos declarados, días que libra… Lo que no cuadra queda como <b>hueco disponible</b> con el motivo: es mejor un hueco señalado que un nombre que no puede estar ahí. Nunca quita lo puesto a mano ni lo forzado; lo que puso la semana tipo, el generador o la Cobertura y ahora rompe una regla dura (un día libre, una ausencia, un local o una franja que ya no hace, un veto, el standby, un «nunca con» estricto) se retira y sale en «Qué ha cambiado»; lo que rompe algo relajable (un partido no declarado) se queda con su aviso. ${mesCerrado(lunes) ? '<b style="color:var(--warn)">El mes está cerrado para la nómina.</b>' : ''}</p>

@@ -50,11 +50,26 @@ const SVG_APTITUD = ICO('<path d="m12 3 2.6 5.5 5.9.8-4.3 4.3 1 6-5.2-2.9-5.2 2.
 function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"'`]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c])); }
 function initials(n) { const p = String(n || '').trim().split(/\s+/); return ((p[0] && p[0][0] || '') + (p[1] ? p[1][0] : '')).toUpperCase(); }
 function pl(n, sing, plur) { return `${n} ${n === 1 ? sing : plur}`; }
+// «a, b y c» (vivía en Equipo; corrección de A7: también la usan la marca «!» de Hoy y la Semana y la Revisión)
+function listaY(xs) { return xs.length > 1 ? xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1] : (xs[0] || ''); }
 function isoHoy() { return fechaMadrid(); }
+// 01/10 (corrección de A7; revisión de cliente H2 y de modelo M-2): ¿ese turno ya se trabajó? Un día de antes de hoy o un turno de hoy
+// cuya franja ya ha terminado (turnoYaPasado con la hora de Madrid: la misma lectura que la Cobertura, Equipo, «Solo desde hoy» del
+// Generador y la Revisión). Lo ya trabajado no lleva la marca «!» de lo que ya no puede estar: nada lo va a cambiar
+// (el día y la hora se leen una vez por segundo como mucho: el Mes lo pregunta por cada plaza del mes)
+let AHORA_MADRID = { t: -Infinity, hoy: '', hm: '' };
+function turnoTrabajado(iso, tid) {
+  const t = Date.now();
+  if (Math.abs(t - AHORA_MADRID.t) > 1000) AHORA_MADRID = { t, hoy: isoHoy(), hm: horaMadrid() };
+  return iso < AHORA_MADRID.hoy || (iso === AHORA_MADRID.hoy && turnoYaPasado(S, iso, tid, { desdeIso: AHORA_MADRID.hoy, ahoraHM: AHORA_MADRID.hm }));
+}
 // 01/10 (corrección de A5; revisión de cliente H1): la hora de Madrid («20:00»). La Cobertura se la pasa al modelo con isoHoy()
 // (opts.ahoraHM) para que lo de hoy ya trabajado tampoco se toque: el modelo no mira el reloj
+// (corrección de A7) el formateador, una vez: Hoy, la Semana y el Mes la preguntan por cada ficha (turnoTrabajado)
+let FMT_HORA_MADRID = null;
 function horaMadrid() {
-  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const fmt = FMT_HORA_MADRID || (FMT_HORA_MADRID = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }));
+  const p = fmt.formatToParts(new Date());
   const g = t => p.find(x => x.type === t).value;
   return `${g('hour')}:${g('minute')}`;
 }
@@ -117,7 +132,11 @@ function toast(msg, kind) {
   d.innerHTML = `<svg class="tico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TOAST_ICO[kind] || TOAST_ICO.info}</svg><span></span>`;
   d.querySelector('span').textContent = msg;
   $('#toasts').appendChild(d);
-  setTimeout(() => { d.style.transition = 'opacity .4s'; d.style.opacity = '0'; setTimeout(() => d.remove(), 400); }, 3400);
+  // (01/10, corrección de A7; revisión de cliente B6) el tiempo crece con lo largo del texto: un aviso de 170 letras («Ausencia retirada ·
+  // … Si fue un error, Ctrl+Z lo deshace») se iba a los 3,4 s, igual que «Se ha añadido a Lavinia». Mientras está, no tapa los botones
+  // que tenga debajo (los avisos no se tocan: pointer-events:none en 25-pasarela-revision.css)
+  const ms = Math.min(12000, Math.max(3400, 1200 + String(msg || '').length * 50));
+  setTimeout(() => { d.style.transition = 'opacity .4s'; d.style.opacity = '0'; setTimeout(() => d.remove(), 400); }, ms);
 }
 const tip = $('#tip');
 document.addEventListener('mouseover', e => {

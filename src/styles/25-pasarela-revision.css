@@ -1,0 +1,21 @@
+/* 01/10 (A7; revisión de cliente de A4, S1): la plaza que no se forzó y ahora rompe una regla dura (un veto nuevo, un local que ya
+   no hace…) lleva la misma marca que lo forzado en Hoy y en la Semana; su «!» dice qué incumple */
+.pchip.rompe{border-color:color-mix(in srgb, var(--bad) 45%, var(--border));box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--bad) 35%, transparent)}
+.wav.rompe{outline:2px solid var(--bad);outline-offset:1px}
+/* (A7; revisión de cliente de A4, S3, y de A5, S2) lo de los días ya pasados, aparte y en gris: se trabajó, no hay que resolverlo */
+/* (corrección de A7; revisión de cliente B11) apagado de verdad también en el modo oscuro: sin fondo propio (el de surface2 era más claro
+   que el de las rojas) y la etiqueta del local en gris */
+.revitem.pasado{border-left:4px solid var(--ink3);color:var(--ink3);background:transparent;opacity:.85}
+.revitem.pasado .lpill{background:var(--ink3)}
+.revitem.pasado .revgo{color:var(--ink3)}
+/* (corrección de A7; revisión de cliente B4) la Revisión: el título y la «×» en una barra fija arriba (en el móvil la «×» se montaba sobre
+   los botones de fecha al bajar) y la explicación de los colores plegable */
+#revOvl .revbarra{position:sticky;top:-24px;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);margin:-24px -26px 0;padding:14px 26px 8px;box-shadow:0 1px 0 var(--border2)}
+#revOvl .revbarra .ovx{position:static;float:none;margin:0;box-shadow:none;flex:none}
+.revleyenda summary{cursor:pointer;font-size:11.5px;color:var(--ink3);margin:2px 0 6px}
+.revleyenda[open] summary{margin-bottom:4px}
+@media (max-width:640px){ #revOvl .revbarra{top:-18px;margin:-18px calc(-14px - env(safe-area-inset-right)) 0 calc(-14px - env(safe-area-inset-left));padding:10px calc(14px + env(safe-area-inset-right)) 6px calc(14px + env(safe-area-inset-left))} }
+/* (corrección de A7; revisión de cliente S2) lo que solo es un aviso (Hojan de sala: «solo hace cocina»), en ámbar en la ficha de Hoy */
+.bdg.avi{background:var(--warn-bg);color:var(--warn)}
+/* (corrección de A7; revisión de cliente B6) los avisos duran más cuanto más largos: que no tapen los botones de debajo (un visor, una hoja) */
+#toasts,#toasts .toast{pointer-events:none}

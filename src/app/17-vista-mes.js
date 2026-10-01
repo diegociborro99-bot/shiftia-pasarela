@@ -22,6 +22,12 @@ function renderLegend() {
   $('#legend').innerHTML = S.locales.map(l => `<span class="lg"><span class="lp" style="background:${esc(l.color)}"></span>${esc(l.nombre)}</span>`).join('') +
     `<span class="lg"><span class="lgd pill pM" style="--lc:var(--ink3)">M</span>mañana</span><span class="lg"><span class="lgd pill pT" style="--lc:var(--ink3)">T</span>tarde</span><span class="lg"><span class="lgd pill pP" style="--lc:var(--ink3)">P</span>partido</span><span class="lg"><span class="lgd pill pC" style="--lc:var(--ink3)">C</span>turno continuo (de corrido)</span><span class="lg"><span class="lgd striped a-VAC">VAC</span>ausencia</span><span class="lg"><span class="lgd striped a-CIE">CIE</span>sin trabajo por un cierre</span><span class="lg"><span class="lgd" style="background:var(--warn-bg);color:var(--warn)">n</span>faltan</span>`;
 }
+// 01/10 (corrección de A7; revisión de cliente B11) la pastilla de las ausencias de un día: cada tipo una vez, con su franja si es solo
+// de media jornada («PERM·M+VAC·T») y a secas si son las dos o el día entero («VAC», no «VAC+VAC»)
+function cortoAusenciasDia(as) {
+  const tipos = [...new Set(as.map(a => a.tipo))];
+  return tipos.map(t => { const de = as.filter(a => a.tipo === t); const fs = de.some(a => !franjasAusencia(a)) ? FRANJAS : FRANJAS.filter(f => de.some(a => franjasAusencia(a).includes(f))); return fs.length === FRANJAS.length ? t : `${t}·${fs.join('')}`; }).join('+');
+}
 function renderMes() {
   const kHoy = isoHoy().slice(0, 7), kMes = mesKey(S.y, S.m);
   $('#mTitle').innerHTML = `<b>${MESES[S.m - 1]}</b> <small>${S.y}</small>${kMes === kHoy ? ' <span class="dchip dc-hoy">ESTE MES</span>' : ` <span class="dchip dc-otro" title="Hoy es ${esc(fmtLargo(isoHoy()))}">${esc(distanciaHoy(isoDe(S.y, S.m, 1)))}</span>`}`;
@@ -65,10 +71,10 @@ function renderMes() {
         if (!cas.length) {
           // 30/09 (revisión de A2, cliente 2): con dos ausencias ese día (permiso por la mañana y vacaciones por la tarde) la
           // pastilla dice «PERM+VAC» y el tooltip las dos con sus detalles (antes solo la primera)
-          if (aus) { const as = ausenciasDia(p, d.iso); h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-${esc(aus.tipo)}" data-tipstr="${esc(etiquetaAusenciasDia(p, d.iso) + as.filter(a => a.detalle).map(a => ' · ' + a.detalle).join(''))}">${esc(franjasAusencia(aus) ? as.map(a => a.tipo).join('+') : aus.tipo)}</span></td>`; continue; }
+          if (aus) { const as = ausenciasDia(p, d.iso); h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-${esc(aus.tipo)}" data-tipstr="${esc(etiquetaAusenciasDia(p, d.iso) + as.filter(a => a.detalle).map(a => ' · ' + a.detalle).join(''))}">${esc(cortoAusenciasDia(as))}</span></td>`; continue; }
           const ed = estadoDia(S, p, d.iso);
           // sin trabajo por el cierre de su local: pastilla «CIE» (24/09, D11)
-          if (!ed.libra && ed.cierre && ed.cierre.tipo !== 'REFUERZA') { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-CIE" data-tipstr="${esc(ed.texto)}">CIE</span></td>`; continue; }
+          if (!ed.libra && ed.cierres.some(x => x.tipo !== 'REFUERZA')) { h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill striped a-CIE" data-tipstr="${esc(ed.texto)}">CIE</span></td>`; continue; }
           h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill vacio">${ed.libra ? 'libra' : ''}</span></td>`;
           continue;
         }
@@ -83,12 +89,16 @@ function renderMes() {
         // (revisión de la fase 5) «Sale primero» a mano sobre quien no puede abrir: el aviso, como en Hoy y la Semana
         const noApto = c => c.entry.abre && manualDe(est, d.iso, c.tid).abre ? revisarEntrada(S, S.staff, est, d.iso, c.tid, p.id).abreNoApto : null;
         const abreNo = cas.map(c => ({ c, na: noApto(c) })).filter(x => x.na);
+        // (01/10, corrección de A7; decisión 4b del coordinador) lo que ya no puede estar (un local, una franja o un veto que ya no
+        // hace…), con la misma lectura que Hoy y la Semana (textoIncumple con durasDe: de lo automático, solo lo que regenerar retira;
+        // nada en lo ya trabajado) y la misma marca roja que lo forzado
+        const rompen = cas.filter(c => !c.entry.forzado && !turnoTrabajado(d.iso, c.tid)).map(c => ({ c, txt: textoIncumple({ origen: c.entry.origen || 'manual', duras: durasDe(S, S.staff, est, d.iso, c.tid, p.id) }, d.iso, c.tid) })).filter(x => x.txt);
         // la otra mitad del día sin trabajo por un cierre (Hojan: El 33 por la mañana, la tarde del Mónaco
         // cerrada): un punto en la pastilla y la franja en el aviso (24/09, revisión F2)
         const edc = cierresDe(S).length ? estadoDia(S, p, d.iso) : null;
-        const cieF = edc && edc.cierre && edc.cierre.tipo !== 'REFUERZA' && !edc.libra ? edc : null;
-        const tip = (sal ? [textoSalido(sal)] : []).concat(cas.map(c => `${FRANJA_LBL[partirTurno(c.tid).franja]}: ${nombreLocal(partirTurno(c.tid).localId)}${c.entry.abre ? ' (abre)' : ''}${c.entry.cocina ? ' (cocina)' : ''}${c.entry.avisos && c.entry.avisos.length ? ' · ' + c.entry.avisos.join(', ') : ''}`)).concat(abreNo.map(x => `⚠ ${textoAbreNoApto(x.na.motivo)}`)).concat(cieF ? [`${cieF.cierre.franjas.map(f => FRANJA_LBL[f]).join(' y ')}: ${cieF.texto}`] : []).join('\n');
-        h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill ${cls}${evPor[d.iso] ? ' ev' : ''}${sal ? ' salido' : ''}" style="--lc:${esc((lm || lt).color)};--lc2:${esc((lt || lm).color)}" data-tipstr="${esc(tip)}">${forz ? '<i class="fz"></i>' : abreNo.length ? '<i class="fz aw"></i>' : ''}${cieF ? '<i class="cief"></i>' : ''}${esc(txt)}</span></td>`;
+        const cieF = edc && edc.cierres.some(x => x.tipo !== 'REFUERZA') && !edc.libra ? edc : null;   // (01/10, A7; B12) cada cierre del día, con sus franjas
+        const tip = (sal ? [textoSalido(sal)] : []).concat(cas.map(c => `${FRANJA_LBL[partirTurno(c.tid).franja]}: ${nombreLocal(partirTurno(c.tid).localId)}${c.entry.abre ? ' (abre)' : ''}${c.entry.cocina ? ' (cocina)' : ''}${c.entry.avisos && c.entry.avisos.length ? ' · ' + c.entry.avisos.join(', ') : ''}`)).concat(rompen.map(x => `${FRANJA_LBL[partirTurno(x.c.tid).franja]}: ${x.txt}`)).concat(abreNo.map(x => `⚠ ${textoAbreNoApto(x.na.motivo)}`)).concat(cieF ? cieF.cierres.filter(x => x.tipo !== 'REFUERZA').map(x => `${x.franjas.map(f => FRANJA_LBL[f]).join(' y ')}: ${motivoSinTrabajo(S, x.cierre, d.iso)}`) : []).join('\n');
+        h += `<td class="${wk.trim()}" data-asig="${p.id}|${d.iso}" role="button" tabindex="0"><span class="pill ${cls}${evPor[d.iso] ? ' ev' : ''}${sal ? ' salido' : ''}" style="--lc:${esc((lm || lt).color)};--lc2:${esc((lt || lm).color)}" data-tipstr="${esc(tip)}">${forz || rompen.length ? '<i class="fz"></i>' : abreNo.length ? '<i class="fz aw"></i>' : ''}${cieF ? '<i class="cief"></i>' : ''}${esc(txt)}</span></td>`;
       }
       h += '</tr>';
     }
@@ -204,6 +214,9 @@ function openDiaPersona(pid, iso, anchor) {
       if (abierta && !confirm(`${p.nombre} está ${motivoAusencia(esa)} desde el ${fmtDM(esa.desde)} sin fecha de fin: se quita solo el ${fmtDM(iso)} y sigue ${motivoAusencia(esa)} ${esa.desde === iso ? 'desde el día siguiente' : 'antes y después'}. Para cerrarla, ponle fecha de fin en Equipo.\n\n¿Quitar solo ese día?`)) return;
       pushUndo('quitar ausencia', { staff: true }); p.ausencias = quitarDiaDeAusencia(p.ausencias, iso, a => a === esa);
       registrarCambio(`Ausencia retirada: ${p.nombre} el ${fmtDM(iso)}${ausDia.length > 1 ? ` · ${etiquetaAusencia(esa)}` : ''}${abierta ? ` (solo ese día: sigue ${motivoAusencia(esa)} desde el ${fmtDM(esa.desde)} sin fecha de fin)` : ''}`, 'aus'); saveState(); renderVistaActiva();
+      // (01/10, A7; corrección de A5, lo que quedó sin tocar) el mismo aviso que Equipo y la ficha: quién entró por su ausencia ese día
+      // y sale al volver a generar (antes el Mes no decía nada)
+      toast(avisoQuitarAusencia(p, [iso]), 'ok');
     }
   });
 }

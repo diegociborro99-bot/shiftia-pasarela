@@ -16,7 +16,8 @@
 const CIE = {};
 const CIE_FR = [['M', 'Mañana'], ['T', 'Tarde'], ['MT', 'Todo el día'], ['0', 'Abierto']];
 // «mar 29»: el último día cerrado, como se lee en la casilla
-function hastaCortoCierre(c) { return hastaCierre(c).replace(/\/\d\d$/, ''); }
+// (01/10, A7; auditoría B12) con el día, el final de su tramo de días seguidos («hasta dom 04»), no el último del cierre
+function hastaCortoCierre(c, iso) { return hastaCierre(c, iso).replace(/\/\d\d$/, ''); }
 // los días del intervalo con su franja: el primero desde su franja, el último hasta la suya
 function diasDelIntervalo(ini, iniF, fin, finF) {
   const out = {};
@@ -505,7 +506,7 @@ function marcaCierreDia(p, iso, est) {
   if (!p || !cierresDe(S).length) return null;
   const x = estadoDia(S, p, iso);
   if (x.libra || x.ausencia || !x.cierre) return null;
-  if (x.cierre.tipo !== 'REFUERZA') return { cls: 'cie', txt: 'cierre', largo: 'sin trabajo · cierre', tip: x.texto };
+  if (x.cierres.some(c => c.tipo !== 'REFUERZA')) return { cls: 'cie', txt: 'cierre', largo: 'sin trabajo · cierre', tip: x.texto };   // (01/10, A7; B12) con dos cierres el mismo día, cualquiera
   if (apoyosSinSitio(S, S.staff, est, iso).some(a => a.pid === p.id)) return { cls: 'cie apoyo', txt: 'apoyo · sin sitio', largo: 'apoyo · sin sitio', tip: `De apoyo por el cierre de ${nombreLocal(x.cierre.cierre.localId)}: aún no tiene sitio` };
   return null;
 }

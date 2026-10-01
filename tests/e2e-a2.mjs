@@ -146,7 +146,8 @@ try {
     await pg.evaluate(() => { S.y = 2026; S.m = 10; cargarMes(); switchTab('mes'); });
     await llega(pg, () => !!document.querySelector('#mesRoot [data-asig="mariluz|2026-10-08"]'), null, 5000);
     const pill = await pg.$eval('#mesRoot [data-asig="mariluz|2026-10-08"]', x => ({ t: x.textContent.trim(), tip: (x.querySelector('.pill') || { dataset: {} }).dataset.tipstr || '' }));
-    ok('el Mes 8/10: la pastilla «PERM+VAC» y el tooltip con las dos y el detalle', pill.t === 'PERM+VAC' && /^Permiso por la mañana · Vacaciones por la tarde \(día entero\) · médico$/.test(pill.tip), j(pill));
+    // (corrección de A7; revisión de cliente B11) cada una con su franja («PERM·M+VAC·T»); dos de lo mismo, una vez («VAC», no «VAC+VAC»)
+    ok('el Mes 8/10: la pastilla «PERM·M+VAC·T» y el tooltip con las dos y el detalle', pill.t === 'PERM·M+VAC·T' && /^Permiso por la mañana · Vacaciones por la tarde \(día entero\) · médico$/.test(pill.tip), j(pill));
     await pg.$eval('#mesRoot [data-asig="mariluz|2026-10-08"]', x => x.scrollIntoView({ block: 'center', inline: 'center' }));
     await pg.click('#mesRoot [data-asig="mariluz|2026-10-08"]');
     ok('la hoja del día se abre con las dos en la cabecera', await llega(pg, () => !!document.querySelector('#diaPersPop') && /Permiso por la mañana · Vacaciones por la tarde \(día entero\)/.test(document.querySelector('#diaPersPop .pd').textContent), null, 3000) >= 0, await pg.$eval('#diaPersPop .pd', x => x.textContent).catch(() => '?'));

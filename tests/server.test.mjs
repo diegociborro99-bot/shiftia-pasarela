@@ -682,6 +682,8 @@ test('CSRF: origen ajeno o cuerpo que no es JSON se rechazan; versiones y copia 
   assert.equal((await emp('GET', '/api/copia')).status, 403);
   const vs = await admin('GET', '/api/estado/versiones');
   assert.equal(vs.status, 200); assert.ok(vs.datos.versiones.length >= 2, 'el servidor conserva versiones anteriores');
+  // (corrección de A7; revisión de cliente B10) y cuántas guarda como mucho: Cuenta decía «guarda las últimas 4» (las que había) encima de «las 60»
+  assert.equal(vs.datos.max, 60);
   const una = await admin('GET', '/api/estado/versiones?v=' + vs.datos.versiones[1].version);
   assert.equal(una.status, 200); assert.ok(Array.isArray(una.datos.estado.staff));
   const copia = await admin('GET', '/api/copia');
@@ -1125,4 +1127,68 @@ test('S0 · GET /api/estado/borrados: quien está en alguna versión anterior y 
     assert.equal((await lo('GET', '/api/estado/borrados')).status, 403, 'el empleado no');
     assert.equal((await fetch(s.base + '/api/estado/borrados')).status, 401, 'sin sesión, 401');
   } finally { await s.parar(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+// 01/10 (A7; revisión de modelo de A6, S3): la comprobación del PUT era de primer nivel (cada clave, lista u objeto) y entraban
+// estados que tumban la app del encargado (comprobado en el navegador con el servidor real: scratchpad/fases/A7/explora/put-roto.mjs):
+// un local null (Hoy), una casilla null o con una entrada null (el Mes, la Semana, Horas), un equipo, un evento o un extra null (el
+// Mes, la Semana, Horas), una plaza null en la semana tipo, ausencias que no son una lista o con un null dentro (el Mes, Equipo, la
+// Semana, Horas) o los locales de una ficha que no son una lista (Equipo). Un nivel más, solo eso: NINGÚN estado válido recibe 400
+// (los once que fabrica la revisión con el modelo, aquí; los reales de revfinal/datos, en el scratchpad de la fase)
+// (con su servidor, como las de antes: el compartido lo para el temporizador de `arrancar` a los 8 s, y esta va la última)
+test('A7 · PUT /api/estado: un nivel más de forma (lo que tumbaría la app da 400) y los estados válidos siguen entrando', async () => {
+  const M = createRequire(import.meta.url)(join(RAIZ, 'modelo.js'));
+  const dir = mkdtempSync(join(tmpdir(), 'shiftia-put-'));
+  const srv = await arrancar(dir);
+  try {
+    const admin = cliente(srv.base);
+    assert.equal((await admin('POST', '/api/login', { usuario: 'oficina', password: ADMIN_PASS })).status, 200);
+    let v = (await admin('GET', '/api/estado')).datos.version;
+    const put = async estado => { const r = await admin('PUT', '/api/estado', { baseVersion: v, estado }); if (r.status === 200) v = r.datos.version; return r.status; };
+    // a) los once estados válidos de la revisión de A6 (09-servidor.mjs), hechos con operaciones del modelo
+    const fresco = () => Object.assign(M.semillaPasarela(), { y: 2026, m: 10, day: 1, meses: {}, nextId: 1, peticiones: [], avisos: [], historial: [], mesesPublicados: [], semLunes: '2026-09-28', guiaOff: false, esquema: M.ESQUEMA_PLANILLA, cierres: {}, cierresPuntuales: [], reglas: {}, extras: [], festivos: [], eventos: [] });
+    const validos = [];
+    validos.push(['recién creado', fresco()]);
+    { const s = fresco(); s.meses['2026-12'] = { apertura: {}, asig: {}, manual: {} }; validos.push(['un mes vacío', s]); }
+    const demo = fresco(); M.sembrarDemo(demo, '2026-10-01'); validos.push(['mes de demo', demo]);
+    { const s = fresco(); delete s.reglas; delete s.mesesPublicados; delete s.cierresPuntuales; delete s.cierres; validos.push(['sin reglas, meses visibles ni cierres', s]); }
+    { const s = fresco(); s.eventos = []; s.equipos = []; s.extras = []; s.festivos = []; validos.push(['listas vacías', s]); }
+    { const s = fresco(); s.staff.push({ id: 'p_nueva', nombre: 'Nueva Persona', puesto: 'sala', locales: [], franjas: ['M', 'T'], libra: [], ausencias: [] }); validos.push(['alta nueva', s]); }
+    { const s = fresco(); M.personaDe(s.staff, 'ivan').ausencias = [{ tipo: 'VAC', desde: '2026-10-05', hasta: '2026-10-07', franjas: ['T'] }]; validos.push(['ausencia por franjas', s]); }
+    { const s = fresco(); M.sembrarDemo(s, '2026-10-01'); const e = M.estadoDesde(s.meses, [], 2026, 10); const c = { id: 'c1', localId: 'MONACO', motivo: 'reforma', detalle: '', dias: { '2026-10-12': ['M', 'T'] }, decisiones: {} }; M.aplicarCierre(s, s.staff, e, c, {}); s.cierresPuntuales = [c]; validos.push(['cierre por fechas aplicado', s]); }
+    { const s = fresco(); M.sembrarDemo(s, '2026-10-01'); M.darSalida(s, s.staff, s.meses, 'susi', '2026-10-15', 'se va'); validos.push(['persona con salida', s]); }
+    { const s = fresco(); M.sembrarDemo(s, '2026-10-01'); s.cierres = { '2026-09': { ts: 1, usuario: 'oficina', tabla: M.horasEquipoMes(s, s.staff, s.meses, 2026, 9) } }; s.reglas = { minimos: false, cocina: false, libra: false }; s.mesesPublicados = ['2026-11']; validos.push(['nómina cerrada, reglas apagadas, mes visible', s]); }
+    { const s = fresco(); s.patron = {}; validos.push(['semana tipo vacía', s]); }
+    { const s = fresco(); s.meses = null; validos.push(['meses: null', s]); }
+    // y lo de antes que sigue valiendo: el día libre de una semana como objeto (antes de D9) y lo vacío o null donde no rompe nada
+    { const s = JSON.parse(JSON.stringify(demo)); M.personaDe(s.staff, 'mariluz').libraPuntual = { semana: '2026-09-28', dias: [2] }; s.meses['2026-11'] = null; s.patron['1'] = null; s.cierres = { '2026-08': null }; validos.push(['libraPuntual de antes, un mes null, un día de la semana tipo null', s]); }
+    for (const [nombre, s] of validos) assert.equal(await put(s), 200, nombre);
+    // b) lo que tumba la app: 400
+    const roto = (nombre, romper) => { const s = JSON.parse(JSON.stringify(demo)); romper(s); return [nombre, s]; };
+    const k = '2026-10', d = '2026-10-05';
+    for (const [nombre, s] of [
+      roto('locales: [null]', s => { s.locales.push(null); }),
+      roto('meses[k].asig: []', s => { s.meses[k].asig = []; }),
+      roto('meses[k]: «ups»', s => { s.meses[k] = 'ups'; }),
+      roto('una casilla null', s => { s.meses[k].asig[d].PASARELA_M = null; }),
+      roto('una entrada null', s => { s.meses[k].asig[d].PASARELA_M = [null]; }),
+      roto('una entrada sin pid', s => { s.meses[k].asig[d].PASARELA_M = [{ origen: 'manual' }]; }),
+      roto('equipos: [null]', s => { s.equipos = [null]; }),
+      roto('eventos: [null]', s => { s.eventos = [null]; }),
+      roto('extras: [null]', s => { s.extras = [null]; }),
+      roto('patron: { 1: [null] }', s => { s.patron['1'] = [null]; }),
+      roto('patron: { 1: «ups» }', s => { s.patron['1'] = 'ups'; }),
+      roto('ausencias: «ups»', s => { s.staff[0].ausencias = 'ups'; }),
+      roto('ausencias: [null]', s => { s.staff[0].ausencias = [null]; }),
+      roto('locales de una ficha: «ups»', s => { s.staff[0].locales = 'ups'; }),
+      roto('franjas de una ficha: [null]', s => { s.staff[0].franjas = [null]; }),
+      // (corrección de A7; revisión de modelo S-1) y solo estas tres formas de un nivel más abajo, que tumbaban la app (Equipo, Horas y la carga)
+      roto('una ausencia sin «desde»', s => { s.staff[0].ausencias = [{ tipo: 'VAC' }]; }),
+      roto('una ausencia vacía', s => { s.staff[0].ausencias = [{}]; }),
+      roto('nombre de una ficha: null', s => { s.staff[0].nombre = null; }),
+      roto('la cocina de un local: «ups»', s => { s.locales[0].cocina = 'ups'; }),
+    ]) assert.equal(await put(s), 400, nombre);
+    // y lo de hoy sigue entrando después (no se quedó nada a medias)
+    assert.equal(await put(JSON.parse(JSON.stringify(demo))), 200);
+  } finally { await srv.parar(); rmSync(dir, { recursive: true, force: true }); }
 });

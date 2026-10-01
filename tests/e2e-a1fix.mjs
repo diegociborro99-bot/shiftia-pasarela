@@ -117,7 +117,8 @@ try {
     const t1 = await toasts(pg), h1 = await historial(pg, 2);
     ok('sin rebote no hay toast de «Por la cocina de…» ni línea de más en el historial', !/Por la cocina/.test(t1) && h1[0] === 'Victoria lleva la cocina de El 33 mañana del 9/10' && !/^Por /.test(h1[1] || ''), j({ t1, h1 }));
     const rev = await pg.evaluate(V => revisionMes(S, S.staff, estadoDeIso(V), { desde: V, hasta: V }).map(x => x.turnoId + ': ' + x.msg), V);
-    ok('la Revisión avisa del cruce de Jenny (cocina por la tarde, sala por la mañana) para que decida el encargado', rev.some(x => /EL33_M.*Jenny: ya lleva la cocina de El 33 ese día/.test(x)), j(rev));
+    // (corrección de A7; revisión de cliente S3) la cocina del mismo local, con su franja: «… de El 33 por la tarde» (antes «… ese día»)
+    ok('la Revisión avisa del cruce de Jenny (cocina por la tarde, sala por la mañana) para que decida el encargado', rev.some(x => /EL33_M.*Jenny: ya lleva la cocina de El 33 por la tarde/.test(x)), j(rev));
     await pg.evaluate(() => deshacer());
     // Noe entra en la mañana de El 33 (a la fuerza: partido no declarado): ya no puede abrir la tarde, y la app lo dice
     const r = await pg.evaluate(V => { pushUndo('poner a Noe'); return asignarUI(V, 'EL33_M', 'noe', { origen: 'manual', forzar: true, permitirPartido: true, puesto: 'sala', razon: 'prueba' }); }, V);
