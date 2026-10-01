@@ -540,7 +540,8 @@ try {
       await api(jC, 'POST', '/api/password', { actual: alta.datos && alta.datos.password, nueva: 'cristian-2026' });
       const eC = await api(jC, 'GET', '/api/estado');
       const cc = eC.ok && eC.datos.estado.cierresPuntuales;
-      ok('el empleado recibe el cierre con su decisión y ninguna de los compañeros', Array.isArray(cc) && cc.length === 1 && JSON.stringify(Object.keys(cc[0].decisiones)) === '["cristian"]' && cc[0].decisiones.cristian.tipo === 'SIN' && cc[0].retirados === undefined, JSON.stringify(cc));
+      // (01/10, A6; auditoría G6) de las plazas retiradas, solo las suyas
+      ok('el empleado recibe el cierre con su decisión y ninguna de los compañeros', Array.isArray(cc) && cc.length === 1 && JSON.stringify(Object.keys(cc[0].decisiones)) === '["cristian"]' && cc[0].decisiones.cristian.tipo === 'SIN' && Array.isArray(cc[0].retirados) && cc[0].retirados.every(r => JSON.stringify(Object.keys(r.entry)) === '["pid"]' && r.entry.pid === 'cristian'), JSON.stringify(cc));
       ok('ningún error de página en modo servidor', !errores.length, errores.join(' | '));
       await A.context().close(); await B.context().close();
     } finally {

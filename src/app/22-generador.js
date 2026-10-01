@@ -174,6 +174,25 @@ function mensajeErrorNucleo(r) {
 // blanda(s) relajada(s) · relajaciones: [{"rule_id":…», que además contaba el reparto como regla relajada)
 const ESTADO_NUCLEO = { OPTIMAL: 'la mejor planilla posible con estas reglas', FEASIBLE: 'una planilla válida (se acabó el tiempo antes de asegurar que es la mejor)', FEASIBLE_RELAXED: 'no ha podido cumplir todas las reglas a la vez' };
 const VUELTA_TXT = ['', '', 'segunda', 'tercera', 'cuarta'];
+// 01/10 (corrección de A6; revisión de modelo S2) lo que queda por cubrir, dicho por lo que es y contado por casillas (una casilla con
+// dos huecos es una): «casilla corta» es la que tiene menos gente que su mínimo (faltan > 0); la que solo tiene apoyos, la que no
+// tiene quien abra y la que no tiene su cocina obligatoria, con su frase. Antes todo hueco contaba como «casilla corta», también el
+// de «solo apoyos» de una casilla con su mínimo
+function cuentaHuecos(hs) {
+  const orden = ['cortas', 'apoyos', 'primero', 'cocina'], cat = new Map();   // cada casilla, en lo primero que le pasa
+  for (const h of hs || []) {
+    const c = h.faltan > 0 ? 'cortas' : h.tipo === 'apoyos' ? 'apoyos' : h.tipo === 'primero' ? 'primero' : h.tipo === 'cocina' ? 'cocina' : null;
+    const k = h.iso + '|' + h.turnoId, ya = cat.get(k);
+    if (c && (!ya || orden.indexOf(c) < orden.indexOf(ya))) cat.set(k, c);
+  }
+  const out = { cortas: 0, apoyos: 0, primero: 0, cocina: 0 };
+  for (const c of cat.values()) out[c]++;
+  return out;
+}
+function textoHuecos(hs) {
+  const c = cuentaHuecos(hs);
+  return [c.cortas ? pl(c.cortas, 'casilla corta', 'casillas cortas') : '', c.apoyos ? pl(c.apoyos, 'casilla solo con apoyos', 'casillas solo con apoyos') : '', c.primero ? pl(c.primero, 'casilla sin quien abra', 'casillas sin quien abra') : '', c.cocina ? pl(c.cocina, 'casilla sin su cocina obligatoria', 'casillas sin su cocina obligatoria') : ''].filter(Boolean).join(', ');
+}
 function lineaNucleo(p) {
   const n = p.nucleo;
   const t = n.stats && n.stats.wall_time_s;
@@ -182,8 +201,7 @@ function lineaNucleo(p) {
   const saltadas = (n.relaxations || []).map(x => `«${x.rule_id}»`);
   if (saltadas.length) partes.push(`para dar una planilla se ha saltado ${saltadas.join(', ')}`);
   if (n.vueltas > 1) partes.push(`${VUELTA_TXT[n.vueltas] || n.vueltas + '.ª'} vuelta: volvió a resolver sin ${pl(n.vetadas, 'propuesta', 'propuestas')} que las reglas no dejaban poner`);
-  const cortas = p.huecos.length;
-  if (cortas) partes.push(`${pl(cortas, 'casilla se queda corta', 'casillas se quedan cortas')}: abajo, con el porqué`);
+  if (p.huecos.length) partes.push(`por cubrir: ${textoHuecos(p.huecos)} (abajo, con el porqué)`);
   return partes.join(' · ');
 }
 // 01/10 (corrección de A4; revisión de cliente 2 y 9): lo que se retira, una línea por persona y motivo, con sus días, sus
@@ -228,6 +246,7 @@ function htmlPrevia(p) {
   const conAviso = p.aplicados.filter(a => a.avisos && a.avisos.length).length;
   // D3: quien ya estaba y pasa a cubrir; solo los nuevos (revisión F3: el relevo ya volcado no es nada que volcar)
   const nRelevos = (p.coberturas || []).filter(c => c.yaEstaba && c.nuevo).length;
+  const ch = cuentaHuecos(p.huecos);
   const lp = tid => { const { localId } = partirTurno(tid); return `<span class="lpill" style="--lc:${colorLocal(localId)}">${esc((localDe(S, localId) || {}).corto || localId)}·${partirTurno(tid).franja}</span>`; };
   const fila = a => `<div class="genrow"><span class="av" style="background:${avColor(a.pid)}">${esc(initials(nombrePid(a.pid)))}</span><span class="gtxt"><b>${esc(nombrePid(a.pid))}</b><small>${esc(a.razon || '')}${a.avisos && a.avisos.length ? ' · <span style="color:var(--warn)">' + esc(a.avisos.join(', ')) + '</span>' : ''}${a.supuesto ? ' · <span style="color:var(--warn)">supuesto</span>' : ''}</small></span>${lp(a.turnoId)}</div>`;
   // 25/09 (fase 7): lo que propuso el núcleo y la puerta no dejó poner va aparte de la semana tipo, y en su hueco
@@ -247,17 +266,26 @@ function htmlPrevia(p) {
     // 01/10 (corrección de A4; revisión de cliente 12): el porqué de cada «Con aviso», escrito al lado en pequeño (antes solo en el
     // title del botón: en el móvil no se veía nunca)
     const conAviso = c => `<span class="galt">${boton(c, false)}${c.avisos && c.avisos.length ? ` <em class="gavtxt">${esc(c.avisos.join(' · '))}</em>` : ''}</span>`;
-    const pq = Object.entries(h.porQueNadie || {}).slice(0, 5).map(([m, quienes]) => `<b>${esc(m)}</b>: ${esc(quienes.slice(0, 4).join(', '))}${quienes.length > 4 ? ` +${quienes.length - 4}` : ''}`).join(' · ');
-    // (fase 5, S37) qué le falta a la casilla: gente, quien abra o la cocina obligatoria
-    const titulo = h.tipo === 'cocina' ? 'Sin cocina (obligatoria)' : h.tipo === 'primero' ? 'Nadie puede abrir (1.ª posición)' : `Faltan ${h.faltan} de ${h.minimo}${h.supuesto ? ' (mínimo supuesto)' : ''}`;
-    const nuc = (h.nucleo || []).map(x => `${esc(nombrePid(x.pid))} (${esc(x.motivo)})`).join(', ');
-    return `<div class="genrow hueco" data-hueco="${h.iso}|${h.turnoId}|${h.tipo || 'faltan'}"><span class="av" style="background:var(--bad)">!</span><span class="gtxt"><b>${titulo}</b>${nuc ? `<small class="gnuc">El núcleo proponía a ${nuc}</small>` : ''}<small class="pqn">${pq || 'nadie disponible'}</small>${limpios.length ? `<small>Pueden entrar: ${limpios.map(c => boton(c, true)).join(' ')}</small>` : ''}${alt.length ? `<small class="gconaviso">Con aviso: ${alt.map(conAviso).join(' ')}</small>` : ''}</span>${lp(h.turnoId)}</div>`;
+    // 01/10 (corrección de A6; revisión de cliente H8) lo que proponía el núcleo, en una frase y agrupado por el porqué: «El núcleo
+    // proponía a Lavinia y Dulce, pero dejarían la casilla solo con apoyos: hace falta alguien de sala o de cocina». Antes, cada uno con
+    // su porqué entre paréntesis (con otro paréntesis dentro) y ese mismo porqué otra vez en «por qué nadie»: media pantalla en el móvil
+    const grupos = new Map();
+    for (const x of h.nucleo || []) { const k = x.regla === 'soloApoyos' ? 'soloApoyos' : x.motivo; if (!grupos.has(k)) grupos.set(k, { regla: x.regla, motivo: x.motivo, pids: [] }); grupos.get(k).pids.push(x.pid); }
+    const nuc = [...grupos.values()].map(g => { const quien = esc(listaY(g.pids.map(nombrePid))); return g.regla === 'soloApoyos' ? `a ${quien}, pero ${g.pids.length > 1 ? 'dejarían' : 'dejaría'} la casilla solo con apoyos: hace falta alguien de sala o de cocina` : `a ${quien} (${esc(g.motivo)})`; }).join('; ');
+    const yaDicho = new Set((h.nucleo || []).map(x => x.motivo));
+    const pq = Object.entries(h.porQueNadie || {}).filter(([m]) => !yaDicho.has(m)).slice(0, 5).map(([m, quienes]) => `<b>${esc(m)}</b>: ${esc(quienes.slice(0, 4).join(', '))}${quienes.length > 4 ? ` +${quienes.length - 4}` : ''}`).join(' · ');
+    // (fase 5, S37) qué le falta a la casilla: gente, quien abra o la cocina obligatoria. 01/10 (A6; auditoría G4): o alguien que
+    // no sea apoyo (el Núcleo ya no deja dos apoyos solos); si además falta gente, el hueco lo dice detrás
+    const titulo = h.tipo === 'cocina' ? 'Sin cocina (obligatoria)' : h.tipo === 'primero' ? 'Nadie puede abrir (1.ª posición)' : h.tipo === 'apoyos' ? 'Solo apoyos: hace falta alguien de sala o de cocina' : `Faltan ${h.faltan} de ${h.minimo}${h.supuesto ? ' (mínimo supuesto)' : ''}${h.motivo ? ' · ' + esc(h.motivo) : ''}`;
+    return `<div class="genrow hueco" data-hueco="${h.iso}|${h.turnoId}|${h.tipo || 'faltan'}"><span class="av" style="background:var(--bad)">!</span><span class="gtxt"><b>${titulo}</b>${nuc ? `<small class="gnuc">El núcleo proponía ${nuc}</small>` : ''}<small class="pqn">${pq || 'nadie disponible'}</small>${limpios.length ? `<small>Pueden entrar: ${limpios.map(c => boton(c, true)).join(' ')}</small>` : ''}${alt.length ? `<small class="gconaviso">Con aviso: ${alt.map(conAviso).join(' ')}</small>` : ''}</span>${lp(h.turnoId)}</div>`;
   };
   return `<div class="genkpis">
       <div class="genk ok"><b>${p.aplicados.length}</b><span>plazas propuestas</span></div>
       <div class="genk"><b>${nPatron}</b><span>de la semana tipo</span></div>
       <div class="genk"><b>${nGen}</b><span>rellenadas por el ${p.motor === 'nucleo' ? 'núcleo' : 'generador'}</span></div>
-      <div class="genk ${p.huecos.length ? 'bad' : 'ok'}"><b>${p.huecos.length}</b><span>casillas que siguen cortas</span></div>
+      <div class="genk ${ch.cortas ? 'bad' : 'ok'}"><b>${ch.cortas}</b><span>casillas que siguen cortas</span></div>
+      ${ch.apoyos ? `<div class="genk bad"><b>${ch.apoyos}</b><span>solo con apoyos</span></div>` : ''}
+      ${ch.primero + ch.cocina ? `<div class="genk bad"><b>${ch.primero + ch.cocina}</b><span>sin quien abra o sin su cocina</span></div>` : ''}
       ${conAviso ? `<div class="genk warn"><b>${conAviso}</b><span>con aviso</span></div>` : ''}
       ${p.coberturas.length ? `<div class="genk"><b>${p.coberturas.length}</b><span>coberturas «cubre a»</span></div>` : ''}
     </div>
@@ -267,7 +295,7 @@ function htmlPrevia(p) {
     ${rechST.length ? `<div class="warnbanner"><b>${pl(rechST.length, 'plaza de la semana tipo no se pudo poner', 'plazas de la semana tipo no se pudieron poner')}</b>${rechST.slice(0, 5).map(lineaRech).join(' · ')}</div>` : ''}
     ${rechNuc.length ? `<div class="warnbanner"><b>${pl(rechNuc.length, 'propuesta del núcleo no se pudo poner', 'propuestas del núcleo no se pudieron poner')}</b>${rechNuc.slice(0, 5).map(lineaRech).join(' · ')}${rechNuc.some(r => r.vetada) ? ' · <i>el núcleo volvió a resolver sin ellas y la casilla sigue corta</i>' : ''}${!p.permitirPartido && rechNuc.some(r => r.regla === 'partido' || r.regla === 'nuncaCon') ? ' · <i>con «Permitir partidos no declarados» marcado, los partidos no declarados y las parejas «nunca con» flexibles entran con aviso</i>' : ''}</div>` : ''}
     ${!p.aplicados.length && !p.huecos.length && !(p.retirados || []).length ? '<div class="genvacio">Nada que proponer: el periodo ya está completo (o queda fuera de «solo desde hoy»).</div>' : ''}
-    ${dias.map(iso => `<div class="gendia"><div class="gdh">${fmtLargo(iso)}<small>${pl(porDia[iso].ap.length, 'plaza', 'plazas')}${porDia[iso].hu.length ? ` · ${pl(porDia[iso].hu.length, 'casilla corta', 'casillas cortas')}` : ''} · <button class="glink" data-irdia="${iso}">ver el día</button></small></div>${porDia[iso].hu.map(hueco).join('')}${porDia[iso].ap.map(fila).join('')}</div>`).join('')}
+    ${dias.map(iso => `<div class="gendia"><div class="gdh">${fmtLargo(iso)}<small>${pl(porDia[iso].ap.length, 'plaza', 'plazas')}${porDia[iso].hu.length ? ` · ${textoHuecos(porDia[iso].hu)}` : ''} · <button class="glink" data-irdia="${iso}">ver el día</button></small></div>${porDia[iso].hu.map(hueco).join('')}${porDia[iso].ap.map(fila).join('')}</div>`).join('')}
     <div class="genbar"><button class="btn btn-cta" id="genAplicar" ${p.aplicados.length || (p.retirados || []).length || nRelevos ? '' : 'disabled'}>${p.aplicados.length || (p.retirados || []).length || nRelevos ? `Volcar a la planilla (${[p.aplicados.length ? pl(p.aplicados.length, 'plaza', 'plazas') : '', (p.retirados || []).length ? pl(p.retirados.length, 'retirada', 'retiradas') : '', nRelevos ? pl(nRelevos, 'relevo «cubre a»', 'relevos «cubre a»') : ''].filter(Boolean).join(', ')})` : 'Nada nuevo que volcar'}</button><span class="revsub" style="margin:0">Se puede deshacer con ${comoDeshacer()}. Las casillas cortas quedan marcadas en rojo en Hoy, Semana y Mes.</span></div>`;
 }
 function aplicarPrevia() {
@@ -281,10 +309,10 @@ function aplicarPrevia() {
   // generador le retiraba su propia plaza
   const r = volcarPrevia(S, S.staff, iso => estadoDeIso(iso, true), p, { desde: GEN.desde, hasta: GEN.hasta, desdeIso: GEN.opts.desdeHoy ? isoHoy() : undefined, previaDe: iso => p.meses[iso.slice(0, 7)] });
   const n = r.aplicadas, fallos = r.fallos, nRet = r.retiradas;
-  registrarCambio(`Generador (${p.motor === 'nucleo' ? 'núcleo Shiftia' : 'local'}): ${pl(n, 'plaza aplicada', 'plazas aplicadas')} del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}${nRet ? ` · ${pl(nRet, 'retirada que ya no valía', 'retiradas que ya no valían')} (${lineasRetirados(p.retirados, true).join('; ')})` : ''}${r.relevos ? ` · ${pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : ''}${p.huecos.length ? ` · ${pl(p.huecos.length, 'casilla sigue corta', 'casillas siguen cortas')}` : ''}${fallos ? ` · ${fallos} no se pudieron poner` : ''}`, 'ia');
+  registrarCambio(`Generador (${p.motor === 'nucleo' ? 'núcleo Shiftia' : 'local'}): ${pl(n, 'plaza aplicada', 'plazas aplicadas')} del ${fmtDM(GEN.desde)} al ${fmtDM(GEN.hasta)}${nRet ? ` · ${pl(nRet, 'retirada que ya no valía', 'retiradas que ya no valían')} (${lineasRetirados(p.retirados, true).join('; ')})` : ''}${r.relevos ? ` · ${pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»')}` : ''}${p.huecos.length ? ` · por cubrir: ${textoHuecos(p.huecos)}` : ''}${fallos ? ` · ${fallos} no se pudieron poner` : ''}`, 'ia');
   saveState();
   GEN.previa = null;
-  toast(textoVolcado(n, nRet, [r.relevos ? pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»') : '', p.huecos.length ? `${pl(p.huecos.length, 'casilla corta', 'casillas cortas')} por cubrir` : '']), p.huecos.length ? 'warn' : 'ok');
+  toast(textoVolcado(n, nRet, [r.relevos ? pl(r.relevos, 'relevo «cubre a»', 'relevos «cubre a»') : '', p.huecos.length ? `por cubrir: ${textoHuecos(p.huecos)}` : '']), p.huecos.length ? 'warn' : 'ok');
   renderGenerador(); pintaRevDot();
 }
 function vaciarGenerado() {

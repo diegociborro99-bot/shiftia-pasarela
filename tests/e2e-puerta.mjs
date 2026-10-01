@@ -185,7 +185,7 @@ try {
     let filas = await abrir();
     const jen = filas.find(f => f.pid === 'jenny');
     ok('Jenny (titular de esa cocina, que ese lunes lleva la de la mañana) sale «con aviso» marcada de cocina', !!jen && jen.grupo === 'CON AVISO' && jen.cocina && jen.aviso, JSON.stringify(jen));
-    ok('con su razón de cocina y el aviso del partido', !!jen && /cocina titular de Bar Mónaco/.test(jen.motivo) && /partido no declarado/.test(jen.motivo), jen && jen.motivo);
+    ok('con su razón de cocina y el aviso del partido', !!jen && /cocina titular de Bar Mónaco/.test(jen.motivo) && /no hace partido/.test(jen.motivo), jen && jen.motivo);
     ok('y ya no en «no pueden» con un motivo de sala', !filas.some(f => f.pid === 'jenny' && f.grupo === 'NO PUEDEN'), JSON.stringify(filas.filter(f => f.pid === 'jenny')));
     // (si no está entre las que se pueden pulsar, se sigue con lo demás: la comprobación ya ha fallado)
     if (await pg.$('#pickerPop .prowp[data-pickpid="jenny"]')) {
@@ -213,9 +213,9 @@ try {
     await pg.click('#pickerPop [data-forzar="jacquelin"]');
     await llega(pg, () => !document.querySelector('#pickerPop'), null, 3000);
     const pregunta = pg.dialogos[0] || '';
-    ok('la pregunta de «forzar» lista TODAS las reglas, cada una con la suya', /Locales donde trabaja — solo Zapatillera/.test(pregunta) && /Mañanas y tardes — siempre de mañana/.test(pregunta) && /Días de partido — partido no declarado los lunes/.test(pregunta), pregunta);
+    ok('la pregunta de «forzar» lista TODAS las reglas, cada una con la suya', /Locales donde trabaja — solo Zapatillera/.test(pregunta) && /Mañanas y tardes — siempre de mañana/.test(pregunta) && /Días de partido — no hace partido los lunes/.test(pregunta), pregunta);
     const avisoFinal = await pg.evaluate(() => [...document.querySelectorAll('#toasts .toast')].map(t => t.textContent).pop() || '');
-    ok('y el aviso de después pone cada aviso con su regla', /Locales donde trabaja: solo Zapatillera/.test(avisoFinal) && /Mañanas y tardes: siempre de mañana/.test(avisoFinal) && /Días de partido: partido no declarado los lunes/.test(avisoFinal), avisoFinal);
+    ok('y el aviso de después pone cada aviso con su regla', /Locales donde trabaja: solo Zapatillera/.test(avisoFinal) && /Mañanas y tardes: siempre de mañana/.test(avisoFinal) && /Días de partido: no hace partido los lunes/.test(avisoFinal), avisoFinal);
     // lo mismo desde el Mes (la hoja de una persona en un día → «Poner en…»)
     await pg.keyboard.press('Control+z');
     await llega(pg, v => !pidsEn(estadoDeIso(v), v, 'MONACO_T').includes('jacquelin'), V, 3000);
@@ -225,9 +225,9 @@ try {
     await pg.click('#diaPersPop [data-pon="MONACO_T"]');
     await llega(pg, v => pidsEn(estadoDeIso(v), v, 'MONACO_T').includes('jacquelin'), V, 3000);
     const preguntaMes = pg.dialogos[0] || '';
-    ok('en el Mes, la pregunta también lista todas las reglas', /Locales donde trabaja — solo Zapatillera/.test(preguntaMes) && /Mañanas y tardes — siempre de mañana/.test(preguntaMes) && /Días de partido — partido no declarado los lunes/.test(preguntaMes), preguntaMes);
+    ok('en el Mes, la pregunta también lista todas las reglas', /Locales donde trabaja — solo Zapatillera/.test(preguntaMes) && /Mañanas y tardes — siempre de mañana/.test(preguntaMes) && /Días de partido — no hace partido los lunes/.test(preguntaMes), preguntaMes);
     const avisoMes = await pg.evaluate(() => [...document.querySelectorAll('#toasts .toast')].map(t => t.textContent).pop() || '');
-    ok('y su aviso, cada una con su regla', /Locales donde trabaja: solo Zapatillera/.test(avisoMes) && /Días de partido: partido no declarado los lunes/.test(avisoMes), avisoMes);
+    ok('y su aviso, cada una con su regla', /Locales donde trabaja: solo Zapatillera/.test(avisoMes) && /Días de partido: no hace partido los lunes/.test(avisoMes), avisoMes);
     await pg.context().close();
   });
 

@@ -185,7 +185,8 @@ try {
     await clic(pg, '#pickerPop [data-forzar="hojan"]');
     const h = (await casilla(pg, dia, 'MONACO_M')).find(x => x.pid === 'hojan');
     ok('forzado: la entrada queda como forzada', !!h && h.forzado, JSON.stringify(h));
-    ok('y la Revisión lo da por forzado a mano con «solo hace cocina»', await pg.evaluate(v => revisionMes(S, S.staff, estadoDeIso(v), { desde: v, hasta: v }).some(x => x.tipo === 'forzado' && /Hojan: solo hace cocina/.test(x.msg)), dia));
+    // (corrección de A6; revisión de cliente H2) la línea de lo forzado dice «Hojan, puesto a la fuerza (“su motivo”): …»
+    ok('y la Revisión lo da por forzado a mano con «solo hace cocina»', await pg.evaluate(v => revisionMes(S, S.staff, estadoDeIso(v), { desde: v, hasta: v }).some(x => x.tipo === 'forzado' && /Hojan, puesto a la fuerza[^:]*: solo hace cocina/.test(x.msg)), dia));
     await pg.context().close();
   });
 

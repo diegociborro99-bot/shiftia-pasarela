@@ -97,13 +97,14 @@ function renderCobertura() { pintaCob($('#cobRoot'), 'tab'); }
 // 24/09 (reunión: «tú vas a equipo… Cubre a Iván… y ahora en el generador de cobertura debería ya
 // sugerir… sigue poniendo a Dulce»): el plan que se enseña se calculó con una plantilla y una
 // planilla concretas. Si cambian (en Equipo, en la planilla o con Ctrl+Z), ese plan ya no vale: no
-// se vuelve a pintar el viejo, se avisa «La ficha ha cambiado: vuelve a buscar». La huella es la de
-// la sincronización (huellaPlanilla): meses, fichas, locales, semana tipo, eventos y cierres.
-function planCaducado() { return !!COB.res && COB.res.huella !== huellaPlanilla(S); }
+// se vuelve a pintar el viejo, se avisa «… vuelve a buscar». La huella es la de la sincronización (huellaPlanilla): la lista de la
+// planilla del modelo (CLAVES_PLANILLA), con las reglas del grupo desde el 01/10; sin los meses visibles (huellaCobertura,
+// corrección de A6: hacer visible un mes no cambia el plan)
+function planCaducado() { return !!COB.res && COB.res.huella !== huellaCobertura(S); }
 const mismaIncidencia = (a, b) => !!a && !!b && a.pid === b.pid && a.tipo === b.tipo && JSON.stringify(a.dias) === JSON.stringify(b.dias) && JSON.stringify(a.franjas || []) === JSON.stringify(b.franjas || []);
 function htmlCaducado() {
-  return `<div class="cobcard cobvacia cobcaduca" id="cobCaduco" role="status"><span class="micro">EL PLAN DE ANTES YA NO VALE</span><h3>La ficha ha cambiado: vuelve a buscar</h3>
-    <p class="revsub">Desde que se buscó quién cubre ha cambiado la plantilla o la planilla (en Equipo, en la planilla o con Ctrl+Z), así que ese plan podría no cumplir lo que hay ahora.</p>
+  return `<div class="cobcard cobvacia cobcaduca" id="cobCaduco" role="status"><span class="micro">EL PLAN DE ANTES YA NO VALE</span><h3>Ha cambiado la planilla, una ficha o una regla del grupo: vuelve a buscar</h3>
+    <p class="revsub">Desde que se buscó quién cubre ha cambiado algo (en Equipo, en la planilla o con Ctrl+Z), así que ese plan podría no cumplir lo que hay ahora.</p>
     <button class="btn btn-cta" id="cobRebuscar">✦ Buscar otra vez</button></div>`;
 }
 function pintaCob(root, modo) {
@@ -238,7 +239,7 @@ function proponerCobertura(root, modo) {
     // (A5, F1) «solo desde hoy»: lo de antes no se cubre (va a res.pasados); (corrección de A5, cliente H1) con la hora de Madrid,
     // tampoco lo de hoy ya trabajado
     const res = planesCobertura(S, S.staff, base, inc, Object.assign({ siempre: COB.siempre, intercambio: COB.tipo === 'CAMBIO' && COB.intercambio, meses: S.meses }, desdeHoyCob()));
-    res.inc = inc; res.ts = Date.now(); res.rango = rango; res.diasEstado = diasEstado; res.huella = huellaPlanilla(S);
+    res.inc = inc; res.ts = Date.now(); res.rango = rango; res.diasEstado = diasEstado; res.huella = huellaCobertura(S);
     COB.res = res; COB.aplicado = null; COB.caducado = null;
   } catch (e) { toast('No se pudo proponer: ' + (e && e.message ? e.message : e), 'bad'); }
   pintaCob(root, modo);

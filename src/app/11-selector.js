@@ -31,7 +31,10 @@ function openPicker(iso, tid, anchor) {
   // la puerta: una ausencia, el local cerrado o estar ya en otro local esa franja, no)
   const porPid = new Map(noPueden.map(x => [x.pid, x]));
   // (revisión F4) en una casilla sin cocina, quien la lleva se evalúa y se fuerza como cocina (data-cocina)
-  const filaNo = x => `<div class="prowp dis${x.cocina ? ' coc' : ''}"${x.cocina ? ' data-cocina="1"' : ''}><span class="av" style="background:${avColor(x.pid)}">${esc(initials(x.nombre))}</span><span class="pn2">${esc(x.nombre)}<span class="prregla">${esc(nombreRegla(x.regla))}${x.cocina ? ' · como cocina' : ''}</span><span class="prsub">${esc(x.motivo)}</span></span>${x.forzable ? `<button class="forzar" data-forzar="${x.pid}" title="Ponerlo de todas formas y dejar constancia">forzar</button>` : ''}</div>`;
+  // (01/10, corrección de A6; revisión de cliente H4) si incumple más de una regla, la fila lo dice («· y 2 más»): las demás salían
+  // solo al pulsar «forzar»
+  const masReglas = x => (x.incumple || []).filter(i => i.motivo !== x.motivo).length;
+  const filaNo = x => `<div class="prowp dis${x.cocina ? ' coc' : ''}"${x.cocina ? ' data-cocina="1"' : ''}><span class="av" style="background:${avColor(x.pid)}">${esc(initials(x.nombre))}</span><span class="pn2">${esc(x.nombre)}<span class="prregla">${esc(nombreRegla(x.regla))}${x.cocina ? ' · como cocina' : ''}</span><span class="prsub">${esc(x.motivo)}${masReglas(x) ? ` · y ${masReglas(x)} más` : ''}</span></span>${x.forzable ? `<button class="forzar" data-forzar="${x.pid}" title="Ponerlo de todas formas y dejar constancia">forzar</button>` : ''}</div>`;
   // las filas ya filtradas por lo que se haya escrito en la lupa. Los grupos que se quedan
   // sin nadie desaparecen con su cabecera: un «PUEDEN · 0» solo estorba. La ★ es la primera
   // de la cocina si la casilla no la tiene; si no, la primera de «pueden».
@@ -85,7 +88,7 @@ function openPicker(iso, tid, anchor) {
       // casilla seguía sin cocina
       pushUndo(`forzar a ${nombrePid(pid)}`);
       const puesto = rr.cocina ? { puesto: 'cocina', cocina: true } : { puesto: 'sala' };
-      const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', forzar: true, permitirPartido: true, razon: motivo.trim() || 'forzado por el encargado' }, puesto));
+      const res = asignarUI(iso, tid, pid, Object.assign({ origen: 'manual', forzar: true, permitirPartido: true, razon: motivo.trim() || RAZON_FORZADO }, puesto));
       if (res.ok) { closePicker(); renderVistaActiva(); toast(`${nombrePid(pid)} puesto a la fuerza · incumple ${conSuRegla(res.avisos, inc)}`, 'warn'); }
       else { undoStack.pop(); actualizarUndoBtn(); toast(`${nombreRegla(res.regla)} — ${res.motivo}`, 'bad'); }
       return;
@@ -165,20 +168,37 @@ function openMenuTurno(iso, tid, pid, anchor) {
   colocarPop(pop, anchor);
   cierraFuera(pop);
   // el formulario del tramo, dentro del mismo popover: entra, sale, «hasta el cierre»
+  // 01/10 (corrección de A6; revisión de cliente H1): en un turno continuo, qué se apunta en cualquiera de las dos mitades. Con
+  // horas en una sola mitad, esas son las de todo el turno (la otra no suma: mitadDentro, en el modelo); en las dos, cada mitad
+  // cuenta lo suyo. Si la otra mitad ya lleva horas, se dice, para que no se apunte el turno entero dos veces
+  const notaContinuo = () => {
+    if (turnoDelDia(S, e, iso, pid).continuo !== localId) return '';
+    const otraF = franja === 'M' ? 'T' : 'M', otra = asignados(e, iso, turnoId(localId, otraF)).find(x => x.pid === pid);
+    if (!(otra && otra.ini && otra.fin)) return 'Turno continuo: pon la hora de entrada y la de salida de todo el turno';
+    const ella = `la ${FRANJA_LBL[otraF].toLowerCase()}`;
+    return entry.ini && entry.fin ? `Turno continuo: ${ella} lleva ${otra.ini}–${otra.fin} y cada mitad cuenta lo suyo`
+      : `Turno continuo: ${ella} ya lleva ${otra.ini}–${otra.fin} y cuenta como todo el turno; si apuntas también la ${FRANJA_LBL[franja].toLowerCase()}, cada mitad cuenta lo suyo`;
+  };
   const pintarTramo = () => {
     const dow = isoDow(iso);
     const cierre = cierreDe(l, dow);
     const hLocal = horarioDe(l, dow, franja);
+    const nc = notaContinuo();
     pop.innerHTML = `<div class="ph">${esApoyo(p) ? 'Ajustar apoyo' : 'Horario distinto'} · ${esc(p.nombre)}</div>
       <div class="pd">${esc(l.nombre)} · ${fmtLargo(iso)}${hLocal ? ` · el local, ${esc(hLocal.ini)}–${esc(hLocal.fin)}` : ''}</div>
+      ${nc ? `<p class="trnota" data-trcont>${esc(nc)}</p>` : ''}
       <div class="trform">
         <label>Entra<input type="time" id="trIni" data-libre value="${esc(entry.ini || '')}"></label>
         <label>Sale<input type="time" id="trFin" data-libre value="${esc(entry.fin || '')}"></label>
         ${cierre ? `<button type="button" class="btn-mini ghost" data-trcierre="${esc(cierre)}">hasta el cierre (${esc(cierre)})</button>` : ''}
       </div>
+      <p class="trerr" data-trerr role="alert" hidden></p>
       <div class="trbar">${entry.ini ? '<button type="button" class="popb peligro" data-trquitar>Quitar las horas</button>' : ''}<button type="button" class="popb rec" data-trok>Guardar</button></div>`;
     const ini = pop.querySelector('#trIni'); if (ini && matchMedia('(hover:hover)').matches) ini.focus();
   };
+  // (corrección de A6; revisión de cliente, «no es de A6») lo que no se puede guardar se dice dentro del formulario, encima de
+  // «Guardar»: como aviso suelto, en el móvil tapaba el botón mientras se veía
+  const avisoTramo = txt => { const x = pop.querySelector('[data-trerr]'); if (!x) { toast(txt, 'warn'); return; } x.textContent = txt; x.hidden = false; };
   const guardarTramo = quitar => {
     if (!confirmarSiCerrado(iso)) return;
     const ew = estadoDeIso(iso, true);
@@ -186,7 +206,9 @@ function openMenuTurno(iso, tid, pid, anchor) {
     if (quitar) { pushUndo('horas del apoyo'); delete en.ini; delete en.fin; }
     else {
       const vi = (pop.querySelector('#trIni') || {}).value, vf = (pop.querySelector('#trFin') || {}).value;
-      if (!/^\d\d:\d\d$/.test(vi || '') || !/^\d\d:\d\d$/.test(vf || '')) { toast('Hacen falta la hora de entrada y la de salida', 'warn'); return; }
+      if (!/^\d\d:\d\d$/.test(vi || '') || !/^\d\d:\d\d$/.test(vf || '')) { avisoTramo('Hacen falta la hora de entrada y la de salida'); return; }
+      // 01/10 (A6; auditoría G9): «de 16:00 a 16:00» no es un turno; el modelo ya no le cuenta horas (antes 24), y aquí no se guarda
+      if (vi === vf) { avisoTramo('La hora de entrada y la de salida no pueden ser la misma'); return; }
       pushUndo('horas del apoyo'); en.ini = vi; en.fin = vf;
     }
     registrarCambio(`${esApoyo(p) ? 'Apoyo de' : 'Horario de'} ${p.nombre} en ${l.nombre} el ${fmtDM(iso)}: ${en.ini ? en.ini + '–' + en.fin : 'el del local'}`, 'asig');

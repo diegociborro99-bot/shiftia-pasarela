@@ -174,7 +174,7 @@ try {
       ok('todo el que se ofrece para ese hueco puede abrir', !!hp && abren, hp && j(hp.botones));
       // (corrección de A4, cliente 12) el porqué de «Con aviso» se lee en la fila (en el móvil no hay ratón para el title)
       const hm = huecos.find(h => h.k === `${M6}|MONACO_T|faltan`);
-      ok('el hueco del Mónaco por la tarde ofrece «Con aviso» con el porqué escrito en la fila', !!hm && /Con aviso: .*Yilian.*partido no declarado los martes/.test(hm.txt), hm && hm.txt);
+      ok('el hueco del Mónaco por la tarde ofrece «Con aviso» con el porqué escrito en la fila', !!hm && /Con aviso: .*Yilian.*no hace partido los martes/.test(hm.txt), hm && hm.txt);
     });
     await pg.context().close();
   }

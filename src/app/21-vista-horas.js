@@ -73,7 +73,7 @@ function renderHoras() {
     const tp = l0 && l0.horarioPartido;
     const tpFin = tp && tp.porDow && tp.porDow[6] && tp.porDow[6].M && tp.porDow[6].T ? tp.porDow[6] : null;
     const dur = l0 && l0.duracion && +l0.duracion.M > 0 ? Math.round(+l0.duracion.M / 6) / 10 : null;
-    h += `<div class="haviso info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11.3v5"/><circle fill="currentColor" stroke="none" cx="12" cy="8" r="1.05"/></svg><span><b>Se cuentan ${dur ? esc(fmtHoras(dur)) : 'las horas de apertura'} por turno.</b> El local abre ${esc(horarioTxt(l0, 'M'))} por la mañana y ${esc(horarioTxt(l0, 'T'))} por la tarde, pero cada persona hace su turno${dur ? ' de ' + esc(fmtHoras(dur)) : ''}.${tp ? ` Un <b>partido</b> son las mismas horas repartidas entre las dos franjas: entre semana ${esc(tramoTxt(tp))}${tpFin ? `, y el fin de semana ${esc(tramoTxt(tpFin))}` : ''}; quien abre una franja entra a la hora de abrir. Un <b>continuo</b> es un turno seguido y se cuenta una vez.` : ''}${cierreAp.length ? ' La hora de cierre es aproximada.' : ''} Se ajusta en Equipo → Ajustes de los locales, o casilla a casilla desde Hoy.</span></div>`;
+    h += `<div class="haviso info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11.3v5"/><circle fill="currentColor" stroke="none" cx="12" cy="8" r="1.05"/></svg><span><b>Se cuentan ${dur ? esc(fmtHoras(dur)) : 'las horas de apertura'} por turno.</b> El local abre ${esc(horarioTxt(l0, 'M'))} por la mañana y ${esc(horarioTxt(l0, 'T'))} por la tarde, pero cada persona hace su turno${dur ? ' de ' + esc(fmtHoras(dur)) : ''}.${tp ? ` Un <b>partido</b> son las mismas horas repartidas entre las dos franjas: entre semana ${esc(tramoTxt(tp))}${tpFin ? `, y el fin de semana ${esc(tramoTxt(tpFin))}` : ''}; quien abre una franja entra a la hora de abrir. Un <b>continuo</b> es un turno seguido y se cuenta una vez: con horas a mano en una sola mitad, esas son las de todo el turno; en las dos, cada mitad cuenta lo suyo.` : ''}${cierreAp.length ? ' La hora de cierre es aproximada.' : ''} Se ajusta en Equipo → Ajustes de los locales, o casilla a casilla desde Hoy.</span></div>`;
   }
   if (cierre) {
     // 25/09 (revisión final): la fila entera (diferenciasHoras, del modelo), no solo días, turnos y horas; y lo que ha
@@ -125,12 +125,12 @@ function renderHoras() {
     const p = personaDeId(r.pid) || { id: r.pid, nombre: r.nombre };
     h += `<tbody data-apoyo="${esc(r.pid)}"><tr class="hgrp"><td class="per"><span class="av" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span><span class="pn2"><b>${esc(p.nombre)}</b><small>${r.dias.length ? pl(r.dias.length, 'día', 'días') : 'sin turnos este mes'}${r.sinHoras ? ` · ${r.sinHoras} sin ajustar` : ''}</small></span></td><td colspan="3"></td><td class="num hh"><b>${r.dias.length ? numHoras(r.horas) : mut}</b></td></tr>`;
     for (const d of r.dias) for (const t of d.tramos) {
-      h += `<tr class="hdia"><td></td><td class="hor"><b>${fmtDM(d.iso)}</b> <small>${esc(DIAS_L[isoDow(d.iso)].slice(0, 3).toLowerCase())}</small></td><td class="per"><span class="hlocdot" style="--lc:${esc(colorLocal(t.localId))}"></span>${esc(nombreLocal(t.localId))} <small>${FRANJA_LBL[t.franja].toLowerCase()}</small></td><td class="hor">${t.ini ? `${esc(t.ini)}–${esc(t.fin)}` : '—'}${t.aMano ? '' : '<span class="hsup" title="No se ajustaron las horas: cuenta el turno entero del local">sin ajustar</span>'}</td><td class="num">${numHoras(t.minutos / 60)}</td></tr>`;
+      h += `<tr class="hdia"><td></td><td class="hor"><b>${fmtDM(d.iso)}</b> <small>${esc(DIAS_L[isoDow(d.iso)].slice(0, 3).toLowerCase())}</small></td><td class="per"><span class="hlocdot" style="--lc:${esc(colorLocal(t.localId))}"></span>${esc(nombreLocal(t.localId))} <small>${FRANJA_LBL[t.franja].toLowerCase()}</small></td><td class="hor">${t.dentro ? `<small>va en la ${t.franja === 'M' ? 'tarde' : 'mañana'} (turno continuo)</small>` : `${t.ini ? `${esc(t.ini)}–${esc(t.fin)}` : '—'}${t.aMano ? '' : '<span class="hsup" title="No se ajustaron las horas: cuenta el turno entero del local">sin ajustar</span>'}`}</td><td class="num">${numHoras(t.minutos / 60)}</td></tr>`;
     }
     h += '</tbody>';
   }
   h += `<tfoot><tr><td>Total · ${pl(reg.length, 'apoyo', 'apoyos')}</td><td colspan="3">${sinAjustar ? `<span class="hsup">${sinAjustar} sin ajustar</span> cuentan el turno entero del local` : reg.some(r => r.dias.length) ? 'todas las horas ajustadas' : ''}</td><td class="num hh"><b>${numHoras(totApoyos)}</b></td></tr></tfoot></table></div></div>`;
-  h += '<p class="hfoot">Los apoyos se pagan por horas: cada día lleva de qué hora a qué hora, y se ajusta desde Hoy o Semana tocando a la persona → «Ajustar apoyo». Un tramo sin ajustar cuenta el turno entero del local. En el papel del bar no salen horas.</p>';
+  h += '<p class="hfoot">Los apoyos se pagan por horas: cada día lleva de qué hora a qué hora, y se ajusta desde Hoy o Semana tocando a la persona → «Ajustar apoyo». Un tramo sin ajustar cuenta el turno entero del local. En un turno continuo, las horas puestas en una sola mitad son las de todo el turno. En el papel del bar no salen horas.</p>';
 
   // ---- por local ----
   const locs = horasLocalMes(S, S.staff, S.meses, y, m);
@@ -154,7 +154,7 @@ function detalleHoras(p, f, extrasMes) {
   const notas = [];
   if (f.ausencias) notas.push(`${pl(f.ausencias, 'día', 'días')} de ausencia (no cuentan para el contrato)`);
   if (f.ausenciasMedias) notas.push(`${pl(f.ausenciasMedias, 'media jornada', 'medias jornadas')} de ausencia (cuenta${f.ausenciasMedias > 1 ? 'n' : ''} medio día para el contrato)`);
-  if (f.continuos) notas.push(`${pl(f.continuos, 'día de turno continuo', 'días de turno continuo')} (un turno seguido, se cuenta una vez)`);
+  if (f.continuos) notas.push(`${pl(f.continuos, 'día de turno continuo', 'días de turno continuo')} (un turno seguido, se cuenta una vez; con horas a mano en una sola mitad, esas son las de todo el turno)`);
   if (f.forzados) notas.push(`${pl(f.forzados, 'asignación forzada', 'asignaciones forzadas')} a mano`);
   // 24/09 (D11 y revisión F2): los días (o medios días) sin trabajo por el cierre de un local; solo
   // informativo: si se pagan o no lo decide el grupo

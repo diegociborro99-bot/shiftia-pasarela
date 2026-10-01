@@ -75,9 +75,11 @@ function activarModoEmpleado() {
   // 24/09: los cambios de día libre de las semanas de este mes, como en la Cobertura
   // (revisión final, 25/09) un mes que el encargado aún no ha hecho visible no llega (el servidor no lo manda): no es
   // que no tenga turnos. La semana del 28/09 que se comparte llega al 04/10 y el perfil decía «no tienes turnos»
+  // 01/10 (A6; auditoría G5): el servidor ya le manda las reglas del grupo; con «Días que libra» apagada, su cabecera tampoco dice
+  // «libra los lunes» (ni el cambio de día libre de la semana, como ya pasaba)
   const lpMes = activa(S, p, 'libra') ? librasPuntuales(p).filter(x => x.dias.length && est.days.some(d => lunesDe(d.iso) === x.semana)) : [];
   sec.innerHTML = `<div class="fichead" style="margin-top:6px"><span class="fichav" style="background:${avColor(p.id)}">${esc(initials(p.nombre))}</span>
-      <span><h2>${esc(p.nombre)}</h2><span class="sub">${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${esc(locs)}${p.libra && p.libra.length ? ' · libra ' + textoDias(p.libra) : ''}${esc(lpMes.map(x => ` (semana del ${fmtDDMM(x.semana)}: ${textoCambioLibre(p, x, true)})`).join(''))}${salidaDe(p) ? ` · ${esc(textoSalida(p))}` : ''}</span></span>
+      <span><h2>${esc(p.nombre)}</h2><span class="sub">${esc((PUESTOS.find(x => x.id === p.puesto) || {}).label || '')} · ${esc(locs)}${activa(S, p, 'libra') && p.libra && p.libra.length ? ' · libra ' + textoDias(p.libra) : ''}${esc(lpMes.map(x => ` (semana del ${fmtDDMM(x.semana)}: ${textoCambioLibre(p, x, true)})`).join(''))}${salidaDe(p) ? ` · ${esc(textoSalida(p))}` : ''}</span></span>
       <span style="margin-left:auto;display:flex;gap:6px"><button class="btn-mini ghost" id="perfCuenta">Contraseña</button><button class="btn-mini ghost" id="perfSalir">Salir</button></span></div>
     <div class="dnav" style="margin-top:12px"><div class="arrows"><button class="mbtn" id="perfPrev" aria-label="Mes anterior">‹</button><button class="mbtn" id="perfNext" aria-label="Mes siguiente">›</button></div><div><span class="dkick">Mi mes</span><div class="dbig"><b>${MESES[S.m - 1]}</b> <small>${S.y}</small></div></div></div>
     <div class="kpis" style="margin:10px 0 14px">

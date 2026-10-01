@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ADMIN_PASS = 'pasarela2026x', PROG_PASS = 'programador2026', GENERICA = 'pasarela2026';
@@ -175,6 +176,24 @@ test('PUT /api/estado: cierresPuntuales es una lista de cierres con local y día
   const c = { id: 'cie_1', localId: 'MONACO', dias: { '2026-09-28': ['T'] }, motivo: 'reforma', detalle: '', decisiones: {}, retirados: [] };
   assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: Object.assign({}, base, { cierresPuntuales: [c] }) })).status, 200);
   assert.deepEqual((await admin('GET', '/api/estado')).datos.estado.cierresPuntuales, [c], 'y se guarda tal cual');
+});
+
+// 01/10 (A6; auditoría G8): la lista de lo que es «la planilla» (CLAVES_PLANILLA, del modelo) la leen la huella de la app y esta
+// comprobación: cada clave, si viene, con su forma (lista u objeto). Lo que guarda la app de hoy, entero, sigue entrando
+test('PUT /api/estado: cada clave de la planilla (CLAVES_PLANILLA) con su forma; un estado de hoy, entero, sigue entrando', async () => {
+  const M = createRequire(import.meta.url)(join(RAIZ, 'modelo.js'));
+  const hoy = Object.assign(M.semillaPasarela(), { meses: {}, nextId: 1, peticiones: [], avisos: [], historial: [], mesesPublicados: ['2026-11'], entrevistas: [], reglas: { minimos: false }, migraciones: { altas1709: 1 } });
+  M.sembrarDemo(hoy, '2026-10-01');
+  hoy.cierresPuntuales = [{ id: 'cie_1', localId: 'MONACO', dias: { '2026-10-06': ['T'] }, motivo: 'reforma', detalle: '', decisiones: {}, retirados: [], deSemanaTipo: { '2026-10-06': ['T'] } }];
+  hoy.cierres = { '2026-09': { ts: 1, tabla: [] } };
+  const cur = await admin('GET', '/api/estado');
+  const put = await admin('PUT', '/api/estado', { baseVersion: cur.datos.version, estado: hoy });
+  assert.equal(put.status, 200, 'el estado que guarda la app de hoy (semana tipo, equipos, reglas, meses visibles, cierres)');
+  const v = put.datos.version;
+  const malo = async (parche, por) => assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: Object.assign({}, hoy, parche) })).status, 400, por);
+  for (const [k, x] of [['reglas', 'ups'], ['reglas', []], ['patron', []], ['patron', 'ups'], ['cierres', []], ['equipos', {}], ['equipos', 'ups'], ['mesesPublicados', {}]]) await malo({ [k]: x }, `${k}: ${JSON.stringify(x)}`);
+  assert.ok(M.CLAVES_PLANILLA.includes('reglas') && M.CLAVES_PLANILLA.includes('mesesPublicados') && M.CLAVES_PLANILLA.includes('equipos'));
+  assert.equal((await admin('PUT', '/api/estado', { baseVersion: v, estado: Object.assign({}, hoy, { reglas: undefined, patron: null, equipos: undefined, cierres: null }) })).status, 200, 'ausentes o null valen (lo de antes no las traía)');
 });
 
 test('crear usuario empleado: contraseña GENÉRICA y cambio obligatorio al entrar', async () => {

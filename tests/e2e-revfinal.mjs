@@ -82,7 +82,7 @@ try {
     await llega(pg, D => asignados(estadoDeIso(D), D, 'PASARELA_T').some(x => x.pid === 'mariluz'), DOM, 4000);
     const ml = await pg.evaluate(D => JSON.parse(JSON.stringify(asignados(estadoDeIso(D), D, 'PASARELA_T').find(x => x.pid === 'mariluz') || null)), DOM);
     ok('entra «por Iván» y puesta a mano', !!ml && ml.por === 'ivan' && ml.origen === 'manual', JSON.stringify(ml));
-    ok('sin «partido no declarado»: su partido es el autorizado para cubrir a Iván (solo queda el aviso de la pareja)', !!ml && !(ml.avisos || []).some(a => /partido no declarado/.test(a)), JSON.stringify(ml && ml.avisos) + ' · ' + await ultimoToast(pg));
+    ok('sin «partido no declarado»: su partido es el autorizado para cubrir a Iván (solo queda el aviso de la pareja)', !!ml && !(ml.avisos || []).some(a => /partido no declarado|no hace partido/.test(a)), JSON.stringify(ml && ml.avisos) + ' · ' + await ultimoToast(pg));
     const rev = await pg.evaluate(D => { S.y = 2026; S.m = 10; cargarMes(); return revisionMes(S, S.staff, est, { hoy: isoHoy() }).filter(x => x.iso === D && /Mari Luz/.test(x.msg)).map(x => x.nivel + ': ' + x.msg); }, DOM);
     ok('la Revisión no la da por «no hace partido los domingos»', !rev.some(x => /no hace partido/.test(x)), rev.join(' | '));
     ok('Ctrl+Z la quita', await pg.evaluate(D => { deshacer(); return !asignados(estadoDeIso(D), D, 'PASARELA_T').some(x => x.pid === 'mariluz'); }, DOM));

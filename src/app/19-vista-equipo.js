@@ -793,16 +793,22 @@ function openAjustesLocales(localId, cambiosPrevios) {
       l.duracion[f] = h > 0 ? Math.round(h * 60) : 0;
       anota(l, `horas por turno de ${FRANJA_LBL[f].toLowerCase()}`); return;
     }
+    // (01/10, corrección de A6; revisión de cliente S2) un horario o un tramo del partido con la misma hora de entrada y de salida no
+    // tiene horas (el modelo le cuenta 0, tramoVacio; antes, 24): no se guarda, con el mismo aviso que «Ajustar apoyo»
+    const igualQueLaOtra = (t, otra, antes) => { if (!t.value || !otra || t.value !== otra) return false; t.value = antes || ''; toast('La hora de entrada y la de salida no pueden ser la misma', 'warn'); return true; };
     if (t.dataset.horp) {
       const [f, k] = t.dataset.horp.split('|');
+      const hp0 = (l.horarioPartido || {})[f] || {};
+      if (igualQueLaOtra(t, hp0[k === 'ini' ? 'fin' : 'ini'], hp0[k])) return;
       l.horarioPartido = l.horarioPartido || {};
       l.horarioPartido[f] = Object.assign({ ini: '', fin: '' }, l.horarioPartido[f] || {}, { [k]: t.value });
       anota(l, `tramo del partido de ${FRANJA_LBL[f].toLowerCase()}`); return;
     }
     if (t.dataset.horpx) {
       // la excepción solo existe con entrada Y salida; si falta una, se borra
-      const [d, f] = t.dataset.horpx.split('|');
+      const [d, f, k] = t.dataset.horpx.split('|');
       const ini = ov.querySelector(`[data-horpx="${d}|${f}|ini"]`).value, fin = ov.querySelector(`[data-horpx="${d}|${f}|fin"]`).value;
+      if (igualQueLaOtra(t, k === 'ini' ? fin : ini, ((((l.horarioPartido || {}).porDow || {})[d] || {})[f] || {})[k])) return;
       l.horarioPartido = l.horarioPartido || {};
       l.horarioPartido.porDow = l.horarioPartido.porDow || {};
       l.horarioPartido.porDow[d] = l.horarioPartido.porDow[d] || {};
@@ -812,13 +818,16 @@ function openAjustesLocales(localId, cambiosPrevios) {
     }
     if (t.dataset.hor) {
       const [f, k] = t.dataset.hor.split('|');
+      const h0 = l.horario[f] || {};
+      if (igualQueLaOtra(t, h0[k === 'ini' ? 'fin' : 'ini'], h0[k])) return;
       l.horario[f] = l.horario[f] || { ini: '', fin: '' }; l.horario[f][k] = t.value;
       anota(l, `horario de ${FRANJA_LBL[f].toLowerCase()}`); return;
     }
     if (t.dataset.horx) {
       // la excepción solo existe con entrada Y salida; si falta una, se borra
-      const [d, f] = t.dataset.horx.split('|');
+      const [d, f, k] = t.dataset.horx.split('|');
       const ini = ov.querySelector(`[data-horx="${d}|${f}|ini"]`).value, fin = ov.querySelector(`[data-horx="${d}|${f}|fin"]`).value;
+      if (igualQueLaOtra(t, k === 'ini' ? fin : ini, (((l.horario.porDow || {})[d] || {})[f] || {})[k])) return;
       l.horario.porDow[d] = l.horario.porDow[d] || {};
       if (ini && fin) l.horario.porDow[d][f] = { ini, fin }; else delete l.horario.porDow[d][f];
       if (!Object.keys(l.horario.porDow[d]).length) delete l.horario.porDow[d];

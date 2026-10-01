@@ -273,7 +273,11 @@ test('el estado que recibe un empleado va proyectado: de los demás solo lo mín
   for (const p of e.staff.filter(p => p.id !== 'lola')) {
     assert.ok(p.nota === undefined && p.ausencias === undefined && p.contrato === undefined && p.prefs === undefined, `${p.id}: nota/ausencias/contrato no viajan a otra persona`);
   }
-  assert.equal(e.staff.find(p => p.id === 'lola').nota, 'abre el local', 'lo suyo sí, completo');
+  // (01/10, corrección de A6; revisión de cliente S1) de lo suyo, lo que usa su app: quién es, sus locales, su día libre, sus
+  // ausencias…; la nota interna del encargado («abre el local») no
+  const suya = e.staff.find(p => p.id === 'lola');
+  assert.equal(suya.nombre, 'Lola', 'lo suyo sí');
+  assert.equal(suya.nota, undefined, 'pero no la nota interna del encargado');
   assert.equal(e.patron, undefined, 'la semana tipo es del encargado');
   assert.equal(e.cierres, undefined);
   assert.deepEqual(e.historial, []);

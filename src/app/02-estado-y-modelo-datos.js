@@ -136,9 +136,14 @@ function migrarEstado(estado) {
   if (!Array.isArray(estado.cierresPuntuales)) estado.cierresPuntuales = [];
   if (!estado.meses || typeof estado.meses !== 'object') estado.meses = {};
   for (const p of estado.staff) normalizarFicha(p);
+  // 25/09 (revisión final) la app del empleado recibe la planilla recortada (sin las fichas de los compañeros, sin historial ni
+  // migraciones): no la corrige, quien escribe la planilla es el encargado (ver abajo)
+  const empleado = typeof SRV !== 'undefined' && SRV.on && !SRV.esAdmin;
   migrarHorarios(estado);   // 15/09: los horarios que confirmó la encargada por WhatsApp
   migrarPuestos(estado);    // 17/09: el puesto «comodín» pasa a ser «apoyo»
-  migrarAltas(estado);      // 17/09: Dulce y Susi, que entraron después del primer arranque
+  // 17/09: Dulce y Susi, que entraron después del primer arranque. 01/10 (A6; auditoría G11): no en la app del empleado, que no
+  // recibe la marca de que ya se hizo (estado.migraciones) y las volvía a dar de alta en su copia si el encargado las había quitado
+  if (!empleado) migrarAltas(estado);
   for (const p of estado.staff) normalizarFicha(p);   // también las altas de arriba (revisión F3)
   // 24/09 (fase 6): «sin local fijo» es no tener locales (D7: fuera la marca p.comodin); la pareja «nunca con» en las
   // dos fichas, con «flexible» y el interruptor de cada pareja (S21, S24); y fuera los interruptores que ya no
@@ -156,7 +161,6 @@ function migrarEstado(estado) {
   // de la casilla a quien abría o llevaba la cocina). Y no en la app del empleado: recibe la planilla recortada (sin
   // las fichas de los compañeros, sin historial ni migraciones) y las volvía a pasar sobre su copia; quien escribe
   // la planilla es el encargado
-  const empleado = typeof SRV !== 'undefined' && SRV.on && !SRV.esAdmin;
   if (!empleado) {
     const mm = migrarMarcasAutomaticas(estado, isoHoy());
     migrarAbrePatron(estado, isoHoy());
@@ -226,7 +230,13 @@ function panelesVigilados(nuevo) {
   return out;
 }
 const mesesConContenido = m => Object.fromEntries(Object.entries(m || {}).filter(([, v]) => v && (Object.keys(v.apertura || {}).length || Object.keys(v.asig || {}).length)));
-const huellaPlanilla = e => JSON.stringify([mesesConContenido(e.meses), e.staff || [], e.locales || [], e.patron || {}, e.eventos || [], e.extras || [], e.festivos || [], e.cierres || {}, e.cierresPuntuales || []]);
+// 01/10 (A6; auditoría G8): la planilla es la lista del modelo (CLAVES_PLANILLA, la misma que comprueba el servidor), con las
+// reglas del grupo, los equipos y los meses visibles: antes apagar «Mínimos» o «Cocina» no daba por viejo el plan de la Cobertura
+// (planCaducado). Una clave que falta vale lo mismo que vacía (vacioHuella), y de los meses solo los que tienen algo
+const huellaPlanilla = e => JSON.stringify(CLAVES_PLANILLA.map(k => k === 'meses' ? mesesConContenido(e.meses) : vacioHuella(e[k]) ? null : e[k]));
+// 01/10 (corrección de A6; revisión de cliente H9): la del plan de la Cobertura, sin los meses visibles para el equipo. Hacer visible
+// noviembre no cambia quién trabaja ni dónde, y el plan caducaba («La ficha ha cambiado»); la sincronización sigue con la entera
+const huellaCobertura = e => huellaPlanilla(Object.assign({}, e, { mesesPublicados: null }));
 function aplicarEstadoExterno(recibido) {
   // 24/09 (revisión de la fase 6): lo que llega se compara ya migrado, como está S. El servidor guarda el estado tal
   // cual lo subió la versión de antes (la pareja «flexible» de la persona, la marca de comodín…) hasta que el encargado

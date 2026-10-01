@@ -381,10 +381,13 @@ try {
   {
     const dialogos = [];
     const pg = await pagina('quince', dialogos);
-    // Revisión con la semana volcada y sin regenerar: solo el aviso del día libre, dicho bien
+    // Revisión con la semana volcada y sin regenerar: el aviso del día libre, dicho bien. (01/10, A6; decisión D16: la Revisión
+    // nombra todas las reglas que rompe, también el partido del día que libra; dicho sin contradecir su ficha, que lo hace los
+    // martes: esta semana pasa al miércoles. Nunca «no hace partido los martes»)
     await hazlo(pg, () => { ponerLibraPuntual(personaDeId('mariluz'), '2026-09-28', [2]); saveState(); });
     const rev = await pg.evaluate(() => revisionMes(S, S.staff, estadoDeIso('2026-09-29'), { desde: '2026-09-29', hasta: '2026-09-29' }).filter(x => /Mari Luz/.test(x.msg)).map(x => x.msg));
-    ok('Revisión: «libra el martes esta semana», sin «no hace partido los martes»', rev.length > 0 && rev.every(m => /libra el martes esta semana/.test(m) && !/partido/.test(m)), JSON.stringify(rev));
+    // (corrección de A6; revisión de cliente H4) el partido de una persona, una vez por día con sus franjas: «… (mañana y tarde)»
+    ok('Revisión: «libra el martes esta semana» y, del partido, una vez, «esta semana su partido del martes pasa al miércoles (mañana y tarde)» (sin «no hace partido los martes»)', rev.length > 0 && rev.every(m => /Mari Luz: libra el martes esta semana/.test(m) && !/no hace partido/.test(m)) && rev.filter(m => /esta semana su partido del martes pasa al miércoles \(mañana y tarde\)/.test(m)).length === 1 && rev.join(' ').match(/su partido del martes/g).length === 1, JSON.stringify(rev));
     // la hoja impresa del Generador explica el hueco con el mismo texto
     const hoja = await pg.evaluate(() => { const e = clonarEstado(estadoSemana('2026-09-28', false)); for (const t of turnosDe(S)) desasignar(e, '2026-09-29', t.id, 'mariluz'); const x = pxgDestrapa({ estado: e }, { iso: '2026-09-29', turnoId: 'PASARELA_T', tipo: 'faltan' }).find(y => y.nombre === 'Mari Luz'); return x ? x.motivo : null; });
     ok('la hoja impresa dice «libra el martes esta semana» (el mismo texto, del modelo)', hoja === 'libra el martes esta semana', hoja);

@@ -168,7 +168,8 @@ document.addEventListener('click', e => {
     if (!(n >= 0) || n > 20) { toast('Escribe cuántas personas hacen falta (un número)', 'warn'); return; }
     if (!confirmarSiCerrado(iso)) return;
     pushUndo('abrir casilla');
-    abrirCasilla(estadoDeIso(iso, true), iso, tid, n);
+    // (01/10, A6; auditoría A6) con la configuración: bajo un cierre por fechas no se abre a mano (se abre desde el cierre)
+    if (!abrirCasilla(estadoDeIso(iso, true), iso, tid, n, S)) { undoStack.pop(); actualizarUndoBtn(); toast('Ese día está cerrado por fechas: se abre desde «Ver cierre»', 'warn'); return; }
     registrarCambio(`Casilla abierta a mano: ${nombreLocal(localId)} ${fr} del ${fmtDM(iso)} (mínimo ${n})`, 'cambio');
     saveState(); renderVistaActiva();
     return;

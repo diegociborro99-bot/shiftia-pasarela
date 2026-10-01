@@ -117,8 +117,9 @@ try {
   ok('se le quita «Cubre a» Iván', await pg.evaluate(() => !(personaDeId('mariluz').cubreA || []).length));
   await cerrarFicha(pg);
   await vista(pg, 'cobertura');
-  const caduco = () => pg.evaluate(() => { const c = document.querySelector('#cobRes #cobCaduco'); return !!c && /La ficha ha cambiado: vuelve a buscar/.test(c.textContent) && !document.querySelector('#cobRes .cobplan'); });
-  ok('al volver a Cobertura: «La ficha ha cambiado: vuelve a buscar», sin el plan viejo', await caduco(), await pg.evaluate(() => document.querySelector('#cobRes') && document.querySelector('#cobRes').textContent.slice(0, 200)));
+  // (corrección de A6; revisión de cliente H9) el texto, general: «Ha cambiado la planilla, una ficha o una regla del grupo»
+  const caduco = () => pg.evaluate(() => { const c = document.querySelector('#cobRes #cobCaduco'); return !!c && /Ha cambiado la planilla, una ficha o una regla del grupo: vuelve a buscar/.test(c.textContent) && !document.querySelector('#cobRes .cobplan'); });
+  ok('al volver a Cobertura: «Ha cambiado la planilla, una ficha o una regla del grupo: vuelve a buscar», sin el plan viejo', await caduco(), await pg.evaluate(() => document.querySelector('#cobRes') && document.querySelector('#cobRes').textContent.slice(0, 200)));
   await pg.click('body', { position: { x: 5, y: 5 } }).catch(() => {});
   await pg.keyboard.press('Control+z');
   ok('Ctrl+Z le devuelve «Cubre a» Iván', await llega(pg, () => (personaDeId('mariluz').cubreA || []).some(c => c.pid === 'ivan'), null, 3000) >= 0);

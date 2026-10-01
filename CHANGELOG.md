@@ -2,6 +2,47 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **El turno continuo con horas a mano cuenta bien, el Núcleo no deja dos apoyos solos, al móvil del empleado solo le llega lo
+  suyo y «forzar» dice todas las reglas (01/10).** Lo que se nota:
+  - **Horas del turno continuo** (abre la mañana y la tarde del mismo bar, de corrido). Si apuntas a mano en una de las dos
+    mitades de qué hora a qué hora hizo el turno, esas son las horas de todo el turno: Noe «de 11:00 a 19:00» son 8 horas, lo
+    pongas en la mañana o en la tarde. Si apuntas las dos mitades, cada una cuenta lo suyo (de 9 a 14 y de 14 a 17, 8 horas). Sin
+    horas a mano, como siempre: el turno se cuenta una vez. Lo mismo en las horas nocturnas, el registro de apoyos, el Excel y la
+    impresión de Horas, y el formulario de las dos mitades lo dice («Turno continuo: pon la hora de entrada y la de salida de todo
+    el turno»). En el registro de apoyos, la mitad que va dentro del continuo ya no sale como «sin ajustar».
+  - **La misma hora de entrada y de salida no se guarda**: ni en «Ajustar apoyo» u «Horario distinto este día» («de 16:00 a
+    16:00» pagaba 24 horas) ni en Ajustes de los locales (el horario y los tramos del partido). En «Ajustar apoyo» el aviso sale
+    dentro del formulario, encima de «Guardar» (en el móvil ya no lo tapa). Y las horas de cada bar se suman en minutos, como las
+    de cada persona (Pasarela daba una décima de más).
+  - **El Núcleo no deja dos apoyos solos.** Si el núcleo propone una tarde solo con apoyos, no se pone y se le pide otra cosa; si
+    en la vuelta siguiente pone a alguien de sala en esa tarde, el apoyo entra con él. Si la casilla se queda corta, el hueco lo
+    dice en una frase: «El núcleo proponía a Lavinia y Dulce, pero dejarían la casilla solo con apoyos: hace falta alguien de sala
+    o de cocina». Una casilla que se queda solo con apoyos sale como hueco con los dos generadores, y «casillas cortas» son solo
+    las que tienen menos gente de la que hace falta (las que solo tienen apoyos o no tienen quien abra se cuentan aparte).
+  - **El móvil del empleado.** Ve las reglas del grupo: con «Días que libra» apagada ya no le sale «libra los miércoles». Ve sus
+    días sin trabajo por un cierre del bar, también los de una semana que se cerró antes de generar. Y ya no le llega lo que no
+    le hace falta: ni la nota que el encargado escribe en su ficha, ni lo que está por confirmar con el grupo, ni de los
+    compañeros sus horas ajustadas, por qué entraron, si se forzaron o que entraron por la falta de alguien. Su app ya no vuelve
+    a dar de alta a Dulce o Susi si el encargado las quitó.
+  - **Apagar una regla del grupo (Mínimos, Cocina) o tocar un equipo de fútbol cuenta como un cambio de la planilla**: con un
+    plan de la Cobertura en pantalla, sale «Ha cambiado la planilla, una ficha o una regla del grupo: vuelve a buscar», y en otro
+    dispositivo se cierra lo que estuviera abierto y se vacía el deshacer, como con cualquier cambio. Hacer visible un mes para el
+    equipo no toca el plan de la Cobertura.
+  - **«Forzar» dice todas las reglas que te saltas**, también el partido del día que libra («solo Pasarela · libra los miércoles ·
+    no hace partido los miércoles»), y se guardan todas. El partido se dice siempre igual, «no hace partido los miércoles», al
+    forzar, en el aviso, en el historial y en la Revisión. En el selector, la fila de quien no puede dice la primera regla «y 2
+    más» si hay más. La semana en que alguien libra otro día, del partido dice «esta semana su partido del martes pasa al
+    miércoles». La hoja impresa sigue igual.
+  - **La Revisión, cada cosa una vez.** Una pareja «nunca con» sale una vez: si pusiste a una de las dos a la fuerza, en la línea
+    de lo forzado y con lo que escribiste al forzar («Leo, puesto a la fuerza ("No hay nadie más"): no puede coincidir con Susana
+    Capón»); si no, en rojo, «Susana Capón y Leo no pueden coincidir». El partido de una persona, una vez por día («no hace
+    partido los martes (mañana y tarde)»). Lo forzado va en su línea, con el número bien dicho («1 asignación forzada», «2
+    asignaciones forzadas») y lo que escribiste al forzar; los avisos de lo que no se forzó, aparte.
+  - **Lo pequeño.** Llevar la cocina en Pasarela, que no tiene cocina, se frena («Pasarela no tiene cocina», se puede forzar); la
+    Revisión y el menú de esa persona en Hoy lo dicen, y una semana tipo que la traiga la pone de sala. Una casilla cerrada a mano
+    ese día dice «cerrado ese día a mano» (no «no abre la tarde el lunes»), y bajo un cierre por fechas no se abre ni se cierra
+    a mano. El usuario que sugiere la app al dar de alta a alguien tiene entre 3 y 30 letras («jo1», «a01») y no se queda con
+    «de» o «los» («maria.angeles», no «maria.de»).
 - **La Cobertura no toca lo ya trabajado, un cambio de turno no usa «cubre a» y lo que entró por alguien se va cuando
   vuelve (01/10).** Lo que se nota:
   - **Solo desde hoy, y desde ahora.** Si marcas días que ya han pasado (una baja que se apunta tarde), en la fila de días

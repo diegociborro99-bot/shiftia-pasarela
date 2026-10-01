@@ -707,10 +707,12 @@ const server = http.createServer(async (req, res) => {
         const fechaIso = s => M.fechaIsoValida(s);
         const salidaBien = x => x === undefined || x === null || (!!x && typeof x === 'object' && !Array.isArray(x) && fechaIso(x.desde) && (x.motivo === undefined || typeof x.motivo === 'string'));
         const fichaBien = p => ['nuncaCon', 'nuncaConFlex', 'nuncaConOff'].every(k => ids(p[k])) && (p.localHabitual === undefined || p.localHabitual === null || typeof p.localHabitual === 'string') && salidaBien(p.salida);
-        const bien = ['locales', 'peticiones', 'avisos', 'historial', 'festivos', 'eventos', 'extras', 'mesesPublicados', 'cierresPuntuales'].every(lista)
+        // 01/10 (A6; auditoría G8): cada clave de la planilla, con su forma (lista u objeto), de la lista del modelo
+        // (CLAVES_PLANILLA, la misma que la huella de la app; ahora también la semana tipo, los equipos, los meses cerrados y las
+        // reglas del grupo: un `reglas: "ups"` dejaba a la app sin poder leer ninguna); aquí, lo que no es la planilla
+        const bien = ['peticiones', 'avisos', 'historial'].every(lista) && M.formaPlanillaBien(estado)
           && estado.staff.every(p => p && typeof p === 'object' && typeof p.id === 'string' && fichaBien(p))
-          && (!Array.isArray(estado.cierresPuntuales) || estado.cierresPuntuales.every(esCierre))
-          && (estado.meses === undefined || (estado.meses && typeof estado.meses === 'object' && !Array.isArray(estado.meses)));
+          && (!Array.isArray(estado.cierresPuntuales) || estado.cierresPuntuales.every(esCierre));
         if (!bien) { json(res, 400, { error: 'estado inválido: alguna lista no tiene la forma esperada' }); return; }
       }
       const actual = leerEstado();

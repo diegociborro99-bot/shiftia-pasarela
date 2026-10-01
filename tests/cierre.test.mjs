@@ -24,13 +24,15 @@ const CIERRE = {
 };
 const estado = () => ({ staff: [{ id: 'cristian', nombre: 'Cristian' }, { id: 'scapon', nombre: 'Susana Capón' }, { id: 'yilian', nombre: 'Yilian' }, { id: 'lola', nombre: 'Lola' }], meses: {}, cierresPuntuales: [JSON.parse(JSON.stringify(CIERRE))] });
 
-test('el empleado recibe el cierre (local, días, motivo) y SOLO su decisión: ni las de los compañeros ni las plazas retiradas', () => {
+test('el empleado recibe el cierre (local, días, motivo) y SOLO su decisión: ni las de los compañeros ni sus plazas retiradas', () => {
   const e = estadoParaEmpleado(estado(), 'cristian', '2026-09');
   assert.equal(e.cierresPuntuales.length, 1);
   const c = e.cierresPuntuales[0];
   assert.deepEqual({ id: c.id, localId: c.localId, dias: c.dias, motivo: c.motivo, detalle: c.detalle }, { id: 'cie_1', localId: 'MONACO', dias: CIERRE.dias, motivo: 'reforma', detalle: 'pequeña reforma' });
   assert.deepEqual(c.decisiones, { cristian: CIERRE.decisiones.cristian }, 'solo la suya');
-  assert.equal(c.retirados, undefined, 'las plazas retiradas son de otros');
+  // (01/10, A6; auditoría G6) de las plazas retiradas, solo la suya y sin más datos que el que es suya: sin decisión es lo que le
+  // dice «sin trabajo» en su app
+  assert.deepEqual(c.retirados, [{ iso: '2026-09-29', tid: 'MONACO_T', entry: { pid: 'cristian' } }], 'de las plazas retiradas, solo la suya');
   assert.ok(!/scapon|yilian|VAC|REFUERZA/.test(JSON.stringify(e.cierresPuntuales)), 'ni rastro de lo que hacen los compañeros');
   const lola = estadoParaEmpleado(estado(), 'lola', '2026-09');
   assert.deepEqual(lola.cierresPuntuales[0].decisiones, {}, 'quien no está afectada ve el cierre y ninguna decisión');
@@ -74,7 +76,9 @@ test('accesos: Ajustes de los locales («Cierres por fechas» y el aviso de «Cu
 test('la clave nueva viaja en todo el estado: migración, huella, deshacer', () => {
   const est = fuente('02-estado-y-modelo-datos.js');
   assert.match(est, /estado\.cierresPuntuales = \[\]/);
-  assert.match(est, /const huellaPlanilla = e => JSON\.stringify\(\[[^\n]*e\.cierresPuntuales/);
+  // (01/10, A6; auditoría G8) la huella es la lista del modelo, que lleva los cierres por fechas
+  assert.match(est, /const huellaPlanilla = e => JSON\.stringify\(CLAVES_PLANILLA\.map\(/);
+  assert.match(html, /const CLAVES_PLANILLA = \[[^\n]*'cierresPuntuales'/);
   assert.match(est, /extra\.cierres\) u\.cierresPuntuales =/);
   assert.match(est, /if \(u\.cierresPuntuales\) S\.cierresPuntuales = u\.cierresPuntuales/);
 });

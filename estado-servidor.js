@@ -2,7 +2,7 @@
 // cliente): el encargado y el programador ven todo; el empleado solo lo suyo y
 // lo mínimo de los compañeros para leer su planilla y proponer cambios de turno.
 'use strict';
-const { avisoEsPara, mesesVisibles, fechaMadrid } = require('./modelo.js');
+const { avisoEsPara, mesesVisibles, fechaMadrid, decisionCierre, diasDeCierre, franjasSemanaTipo, turnoId } = require('./modelo.js');
 
 function estadoParaEmpleado(estado, pid, hoyClave) {
   if (!estado || !Array.isArray(estado.staff)) return estado;
@@ -17,7 +17,13 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
   // para leer su planilla. Copia: el estado del servidor no se toca.
   // (revisión final, 25/09) y la marca de antes de la fase 6 (nuncaConFlexible), que llega mientras el encargado no
   // haya guardado con la versión nueva: decía que tenía una pareja flexible
-  const propia = p => { const c = Object.assign({}, p); delete c.nuncaCon; delete c.nuncaConFlex; delete c.nuncaConOff; delete c.nuncaConFlexible; return c; };
+  // 01/10 (corrección de A6; revisión de cliente S1): de su propia ficha, solo lo que usa su app (su perfil: quién es, su puesto, sus
+  // locales y franjas, su día libre de siempre y el de esa semana, el interruptor de su ficha, su salida y sus ausencias, que
+  // también lee Horas). Antes viajaba entera: la nota interna del encargado («no hace la tarde completa…»), los «supuestos»
+  // («pendiente del cliente»), sus reglas (vetos, «no abre», cocina, partido, «cubre a»), sus preferencias y su contrato. Las
+  // parejas «nunca con» ya no viajaban (fase 6, S21)
+  const PROPIA = ['id', 'nombre', 'color', 'puesto', 'locales', 'franjas', 'libra', 'libraPuntual', 'inactivas', 'salida', 'ausencias'];
+  const propia = p => { const c = {}; for (const k of PROPIA) if (p[k] !== undefined) c[k] = p[k]; return c; };
   const staff = estado.staff.map(p => p.id === pid ? propia(p) : ({
     id: p.id, nombre: p.nombre, color: p.color, puesto: p.puesto, locales: p.locales,
   }));
@@ -29,18 +35,51 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
     .map(a => { const dirigido = !!((Array.isArray(a.paraPids) && a.paraPids.length) || a.paraPid); const c = Object.assign({}, a, { ocultoPor: (a.ocultoPor || []).filter(q => q === pid) }); delete c.paraPid; delete c.paraPids; if (dirigido) c.paraPids = [pid]; return c; });
   // 24/09 (D11): los cierres de un local por fechas sí viajan —su casilla sale «Cerrado por reforma»—,
   // pero de las decisiones solo la suya (qué hace él esos días): ni lo que hacen los compañeros
-  // (vacaciones, sin trabajo) ni las plazas que se retiraron al cerrar.
+  // (vacaciones, sin trabajo) ni las plazas que se les retiraron al cerrar.
+  // 01/10 (A6; auditoría G6): y lo suyo de lo que se retiró. Sin decisión, cuenta como «sin trabajo» lo que se le retiró al cerrar
+  // (c.retirados) y su plaza en las casillas que el cierre leyó de la semana tipo (c.deSemanaTipo): sin ninguna de las dos su app
+  // no decía «sin trabajo» esos días ni Horas los contaba. De lo retirado, solo sus plazas (y de cada una, solo que es suya); la
+  // semana tipo no viaja (su app tiene la de la semilla), así que esas casillas se leen aquí con la misma lectura que el
+  // encargado (decisionCierre) y le llegan como plazas suyas retiradas
+  const retiradosDe = c => {
+    const out = (Array.isArray(c.retirados) ? c.retirados : []).filter(r => r && r.entry && r.entry.pid === pid).map(r => ({ iso: r.iso, tid: r.tid, entry: { pid } }));
+    if (!c.deSemanaTipo || (c.decisiones && c.decisiones[pid]) || !c.dias || typeof c.dias !== 'object') return out;
+    try {
+      for (const iso of diasDeCierre(c)) for (const f of franjasSemanaTipo(c, iso)) {
+        const tid = turnoId(c.localId, f);
+        if (out.some(r => r.iso === iso && r.tid === tid)) continue;
+        const dc = decisionCierre(estado, pid, iso, f);
+        if (dc && !dc.explicita && dc.cierre === c) out.push({ iso, tid, entry: { pid } });
+      }
+    } catch (e) { /* un estado de antes con otra forma: se queda con lo retirado, la proyección no tumba su GET */ }
+    return out;
+  };
   const cierresPuntuales = (Array.isArray(estado.cierresPuntuales) ? estado.cierresPuntuales : []).map(c => ({
     id: c.id, localId: c.localId, dias: c.dias, motivo: c.motivo, detalle: c.detalle,
     decisiones: c.decisiones && c.decisiones[pid] ? { [pid]: c.decisiones[pid] } : {},
+    retirados: retiradosDe(c),
   }));
   // 24/09 (revisión F3b, D13): la casilla sigue diciendo «por Iván» (lo necesita para leerla), pero no la
   // marca interna `porDesignacion`, que dice que un compañero tiene la designación de cubrir a otro (lo
   // mismo que se le oculta de las fichas). Copia: el estado del servidor no se toca.
   // 25/09 (revisión final): ni los avisos guardados al forzar una entrada («nunca con Lavinia», «nunca con Susana
   // Capón»), que dicen las parejas «nunca con» de los compañeros, lo mismo que se le quita de su ficha. Su vista no
-  // los usa; la marca `forzado` se queda.
-  const sinInterno = e => { if (!e || (!e.porDesignacion && !e.avisos)) return e; const c = Object.assign({}, e); delete c.porDesignacion; delete c.avisos; return c; };
+  // los usa (la marca `forzado` se quedaba; desde la corrección de A6, solo en las suyas).
+  // 01/10 (A6; auditoría G10 y el añadido de A5): ni la marca de la Cobertura de que entró por la ausencia de alguien
+  // (`porAusenciaDe`), y de las entradas de los compañeros tampoco las horas a mano (`ini`/`fin`: lo que se les paga) ni la razón
+  // (su carga, «cocina titular», «plaza fija…»). El «por» y la nota se quedan: es lo que necesita para leer la casilla. Las suyas,
+  // con sus horas (las cuenta su perfil)
+  // (corrección de A6; revisión de cliente S3) y de las de los compañeros tampoco si se forzaron (`forzado`) ni de dónde vienen
+  // (`origen`: «cobertura», «patron»…): su app no lo enseña en ningún sitio y solo servía a quien mirara las tripas del navegador
+  const INTERNO = ['porDesignacion', 'avisos', 'porAusenciaDe'], AJENO = INTERNO.concat(['ini', 'fin', 'razon', 'forzado', 'origen']);
+  const sinInterno = e => {
+    if (!e) return e;
+    const fuera = e.pid === pid ? INTERNO : AJENO;
+    if (!fuera.some(k => k in e)) return e;
+    const c = Object.assign({}, e);
+    for (const k of fuera) delete c[k];
+    return c;
+  };
   const meses = {};
   for (const [k, v] of Object.entries(mesesVisibles(estado, hoy))) {
     const asig = {};
@@ -52,6 +91,9 @@ function estadoParaEmpleado(estado, pid, hoyClave) {
   }
   return {
     staff, cierresPuntuales,
+    // 01/10 (A6; auditoría G5): las reglas del grupo (lo que el encargado apagó en Equipo → Condiciones). Sin ellas su app las daba
+    // todas por encendidas: «libra los lunes» con «Días que libra» apagada, y el cambio de día libre de la semana
+    reglas: estado.reglas && typeof estado.reglas === 'object' && !Array.isArray(estado.reglas) ? estado.reglas : {},
     // la configuración de los locales (horarios, mínimos, cocina) es pública dentro del grupo
     locales: Array.isArray(estado.locales) ? estado.locales : [],
     meses, festivos: estado.festivos || [],

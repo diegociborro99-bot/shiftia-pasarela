@@ -305,6 +305,9 @@ const COMPROBAR = {
   cerrado(camino, c) { return !c.en.includes('x') && !c.huecos.length; },
   // (fase 7) la casilla pide gente en el problema del núcleo (su mínimo)
   pide(camino, c, s) { return c.min > s.min; },
+  // (01/10, A6; auditoría G4) el problema del núcleo no lo sabe (está disponible igual), pero el volcado lo rechaza con su regla en
+  // los dos modos del Generador (y la vuelta siguiente lo veta en ese local): «dos apoyos no se quedan solos», como el relleno
+  rechaza(camino, c, s, esc) { return camino === 'nucleo' && c.disp === s.disp && !c.vuelca.ok && c.vuelca.regla === esc.regla && !c.relajado.ok && c.relajado.regla === esc.regla && s.vuelca.ok && s.relajado.ok; },
   llena(camino, c, s) { return COMPROBAR.cubre(camino, c.planes ? { en: (c.planes[0] || { asig: [] }).asig.map(a => a.split('|')[1]) } : c, s.planes ? { en: (s.planes[0] || { asig: [] }).asig.map(a => a.split('|')[1]) } : s); },
   // se cumple: la condición existe y la planilla (con Xavi puesto a mano) la cumple
   cumple(camino, c, s, esc) { return c.conds.some(k => k.startsWith(esc.cond) && k.endsWith(':ok')); },
@@ -409,7 +412,7 @@ const ESCENARIOS = [
     apagadaRef: { reglaOff: 'sinReglaOff', fichaOff: 'con' } }, mCocina),
   // S33 (José, 17/09): dos apoyos no se quedan solos
   { id: 'puesto apoyo', campo: 'puesto', clave: null, regla: 'soloApoyos', trato: 'relajable', con: x => { x.puesto = 'apoyo'; },
-    celdas: duro({ puedeEstar: 'nada', patron: 'nada', selector: 'relaja', condiciones: 'nada', nucleo: 'nada' }) },
+    celdas: duro({ puedeEstar: 'nada', patron: 'nada', selector: 'relaja', condiciones: 'nada', nucleo: 'rechaza' }) },
   // (fase 6, S29 y D7) «sin local fijo» es no tener locales (la marca p.comodin se borra): suma en el relleno, la
   // Cobertura y el selector. El interruptor «Locales» de la ficha apaga el límite (no poder ir a otro local), no
   // quién es de qué local: apagado, igual que encendido. Las condiciones y su verificación son las de «Locales»
@@ -1280,7 +1283,7 @@ test('auditoría S25 · «H-nucleo-partido» (relaciones-rol): el núcleo limita
   assert.ok(h && h.faltan > 0 && (h.nucleo || []).some(x => x.pid === 'mariluz' && x.regla === 'partido'), `el rechazo cuenta como hueco: ${JSON.stringify(a.r.huecos)}`);
   const b = vuelca(true);
   const en = M.asignados(b.e, DOM, 'PASARELA_T').find(x => x.pid === 'mariluz');
-  assert.ok(en && (en.avisos || []).some(t => /partido no declarado/.test(t)), JSON.stringify(M.asignados(b.e, DOM, 'PASARELA_T')));
+  assert.ok(en && (en.avisos || []).some(t => /no hace partido/.test(t)), JSON.stringify(M.asignados(b.e, DOM, 'PASARELA_T')));
 });
 // revision-disponibilidad r06: lo que el núcleo cree que puede hacer cada persona, medio día a medio día y local a
 // local, es lo que dice la puerta (puedeEstar, de sala o de cocina) con la planilla vacía. Con cada variable de la

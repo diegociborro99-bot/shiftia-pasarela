@@ -168,7 +168,7 @@ try {
   ok('el problema va en el modo relajado y la pareja flexible es blanda', !!pr && pr.meta.permitirPartido === true && pareja(pr, 'soft') && !pareja(pr, 'hard'));
   ok('en el modo relajado, la tarde de Mari Luz del domingo no va vetada (su partido entraría con aviso)', !!pr && w(pr, 'mariluz').unavailable[idx(pr, DOM, 'T')] === undefined, pr && JSON.stringify(w(pr, 'mariluz').unavailable[idx(pr, DOM, 'T')]));
   const cr = await pg.evaluate(d => GEN.previa.aplicados.find(a => a.pid === 'cristian' && a.iso === d && a.turnoId === 'PASARELA_T') || null, DIA);
-  ok('el partido de Cristian entra, con su aviso', !!cr && (cr.avisos || []).some(t => /partido no declarado/.test(t)), JSON.stringify(cr));
+  ok('el partido de Cristian entra, con su aviso', !!cr && (cr.avisos || []).some(t => /no hace partido/.test(t)), JSON.stringify(cr));
   ok('Iván sigue sin entrar el lunes (libra: eso no lo relaja nadie)', await pg.evaluate(l => !GEN.previa.aplicados.some(a => a.pid === 'ivan' && a.iso === l), LUN));
 
   // ── volcar y deshacer
