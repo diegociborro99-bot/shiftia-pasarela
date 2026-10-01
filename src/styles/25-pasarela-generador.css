@@ -1,0 +1,17 @@
+/* 01/10 (corrección de A4; revisión de cliente 6 y 9): «Se retira» del Generador → Semana, sin caja con scroll (con 18 retiradas
+   la mitad no se veía y nada decía que hubiera más), agrupada por persona y con su título separado de la lista de arriba. En el
+   móvil, ninguna de las dos listas hace scroll dentro de la página (scroll dentro del scroll) */
+.gscol ul.gretlist{max-height:none;overflow:visible}
+.gscol .gcamblist+h3,.gscol p.revsub+h3{margin-top:16px}
+.gscol h3.gsretira{margin-top:16px}
+.gscol h3.gsretira:first-child{margin-top:0}
+.gsinturnos{margin:0 0 6px;font-size:12.5px;font-weight:700;color:var(--warn)}
+/* el Periodo libre: la lista entera, una línea por persona y motivo */
+.warnbanner.gretlist ul{margin:4px 0 0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:3px;font-size:13px}
+.warnbanner.gretlist li{color:var(--warn)}
+/* (cliente 12) el porqué de cada «Con aviso» de un hueco, en pequeño al lado del nombre (el title no se ve en el móvil) */
+.gconaviso .galt{display:inline-flex;align-items:baseline;gap:4px;margin:0 8px 2px 0;flex-wrap:wrap}
+.gconaviso .gavtxt{font-style:normal;font-size:11px;color:var(--warn)}
+@media (max-width:640px){
+  .gscol .gcamblist{max-height:none;overflow:visible}
+}

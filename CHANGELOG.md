@@ -2,6 +2,46 @@
 
 ## v0.6.0 · 17/09/2026 — Reunión con José y Aroa, y la base de entrevistas
 
+- **El Generador quita lo que ya no puede estar y te dice quién y por qué (30/09 y 01/10).** Lo que se nota:
+  - **Volver a generar quita lo que ya no puede estar.** Si cambias algo en Equipo (un local, una franja, un veto, el standby,
+    un «nunca con», un día libre, unas vacaciones) y vuelves a generar la semana, la app quita a quien ya no puede estar en ese
+    turno y te lo dice con el motivo, una línea por persona: «Tere · solo Bar Mónaco: lun 28, mar 29 y mié 30 mañana en
+    Pasarela». Lo que pusiste tú a mano o forzaste no lo toca nunca. Ctrl+Z (en el móvil, «Más → Deshacer») lo devuelve todo.
+    Antes solo quitaba por el día libre, las vacaciones o un cierre, y lo demás se quedaba con un aviso.
+  - **Lo que es solo un aviso se queda con su aviso:** un partido no declarado, o quien «solo hace cocina» puesto de sala. La
+    cocina obligatoria del Mónaco no quita a nadie: si falta, sale como hueco.
+  - **Si dos que no pueden coincidir están en el mismo turno, sale una y se dice por qué:** se queda quien lleva la cocina y, si
+    no, quien abre («sale Cris Parreño · nunca con Esmeralda (se queda Esmeralda, que lleva la cocina)»). Si lo quieres al
+    revés, deshaces y lo pones a mano.
+  - **Nadie «libra» sin librar.** En «Quién libra cada día» (en pantalla y en la hoja impresa) solo sale quien libra de verdad
+    ese día; quien se ha quedado sin turno sale «sin plaza», y si alguien se queda sin ningún turno en toda la semana, el
+    Generador lo dice: «Tere se queda sin turnos esta semana».
+  - **Quién falta y por qué.** La fila «Ausentes» dice vacaciones, permisos y días libres («Iván · vacaciones», «Juani ·
+    permiso por la mañana»), las dos cosas si en un día hay dos («permiso por la mañana · vacaciones por la tarde»), y en
+    «otro motivo» lo que se apuntó («Noe · médico») o «no viene». La hoja impresa tiene también la fila «Sin trabajo · por un
+    cierre».
+  - **En «Periodo libre» se ve la lista entera** de lo que se quita, por persona, y el historial dice quién y por qué. Lo que ya
+    sale en «Se retira» no se repite en «no se pudieron poner», y «Se retira» ya no va en una caja con su propio scroll.
+  - **Huecos.** En un hueco de «nadie puede abrir», «Con aviso» solo ofrece a quien puede abrir (Leo, que nunca sale el primero,
+    ya no aparece) y también sale «Pueden entrar». Debajo de cada «Con aviso» se lee el porqué (antes solo al pasar el ratón,
+    y en el móvil nunca).
+  - **Condiciones.** Cada veto es su condición: con dos, solo sale en rojo el que se rompe. Lo que el Generador juntó con aviso
+    (un partido no declarado, una pareja «nunca con» flexible) sale cumplido con la nota «relajado por el generador con aviso»,
+    salvo que la pareja ya no sea flexible. «(lo puesto a mano no se toca)» solo sale cuando es una plaza puesta a mano la que
+    rompe esa condición.
+  - **Un solo «por X» en cada turno:** si ya hay quien cubre a X, el siguiente entra «para llegar al mínimo (había 1 de 2)», y
+    esa frase solo sale si de verdad falta gente.
+  - **Cambiar el día libre y quitar el cambio deja la semana como estaba:** cada uno en su sitio, quién abre, quién lleva la
+    cocina y quién cubre a quién (también lo de otras personas). El aviso dice si esa persona estaba cubriendo a otra («y deja
+    de cubrir a Iván», «y vuelve a cubrir a Iván») y los huecos que quedan.
+  - **Un cambio de turno con quien lleva la cocina** se hace entero (quien recibe el turno entra a llevar la cocina) o no se
+    hace: nunca a medias.
+  - **La semana tipo no pone de sala a quien «solo hace cocina»:** esa plaza sale en «no se pudieron poner», con el motivo.
+    Poner a alguien desde el Mes pregunta lo mismo que el selector, y al reabrir un cierre quien ya no puede volver a su
+    turno lo dice en vez de volver sin más.
+  - **Dos apoyos no se quedan solos, tampoco en la cocina.**
+  - **Quien está en standby** solo tiene en el Generador la condición «aún no entra en la planilla».
+  (Auditoría del modelo del 25/09, fase A4, y su corrección del 01/10.)
 - **Los cierres por fechas y la semana tipo: editar un cierre, guardar la semana tipo con el Mónaco cerrado y los textos del
   visor (30/09; auditoría del modelo del 25/09, fase A3).** Lo que se nota:
   - **Editar un cierre** hecho antes de generar la semana (cambiarle el detalle, acortarlo, volver a marcar el día en «Cuándo

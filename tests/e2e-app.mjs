@@ -30,8 +30,9 @@ const srv = createServer((req, res) => {
 await new Promise(r => srv.listen(0, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${srv.address().port}`;
 
-const HOY = new Date(); const pad = n => String(n).padStart(2, '0');
-const ISO_HOY = `${HOY.getFullYear()}-${pad(HOY.getMonth() + 1)}-${pad(HOY.getDate())}`, CLAVE = ISO_HOY.slice(0, 7);
+// 30/09 (A4): «hoy» en la hora de Madrid, como lo calcula la app (isoHoy → fechaMadrid), no en la del sistema: a partir de las
+// 22:00 UTC Node iba un día por detrás del navegador y el mes del demo (ya octubre) no cuadraba con CLAVE (aún septiembre)
+const ISO_HOY = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' }), CLAVE = ISO_HOY.slice(0, 7);
 const errores = [];
 const masDias = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const abrirContexto = async (br, viewport, movil) => {

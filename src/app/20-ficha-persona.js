@@ -380,7 +380,11 @@ function semanaVolcada(lunes) {
 // los avisos del modelo (un día que ya ha pasado, días que no se pueden emparejar)
 function lineasMoverDiaLibre(p, r, e) {
   const dia = iso => `${DIAS_L[isoDow(iso)].toLowerCase()} ${+iso.slice(8, 10)}`;
-  const grupos = xs => { const m = new Map(); for (const x of xs) { const k = x.pid + '|' + x.iso; if (!m.has(k)) m.set(k, { pid: x.pid, iso: x.iso, tids: [] }); m.get(k).tids.push(x.turnoId); } return [...m.values()]; };
+  const grupos = xs => { const m = new Map(); for (const x of xs) { const k = x.pid + '|' + x.iso; if (!m.has(k)) m.set(k, { pid: x.pid, iso: x.iso, tids: [], pors: [] }); m.get(k).tids.push(x.turnoId); if (x.por) m.get(k).pors.push(x.por); } return [...m.values()]; };
+  // 01/10 (corrección de A4; revisión de cliente 10): si esa persona cubría a otra ese día (su relevo, «por Iván»), se dice: al
+  // irse deja de cubrirla y al volver la vuelve a cubrir (lo que dice la planilla de después, `e`)
+  const nombres = pids => listaY([...new Set(pids)].map(nombrePid));
+  const cubreDespues = g => e ? g.tids.map(t => (asignados(e, g.iso, t).find(y => y.pid === g.pid) || {}).por).filter(Boolean) : [];
   const donde = tids => { const loc = [...new Set(tids.map(t => partirTurno(t).localId))]; return loc.map(l => `${nombreLocal(l)} ${tids.filter(t => partirTurno(t).localId === l).map(t => FRANJA_LBL[partirTurno(t).franja].toLowerCase()).join(' y ')}`).join(', '); };
   // «nunca con Lavinia (plaza puesta a mano)»: si lo impide una plaza puesta a mano o forzada, que
   // nadie quita en automático, se dice, para que el encargado decida
@@ -390,8 +394,8 @@ function lineasMoverDiaLibre(p, r, e) {
     return `${x.motivo}${q && !esAutomatica(q) ? ' (plaza puesta a mano)' : ''}`;
   };
   const lineas = [];
-  for (const g of grupos(r.quitados)) lineas.push(g.pid === p.id ? `${p.nombre} sale del ${dia(g.iso)} (${donde(g.tids)})` : `${nombrePid(g.pid)} deja de cubrir a ${p.nombre} el ${dia(g.iso)} (${donde(g.tids)})`);
-  for (const g of grupos(r.puestos)) lineas.push(g.pid === p.id ? `${p.nombre} entra el ${dia(g.iso)} en ${donde(g.tids)}` : `${nombrePid(g.pid)} cubre a ${p.nombre} el ${dia(g.iso)} (${donde(g.tids)})`);
+  for (const g of grupos(r.quitados)) lineas.push(g.pid === p.id ? `${p.nombre} sale del ${dia(g.iso)} (${donde(g.tids)})${g.pors.length ? ` y deja de cubrir a ${nombres(g.pors)}` : ''}` : `${nombrePid(g.pid)} deja de cubrir a ${p.nombre} el ${dia(g.iso)} (${donde(g.tids)})`);
+  for (const g of grupos(r.puestos)) { const cub = g.pid === p.id ? cubreDespues(g) : []; lineas.push(g.pid === p.id ? `${p.nombre} entra el ${dia(g.iso)} en ${donde(g.tids)}${cub.length ? ` y vuelve a cubrir a ${nombres(cub)}` : ''}` : `${nombrePid(g.pid)} cubre a ${p.nombre} el ${dia(g.iso)} (${donde(g.tids)})`); }
   for (const g of grupos(r.quedan)) lineas.push(`se queda el ${dia(g.iso)} en ${donde(g.tids)} porque se puso a mano o forzado (con su aviso)`);
   for (const x of r.rechazados || []) lineas.push(`no se puede poner a ${nombrePid(x.pid)} el ${dia(x.iso)} en ${lblTurno(x.turnoId)}: ${porQue(x)}`);
   for (const h of r.huecos) lineas.push(`queda un hueco el ${dia(h.iso)} en ${lblTurno(h.turnoId)} (${h.faltan === 1 ? 'falta' : 'faltan'} ${h.faltan} de ${h.minimo}): genera la semana o busca quién cubre`);

@@ -375,8 +375,9 @@ const ESCENARIOS = [
     celdas: nada({ patron: 'cubre', relleno: 'ordena', semana: 'ordena', cobertura: 'ordena', selector: 'ordena', verificar: 'cumple', condiciones: 'lista', nucleo: 'cubre' }) },
   // S34: quien solo hace cocina no refuerza la sala
   // (revisión F4) y el Generador la enseña y la comprueba («Hojan solo hace cocina»)
+  // (30/09, A4; auditoría H6) la semana tipo también pasa por la puerta con el puesto: su plaza de sala se rechaza
   { id: 'soloCocina', campo: 'soloCocina', clave: 'cocina', regla: 'cocina', trato: 'forzable', cond: 'p:x:soloCocina', opts: { puesto: 'sala' }, con: x => { x.soloCocina = true; },
-    celdas: duro({ patron: 'nada' }) },
+    celdas: duro() },
   // Fase 5 (24/09), qué apaga cada interruptor de la cocina:
   //  · «Cocina» en la FICHA (S15) apaga sus límites —«solo unos días», «nunca», «solo hace cocina»—, no que
   //    sea titular o reserva de un local: eso es un dato de la plaza (como el «por», D12), y se cambia en la

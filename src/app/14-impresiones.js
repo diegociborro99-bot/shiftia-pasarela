@@ -392,7 +392,30 @@ function pxgLibran(res) {
     const pids = res.libran[iso] || [], sinPl = (res.sinPlaza || {})[iso] || [];   // (revisión de A2) «sin plaza» aparte de «libra»
     h += `<td class="pxg-c" data-libran="${iso}"><div class="pxg-cnt">${pids.length} libra${pids.length === 1 ? '' : 'n'}</div>${pids.length || sinPl.length ? `<div class="pxg-chips">${pids.map(pid => `<span>${esc(nombrePid(pid))}</span>`).join('')}${sinPl.map(pid => `<span class="sinplaza">${esc(nombrePid(pid))} · sin plaza</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`;
   }
-  return h + '</tr></tbody></table>';
+  h += '</tr>';
+  // 30/09 (A4; auditoría E4): los ausentes de cada día con su tipo, como el pie del Generador (las bajas van arriba, «De baja: …»)
+  const ausDia = iso => ((res.ausentes || {})[iso] || []).filter(x => x.tipo !== 'BAJ');
+  if (res.dias.some(iso => ausDia(iso).length)) {
+    h += `<tr><td class="pxg-lbl"><b>Ausentes</b><small>vacaciones · permisos · libres</small></td>`;
+    // (01/10, corrección de A4; revisión de modelo H-07 y de cliente 14) con la etiqueta del día del modelo, como el pie del Generador
+    for (const iso of res.dias) h += `<td class="pxg-c" data-ausentes="${iso}">${ausDia(iso).length ? `<div class="pxg-chips">${ausDia(iso).map(x => `<span class="aus">${esc(nombrePid(x.pid))} · ${esc(x.etiqueta || etiquetaAusencia(x).toLowerCase())}</span>`).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`;
+    h += '</tr>';
+  }
+  // 01/10 (corrección de A4; revisión de cliente 5): quien no trabaja por un cierre, en su fila, como el pie del Generador (el día
+  // entero, la franja de quien trabaja la otra, y el apoyo que nadie ha colocado). Antes la hoja no la tenía y esas personas no
+  // salían en ningún sitio del papel
+  const sinT = res.sinTrabajo || {}, sinTP = res.sinTrabajoParcial || {}, sinSitio = res.apoyoSinSitio || {}, sinSitioP = res.apoyoSinSitioParcial || {};
+  const frs = fs => fs.map(f => FRANJA_LBL[f].toLowerCase()).join(' y ');
+  const chipsCierre = iso => (sinT[iso] || []).map(pid => `<span>${esc(nombrePid(pid))}</span>`)
+    .concat((sinTP[iso] || []).map(x => `<span>${esc(nombrePid(x.pid))} · ${esc(frs(x.franjas))}</span>`))
+    .concat((sinSitio[iso] || []).map(pid => `<span>${esc(nombrePid(pid))} · apoyo sin sitio</span>`))
+    .concat((sinSitioP[iso] || []).map(x => `<span>${esc(nombrePid(x.pid))} · ${esc(frs(x.franjas))} · apoyo sin sitio</span>`));
+  if (res.dias.some(iso => chipsCierre(iso).length)) {
+    h += `<tr><td class="pxg-lbl"><b>Sin trabajo</b><small>por un cierre</small></td>`;
+    for (const iso of res.dias) h += `<td class="pxg-c" data-sintrabajo="${iso}">${chipsCierre(iso).length ? `<div class="pxg-chips">${chipsCierre(iso).join('')}</div>` : '<span class="pxvacio">nadie</span>'}</td>`;
+    h += '</tr>';
+  }
+  return h + '</tbody></table>';
 }
 // frase de resumen de la página 1: qué se ha corregido, turnos y condiciones, huecos
 function pxgResumen(res) {
@@ -467,7 +490,7 @@ function pxgHuecos(res) {
     if (pq.length && hu.tipo === 'primero') h += `<p class="pxg-p pq">El resto: ${pq.slice(0, 4).map(([m, qs]) => `<b>${esc(m)}</b> (${esc(pxgLista(qs))})`).join(' · ')}${pq.length > 4 ? ' · …' : ''}${colocados ? `; ${pxgNum(colocados)} más ya están colocados esa ${fr} en otro local` : ''}.</p>`;
     if (slots.length) h += `<p class="pxg-p"><b>Queda:</b> ${pxgPosiciones(slots)}.${hu.tipo === 'primero' && d && d.n >= d.min ? ` El mínimo de ${pxgNum(d.min)} está cubierto; lo que falta es quien abra.` : ''}</p>`;
     const des = pxgDestrapa(res, hu);
-    h += `<p class="pxg-des">${des.length ? `Se destraparía si se levantara una sola condición: ${des.map(x => `<b>${esc(x.nombre)}</b>, que ${esc(x.motivo)}`).join('; ')}. Decisión del cliente, no nuestra.` : `No se destrapa levantando una sola condición: a cada persona de la plantilla la frenan dos o más, o ya está colocada esa ${fr}.`}</p>`;
+    h += `<p class="pxg-des">${des.length ? `Se destraparía si se levantara una sola condición: ${des.map(x => `<b>${esc(x.nombre)}</b>, que ${esc(x.motivo)}`).join('; ')}.` : `No se destrapa levantando una sola condición: a cada persona de la plantilla la frenan dos o más, o ya está colocada esa ${fr}.`}</p>`;
     return h + '</div>';
   }).join('');
 }

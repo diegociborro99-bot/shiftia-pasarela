@@ -269,13 +269,13 @@ try {
     await hazlo(pg, () => { ponerLibraPuntual(personaDeId('mariluz'), '2026-09-28', [2]); saveState(); irAGenerador({ desde: '2026-09-28', hasta: '2026-10-04', titulo: 'Periodo' }); GEN.modo = 'periodo'; renderGenerador(); });
     await clic(pg, '#genPrevia');
     await llega(pg, () => !!(GEN.previa && GEN.previa.retirados && GEN.previa.retirados.length), null, 20000);
-    const ban = String(await ev(pg, '#genRoot .warnbanner.gretlist', x => x.textContent) || '');
-    const partes = ban.split(' · ');
-    ok('la lista de retirados dice mañana y tarde y no repite a nadie', /Mari Luz en Pasarela mañana y tarde el 29\/9/.test(ban) && new Set(partes).size === partes.length, ban);
+    // (01/10, corrección de A4, cliente 9) una línea por persona y motivo: «Mari Luz · libra …: mar 29/9 mañana y tarde en Pasarela»
+    const lis = await pg.$$eval('#genRoot .warnbanner.gretlist li', xs => xs.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+    ok('la lista de retirados dice mañana y tarde y no repite a nadie', lis.some(l => /^Mari Luz · .*: mar 29\/9 mañana y tarde en Pasarela$/.test(l)) && new Set(lis.map(l => l.split(':')[0])).size === lis.length, JSON.stringify(lis));
     await clic(pg, '#genAplicar');
     await llega(pg, () => !GEN.previa, null, 10000);
     const toasts = await pg.$$eval('#toasts .toast span', xs => xs.map(x => x.textContent));
-    ok('el aviso final cuenta las retiradas', toasts.some(t => /4 retiradas/.test(t)), JSON.stringify(toasts));
+    ok('el aviso final cuenta las retiradas', toasts.some(t => /4 retiradas|Se han retirado 4 plazas que ya no podían estar/.test(t)), JSON.stringify(toasts));
     // una propuesta «Con aviso» del hueco: la acepta el encargado con un clic → es suya (manual)
     const cand = await pg.evaluate(() => { const iso = '2026-11-03', tid = 'PASARELA_T'; const c = candidatosPara(S, S.staff, estadoDeIso(iso), iso, tid, { permitirPartido: true })[0]; return c ? `${iso}|${tid}|${c.pid}` : null; });
     await hazlo(pg, c => { document.getElementById('genRes').insertAdjacentHTML('beforeend', `<button type="button" id="pruebaAviso" data-aplicaruno="${c}">x</button>`); }, cand);

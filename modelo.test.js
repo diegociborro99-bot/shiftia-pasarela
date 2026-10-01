@@ -668,7 +668,10 @@ ok('generarSemana del 14 al 20 de septiembre reproduce la planilla corregida del
   assert.deepEqual(quien('2026-09-14', 'PASARELA_M'), ['lola', 'tere'], 'la mañana del lunes se queda en Lola y Tere: el tercero es el hueco de arriba');
   const lunT = slots('2026-09-14', 'PASARELA_T');
   assert.equal(lunT[0].pid, 'mariluz'); assert.ok(lunT[0].abre && !lunT[0].partido, 'Mari Luz abre la tarde del lunes, y es turno entero, no partido: ' + JSON.stringify(lunT));
-  assert.equal(r.resumen.turnos, 54); assert.equal(r.resumen.descansos, 27); assert.ok(r.resumen.maxDias <= 6);
+  // (01/10, corrección de A4, cliente 1) 26 descansos y no 27: Leo (apoyo, libra miércoles, jueves y domingo) no tiene plaza el
+  // martes 15 y ya no sale como que libra, sino «sin plaza»
+  assert.equal(r.resumen.turnos, 54); assert.equal(r.resumen.descansos, 26); assert.ok(r.resumen.maxDias <= 6);
+  assert.deepEqual(r.sinPlaza['2026-09-15'], ['leo']);
   assert.deepEqual(r.libran['2026-09-18'], [], 'Dulce está en standby: no cuenta como que libra'); assert.equal(r.libran['2026-09-14'].length, 6); assert.equal(r.libran['2026-09-20'].length, 6);
   const rotas = r.condiciones.filter(c => !c.ok);
   assert.ok(r.condiciones.length >= 30, 'catálogo de condiciones: ' + r.condiciones.length);
@@ -3547,7 +3550,11 @@ ok('F3b · quitar la designación (D13): deja de aplicarse en todos los caminos 
   // el encargado pone además a mano a Dulce «por Iván» el domingo
   assert.ok(M.asignar(e, cfg, st, F3_DOM, 'PASARELA_T', 'dulce', { origen: 'manual', por: 'ivan', razon: 'cubre a Iván' }).ok);
   // la designación puesta: el selector (★) la da, la condición del Generador la lista, la Revisión autoriza el partido
-  const libre = M.clonarEstado(e); M.desasignar(libre, F3_DOM, 'PASARELA_T', 'roberto');
+  // (30/09, A4; auditoría C2, D3: con Dulce ya «por Iván» en la casilla, el siguiente entra «para llegar al mínimo», no «por Iván»;
+  // la designación se ve en la casilla sin nadie por él)
+  const conDulce = M.clonarEstado(e); M.desasignar(conDulce, F3_DOM, 'PASARELA_T', 'roberto');
+  assert.ok(M.candidatosPara(cfg, st, conDulce, F3_DOM, 'PASARELA_T').every(c => !c.cubre), 'un solo «por Iván» por casilla');
+  const libre = M.clonarEstado(conDulce); M.desasignar(libre, F3_DOM, 'PASARELA_T', 'dulce');
   assert.strictEqual((M.candidatosPara(cfg, st, libre, F3_DOM, 'PASARELA_T')[0] || {}).cubre, 'ivan');
   assert.ok(M.condicionesDe(cfg, st, F3_LUN).some(c => /Roberto cubre a Iván los domingos/.test(c.texto)), 'condición');
   assert.ok(M.revisionMes(cfg, st, e, { desde: F3_DOM, hasta: F3_DOM }).some(x => x.tipo === 'autorizado' && /Roberto: partido para cubrir a Iván/.test(x.msg)));
@@ -7553,6 +7560,651 @@ ok('A3 · corrección (cliente 5): generarSemana lista aparte, por franja, al ap
   assert.deepStrictEqual(g.apoyoSinSitioParcial[MA], [{ pid: 'adrian', franjas: ['T'] }], 'sale como apoyo sin sitio de la tarde');
   assert.ok(!g.apoyoSinSitio[MA].includes('adrian') && !g.libran[MA].includes('adrian'));
   assert.ok(g.dias.every(iso => Array.isArray(g.apoyoSinSitioParcial[iso])));
+});
+
+// ---------- A4 (30/09): auditoría del modelo · generador y retirada (H4, H6, C7, C8, C2, E1, E2, E8, E4, E5, D2/E9, E6, D4, E7, E10, D5) ----------
+// Los scripts de los revisores (scratchpad/auditoria-modelo/H-invariantes/{caso-02-directo, caso-08, caso-09-directo}.mjs,
+// E-generador/{09-retirada-reglas, 13-veto-condicion, 12-relevo-ida-vuelta, 06-mover, 10-resumen-semana, 08-casos-finos, 07-huecos,
+// 04-verificar}.js, C-puerta-casilla/{03-cubre, 08-asignar, 01-puerta}.js y D-patron-puntuacion/{07-seguimiento, 08-seguimiento2}.js)
+// como pruebas del repo: en rojo antes, en verde después.
+// la semana del lunes 28/09 (cruza a octubre) sobre dos meses recién creados, como base.js de la lente E: o = { libra, cierre, cubre, ivanVac }
+const A4_LUN = '2026-09-28';
+function a4Escenario(o) {
+  o = Object.assign({ libra: false, cierre: false, cubre: false, ivanVac: false }, o || {});
+  const cfg = cfgBase(), staff = cfg.staff;
+  if (o.libra) M.ponerLibraPuntual(M.personaDe(staff, 'mariluz'), A4_LUN, [2]);
+  if (o.cubre) M.personaDe(staff, 'mariluz').cubreA = [{ pid: 'ivan' }];
+  if (o.ivanVac) M.personaDe(staff, 'ivan').ausencias = [{ tipo: 'VAC', desde: '2026-10-02', hasta: '2026-10-04' }];
+  const ms = { '2026-09': M.nuevoEstado(2026, 9, { festivos: [] }), '2026-10': M.nuevoEstado(2026, 10, { festivos: [] }) };
+  if (o.cierre) {
+    const c = { id: 'c_monaco', localId: 'MONACO', motivo: 'reforma', dias: { '2026-09-27': ['T'], '2026-09-28': ['M', 'T'], '2026-09-29': ['M', 'T'] } };
+    const r = M.aplicarCierre(cfg, staff, ms['2026-09'], c, Object.assign({ scapon: { tipo: 'VAC' }, cristian: { tipo: 'REFUERZA' } }, o.decisiones || {}));
+    assert.deepStrictEqual(r.errores, []);
+  }
+  return { cfg, staff, ms, sv: lpSemanaVirtual(ms, A4_LUN) };
+}
+// la foto de la semana: por casilla, quién (en su orden) con su «por», si es relevo y su razón, y (01/10, corrección H-02/H-11)
+// quién abre y quién lleva la cocina
+const a4Foto = (cfg, e, lunes) => { const m = {}; for (let k = 0; k < 7; k++) { const iso = M.addDias(lunes, k); for (const t of M.turnosDe(cfg)) { const xs = M.asignados(e, iso, t.id).map(x => [x.pid, x.por || null, !!x.relevo, x.razon || null, !!x.abre, !!x.cocina]); if (xs.length) m[iso + ' ' + t.id] = JSON.stringify(xs); } } return m; };
+const a4Difs = (a, b) => [...new Set([...Object.keys(a), ...Object.keys(b)])].sort().filter(k => a[k] !== b[k]);
+const a4Donde = (cfg, e, iso, pid) => M.turnosDe(cfg).filter(t => M.pidsEn(e, iso, t.id).includes(pid)).map(t => t.id);
+
+ok('A4 · H4/D15 (09-retirada-reglas, caso 02): regenerar retira lo AUTOMÁTICO que ahora rompe una regla dura por la puerta (locales, franjas, vetos, standby, «nunca con» estricto, otra casilla esa franja), con el texto del bloqueo; lo relajable (partido, cocina) se queda con su aviso, y lo manual o forzado nunca se retira', () => {
+  const J1 = '2026-10-01', V2 = '2026-10-02';
+  const caso = (cambia, iso, tid, pid) => {
+    const a = a4Escenario();
+    M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+    const antes = M.asignados(a.sv, iso, tid).find(x => x.pid === pid);
+    assert.ok(antes && M.esAutomatica(antes), `${pid} estaba en ${tid} el ${iso} en automático`);
+    cambia(a);
+    const r = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+    return { r, sigue: !!M.asignados(a.sv, iso, tid).find(x => x.pid === pid), ret: r.retirados.filter(x => x.pid === pid && x.iso === iso && x.turnoId === tid), avisos: M.avisosVigentes(a.cfg, a.staff, a.sv, iso, tid, pid), a };
+  };
+  const seRetira = (nombre, x, motivo) => { assert.ok(!x.sigue && x.ret.length === 1 && x.ret[0].motivo === motivo, `${nombre}: ${JSON.stringify({ sigue: x.sigue, ret: x.ret })}`); };
+  const seQueda = (nombre, x, aviso) => { assert.ok(x.sigue && !x.ret.length && x.avisos.includes(aviso), `${nombre}: ${JSON.stringify({ sigue: x.sigue, ret: x.ret, avisos: x.avisos })}`); };
+  seRetira('locales', caso(a => { M.personaDe(a.staff, 'tere').locales = ['MONACO']; }, J1, 'PASARELA_M', 'tere'), 'solo Bar Mónaco');
+  seRetira('franjas', caso(a => { M.personaDe(a.staff, 'ivan').franjas = ['M']; }, J1, 'PASARELA_T', 'ivan'), 'siempre de mañana');
+  seRetira('veto nuevo', caso(a => { M.personaDe(a.staff, 'cristian').vetos.push({ localId: 'MONACO', franja: 'T' }); }, V2, 'MONACO_T', 'cristian'), 'no hace tardes en Bar Mónaco');
+  seRetira('standby', caso(a => { M.personaDe(a.staff, 'tere').standby = true; }, J1, 'PASARELA_M', 'tere'), 'en standby: aún no entra en la planilla');
+  // «nunca con» estricto nuevo entre dos plazas automáticas: sobra Tere (la 3.ª), no Lola, que abre (01/10, corrección C3: el
+  // motivo dice por qué se queda la otra)
+  const nc = caso(a => { M.personaDe(a.staff, 'tere').nuncaCon = ['lola']; }, J1, 'PASARELA_M', 'tere');
+  seRetira('nunca con estricto', nc, 'nunca con Lola (se queda Lola, que abre)');
+  assert.ok(M.pidsEn(nc.a.sv, J1, 'PASARELA_M').includes('lola') && !nc.r.retirados.some(x => x.pid === 'lola'), 'Lola (abre, entró antes) se queda');
+  // las de siempre siguen igual, con el texto de la puerta
+  seRetira('libra', caso(a => { M.personaDe(a.staff, 'mariluz').libra = [4]; }, J1, 'PASARELA_T', 'mariluz'), 'libra los jueves');
+  seRetira('ausencia', caso(a => { M.personaDe(a.staff, 'ivan').ausencias = [{ tipo: 'VAC', desde: J1, hasta: J1 }]; }, J1, 'PASARELA_T', 'ivan'), 'de vacaciones');
+  seRetira('cerrado', caso(a => { M.localDe(a.cfg, 'PASARELA').abre.T = [1, 2, 3, 5, 6, 7]; }, J1, 'PASARELA_T', 'ivan'), 'Pasarela no abre la tarde el jueves');
+  // lo relajable o forzable que no es dura (D15) se queda, con su aviso
+  seQueda('partido', caso(a => { M.personaDe(a.staff, 'mariluz').partido.dias = [2, 5, 6]; }, J1, 'PASARELA_T', 'mariluz'), 'no hace partido los jueves');
+  seQueda('cocina', caso(a => { M.personaDe(a.staff, 'hojan').cocina.nunca = true; }, J1, 'MONACO_T', 'hojan'), 'solo hace cocina');
+  // ya en otra casilla esa franja (dura, no forzable): una entrada automática metida a pelo en un segundo local se retira
+  const dup = caso(a => { a.sv.asig[J1].MONACO_M.push({ pid: 'tere', cocina: false, abre: false, origen: 'generador', razon: 'a pelo' }); }, J1, 'PASARELA_M', 'tere');
+  assert.ok(dup.sigue && dup.r.retirados.some(x => x.pid === 'tere' && x.turnoId === 'MONACO_M' && x.motivo === 'ya en Pasarela esta mañana'), JSON.stringify(dup.r.retirados.filter(x => x.pid === 'tere')));
+  assert.ok(!M.pidsEn(dup.a.sv, J1, 'MONACO_M').includes('tere'));
+  // lo puesto a mano o forzado NUNCA (principio 4): Leo forzado en Pasarela (solo Zapatillera) se queda con su aviso
+  {
+    const a = a4Escenario();
+    M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+    M.personaDe(a.staff, 'leo').locales = ['ZAPA'];
+    assert.ok(M.asignar(a.sv, a.cfg, a.staff, V2, 'PASARELA_M', 'leo', { origen: 'manual', forzar: true, puesto: 'sala', razon: 'lo dice el encargado' }).ok);
+    M.personaDe(a.staff, 'tere').locales = ['MONACO'];
+    const r = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+    assert.ok(!r.retirados.some(x => x.pid === 'leo' && x.turnoId === 'PASARELA_M'), 'lo forzado no se retira: ' + JSON.stringify(r.retirados.filter(x => x.pid === 'leo')));
+    assert.ok(M.pidsEn(a.sv, V2, 'PASARELA_M').includes('leo'));
+    assert.ok(M.avisosVigentes(a.cfg, a.staff, a.sv, V2, 'PASARELA_M', 'leo').includes('solo Zapatillera'));
+    assert.ok(r.retirados.some(x => x.pid === 'leo' && x.turnoId === 'PASARELA_T' && x.motivo === 'solo Zapatillera'), 'su plaza automática de la tarde sí');
+  }
+  // caso 02 de la lente H: cuatro cambios en Equipo tras generar octubre; al regenerar la semana del 5 nadie queda avisado por ellos
+  {
+    const S = cfgBase(); const e = estadoOct();
+    M.generarPlanilla(S, S.staff, e, '2026-10-01', '2026-10-31', {});
+    M.personaDe(S.staff, 'scapon').standby = true; M.personaDe(S.staff, 'cris').franjas = ['T']; M.personaDe(S.staff, 'leo').locales = ['ZAPA']; M.personaDe(S.staff, 'ivan').vetos = [{ localId: 'PASARELA', franja: 'T' }];
+    M.ponerNuncaCon(S.staff, 'cris', 'esmeralda');
+    const g = M.generarPlanilla(S, S.staff, e, '2026-10-05', '2026-10-11', {});
+    assert.ok(g.retirados.length >= 5, JSON.stringify(g.retirados.map(x => [x.pid, x.iso, x.turnoId, x.motivo])));
+    const rev = M.revisionMes(S, S.staff, e, { desde: '2026-10-05', hasta: '2026-10-11' }).filter(x => /standby|solo tardes|solo Zapatillera|no hace tardes|nunca con/.test(x.msg));
+    assert.deepStrictEqual(rev, [], JSON.stringify(rev.slice(0, 3)));
+    // y el generador no vuelve a poner lo que acaba de retirar: regenerar otra vez no retira nada
+    assert.deepStrictEqual(M.generarPlanilla(S, S.staff, e, '2026-10-05', '2026-10-11', {}).retirados, []);
+  }
+});
+
+ok('A4 · H6/C7/C8 (caso 09, 01-puerta §4, 08-asignar §1): todo lo que asigna pasa por la puerta con su puesto: la semana tipo no pone de sala a quien «solo hace cocina» (sale rechazado con el motivo y la condición queda ✓), el volcado y el plan de cobertura tampoco; asignar con cocina:true y sin puesto es cocina, y no hace caso a yaDentro', () => {
+  { // caso 09: Cristian «solo hace cocina» y su plaza fija de sala de la semana tipo
+    const S = cfgBase(); M.personaDe(S.staff, 'cristian').soloCocina = true;
+    const e = estadoOct();
+    const g = M.generarSemana(S, S.staff, e, '2026-10-26', {});
+    const c = g.condiciones.find(x => x.id === 'p:cristian:soloCocina');
+    assert.ok(c && c.ok, `condición: ${JSON.stringify(c && c.detalle)}`);
+    for (let k = 0; k < 7; k++) { const iso = M.addDias('2026-10-26', k); for (const t of M.turnosDe(S)) { const en = M.asignados(e, iso, t.id).find(x => x.pid === 'cristian'); assert.ok(!en || en.cocina, `${iso} ${t.id}: de sala`); } }
+    assert.ok(g.rechazados.some(x => x.pid === 'cristian' && x.turnoId === 'MONACO_T' && x.motivo === 'solo hace cocina'), JSON.stringify(g.rechazados.filter(x => x.pid === 'cristian')));
+  }
+  const D = '2026-10-05';
+  const mundo = () => {
+    const st = [a1P('k', { puesto: 'cocina', soloCocina: true, locales: ['ZAPA'], cocina: { titular: ['ZAPA'], reserva: [], soloDias: [] } }), a1P('a', { locales: ['ZAPA'] }), a1P('b', { locales: ['ZAPA'] })];
+    return { cfg: a1Mundo(st, c => { M.localDe(c, 'ZAPA').cocina.titulares = { M: ['k'], T: ['k'] }; }), st, e: M.nuevoEstado(2026, 10, { festivos: [] }) };
+  };
+  { // el volcado de la vista previa (Periodo): k de sala en la previa no entra en la planilla real
+    const { cfg, st, e } = mundo();
+    const pv = M.nuevoEstado(2026, 10, { festivos: [] });
+    pv.asig[D] = { ZAPA_M: [{ pid: 'k', cocina: false, abre: true, origen: 'generador', razon: 'x' }, { pid: 'a', cocina: false, abre: false, origen: 'generador', razon: 'x' }] };
+    const r = M.volcarPrevia(cfg, st, () => e, { aplicados: [{ iso: D, turnoId: 'ZAPA_M', pid: 'k', origen: 'generador', razon: 'x' }, { iso: D, turnoId: 'ZAPA_M', pid: 'a', origen: 'generador', razon: 'x' }], retirados: [], coberturas: [] }, { desde: D, hasta: D, previaDe: () => pv });
+    assert.strictEqual(r.fallos, 1, JSON.stringify(r));
+    assert.deepStrictEqual(M.pidsEn(e, D, 'ZAPA_M'), ['a']);
+    // y con la cocina en la previa, entra llevándola (puesto cocina)
+    pv.asig[D].ZAPA_M[0].cocina = true;
+    const r2 = M.volcarPrevia(cfg, st, () => e, { aplicados: [{ iso: D, turnoId: 'ZAPA_M', pid: 'k', origen: 'generador', razon: 'x' }], retirados: [], coberturas: [] }, { desde: D, hasta: D, previaDe: () => pv });
+    assert.strictEqual(r2.aplicadas, 1, JSON.stringify(r2));
+    assert.ok(M.asignados(e, D, 'ZAPA_M').find(x => x.pid === 'k').cocina);
+  }
+  { // el plan de cobertura: k de sala «por a» se rechaza con el motivo; como cocina entra
+    const { cfg, st, e } = mundo();
+    assert.ok(M.asignar(e, cfg, st, D, 'ZAPA_M', 'a', { puesto: 'sala' }).ok);
+    M.anadirAusencia(M.personaDe(st, 'a'), { tipo: 'VAC', desde: D, hasta: D });
+    const inc = { pid: 'a', tipo: 'VAC', desde: D, hasta: D };
+    const r = M.ponerPlanCobertura(cfg, st, e, inc, { asignaciones: [{ iso: D, tid: 'ZAPA_M', pid: 'k', cocina: false, cubre: true }] });
+    assert.deepStrictEqual(r.rechazados.map(x => [x.pid, x.motivo]), [['k', 'solo hace cocina']], JSON.stringify(r));
+    const r2 = M.ponerPlanCobertura(cfg, st, e, inc, { asignaciones: [{ iso: D, tid: 'ZAPA_M', pid: 'k', cocina: true, cubre: true }] });
+    assert.deepStrictEqual(r2.rechazados, [], JSON.stringify(r2));
+    assert.ok(M.asignados(e, D, 'ZAPA_M').find(x => x.pid === 'k').cocina);
+  }
+  { // C7: asignar con cocina:true y sin puesto es una plaza de cocina (a, de sala, no lleva la de Zapatillera); C8: yaDentro no cuela un duplicado
+    const { cfg, st, e } = mundo();
+    const r = M.asignar(e, cfg, st, D, 'ZAPA_M', 'a', { cocina: true });
+    assert.ok(!r.ok && r.regla === 'cocina' && /no lleva la cocina de Zapatillera/.test(r.motivo), JSON.stringify(r));
+    assert.ok(M.asignar(e, cfg, st, D, 'ZAPA_M', 'a', { puesto: 'sala' }).ok);
+    const r2 = M.asignar(e, cfg, st, D, 'ZAPA_M', 'a', { puesto: 'sala', yaDentro: true });
+    assert.ok(!r2.ok && r2.regla === 'duplicado', JSON.stringify(r2));
+    assert.deepStrictEqual(M.pidsEn(e, D, 'ZAPA_M'), ['a']);
+  }
+});
+
+ok('A4 · C2/D3 (03-cubre §4): un solo «por X» por casilla: si ya hay quien cubre a X, el relleno pone al resto «para llegar al mínimo (había n de m)», sin «por» y sin el partido autorizado de la designación', () => {
+  const LUN = '2026-10-05';
+  const mk = () => {
+    const st = [a1P('x', { locales: ['PASARELA'], franjas: ['M'] }), a1P('q', { locales: ['PASARELA'], cubreA: [{ pid: 'x' }] }), a1P('r', { locales: ['PASARELA', 'ZAPA'], cubreA: [{ pid: 'x' }] }), a1P('s', { locales: ['PASARELA'] })];
+    const cfg = a1Mundo(st, c => { c.patron = { 1: [{ t: 'PASARELA_M', p: 'x' }] }; M.localDe(c, 'PASARELA').minimos.M[1] = 2; });
+    M.personaDe(st, 'x').ausencias = [{ tipo: 'VAC', desde: LUN, hasta: LUN }];
+    return { cfg, st, est: M.nuevoEstado(2026, 10, { festivos: [] }) };
+  };
+  { // q y r cubren a x: la semana tipo pone a la designada; la otra entra por el mínimo
+    const { cfg, st, est } = mk();
+    M.generarPlanilla(cfg, st, est, LUN, LUN, {});
+    const lista = M.asignados(est, LUN, 'PASARELA_M');
+    assert.strictEqual(lista.length, 2, JSON.stringify(lista));
+    assert.strictEqual(lista.filter(e => M.porDe(st, e) === 'x').length, 1, 'una sola «por x»: ' + JSON.stringify(lista.map(e => [e.pid, e.por, e.razon])));
+    const segunda = lista.find(e => !e.por);
+    assert.match(segunda.razon, /^para llegar al mínimo \(había 1 de 2\)/, segunda.razon);
+    assert.ok(!segunda.porDesignacion);
+    // los candidatos del relleno para esa casilla ya cubierta no llevan «cubre»
+    assert.ok(M.candidatosPara(cfg, st, est, LUN, 'PASARELA_M').every(c => !c.cubre));
+  }
+  { // r ya hace la tarde en Zapatillera (no declara partido): sin el partido autorizado de «cubre a», no entra; entra s por el mínimo
+    const { cfg, st, est } = mk();
+    assert.ok(M.asignar(est, cfg, st, LUN, 'ZAPA_T', 'r', { puesto: 'sala' }).ok);
+    M.generarPlanilla(cfg, st, est, LUN, LUN, {});
+    const lista = M.asignados(est, LUN, 'PASARELA_M');
+    assert.strictEqual(lista.filter(e => M.porDe(st, e) === 'x').length, 1, JSON.stringify(lista.map(e => [e.pid, e.por])));
+    const r = lista.find(e => e.pid === 'r');
+    assert.ok(!r || !M.revisarEntrada(cfg, st, est, LUN, 'PASARELA_M', 'r').autorizados.some(a => a.k === 'partido'), 'la segunda no lleva el partido autorizado');
+    assert.ok(lista.some(e => e.pid === 's' && !e.por), JSON.stringify(lista.map(e => [e.pid, e.por, e.razon])));
+  }
+});
+
+ok('A4 · E1 (13-veto-condicion): la condición de cada veto comprueba SU veto (local, franja y días): con dos vetos, solo sale en rojo el que se rompe', () => {
+  const a = a4Escenario();
+  M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  M.personaDe(a.staff, 'cristian').vetos.push({ localId: 'MONACO', franja: 'T' });
+  const v = M.verificarSemana(a.cfg, a.staff, a.sv, A4_LUN).filter(c => /^p:cristian:veto/.test(c.id));
+  assert.strictEqual(v.length, 2, JSON.stringify(v.map(c => c.id)));
+  const pas = v.find(c => c.id === 'p:cristian:veto:PASARELA:M'), mon = v.find(c => c.id === 'p:cristian:veto:MONACO:T');
+  assert.ok(pas.ok && pas.detalle === '', `el de Pasarela por la mañana no se rompe: ${pas.detalle}`);
+  assert.ok(!mon.ok && /Bar Mónaco tarde/.test(mon.detalle) && !/Pasarela/.test(mon.detalle), mon.detalle);
+  assert.deepStrictEqual([mon.localId, mon.franja, mon.dows], ['MONACO', 'T', null], 'la condición guarda su veto');
+  // un veto de unos días concretos solo se rompe esos días
+  M.personaDe(a.staff, 'cristian').vetos.pop(); M.personaDe(a.staff, 'cristian').vetos.push({ localId: 'MONACO', franja: 'T', dow: [5] });
+  const v2 = M.verificarSemana(a.cfg, a.staff, a.sv, A4_LUN).find(c => c.id === 'p:cristian:veto:MONACO:T:5');
+  assert.ok(v2 && !v2.ok && v2.detalle === 'viernes 2: Bar Mónaco tarde', JSON.stringify(v2 && [v2.ok, v2.detalle, v2.dows]));
+});
+
+ok('A4 · E2/E8 (12-relevo-ida-vuelta, 06-mover B): quitar el cambio de día libre vuelve a pasar por las ausencias de quien esa persona cubre (el relevo y la designación vuelven), calcula los huecos sobre lo tocado y deja cada casilla en su orden', () => {
+  { // 1) Mari Luz es relevo «por Iván» el viernes 2; libra el viernes y luego se quita el cambio
+    const a = a4Escenario({ cubre: true, ivanVac: true });
+    M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+    const foto0 = a4Foto(a.cfg, a.sv, A4_LUN);
+    const e0 = M.asignados(a.sv, '2026-10-02', 'PASARELA_T').find(x => x.pid === 'mariluz');
+    assert.ok(e0 && e0.por === 'ivan' && e0.relevo, JSON.stringify(e0));
+    M.moverDiaLibre(a.cfg, a.staff, a.sv, 'mariluz', A4_LUN, [5], { meses: a.ms });
+    assert.ok(!M.pidsEn(a.sv, '2026-10-02', 'PASARELA_T').includes('mariluz'));
+    const r = M.moverDiaLibre(a.cfg, a.staff, a.sv, 'mariluz', A4_LUN, [], { meses: a.ms });
+    const e1 = M.asignados(a.sv, '2026-10-02', 'PASARELA_T').find(x => x.pid === 'mariluz');
+    assert.ok(e1 && e1.por === 'ivan' && e1.relevo && e1.razon === 'cubre a Iván', 'vuelve como relevo: ' + JSON.stringify(e1));
+    assert.ok(r.puestos.some(x => x.pid === 'mariluz' && x.iso === '2026-10-02'));
+    assert.ok(M.asignados(a.sv, '2026-10-02', 'PASARELA_T').some(e => M.porDe(a.staff, e) === 'ivan'), 'la Cobertura ve el viernes cubierto');
+    assert.deepStrictEqual(a4Difs(foto0, a4Foto(a.cfg, a.sv, A4_LUN)), [], 'ida y vuelta: la semana queda como estaba, orden incluido');
+    assert.deepStrictEqual(M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {}).cambios, [], 'regenerar no cambia nada');
+  }
+  { // 06-mover B: ida y vuelta de varias personas y días deja la semana idéntica (quien vuelve, en su sitio)
+    for (const [pid, ds] of [['mariluz', [2]], ['mariluz', [6]], ['roberto', [4]], ['hojan', [3, 6]]]) {
+      const a = a4Escenario({ cubre: true, ivanVac: true, cierre: true });
+      M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+      const foto0 = a4Foto(a.cfg, a.sv, A4_LUN);
+      M.moverDiaLibre(a.cfg, a.staff, a.sv, pid, A4_LUN, ds, { meses: a.ms });
+      M.moverDiaLibre(a.cfg, a.staff, a.sv, pid, A4_LUN, [], { meses: a.ms });
+      const d = a4Difs(foto0, a4Foto(a.cfg, a.sv, A4_LUN));
+      assert.deepStrictEqual(d, [], `${pid} ${JSON.stringify(ds)}: ${d.map(k => k + ': ' + foto0[k] + ' → ' + a4Foto(a.cfg, a.sv, A4_LUN)[k]).join(' | ')}`);
+    }
+  }
+  { // 2) Roberto cubre a Iván el martes 29 por designación (no relevo): cambia su libre al martes y lo quita
+    const a = a4Escenario();
+    M.personaDe(a.staff, 'roberto').cubreA.push({ pid: 'ivan' });
+    M.personaDe(a.staff, 'mariluz').ausencias = [{ tipo: 'PERM', desde: '2026-09-29', hasta: '2026-09-29', franjas: ['T'] }];
+    M.personaDe(a.staff, 'ivan').ausencias = [{ tipo: 'VAC', desde: '2026-09-29', hasta: '2026-09-29' }];
+    M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+    assert.ok(M.asignados(a.sv, '2026-09-29', 'PASARELA_T').some(x => x.pid === 'roberto' && x.por === 'ivan'));
+    const foto0 = a4Foto(a.cfg, a.sv, A4_LUN);
+    const r1 = M.moverDiaLibre(a.cfg, a.staff, a.sv, 'roberto', A4_LUN, [2], { meses: a.ms });
+    assert.ok(r1.huecos.some(h => h.iso === '2026-09-29' && h.turnoId === 'PASARELA_T'), JSON.stringify(r1.huecos));
+    const r2 = M.moverDiaLibre(a.cfg, a.staff, a.sv, 'roberto', A4_LUN, [], { meses: a.ms });
+    assert.ok(M.asignados(a.sv, '2026-09-29', 'PASARELA_T').some(x => x.pid === 'roberto' && x.por === 'ivan' && x.porDesignacion), 'vuelve por la designación: ' + JSON.stringify(M.asignados(a.sv, '2026-09-29', 'PASARELA_T').map(x => [x.pid, x.por])));
+    assert.ok(r2.puestos.some(x => x.pid === 'roberto' && x.turnoId === 'PASARELA_T'));
+    assert.deepStrictEqual(r2.huecos, []);
+    assert.deepStrictEqual(a4Difs(foto0, a4Foto(a.cfg, a.sv, A4_LUN)), []);
+    // solo esa persona: si al quitar el cambio Roberto ya no puede cubrir (veto nuevo), nadie más entra por él y el hueco se dice
+    M.moverDiaLibre(a.cfg, a.staff, a.sv, 'roberto', A4_LUN, [2], { meses: a.ms });
+    M.personaDe(a.staff, 'roberto').vetos.push({ localId: 'PASARELA', franja: 'T' });
+    const r3 = M.moverDiaLibre(a.cfg, a.staff, a.sv, 'roberto', A4_LUN, [], { meses: a.ms });
+    assert.ok(!M.asignados(a.sv, '2026-09-29', 'PASARELA_T').some(x => x.por === 'ivan'), 'nadie entra por Iván en nombre de otro');
+    assert.ok(r3.huecos.some(h => h.iso === '2026-09-29' && h.turnoId === 'PASARELA_T' && h.faltan === 1), 'el hueco de la casilla de Iván se dice aunque no se haya retirado nada de ella: ' + JSON.stringify(r3.huecos));
+  }
+});
+
+ok('A4 · E4 (10-resumen-semana, 08-casos-finos caso 4): generarSemana devuelve ausentes[iso] = [{ pid, tipo }] con todos los ausentes del día (vacaciones, permiso, día libre, otro y baja), también los que pone un cierre; cada persona está en una sola cuenta', () => {
+  const a = a4Escenario({ libra: true, cierre: true, cubre: true, ivanVac: true, decisiones: { cris: { tipo: 'LD' } } });
+  M.personaDe(a.staff, 'juani').ausencias = [{ tipo: 'PERM', desde: '2026-10-01', hasta: '2026-10-01', franjas: ['M'] }];
+  const r = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  assert.ok(r.ausentes && r.dias.every(iso => Array.isArray(r.ausentes[iso])), 'ausentes por día');
+  const de = (iso, pid) => (r.ausentes[iso] || []).find(x => x.pid === pid);
+  assert.deepStrictEqual(de('2026-09-29', 'scapon'), { pid: 'scapon', tipo: 'VAC', etiqueta: 'vacaciones' }, 'Susana Capón de vacaciones por el cierre');
+  assert.deepStrictEqual(de('2026-09-28', 'cris'), { pid: 'cris', tipo: 'LD', etiqueta: 'día libre' }, 'Cris con día libre por el cierre');
+  assert.deepStrictEqual(de('2026-10-02', 'ivan'), { pid: 'ivan', tipo: 'VAC', etiqueta: 'vacaciones' });
+  assert.deepStrictEqual(de('2026-09-28', 'laura'), { pid: 'laura', tipo: 'BAJ', etiqueta: 'baja' });
+  assert.deepStrictEqual(de('2026-10-01', 'juani'), { pid: 'juani', tipo: 'PERM', franjas: ['M'], etiqueta: 'permiso por la mañana' }, 'la media jornada, con su franja (y desde la corrección H-07, la etiqueta del día)');
+  assert.strictEqual(de('2026-09-30', 'ivan'), undefined);
+  for (const iso of r.dias) {
+    const trabajan = new Set(); for (const t of M.turnosDe(a.cfg)) for (const pid of M.pidsEn(a.sv, iso, t.id)) trabajan.add(pid);
+    const cuenta = new Set([...trabajan, ...r.libran[iso], ...r.sinPlaza[iso], ...r.ausentes[iso].map(x => x.pid), ...a.staff.filter(p => p.standby).map(p => p.id), ...r.sinTrabajo[iso], ...r.apoyoSinSitio[iso]]);
+    assert.deepStrictEqual(a.staff.filter(p => !cuenta.has(p.id)).map(p => p.id), [], `${iso}: alguien sin cuenta`);
+    for (const x of r.ausentes[iso]) assert.ok(!r.libran[iso].includes(x.pid) && !r.sinTrabajo[iso].includes(x.pid), `${iso}: ${x.pid} ausente y además libra o sin trabajo`);
+  }
+});
+
+ok('A4 · E5, D2/E9 (07-huecos casos 2 y 4, 08-seguimiento2 E2): candidatosConAviso acepta { primero, cocina, meses }: en un hueco de apertura solo ofrece a quien puede abrir, y con meses cuenta la semana entera como el selector', () => {
+  { // el hueco «nadie puede abrir» de El 33 el martes 6 (Cristian solo, a mano)
+    const S = cfgBase(), e = estadoOct(), iso = '2026-10-06';
+    M.asignar(e, S, S.staff, iso, 'EL33_T', 'cristian', { origen: 'manual', puesto: 'sala' });
+    assert.ok(M.huecosDeCasilla(S, S.staff, e, iso, 'EL33_T').some(h => h.tipo === 'primero'));
+    const sin = M.candidatosConAviso(S, S.staff, e, iso, 'EL33_T');
+    assert.ok(sin.some(c => c.pid === 'leo'), 'sin primero, Leo (nunca de primero) sale con aviso: ' + JSON.stringify(sin.map(c => c.pid)));
+    const con = M.candidatosConAviso(S, S.staff, e, iso, 'EL33_T', { primero: true });
+    assert.ok(!con.some(c => c.pid === 'leo'), 'con primero, Leo no: ' + JSON.stringify(con.map(c => c.pid)));
+    assert.ok(con.every(c => M.puedePrimero(S, S.staff, e, iso, 'EL33_T', c.pid).ok), JSON.stringify(con.map(c => c.pid)));
+    const abren = M.candidatosPara(S, S.staff, e, iso, 'EL33_T', { primero: true });
+    assert.ok(abren.length && abren.every(c => M.puedePrimero(S, S.staff, e, iso, 'EL33_T', c.pid).ok));
+    // cocina: se evalúa como cocina (solo quien puede llevarla)
+    const coc = M.candidatosConAviso(S, S.staff, e, '2026-10-09', 'MONACO_T', { cocina: true });
+    assert.ok(coc.every(c => M.puedeCocina(S, M.personaDe(S.staff, c.pid), 'MONACO', '2026-10-09')), JSON.stringify(coc.map(c => c.pid)));
+  }
+  { // la semana que cruza de mes, con meses: la carga es la del selector
+    const a = a4Escenario({ libra: true, cierre: true, cubre: true, ivanVac: true });
+    M.generarPlanilla(a.cfg, a.staff, a.ms['2026-09'], A4_LUN, '2026-09-30', { meses: a.ms }); M.generarPlanilla(a.cfg, a.staff, a.ms['2026-10'], '2026-10-01', '2026-10-04', { meses: a.ms });
+    const iso = '2026-10-04', tid = 'PASARELA_T', oct = a.ms['2026-10'];
+    const sin = M.candidatosConAviso(a.cfg, a.staff, oct, iso, tid), con = M.candidatosConAviso(a.cfg, a.staff, oct, iso, tid, { meses: a.ms });
+    const sel = M.gruposSelector(a.cfg, a.staff, oct, iso, tid, { meses: a.ms }).conAviso;
+    assert.deepStrictEqual(con.map(c => [c.pid, c.turnosSemana]), sel.map(c => [c.pid, c.turnosSemana]), 'como el selector');
+    assert.ok(sin.some((c, i) => c.turnosSemana !== con[i].turnosSemana), 'sin meses contaba solo octubre: ' + JSON.stringify(sin.map(c => [c.pid, c.turnosSemana])));
+  }
+});
+
+ok('A4 · E6 (08-casos-finos caso 1, 04-verificar b): lo que relajó el propio generador con aviso (partido no declarado, pareja flexible) no es una condición rota: cumplida con la nota «relajado por el generador con aviso»; lo puesto a mano que rompe la regla sigue en rojo, y el resumen dice cuántas plazas hay a mano', () => {
+  { // la pareja flexible Mari Luz–Lavinia relajada por el relleno el domingo 4
+    const a = a4Escenario({ cubre: true, ivanVac: true });
+    M.personaDe(a.staff, 'roberto').ausencias = [{ tipo: 'PERM', desde: '2026-10-04', hasta: '2026-10-04' }];
+    M.personaDe(a.staff, 'cristian').ausencias = [{ tipo: 'PERM', desde: '2026-10-04', hasta: '2026-10-04' }];
+    const r = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, { permitirPartido: true });
+    const dom = M.asignados(a.sv, '2026-10-04', 'PASARELA_T');
+    assert.ok(dom.some(x => x.pid === 'mariluz' && (x.avisos || []).some(t => /^nunca con Lavinia/.test(t))), 'preparado: Mari Luz con Lavinia con aviso: ' + JSON.stringify(dom.map(x => [x.pid, x.avisos])));
+    const c = r.condiciones.find(x => x.id === 'p:mariluz:nuncaCon:lavinia' || x.id === 'p:lavinia:nuncaCon:mariluz');
+    assert.ok(c && c.ok && /domingo 4: juntos en Pasarela, relajado por el generador con aviso/.test(c.nota || ''), JSON.stringify(c && [c.ok, c.detalle, c.nota]));
+    assert.strictEqual(r.resumen.plazasAMano, 0);
+  }
+  { // el partido no declarado de Roberto el domingo 4, relajado por el relleno
+    const a = a4Escenario({ cierre: true, cubre: true, ivanVac: true });
+    const r = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, { permitirPartido: true });
+    const rob = M.asignados(a.sv, '2026-10-04', 'PASARELA_T').find(x => x.pid === 'roberto');
+    assert.ok(rob && M.esAutomatica(rob) && (rob.avisos || []).some(t => /^partido no declarado/.test(t)), 'preparado: ' + JSON.stringify(rob));
+    const c = r.condiciones.find(x => x.id === 'p:roberto:partido');
+    assert.ok(c && c.ok && /domingo 4: partido no declarado, relajado por el generador con aviso/.test(c.nota || ''), JSON.stringify(c && [c.ok, c.detalle, c.nota]));
+    // lo mismo puesto a mano (forzado) sigue siendo una condición rota, y el resumen cuenta la plaza a mano
+    M.retirarEntrada(a.sv, a.cfg, a.staff, '2026-10-04', 'PASARELA_T', 'roberto');
+    assert.ok(M.asignar(a.sv, a.cfg, a.staff, '2026-10-04', 'PASARELA_T', 'roberto', { origen: 'manual', forzar: true, puesto: 'sala', razon: 'lo dice el encargado' }).ok);
+    const r2 = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, { permitirPartido: true });
+    const c2 = r2.condiciones.find(x => x.id === 'p:roberto:partido');
+    assert.ok(c2 && !c2.ok && /domingo 4: partido no declarado/.test(c2.detalle), JSON.stringify(c2 && [c2.ok, c2.detalle, c2.nota]));
+    assert.strictEqual(r2.resumen.plazasAMano, 1);
+    // y un partido que la ficha dejó de declarar después de generar (nadie lo relajó) sigue en rojo
+    const b = a4Escenario();
+    M.generarSemana(b.cfg, b.staff, b.sv, A4_LUN, {});
+    M.personaDe(b.staff, 'mariluz').partido.dias = [2, 5, 6];
+    const c3 = M.generarSemana(b.cfg, b.staff, b.sv, A4_LUN, {}).condiciones.find(x => x.id === 'p:mariluz:partido');
+    assert.ok(c3 && !c3.ok && /jueves 1: partido no declarado/.test(c3.detalle), JSON.stringify(c3 && [c3.ok, c3.detalle, c3.nota]));
+  }
+});
+
+ok('A4 · D4 (07-seguimiento G): «dos apoyos no se quedan solos» también para el puesto de cocina: el apoyo que llevaría la cocina de una casilla vacía no entra solo (el selector lo ofrece «con aviso» en su grupo de cocina, y el relleno no lo pone)', () => {
+  const S = cfgBase(), st = S.staff, iso = '2026-10-09', tid = 'MONACO_T';
+  M.localDe(S, 'MONACO').cocina.titulares.T.push('yilian');   // Yilian (apoyo) en la lista de cocina del Mónaco por la tarde
+  M.anadirAusencia(M.personaDe(st, 'hojan'), { tipo: 'VAC', desde: iso, hasta: iso });
+  M.anadirAusencia(M.personaDe(st, 'jenny'), { tipo: 'VAC', desde: iso, hasta: iso });
+  const e = estadoOct();
+  const ev = M.evaluarPlaza(M.crearContexto(S, st, e), iso, tid, 'yilian', { puesto: 'cocina', apoyos: true });
+  assert.ok(!ev.ok && ev.bloqueos.some(b => b.k === 'soloApoyos' && b.relajable), JSON.stringify(ev.bloqueos.map(b => b.k)));
+  const g = M.gruposSelector(S, st, e, iso, tid);
+  assert.ok(!g.cocina.some(c => c.pid === 'yilian'), 'no en el grupo de cocina limpio: ' + JSON.stringify(g.cocina.map(c => c.pid)));
+  const ya = g.conAviso.find(c => c.pid === 'yilian');
+  assert.ok(ya && ya.cocina && ya.avisos.includes('solo apoyos') && ya.escalon === 2, 'con aviso, como cocina: ' + JSON.stringify(g.conAviso.map(c => [c.pid, c.cocina, c.avisos])));
+  assert.ok(!(g.recomendado && g.recomendado.pid === 'yilian'));
+  assert.ok(!g.noPueden.some(x => x.pid === 'yilian'));
+  const gen = M.generarPlanilla(S, st, estadoOct(), iso, iso, { sinPatron: true, simular: true });
+  assert.ok(!M.revisarTurno(S, st, gen.estado, iso, tid).soloApoyos, 'el relleno no deja la casilla solo con apoyos: ' + JSON.stringify(M.pidsEn(gen.estado, iso, tid)));
+  // con alguien de plantilla ya dentro, el apoyo lleva la cocina sin aviso
+  assert.ok(M.asignar(e, S, st, iso, tid, 'scapon', { puesto: 'sala', origen: 'manual' }).ok);
+  assert.ok(M.gruposSelector(S, st, e, iso, tid).cocina.some(c => c.pid === 'yilian'));
+});
+
+ok('A4 · E7, E10, D5: generarPlanilla recorta el rango a los días del mes (no virtual); con standby la ficha solo tiene esa condición; turnosSemanaDe con un estado virtual lee los otros días de meses', () => {
+  { // E7
+    const S = cfgBase(), e = estadoOct();
+    const g = M.generarPlanilla(S, S.staff, e, '2026-09-28', '2026-10-04', {});
+    assert.ok(!Object.keys(e.asig).some(iso => iso < '2026-10-01'), 'sin días de septiembre en el estado de octubre: ' + JSON.stringify(Object.keys(e.asig).filter(iso => iso < '2026-10-01')));
+    assert.ok(g.aplicados.length && g.aplicados.every(x => x.iso >= '2026-10-01'));
+    const g2 = M.generarPlanilla(S, S.staff, estadoOct(), '2026-11-02', '2026-11-08', {});
+    assert.deepStrictEqual([g2.aplicados, g2.huecos, g2.retirados], [[], [], []], 'fuera del mes: nada');
+  }
+  { // E10
+    const S = cfgBase();
+    const cs = M.condicionesDe(S, S.staff, '2026-10-05').filter(c => c.pid === 'dulce');
+    assert.deepStrictEqual(cs.map(c => c.id), ['p:dulce:standby'], JSON.stringify(cs.map(c => c.texto)));
+    M.personaDe(S.staff, 'dulce').standby = false;
+    assert.ok(M.condicionesDe(S, S.staff, '2026-10-05').filter(c => c.pid === 'dulce').length > 1, 'sin standby vuelven las suyas');
+  }
+  { // D5
+    const S = cfgBase(), st = S.staff;
+    const sep = M.nuevoEstado(2026, 9, { festivos: [] }), o = M.nuevoEstado(2026, 10, { festivos: [] });
+    M.instanciarPatron(S, st, sep, '2026-09-28', '2026-09-30'); M.instanciarPatron(S, st, o, '2026-10-01', '2026-10-04');
+    const meses = { '2026-09': { asig: sep.asig, apertura: sep.apertura, manual: sep.manual }, '2026-10': { asig: o.asig, apertura: o.apertura, manual: o.manual } };
+    const v = { y: 2026, m: 10, days: [], asig: {}, apertura: {}, manual: {}, festivos: [], virtual: true };
+    for (const d of M.rangoIso('2026-10-02', '2026-10-04')) { v.days.push({ d: +d.slice(8), iso: d, dow: M.isoDow(d), festivo: false }); v.asig[d] = o.asig[d]; }
+    for (const pid of ['cristian', 'roberto', 'mariluz']) {
+      const real = [...M.rangoIso('2026-09-28', '2026-10-04')].reduce((n, d) => n + M.casillasDe(d < '2026-10-01' ? sep : o, d, pid).length, 0);
+      assert.strictEqual(M.turnosSemanaDe(v, pid, '2026-10-03', meses), real, `${pid}: virtual con meses`);
+      assert.strictEqual(M.turnosSemanaDe(o, pid, '2026-10-03', meses), real, `${pid}: el mes con meses`);
+    }
+  }
+});
+
+// ---------- A4 · corrección tras la revisión (01/10): revisión de modelo H-01…H-09 y de cliente C1, C3, C4, C14 ----------
+// Los scripts de los revisores (scratchpad/fases/A4rev/modelo/NN-*.js) como pruebas del repo: en rojo antes, en verde después.
+// la casilla de Pasarela del lunes 5/10 con tres personas puestas en este orden, cada una con su origen
+const a4fCasilla = (ids, origenes) => {
+  const st = ids.map(id => a1P(id, { locales: ['PASARELA'] }));
+  const cfg = a1Mundo(st);
+  const e = M.nuevoEstado(2026, 10, { festivos: [] });
+  for (const id of ids) assert.ok(M.asignar(e, cfg, st, '2026-10-05', 'PASARELA_M', id, { puesto: 'sala', origen: origenes[id] || 'generador', razon: 'x' }).ok, id);
+  return { cfg, st, e };
+};
+const a4fRet = r => r.retirados.map(x => [x.pid, x.motivo]);
+
+ok('A4 · corrección H-01 (01-nuncacon-corto, 02-nuncacon-dos-estrictas): regenerar mira TODAS las parejas «nunca con» de la plaza: la estricta que va detrás de una flexible (o de otra estricta que no la saca) también se retira, a la primera y una sola vez', () => {
+  const D = '2026-10-05';
+  { // b y c a mano, a automática (la última): a «nunca con» b flexible y «nunca con» c estricto
+    const { cfg, st, e } = a4fCasilla(['b', 'c', 'a'], { b: 'manual', c: 'manual' });
+    M.ponerNuncaCon(st, 'a', 'b', { flexible: true }); M.ponerNuncaCon(st, 'a', 'c', {});
+    const r = M.generarPlanilla(cfg, st, e, D, D, {});
+    assert.deepStrictEqual(a4fRet(r), [['a', 'nunca con C']], 'la estricta de detrás de la flexible');
+    assert.deepStrictEqual(M.revisionMes(cfg, st, e, { desde: D, hasta: D }).filter(x => /nunca con/.test(x.msg)).map(x => x.msg), [], 'la Revisión ya no avisa');
+    assert.deepStrictEqual(M.generarPlanilla(cfg, st, e, D, D, {}).retirados, [], 'regenerar otra vez no retira nada');
+  }
+  { // las tres automáticas: la pareja estricta a–c se resuelve igual (sale la de después, a)
+    const { cfg, st, e } = a4fCasilla(['b', 'c', 'a'], {});
+    M.ponerNuncaCon(st, 'a', 'b', { flexible: true }); M.ponerNuncaCon(st, 'a', 'c', {});
+    const r = M.generarPlanilla(cfg, st, e, D, D, {});
+    assert.deepStrictEqual(r.retirados.map(x => x.pid), ['a'], JSON.stringify(a4fRet(r)));
+    assert.ok(/^nunca con C\b/.test(r.retirados[0].motivo), r.retirados[0].motivo);
+    assert.deepStrictEqual(M.generarPlanilla(cfg, st, e, D, D, {}).retirados, []);
+  }
+  { // 02: a y b automáticas, c a mano; a «nunca con» b y c, las dos estrictas. Sale a a la primera (por c, que está a mano), b
+    // ya no choca con nadie y se queda; regenerar otra vez no retira nada (antes: la 1.ª vez b, la 2.ª a)
+    const { cfg, st, e } = a4fCasilla(['a', 'b', 'c'], { c: 'manual' });
+    M.ponerNuncaCon(st, 'a', 'b', {}); M.ponerNuncaCon(st, 'a', 'c', {});
+    const r1 = M.generarPlanilla(cfg, st, e, D, D, {});
+    assert.deepStrictEqual(a4fRet(r1), [['a', 'nunca con C']]);
+    assert.deepStrictEqual(M.pidsEn(e, D, 'PASARELA_M'), ['b', 'c']);
+    assert.deepStrictEqual(M.generarPlanilla(cfg, st, e, D, D, {}).retirados, [], 'idempotente');
+  }
+});
+
+ok('A4 · corrección H-09 (17-sobra-de-mas): dentro de la casilla se retira de una en una: quien chocaba («nunca con» estricto) con alguien que ya sale por otra regla se queda y no sale en «Se retira»', () => {
+  const a = a4Escenario(), J1 = '2026-10-01';
+  M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  assert.deepStrictEqual(M.pidsEn(a.sv, J1, 'PASARELA_M'), ['lola', 'mariluz', 'tere'], 'preparado');
+  M.personaDe(a.staff, 'lola').locales = ['ZAPA'];
+  M.ponerNuncaCon(a.staff, 'lola', 'tere', {});
+  const r = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  assert.deepStrictEqual(r.retirados.filter(x => x.iso === J1 && x.turnoId === 'PASARELA_M').map(x => [x.pid, x.motivo]), [['lola', 'solo Zapatillera']]);
+  assert.ok(M.pidsEn(a.sv, J1, 'PASARELA_M').includes('tere'), 'Tere se queda');
+});
+
+ok('A4 · corrección C3 (revisión de cliente 3): entre dos plazas automáticas que chocan por un «nunca con» estricto se queda quien lleva la cocina que la casilla necesita y, si no, quien abre; a igualdad sale la que va después. El motivo lo dice', () => {
+  const a = a4Escenario();
+  M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  const MA = ['2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03'];
+  for (const iso of MA) { const xs = M.asignados(a.sv, iso, 'MONACO_M'); assert.ok(xs[0].pid === 'cris' && xs[0].abre && xs.some(x => x.pid === 'esmeralda' && x.cocina), `preparado ${iso}: ${JSON.stringify(xs.map(x => x.pid))}`); }
+  // Esmeralda (la cocina del Mónaco por la mañana, obligatoria) pasa a «nunca con» Cris Parreño (que abre): sale Cris
+  M.ponerNuncaCon(a.staff, 'esmeralda', 'cris', {});
+  const r = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  const ret = r.retirados.filter(x => x.turnoId === 'MONACO_M');
+  assert.deepStrictEqual(ret.map(x => [x.iso, x.pid, x.motivo]), MA.map(iso => [iso, 'cris', 'nunca con Esmeralda (se queda Esmeralda, que lleva la cocina)']));
+  for (const iso of MA) assert.ok(M.asignados(a.sv, iso, 'MONACO_M').some(x => x.pid === 'esmeralda' && x.cocina), `${iso}: Esmeralda sigue con la cocina`);
+  assert.ok(!r.huecos.some(h => h.turnoId === 'MONACO_M' && h.tipo === 'cocina'), 'el Mónaco no se queda sin cocina: ' + JSON.stringify(r.huecos.filter(h => h.turnoId === 'MONACO_M')));
+  assert.deepStrictEqual(M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {}).retirados, [], 'regenerar otra vez no retira nada');
+  // sin cocina de por medio, se queda quien abre (Lola) y el motivo lo dice
+  const b = a4Escenario();
+  M.generarSemana(b.cfg, b.staff, b.sv, A4_LUN, {});
+  M.ponerNuncaCon(b.staff, 'tere', 'lola', {});
+  const r2 = M.generarSemana(b.cfg, b.staff, b.sv, A4_LUN, {});
+  assert.deepStrictEqual(r2.retirados.filter(x => x.iso === '2026-10-01' && x.turnoId === 'PASARELA_M').map(x => [x.pid, x.motivo]), [['tere', 'nunca con Lola (se queda Lola, que abre)']]);
+  // a igualdad (ninguna abre ni lleva la cocina), sale la de después en la casilla
+  const { cfg, st, e } = a4fCasilla(['b', 'c', 'a'], {});
+  M.ponerNuncaCon(st, 'c', 'a', {});
+  assert.deepStrictEqual(a4fRet(M.generarPlanilla(cfg, st, e, '2026-10-05', '2026-10-05', {})), [['a', 'nunca con C (se queda C, que va antes en la casilla)']]);
+});
+
+ok('A4 · corrección H-02 (07-mover-caso-orden, 08-mover-clasifica): quitar el cambio de día libre deja cada casilla como estaba, también QUIÉN ABRE y quién lleva la cocina (la casilla vuelve al orden de la semana tipo y el «abre» heredado en la ida no se queda, salvo el puesto a mano)', () => {
+  const idaYVuelta = (o, pid, ds) => {
+    const a = a4Escenario(o);
+    M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+    const foto0 = a4Foto(a.cfg, a.sv, A4_LUN);
+    M.moverDiaLibre(a.cfg, a.staff, a.sv, pid, A4_LUN, ds, { meses: a.ms });
+    M.moverDiaLibre(a.cfg, a.staff, a.sv, pid, A4_LUN, [], { meses: a.ms });
+    const foto1 = a4Foto(a.cfg, a.sv, A4_LUN);
+    return { a, d: a4Difs(foto0, foto1).map(k => `${pid} ${JSON.stringify(ds)} ${k}: ${foto0[k]} → ${foto1[k]}`) };
+  };
+  // Mari Luz abre Pasarela el domingo 4 por la mañana; cambia su día libre al domingo y se quita el cambio: vuelve a abrir ella
+  // (antes se quedaba abriendo Roberto, que abrió durante la ida); Noe y Jenny el viernes en El 33 por la tarde, igual
+  for (const [pid, ds] of [['mariluz', [7]], ['noe', [5]], ['jenny', [5]]]) assert.deepStrictEqual(idaYVuelta({}, pid, ds).d, []);
+  // barrido acotado (la semana base y la de Iván de vacaciones con Mari Luz que le cubre): nada distinto tras la vuelta
+  const difs = [];
+  for (const o of [{}, { cubre: true, ivanVac: true }]) for (const pid of ['mariluz', 'roberto', 'lavinia', 'noe', 'jenny', 'adrian', 'hojan', 'yilian', 'lola', 'tere']) for (const ds of [[5], [7], [3, 6]]) difs.push(...idaYVuelta(o, pid, ds).d);
+  assert.deepStrictEqual(difs, []);
+  // lo puesto a mano se respeta: «Sale primero» a mano para Roberto el domingo sigue siendo suyo tras la ida y vuelta de Mari Luz
+  const a = a4Escenario();
+  M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  M.marcarAbre(a.sv, '2026-10-04', 'PASARELA_M', 'roberto', a.cfg, a.staff);
+  assert.ok(M.manualDe(a.sv, '2026-10-04', 'PASARELA_M').abre, 'preparado: Roberto sale primero a mano');
+  M.moverDiaLibre(a.cfg, a.staff, a.sv, 'mariluz', A4_LUN, [7], { meses: a.ms });
+  M.moverDiaLibre(a.cfg, a.staff, a.sv, 'mariluz', A4_LUN, [], { meses: a.ms });
+  assert.deepStrictEqual(M.asignados(a.sv, '2026-10-04', 'PASARELA_M').filter(x => x.abre).map(x => x.pid), ['roberto']);
+});
+
+ok('A4 · corrección H-03 (06-mover-caso-sluna): el cambio de día libre de una persona no le quita a OTRA su relevo: Roberto sigue «por Susana Luna» en Zapatillera tarde tras la ida y vuelta de Adrián (desmarcarRelevos mira los dos puestos, como sigueCubriendo)', () => {
+  const a = a4Escenario(), V2 = '2026-10-02';
+  M.personaDe(a.staff, 'sluna').ausencias = [{ tipo: 'VAC', desde: '2026-09-29', hasta: '2026-10-03' }];
+  M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  const rob = () => M.asignados(a.sv, V2, 'ZAPA_T').find(x => x.pid === 'roberto') || {};
+  assert.ok(rob().por === 'sluna' && rob().relevo, 'preparado: ' + JSON.stringify(rob()));
+  const foto0 = a4Foto(a.cfg, a.sv, A4_LUN);
+  M.moverDiaLibre(a.cfg, a.staff, a.sv, 'adrian', A4_LUN, [5], { meses: a.ms });
+  assert.ok(rob().por === 'sluna' && rob().relevo && rob().cocina, 'en la ida Roberto lleva la cocina y sigue de relevo: ' + JSON.stringify(rob()));
+  M.moverDiaLibre(a.cfg, a.staff, a.sv, 'adrian', A4_LUN, [], { meses: a.ms });
+  assert.ok(rob().por === 'sluna' && rob().relevo, 'tras la vuelta sigue «por Susana Luna»: ' + JSON.stringify(rob()));
+  assert.ok(M.asignados(a.sv, V2, 'ZAPA_T').some(e => M.porDe(a.staff, e) === 'sluna'), 'la Cobertura ve a Susana Luna cubierta el viernes');
+  assert.deepStrictEqual(a4Difs(foto0, a4Foto(a.cfg, a.sv, A4_LUN)), []);
+  assert.deepStrictEqual(M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {}).cambios, [], 'regenerar no cambia nada');
+});
+
+ok('A4 · corrección H-04 (15-intercambio-puesto): en un cambio de turno, quien recibe el turno cedido entra con el puesto de ese turno (la cocina, si la llevaba) en el plan y al aplicar; y si el cambio no se puede hacer entero, no se hace a medias', () => {
+  const D1 = '2026-10-05', D2 = '2026-10-06';
+  const mundo = () => {
+    const st = [a1P('k', { soloCocina: true, locales: ['ZAPA'], cocina: { titular: ['ZAPA'], reserva: [], soloDias: [] } }), a1P('a', { locales: ['ZAPA'], cocina: { titular: ['ZAPA'], reserva: [], soloDias: [] } }), a1P('b', { locales: ['ZAPA'] })];
+    const cfg = a1Mundo(st, c => { M.localDe(c, 'ZAPA').cocina.titulares = { M: ['k', 'a'], T: ['k', 'a'] }; M.localDe(c, 'ZAPA').cocina.obligatoria = { M: true, T: true }; });
+    const e = M.nuevoEstado(2026, 10, { festivos: [] });
+    assert.ok(M.asignar(e, cfg, st, D1, 'ZAPA_M', 'k', { puesto: 'cocina', cocina: true, origen: 'manual' }).ok);
+    assert.ok(M.asignar(e, cfg, st, D2, 'ZAPA_M', 'b', { puesto: 'sala', origen: 'manual' }).ok && M.asignar(e, cfg, st, D2, 'ZAPA_M', 'a', { puesto: 'sala', origen: 'manual' }).ok);
+    assert.deepStrictEqual(M.asignados(e, D2, 'ZAPA_M').map(x => [x.pid, !!x.cocina]), [['b', false], ['a', true]], 'preparado: a lleva la cocina el martes');
+    const inc = { pid: 'k', tipo: 'CAMBIO', desde: D1, hasta: D1 };
+    const plan = M.planesCobertura(cfg, st, e, inc, { intercambio: true }).planes.find(p => p.asignaciones.some(x => x.intercambio));
+    assert.ok(plan, 'hay un plan con intercambio');
+    return { st, cfg, e, inc, plan };
+  };
+  const foto = (e, iso) => M.asignados(e, iso, 'ZAPA_M').map(x => [x.pid, !!x.cocina]);
+  { // k «solo hace cocina» recibe el martes de a, que llevaba la cocina: entra de cocina
+    const { st, cfg, e, inc, plan } = mundo();
+    const r = M.aplicarCobertura(cfg, st, e, inc, plan);
+    assert.deepStrictEqual(r.rechazados, [], JSON.stringify(r.rechazados));
+    assert.deepStrictEqual(r.intercambios.map(x => [x.iso, x.pid, x.quita]), [[D2, 'k', 'a']]);
+    assert.deepStrictEqual(foto(e, D1), [['a', true]]);
+    assert.deepStrictEqual(foto(e, D2).sort(), [['b', false], ['k', true]]);
+  }
+  { // el cambio ya no cabe al aplicarlo (entre proponer y confirmar, k recibe un veto de los martes por la mañana en
+    // Zapatillera): no se hace nada, ni la mitad (k sigue en su lunes, a no entra en él, el martes queda igual)
+    const { st, cfg, e, inc, plan } = mundo();
+    M.personaDe(st, 'k').vetos = [{ localId: 'ZAPA', franja: 'M', dow: [2] }];
+    const r = M.aplicarCobertura(cfg, st, e, inc, plan);
+    assert.deepStrictEqual([r.quitados, r.asignados, r.intercambios], [0, [], []], JSON.stringify(r));
+    assert.ok(r.rechazados.length && r.rechazados.some(x => /no hace mañanas en Zapatillera/.test(x.motivo)), JSON.stringify(r.rechazados));
+    assert.deepStrictEqual(foto(e, D1), [['k', true]], 'k sigue en su lunes');
+    assert.deepStrictEqual(foto(e, D2), [['b', false], ['a', true]], 'el martes, como estaba');
+  }
+});
+
+ok('A4 · corrección H-05 (13-relajado-obsoleto, 14-prefijo-nombre): «relajado por el generador» solo con el aviso EXACTO de esa pareja y si la pareja SIGUE siendo flexible: un aviso viejo de cuando era flexible, o el de otra persona cuyo nombre empieza igual («Cristian» / «Cris»), no tapa un «nunca con» estricto roto', () => {
+  { // 13: el generador juntó a Mari Luz y Lavinia (flexible) el domingo 4; después la pareja pasa a estricta y el domingo no se toca
+    const a = a4Escenario({ cubre: true, ivanVac: true });
+    M.personaDe(a.staff, 'roberto').ausencias = [{ tipo: 'PERM', desde: '2026-10-04', hasta: '2026-10-04' }];
+    M.personaDe(a.staff, 'cristian').ausencias = [{ tipo: 'PERM', desde: '2026-10-04', hasta: '2026-10-04' }];
+    M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, { permitirPartido: true });
+    const ml = M.asignados(a.sv, '2026-10-04', 'PASARELA_T').find(x => x.pid === 'mariluz');
+    assert.ok(ml && (ml.avisos || []).some(x => /^nunca con Lavinia \(pareja flexible/.test(x)) && M.pidsEn(a.sv, '2026-10-04', 'PASARELA_T').includes('lavinia'), 'preparado: ' + JSON.stringify(M.asignados(a.sv, '2026-10-04', 'PASARELA_T')));
+    M.ponerNuncaCon(a.staff, 'mariluz', 'lavinia', { flexible: false });
+    const c = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, { desdeIso: '2026-10-05' }).condiciones.find(x => x.id === 'p:mariluz:nuncaCon:lavinia');
+    assert.ok(c && !c.ok && /domingo 4: juntos en Pasarela/.test(c.detalle), JSON.stringify(c && [c.ok, c.detalle, c.nota]));
+  }
+  { // 14: Ana (automática) guarda «nunca con Cristian (pareja flexible…)»; Cris, con quien Ana es estricta, forzada a mano
+    const st = [a1P('a', { nombre: 'Ana', locales: ['PASARELA'] }), a1P('cristian', { nombre: 'Cristian', locales: ['PASARELA'] }), a1P('cris', { nombre: 'Cris', locales: ['PASARELA'] })];
+    const cfg = a1Mundo(st), D = '2026-10-05', T = 'PASARELA_M';
+    M.ponerNuncaCon(st, 'a', 'cristian', { flexible: true }); M.ponerNuncaCon(st, 'a', 'cris', {});
+    const e = M.nuevoEstado(2026, 10, { festivos: [] });
+    assert.ok(M.asignar(e, cfg, st, D, T, 'cristian', { puesto: 'sala', origen: 'generador' }).ok);
+    assert.ok(M.asignar(e, cfg, st, D, T, 'a', Object.assign({ puesto: 'sala', origen: 'generador' }, M.RELAJABLE)).ok);
+    assert.ok(M.asignar(e, cfg, st, D, T, 'cris', { puesto: 'sala', origen: 'manual', forzar: true, razon: 'lo dice el encargado' }).ok);
+    const cs = M.verificarSemana(cfg, st, e, D).filter(c => /nuncaCon/.test(c.id));
+    const flex = cs.find(c => c.id === 'p:a:nuncaCon:cristian'), estricta = cs.find(c => c.id === 'p:a:nuncaCon:cris');
+    assert.ok(flex && flex.ok && /relajado por el generador con aviso/.test(flex.nota || ''), 'la flexible sí: ' + JSON.stringify(flex));
+    assert.ok(estricta && !estricta.ok && /lunes 5: juntos en Pasarela/.test(estricta.detalle), 'la estricta con Cris, rota: ' + JSON.stringify(estricta));
+    // y con las dos parejas flexibles: el aviso de Ana es de Cristian, no de Cris (puesta a mano): la de Cris sigue rota
+    M.ponerNuncaCon(st, 'a', 'cris', { flexible: true });
+    const c2 = M.verificarSemana(cfg, st, e, D).find(c => c.id === 'p:a:nuncaCon:cris');
+    assert.ok(c2 && !c2.ok, 'el aviso de «Cristian» no vale para «Cris»: ' + JSON.stringify(c2));
+  }
+});
+
+ok('A4 · corrección H-06 (10-razon-minimo): la razón «para llegar al mínimo (había n de m)» solo cuando de verdad falta gente; con la casilla ya en su mínimo no se dice', () => {
+  const D = '2026-10-05', T = 'PASARELA_M';
+  const st = [a1P('x', { locales: ['PASARELA'], franjas: ['M'] }), a1P('q', { locales: ['PASARELA'], cubreA: [{ pid: 'x' }] }), a1P('r', { locales: ['PASARELA'], cubreA: [{ pid: 'x' }] }), a1P('s', { locales: ['PASARELA'] }), a1P('t', { locales: ['PASARELA'] })];
+  const cfg = a1Mundo(st, c => { c.patron = { 1: [{ t: T, p: 'x' }, { t: T, p: 's' }] }; M.localDe(c, 'PASARELA').minimos.M[1] = 2; });
+  M.personaDe(st, 'x').ausencias = [{ tipo: 'VAC', desde: D, hasta: D }];
+  const est = M.nuevoEstado(2026, 10, { festivos: [] });
+  M.generarPlanilla(cfg, st, est, D, D, {});
+  assert.deepStrictEqual([M.revisarTurno(cfg, st, est, D, T).faltan, M.asignados(est, D, T).map(e => [e.pid, e.por || null])], [0, [['s', null], ['q', 'x']]], 'preparado: completa, con q «por x»');
+  const r = M.gruposSelector(cfg, st, est, D, T, {}).pueden.find(c => c.pid === 'r');
+  assert.ok(r && !r.razones.some(z => /para llegar al mínimo/.test(z)), JSON.stringify(r && r.razones));
+  // con la casilla corta, sí (y con su cuenta)
+  M.desasignar(est, D, T, 's');
+  const r2 = M.gruposSelector(cfg, st, est, D, T, {}).pueden.find(c => c.pid === 'r');
+  assert.ok(r2 && r2.razones[0] === 'para llegar al mínimo (había 1 de 2)', JSON.stringify(r2 && r2.razones));
+});
+
+ok('A4 · corrección H-07 y C14 (12-ausentes; revisión de cliente 14): los ausentes del resumen de la semana llevan la etiqueta del día con TODAS sus ausencias (permiso por la mañana y vacaciones por la tarde, las dos) y «otro motivo» dice lo apuntado o «no viene»', () => {
+  const a = a4Escenario(), J1 = '2026-10-01';
+  const P = id => M.personaDe(a.staff, id);
+  P('mariluz').ausencias = [{ tipo: 'PERM', desde: J1, hasta: J1, franjas: ['M'] }, { tipo: 'VAC', desde: J1, hasta: J1, franjas: ['T'] }];
+  P('noe').ausencias = [{ tipo: 'OTRO', desde: J1, hasta: J1, detalle: 'médico' }];
+  P('tere').ausencias = [{ tipo: 'OTRO', desde: J1, hasta: J1 }];
+  P('roberto').ausencias = [{ tipo: 'PERM', desde: J1, hasta: J1, franjas: ['M'] }];
+  const r = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  const et = pid => (r.ausentes[J1].find(x => x.pid === pid) || {}).etiqueta;
+  assert.strictEqual(et('mariluz'), 'permiso por la mañana · vacaciones por la tarde (día entero)');
+  assert.strictEqual(et('roberto'), 'permiso por la mañana');
+  assert.strictEqual(et('noe'), 'médico');
+  assert.strictEqual(et('tere'), 'no viene');
+  assert.strictEqual(et('laura'), 'baja');
+  assert.deepStrictEqual(r.ausentes[J1].filter(x => x.pid === 'mariluz').length, 1, 'una sola vez');
+});
+
+ok('A4 · corrección C1 (revisión de cliente 1): en el resumen de la semana «libra» solo quien libra de verdad ese día (su día libre, el de esa semana); quien se queda sin plaza sin ausencia, día libre ni cierre va a «sin plaza», y quien al regenerar se queda sin ningún turno en la semana sale en sinTurnos', () => {
+  const a = a4Escenario();
+  M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  // Tere (libra sábado y domingo) pasa a «solo Bar Mónaco», que ya está lleno: sale de Pasarela de lunes a viernes
+  M.personaDe(a.staff, 'tere').locales = ['MONACO'];
+  M.personaDe(a.staff, 'ivan').ausencias = [{ tipo: 'VAC', desde: '2026-09-28', hasta: '2026-10-04' }];
+  const r = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  const LV = r.dias.slice(0, 5), SD = r.dias.slice(5);
+  assert.ok(LV.every(iso => !M.turnosDe(a.cfg).some(t => M.pidsEn(a.sv, iso, t.id).includes('tere'))), 'preparado: Tere sin turnos de lunes a viernes');
+  for (const iso of LV) assert.ok(!r.libran[iso].includes('tere') && r.sinPlaza[iso].includes('tere'), `${iso}: Tere no libra, está sin plaza`);
+  for (const iso of SD) assert.ok(r.libran[iso].includes('tere') && !r.sinPlaza[iso].includes('tere'), `${iso}: su día libre`);
+  assert.deepStrictEqual(r.sinTurnos, ['tere'], 'Tere se queda sin turnos esta semana (Iván, de vacaciones toda la semana, no)');
+  // cada uno en una sola cuenta; quien libra, libra de verdad
+  for (const iso of r.dias) {
+    for (const pid of r.libran[iso]) { const p = M.personaDe(a.staff, pid); assert.ok(M.libraEn(p, iso), `${iso}: ${pid} sale como que libra y no libra`); }
+    assert.ok(!r.libran[iso].some(pid => r.sinPlaza[iso].includes(pid)));
+  }
+  // en la semana base, Leo (apoyo; libra miércoles, jueves y domingo) no tiene turno el martes 29: sin plaza, no «libra»
+  const b = a4Escenario();
+  const rb = M.generarSemana(b.cfg, b.staff, b.sv, A4_LUN, {});
+  assert.ok(!rb.libran['2026-09-29'].includes('leo') && rb.sinPlaza['2026-09-29'].includes('leo'), JSON.stringify([rb.libran['2026-09-29'], rb.sinPlaza['2026-09-29']]));
+  assert.deepStrictEqual(rb.sinTurnos, [], 'generar de cero no deja a nadie «sin turnos» que antes tuviera');
+});
+
+ok('A4 · corrección C4 (revisión de cliente 4): plazasAMano cuenta solo las plazas puestas a mano o forzadas que intervienen en una condición rota (rompen algo ese día y la condición es de esa persona), no cualquier plaza a mano de la semana', () => {
+  const a = a4Escenario();
+  M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  // Leo, a mano y sin aviso, en El 33 el martes 29 por la tarde
+  const r0 = M.asignar(a.sv, a.cfg, a.staff, '2026-09-29', 'EL33_T', 'leo', { origen: 'manual', puesto: 'sala', razon: 'lo dice el encargado' });
+  assert.ok(r0.ok && !r0.avisos.length, 'preparado: ' + JSON.stringify(r0));
+  const r1 = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  assert.strictEqual(r1.resumen.plazasAMano, 0, 'una plaza a mano que no rompe nada no cuenta: ' + JSON.stringify(r1.condiciones.filter(c => !c.ok).map(c => c.texto + ' → ' + c.detalle)));
+  // Leo forzado en Zapatillera el jueves 1 por la tarde (libra los jueves): su condición se rompe por esa plaza
+  assert.ok(M.asignar(a.sv, a.cfg, a.staff, '2026-10-01', 'ZAPA_T', 'leo', { origen: 'manual', forzar: true, puesto: 'sala', razon: 'prueba' }).ok);
+  const r2 = M.generarSemana(a.cfg, a.staff, a.sv, A4_LUN, {});
+  assert.ok(r2.condiciones.some(c => !c.ok && c.pid === 'leo'), 'la condición de Leo se rompe');
+  assert.strictEqual(r2.resumen.plazasAMano, 1, 'solo la forzada');
+});
+
+ok('A4 · corrección (sospecha de la revisión de modelo: puesto en quitarCierre): al reabrir un cierre, lo que vuelve pasa por la puerta con su puesto: quien estaba de sala y ahora «solo hace cocina» no vuelve de sala sin decirlo (se lista con el motivo)', () => {
+  const D = '2026-10-06';
+  const st = [a1P('a', { locales: ['MONACO'] }), a1P('b', { locales: ['MONACO'] })];
+  const cfg = a1Mundo(st);
+  const e = M.nuevoEstado(2026, 10, { festivos: [] });
+  for (const id of ['a', 'b']) assert.ok(M.asignar(e, cfg, st, D, 'MONACO_T', id, { puesto: 'sala', origen: 'generador', razon: 'x' }).ok);
+  const c = { id: 'c1', localId: 'MONACO', motivo: 'reforma', dias: { [D]: ['T'] } };
+  assert.deepStrictEqual(M.aplicarCierre(cfg, st, e, c, {}).errores, []);
+  assert.deepStrictEqual(M.pidsEn(e, D, 'MONACO_T'), [], 'preparado: el cierre deja la casilla vacía');
+  M.personaDe(st, 'a').soloCocina = true;
+  const r = M.quitarCierre(cfg, st, e, 'c1', { devolver: true });
+  assert.deepStrictEqual(r.devueltos.map(x => x.pid), ['b']);
+  assert.deepStrictEqual(r.noDevueltos.map(x => [x.pid, x.motivo]), [['a', 'solo hace cocina']]);
 });
 
 console.log(`\n${n} tests OK`);

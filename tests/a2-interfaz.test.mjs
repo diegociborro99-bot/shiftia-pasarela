@@ -62,7 +62,9 @@ test('la tarjeta de Equipo de quien tiene salida futura dice «se va el d/m»; l
 
 test('al cargar, una ausencia en una franja que la persona no trabaja se quita y queda en el historial; y «Quién libra cada día» enseña «sin plaza» aparte de «libra» (Generador y hoja impresa)', () => {
   assert.match(html, /for \(const x of normalizarAusencias\(estado\.staff\)\) if \(!empleado\) apuntarEn\(estado, `Ausencia quitada al cargar: \$\{x\.nombre\}, \$\{etiquetaAusencia\(x\.ausencia\)\} \$\{rangoAusencia\(x\.ausencia\)\}: no hace \$\{FRANJA_LBL\[x\.ausencia\.franjas\[0\]\]\.toLowerCase\(\)\}s, así que no contaba para nada`, 'aus'\);/, 'migrarEstado la quita y lo apunta');
-  assert.match(html, /\$\{\(res\.sinPlaza\[iso\] \|\| \[\]\)\.map\(pid => `<span class="glchip gsinplaza" style="--pc:\$\{avColor\(pid\)\}" title="Esta semana trabaja este día \(su cambio de día libre\), pero no tiene turno: ponle uno o cambia su día libre">\$\{nc\(pid\)\} · sin plaza<\/span>`\)\.join\(''\)\}/, 'la tabla del Generador');
+  // (01/10, corrección de A4, cliente 1) el title, según por qué no tiene plaza: su cambio de día libre o que se ha quedado sin sitio
+  assert.match(html, /\$\{\(res\.sinPlaza\[iso\] \|\| \[\]\)\.map\(pid => `<span class="glchip gsinplaza" style="--pc:\$\{avColor\(pid\)\}" title="\$\{esc\(tituloSinPlaza\(pid, iso\)\)\}">\$\{nc\(pid\)\} · sin plaza<\/span>`\)\.join\(''\)\}/, 'la tabla del Generador');
+  assert.match(html, /'Esta semana trabaja este día \(su cambio de día libre\), pero no tiene turno: ponle uno o cambia su día libre' : 'No libra este día y no tiene turno: ponle uno si hace falta'/, 'con su title');
   assert.match(html, /\$\{sinPl\.map\(pid => `<span class="sinplaza">\$\{esc\(nombrePid\(pid\)\)\} · sin plaza<\/span>`\)\.join\(''\)\}/, 'la hoja impresa');
   assert.match(html, /\.glchip\.gsinplaza\{/, 'con su estilo');
 });

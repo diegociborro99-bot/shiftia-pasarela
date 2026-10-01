@@ -315,8 +315,9 @@ try {
       const sc = r.headers.get('set-cookie'); if (sc) j.cookie = sc.split(';')[0];
       return { ok: r.ok, status: r.status, datos: await r.json().catch(() => null) };
     };
-    const HOY = new Date(); const pad = n => String(n).padStart(2, '0');
-    const ISO_HOY = `${HOY.getFullYear()}-${pad(HOY.getMonth() + 1)}-${pad(HOY.getDate())}`;
+    // 30/09 (A4): «hoy» en la hora de Madrid, como lo calculan la app (isoHoy → fechaMadrid) y el servidor (borradoEn), no en la
+    // del sistema: a partir de las 22:00 UTC Node iba un día por detrás
+    const ISO_HOY = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
     try {
       const salud = await hasta(async () => (await fetch(SBASE + '/api/salud')).ok, 20000, 150);
       ok(`el servidor arranca en ${PORT}`, !!salud.v, logSrv.slice(-300));
@@ -338,9 +339,12 @@ try {
       await entrar(B, 'oficina', 'clave12345');
       ok('la oficina entra en otro navegador', await appCargada(B) >= 0);
       // la salida desde hoy y «Borrar del todo» (doble confirmación, aceptada por prepararPagina)
+      // (30/09, A4) sus turnos de antes de hoy, que la salida no toca: el día 1 del mes el demo (el mes en curso y el siguiente) no
+      // tiene ninguno, el resto del mes sí; antes se exigía «más de 0» y el día 1 fallaba
+      const antesDeHoy = await A.evaluate(iso => { let n = 0; for (const k of Object.keys(S.meses)) for (const [d, porT] of Object.entries(S.meses[k].asig || {})) if (d < iso) for (const l of Object.values(porT)) if (l.some(x => x.pid === 'adrian')) n++; return n; }, ISO_HOY);
       await A.evaluate(iso => darSalidaUI('adrian', iso, 'se va'), ISO_HOY);
       const nAntes = await A.evaluate(() => { let n = 0; for (const k of Object.keys(S.meses)) for (const porT of Object.values(S.meses[k].asig || {})) for (const l of Object.values(porT)) if (l.some(x => x.pid === 'adrian')) n++; return n; });
-      ok('con la salida desde hoy le quedan turnos de antes en el servidor', nAntes > 0, String(nAntes));
+      ok(`con la salida desde hoy le quedan en el servidor exactamente sus turnos de antes (${antesDeHoy}) y ninguno desde hoy`, nAntes === antesDeHoy, `${nAntes} vs ${antesDeHoy}`);
       await A.click('.tab[data-v="equipo"]');
       await A.waitForSelector('#eqSalidos [data-borrartodo="adrian"]', { timeout: 8000, state: 'attached' });
       const vAntes = await A.evaluate(() => SRV.version);

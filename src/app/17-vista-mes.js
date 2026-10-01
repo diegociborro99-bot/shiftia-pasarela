@@ -171,11 +171,13 @@ function openDiaPersona(pid, iso, anchor) {
       const tid = pon.dataset.pon;
       // (revisión de la fase 6) con aviso, lo mismo que el selector «con aviso» (RELAJABLE del modelo): el partido no
       // declarado y la pareja «nunca con» flexible entran con su aviso; antes la pareja flexible pedía forzarla
-      const r0 = puedeEstar(S, S.staff, e, iso, tid, pid, RELAJABLE);
-      let opts = Object.assign({ origen: 'manual' }, RELAJABLE);
+      // (01/10, corrección de A4; sospecha de la revisión de modelo) con el puesto de sala, como el selector (A4, H6: el puesto en
+      // todo lo que pone): sin él, quien «solo hace cocina» entraba de sala sin que nadie preguntara
+      const r0 = puedeEstar(S, S.staff, e, iso, tid, pid, Object.assign({ puesto: 'sala' }, RELAJABLE));
+      let opts = Object.assign({ origen: 'manual', puesto: 'sala' }, RELAJABLE);
       // el aviso nombra la regla, no solo el motivo (Diego, 18/09); desde la revisión F4, TODAS las que se
       // incumplirían forzándola, cada una con la suya (siSeFuerza, como el selector)
-      const f = r0.ok ? null : siSeFuerza(S, S.staff, e, iso, tid, pid, RELAJABLE);
+      const f = r0.ok ? null : siSeFuerza(S, S.staff, e, iso, tid, pid, Object.assign({ puesto: 'sala' }, RELAJABLE));
       const inc = f && f.forzable && f.incumple.length ? f.incumple : (r0.ok ? [] : [{ k: r0.regla, motivo: r0.motivo }]);
       // (revisión S0) lo que no se puede forzar (la salida, lo cerrado) no se pregunta: se dice y ya
       if (!r0.ok && f && !f.forzable) { toast(`${nombreRegla(r0.regla)} — ${r0.motivo}`, 'bad'); return; }
